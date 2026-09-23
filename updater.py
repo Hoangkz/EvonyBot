@@ -12,6 +12,7 @@ import os
 import re
 import subprocess
 import tempfile
+import urllib.error
 import urllib.request
 from pathlib import Path
 from typing import Callable
@@ -31,8 +32,13 @@ def check_latest() -> dict | None:
     """Latest release as {"version", "url", "name"} if it is newer than this
     app and has an .exe asset, else None."""
     req = urllib.request.Request(_API_LATEST, headers=_HEADERS)
-    with urllib.request.urlopen(req, timeout=15) as resp:
-        release = json.load(resp)
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            release = json.load(resp)
+    except urllib.error.HTTPError as e:
+        if e.code == 404:   # no release published yet
+            return None
+        raise
     latest = release.get("tag_name", "").lstrip("vV")
     if _parse_version(latest) <= _parse_version(__version__):
         return None
