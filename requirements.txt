@@ -6,6 +6,6 @@ numpy
 Pillow
 pytesseract
 certifi
-
+# powershell -ExecutionPolicy Bypass -File installer/build.ps1 -Version 1.0.3
 # -i https://pypi.org/simple/
 # pip config --site set global.index-url https://mirrors.cloud.tencent.com/pypi/simple/

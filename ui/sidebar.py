@@ -39,7 +39,7 @@ class Sidebar(QWidget):
         title.setObjectName("SidebarTitle")
         outer.addWidget(title)
 
-        self.home_button = QPushButton("🏠  Home")
+        self.home_button = QPushButton("🏠  Home1")
         self.home_button.setCheckable(True)
         self.home_button.setChecked(True)
         self.home_button.clicked.connect(self.home_selected.emit)
