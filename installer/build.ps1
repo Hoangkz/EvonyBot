@@ -3,14 +3,20 @@ build.ps1 — build the EvonyBot installer (replaces the PyInstaller build).
 
 Stages everything the installer ships into build\app:
   python\                  Python embeddable runtime + Lib\site-packages
-  main.py, database.py, version.py, updater.py, bot\, ui\, Images\
+  main.cp312-win_amd64.pyd all app code (main, database, version, updater,
+                           bot\, ui\) compiled by Nuitka into this one file
+  EvonyBot.pyw             launcher stub (from main import main)
+  ui\assets\, Images\
   Tesseract-OCR\           only if a Tesseract-OCR folder exists in the project root
 then compiles installer\EvonyBot.iss with Inno Setup into dist\EvonyBot-Setup-<version>.exe.
 
 The installer installs per-user (no admin) into %LOCALAPPDATA%\EvonyBot.
 
-Requirements: the project venv (Python 3.12, 64-bit) and Inno Setup 6
-(https://jrsoftware.org/isdl.php).
+Requirements: the project venv (Python 3.12, 64-bit) with nuitka installed,
+a C compiler - the MSVC C++ Build Tools
+(https://visualstudio.microsoft.com/visual-cpp-build-tools/, workload
+"Desktop development with C++"); without it Nuitka downloads MinGW itself -
+and Inno Setup 6 (https://jrsoftware.org/isdl.php).
 
 The version comes from version.py (__version__) — bump it before building.
 
@@ -48,6 +54,8 @@ if (-not (Test-Path $HostPy)) { throw "venv not found: $HostPy" }
 $hostVer = (& $HostPy -c "import sys; print('%d.%d' % sys.version_info[:2])").Trim()
 $embedVer = ($PyVersion -split '\.')[0..1] -join '.'
 if ($hostVer -ne $embedVer) { throw "venv is Python $hostVer but the embedded runtime is $embedVer" }
+& $HostPy -c "import nuitka"
+if ($LASTEXITCODE -ne 0) { throw "Nuitka missing in the venv: venv\Scripts\python -m pip install nuitka" }
 
 # ---- fresh staging folder --------------------------------------------
 if (Test-Path $App) { Remove-Item $App -Recurse -Force }
@@ -77,27 +85,54 @@ Set-Content $pth.FullName -Encoding ascii -Value @(
 # Copied straight from the venv (same Python major.minor, checked above),
 # so whatever is installed there is what ships - run
 # `pip install -r requirements.txt` in the venv first. Build-only tools
-# (pip, setuptools, PyInstaller and its deps) are left out.
+# (pip, setuptools, PyInstaller, Nuitka and their deps) are left out.
 Write-Host "Copying libraries from the venv..."
 $VenvSite = Join-Path $Root "venv\Lib\site-packages"
 $excludeDirs = @(
     "__pycache__", "pip", "pip-*", "setuptools", "setuptools-*", "_distutils_hack", "pkg_resources",
     "PyInstaller", "pyinstaller-*", "_pyinstaller_hooks_contrib", "pyinstaller_hooks_contrib-*",
-    "altgraph", "altgraph-*", "pefile-*", "ordlookup", "win32ctypes", "pywin32_ctypes-*"
+    "altgraph", "altgraph-*", "pefile-*", "ordlookup", "win32ctypes", "pywin32_ctypes-*",
+    "nuitka", "Nuitka-*", "ordered_set", "ordered_set-*", "zstandard", "zstandard-*",
+    "Cython", "cython-*", "pyximport"
 )
-$excludeFiles = @("distutils-precedence.pth", "pefile.py", "peutils.py")
+$excludeFiles = @("distutils-precedence.pth", "pefile.py", "peutils.py", "cython.py")
 robocopy $VenvSite $SitePackages /E /MT:16 /NFL /NDL /NJH /NJS /NP /XD $excludeDirs /XF $excludeFiles | Out-Null
 if ($LASTEXITCODE -ge 8) { throw "copying site-packages failed (robocopy exit $LASTEXITCODE)" }
 
-# ---- app source + images ---------------------------------------------
-foreach ($f in @("main.py", "database.py", "version.py", "updater.py")) {
-    Copy-Item (Join-Path $Root $f) $App
+# ---- app code -> one .pyd (no readable .py shipped) ------------------
+# Nuitka module mode compiles main.py plus every included module/package
+# into a single extension; third-party libraries are not followed and
+# load from python\Lib\site-packages as usual. Compiled modules keep
+# their __file__ (e.g. <app>\bot\context.py), so paths built from it
+# (Images\, ui\assets\) still resolve.
+Write-Host "Compiling app code with Nuitka..."
+$NuitkaOut = Join-Path $Build "nuitka"
+if (Test-Path $NuitkaOut) { Remove-Item $NuitkaOut -Recurse -Force }
+Push-Location $Root
+try {
+    & $HostPy -m nuitka --module main.py `
+        --include-module=database --include-module=updater --include-module=version `
+        --include-package=bot --include-package=ui `
+        --output-dir=$NuitkaOut --remove-output --no-pyi-file --assume-yes-for-downloads
+    if ($LASTEXITCODE -ne 0) { throw "Nuitka compile failed" }
+} finally {
+    Pop-Location
 }
-foreach ($d in @("bot", "ui", "Images", "Tesseract-OCR")) {
+Copy-Item (Join-Path $NuitkaOut "main*.pyd") $App
+
+# ---- data files ------------------------------------------------------
+New-Item -ItemType Directory -Force (Join-Path $App "ui") | Out-Null
+Copy-Item (Join-Path $Root "ui\assets") (Join-Path $App "ui\assets") -Recurse
+foreach ($d in @("Images", "Tesseract-OCR")) {
     $src = Join-Path $Root $d
     if (Test-Path $src) { Copy-Item $src (Join-Path $App $d) -Recurse }
 }
-Get-ChildItem $App -Recurse -Directory -Filter "__pycache__" | Remove-Item -Recurse -Force
+
+# A .pyd can't be run as a script, so the shortcut starts this stub.
+Set-Content (Join-Path $App "EvonyBot.pyw") -Encoding ascii -Value @(
+    "from main import main",
+    "main()"
+)
 
 # ---- installer -------------------------------------------------------
 Write-Host "Compiling installer..."

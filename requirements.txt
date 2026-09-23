@@ -6,6 +6,9 @@ numpy
 Pillow
 pytesseract
 certifi
+# Build only (installer/build.ps1 compiles with them, does not ship them)
+nuitka
+
 # powershell -ExecutionPolicy Bypass -File installer/build.ps1
 
 # -i https://pypi.org/simple/

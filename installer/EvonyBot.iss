@@ -39,18 +39,22 @@ Type: filesandordirs; Name: "{app}\python"
 Type: filesandordirs; Name: "{app}\bot"
 Type: filesandordirs; Name: "{app}\ui"
 Type: filesandordirs; Name: "{app}\Images"
+; Older builds shipped readable .py files at the top level.
+Type: files; Name: "{app}\*.py"
+Type: files; Name: "{app}\*.pyd"
+Type: files; Name: "{app}\*.pyw"
 
 [Files]
 Source: "..\build\app\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{autoprograms}\{#AppName}"; Filename: "{#AppExe}"; Parameters: """{app}\main.py"""; WorkingDir: "{app}"; IconFilename: "{app}\Images\icon.ico"; AppUserModelID: "{#AppName}"
-Name: "{autodesktop}\{#AppName}"; Filename: "{#AppExe}"; Parameters: """{app}\main.py"""; WorkingDir: "{app}"; IconFilename: "{app}\Images\icon.ico"; AppUserModelID: "{#AppName}"; Tasks: desktopicon
+Name: "{autoprograms}\{#AppName}"; Filename: "{#AppExe}"; Parameters: """{app}\EvonyBot.pyw"""; WorkingDir: "{app}"; IconFilename: "{app}\Images\icon.ico"; AppUserModelID: "{#AppName}"
+Name: "{autodesktop}\{#AppName}"; Filename: "{#AppExe}"; Parameters: """{app}\EvonyBot.pyw"""; WorkingDir: "{app}"; IconFilename: "{app}\Images\icon.ico"; AppUserModelID: "{#AppName}"; Tasks: desktopicon
 
 [Run]
-Filename: "{#AppExe}"; Parameters: """{app}\main.py"""; WorkingDir: "{app}"; Description: "{cm:LaunchProgram,{#AppName}}"; Flags: nowait postinstall skipifsilent
+Filename: "{#AppExe}"; Parameters: """{app}\EvonyBot.pyw"""; WorkingDir: "{app}"; Description: "{cm:LaunchProgram,{#AppName}}"; Flags: nowait postinstall skipifsilent
 ; In-app update runs the installer with /SILENT /RELAUNCH: reopen the app afterwards.
-Filename: "{#AppExe}"; Parameters: """{app}\main.py"""; WorkingDir: "{app}"; Flags: nowait skipifnotsilent; Check: ShouldRelaunch
+Filename: "{#AppExe}"; Parameters: """{app}\EvonyBot.pyw"""; WorkingDir: "{app}"; Flags: nowait skipifnotsilent; Check: ShouldRelaunch
 
 [UninstallDelete]
 ; __pycache__ folders are written at runtime, so the uninstaller doesn't know them.
@@ -58,6 +62,7 @@ Type: filesandordirs; Name: "{app}\python"
 Type: filesandordirs; Name: "{app}\bot"
 Type: filesandordirs; Name: "{app}\ui"
 Type: filesandordirs; Name: "{app}\__pycache__"
+Type: files; Name: "{app}\*.py"
 
 [Code]
 function ShouldRelaunch: Boolean;
