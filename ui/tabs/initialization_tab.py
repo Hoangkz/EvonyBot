@@ -88,7 +88,9 @@ class InitializationTab(DesignerTab):
         self.controls["buttonStart"].setText("Stop" if running else "Start")
 
     def set_all_running(self, running: bool):
-        self.controls["button9"].setText("Stop All" if running else "Start All")
+        button = self.controls["button9"]
+        button.setText("Stop All" if running else "Start All")
+        button.setStyleSheet("background-color: #d9534f; color: white;" if running else "")
 
     def set_device_id(self, device_id: str):
         self.controls["labelID"].setText(device_id)
