@@ -1,5 +1,5 @@
 """
-daily_activities.py — "Daily Activities" activity.
+run.py — "Daily Activities" activity.
 """
 
 

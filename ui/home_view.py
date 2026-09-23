@@ -91,7 +91,7 @@ class HomeView(QWidget):
         toolbar.addStretch(1)
 
         self.start_all_button = QPushButton("Start All(0)")
-        self.start_all_button.setMinimumSize(125, 50)
+        self.start_all_button.setMinimumSize(100, 36)
         self.start_all_button.clicked.connect(self.start_all_requested.emit)
         toolbar.addWidget(self.start_all_button)
         layout.addLayout(toolbar)

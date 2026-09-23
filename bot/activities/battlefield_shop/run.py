@@ -1,5 +1,5 @@
 """
-battlefield_shop.py — "Battlefield Shop" activity.
+run.py — "Battlefield Shop" activity.
 """
 
 

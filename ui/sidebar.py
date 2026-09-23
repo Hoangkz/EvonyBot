@@ -76,6 +76,8 @@ class Sidebar(QWidget):
         btn = self._buttons.pop(device_id, None)
         if btn is not None:
             self._group.removeButton(btn)
+            self._list_layout.removeWidget(btn)
+            btn.hide()
             btn.deleteLater()
 
     def select_device(self, device_id: str):

@@ -103,7 +103,7 @@ if ($LASTEXITCODE -ge 8) { throw "copying site-packages failed (robocopy exit $L
 # Nuitka module mode compiles main.py plus every included module/package
 # into a single extension; third-party libraries are not followed and
 # load from python\Lib\site-packages as usual. Compiled modules keep
-# their __file__ (e.g. <app>\bot\context.py), so paths built from it
+# their __file__ (e.g. <app>\bot\context\templates.py), so paths built from it
 # (Images\, ui\assets\) still resolve.
 Write-Host "Compiling app code with Nuitka..."
 $NuitkaOut = Join-Path $Build "nuitka"

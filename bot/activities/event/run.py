@@ -1,5 +1,5 @@
 """
-event.py — "Event" activity.
+run.py — "Event" activity.
 """
 
 

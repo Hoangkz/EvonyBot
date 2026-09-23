@@ -76,13 +76,12 @@ QTabWidget::pane {{
 }}
 QTabBar::tab {{
     background: transparent;
-    padding: 9px 16px;
+    padding: 9px 24px;
     margin-right: 2px;
     color: {COLORS['text_secondary']};
 }}
 QTabBar::tab:selected {{
     color: {COLORS['accent']};
-    font-weight: 600;
     border-bottom: 2px solid {COLORS['accent']};
 }}
 

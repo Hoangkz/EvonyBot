@@ -86,6 +86,7 @@ class InitializationTab(DesignerTab):
     def set_running(self, running: bool):
         """While the bot runs, Start becomes Stop (same button, same signal)."""
         self.controls["buttonStart"].setText("Stop" if running else "Start")
+        self.controls["buttonStart"].setStyleSheet("background-color: #d9534f; color: white;" if running else "")
 
     def set_all_running(self, running: bool):
         button = self.controls["button9"]

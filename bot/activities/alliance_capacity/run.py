@@ -1,23 +1,13 @@
 """
-alliance_capacity.py — "Alliance Capacity" activity (port of C# ScienceNew).
+run.py — "Alliance Capacity" activity (port of C# ScienceNew).
 
 Opens the alliance science screen and donates, paying gems up to the
 tab's "Times" limit. Each loop takes one screenshot, finds the first
 known image on it (checked in list order) and acts on it.
 """
-from ._common import click_images, delay, exit_images, go_home
+from ...common import click_images, delay, exit_images, find_first, go_home
+from .constants import BACK, BOSS, DONATE, DONE, GEMS, OUT_ALLIANCE, SCIENCE, SCROLL, TAP
 
-SCIENCE = "Science"
-BOSS = "JoinBoss"
-
-# What to do when each image is seen.
-DONE = "done"               # buy-gems dialog: out of free donations -> finished
-GEMS = "gems"               # donate with gems
-DONATE = "donate"           # donate screen open -> long-press Donate
-OUT_ALLIANCE = "out_alliance"
-SCROLL = "scroll"           # war screen -> scroll up
-TAP = "tap"
-BACK = "back"
 
 def run(bot, settings: dict):
     """`bot` is the device's BotContext; `settings` is the "Alliance Capacity" tab's config."""
@@ -27,7 +17,8 @@ def run(bot, settings: dict):
 
     while True:
         screen = bot.screenshot()
-        action, pos = _find_first(bot, screen, targets)
+        # outLM's tap is an offset from the image's top-left corner.
+        action, pos = find_first(bot, screen, targets, top_left={OUT_ALLIANCE})
 
         if action == DONE:
             return
@@ -76,16 +67,6 @@ def _targets() -> list[tuple[str, str]]:
         *[(path, TAP) for path in click_images()],
         (f"{BOSS}/lienminh.png", TAP),
     ]
-
-
-def _find_first(bot, screen, targets):
-    """First (action, pos) in `targets` whose image is on screen, else (None, None)."""
-    for path, action in targets:
-        # outLM's tap is an offset from the image's top-left corner.
-        pos = bot.find(path, screen=screen, center=action != OUT_ALLIANCE)
-        if pos is not None:
-            return action, pos
-    return None, None
 
 
 def _donate(bot, screen):

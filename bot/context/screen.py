@@ -1,106 +1,15 @@
 """
-context.py — what an activity gets to talk to the device with.
-
-BotContext wraps one adbutils device plus the worker's stop flag and
-deadline. Every helper calls `check()` first, so an activity stops as
-soon as the user presses Stop or the auto time-out is reached, without
-having to test for it itself.
+screen.py — screenshots and template matching.
 """
-import threading
 import time
-from pathlib import Path
 
 import cv2
 import numpy as np
 
-# Template images, referenced relative to this folder, e.g. "Science/donate.png".
-TEMPLATE_DIR = Path(__file__).resolve().parent.parent / "Images"
-DEFAULT_THRESHOLD = 0.9
+from .templates import DEFAULT_THRESHOLD, TEMPLATE_DIR
 
 
-class BotInterrupted(Exception):
-    """Base for the exceptions that end a run early (not an error)."""
-
-
-class StopRequested(BotInterrupted):
-    pass
-
-
-class TimedOut(BotInterrupted):
-    pass
-
-
-class BotContext:
-    def __init__(self, device, stop_event: threading.Event, deadline: float | None, log):
-        self.device = device
-        self.serial = device.serial
-        self._stop = stop_event
-        self._deadline = deadline    # time.monotonic() value, or None for no limit
-        self._log = log
-        self._templates: dict[str, np.ndarray] = {}
-        self._window_size: tuple[int, int] | None = None
-
-    # ---- flow control ------------------------------------------------
-    def check(self):
-        if self._stop.is_set():
-            raise StopRequested()
-        if self._deadline is not None and time.monotonic() >= self._deadline:
-            raise TimedOut()
-
-    def sleep(self, seconds: float):
-        """Like time.sleep, but wakes up immediately on Stop / time-out."""
-        end = time.monotonic() + seconds
-        while True:
-            self.check()
-            remaining = end - time.monotonic()
-            if remaining <= 0:
-                return
-            self._stop.wait(min(remaining, 0.2))
-
-    def log(self, message: str):
-        self._log(message)
-
-    # ---- device input ------------------------------------------------
-    def tap(self, x: int, y: int, delay: float = 0):
-        self.check()
-        self.device.click(x, y)
-        self.sleep(delay)
-
-    def tap_percent(self, x: float, y: float, count: int = 1, delay: float = 0):
-        """tap() with coordinates given as 0-100 % of the screen size, `count` times."""
-        w, h = self.window_size()
-        for _ in range(count):
-            self.tap(int(w * x / 100), int(h * y / 100))
-        self.sleep(delay)
-
-    def shell(self, command: str) -> str:
-        self.check()
-        return self.device.shell(command)
-
-    def swipe(self, x1: int, y1: int, x2: int, y2: int, duration: float = 0.3, delay: float = 0):
-        self.check()
-        self.device.swipe(x1, y1, x2, y2, duration)
-        self.sleep(delay)
-
-    def swipe_percent(self, x1: float, y1: float, x2: float, y2: float,
-                      duration: float = 0.3, delay: float = 0):
-        """swipe() with coordinates given as 0-100 % of the screen size."""
-        w, h = self.window_size()
-        self.swipe(int(w * x1 / 100), int(h * y1 / 100), int(w * x2 / 100), int(h * y2 / 100),
-                   duration, delay)
-
-    def back(self, delay: float = 0):
-        self.check()
-        self.device.keyevent("KEYCODE_BACK")
-        self.sleep(delay)
-
-    def window_size(self) -> tuple[int, int]:
-        if self._window_size is None:
-            w, h = self.device.window_size()
-            self._window_size = (w, h)
-        return self._window_size
-
-    # ---- screen ------------------------------------------------------
+class ScreenMixin:
     def screenshot(self) -> np.ndarray:
         """Current screen as a BGR image (OpenCV format)."""
         self.check()

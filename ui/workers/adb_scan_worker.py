@@ -37,7 +37,17 @@ class AdbScanWorker(QThread):
             except Exception:
                 pass  # best-effort only
 
-            serials = [d.serial for d in adb.device_list()]
+            # Closed emulators can linger as "offline"; disconnect them so
+            # they don't show up again, and only list online devices.
+            serials = []
+            for info in adb.list():
+                if info.state == "device":
+                    serials.append(info.serial)
+                elif ":" in info.serial:
+                    try:
+                        adb.disconnect(info.serial)
+                    except Exception:
+                        pass
             self.finished_scan.emit(serials)
         except Exception as e:
             self.failed.emit(str(e))

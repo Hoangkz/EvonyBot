@@ -72,8 +72,24 @@ class MainWindow(QMainWindow):
         self.move(frame.topLeft())
 
     def _on_devices_loaded(self, serials: list):
+        # Drop devices that are no longer connected (emulator closed).
+        for device_id in list(self.device_views):
+            if device_id not in serials:
+                self._unregister_device(device_id)
         for serial in serials:
             self._register_device(serial)
+        self.home_view.set_all_running(self._all_running())
+
+    def _unregister_device(self, device_id: str):
+        self.sidebar.remove_device(device_id)
+        view = self.device_views.pop(device_id, None)
+        if view is not None:
+            if self.stack.currentWidget() is view:
+                self.stack.setCurrentWidget(self.home_view)
+                self.sidebar.select_home()
+            self.stack.removeWidget(view)
+            view.deleteLater()
+        self.bots.stop(device_id)
 
     def _register_device(self, device_id: str):
         if device_id in self.device_views:

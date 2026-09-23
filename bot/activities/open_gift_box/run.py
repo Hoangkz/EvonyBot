@@ -1,5 +1,5 @@
 """
-open_gift_box.py — "Open Gift Box" activity (port of C# OpenAllGiftBox).
+run.py — "Open Gift Box" activity (port of C# OpenAllGiftBox).
 
 Goes to Items, and on the gift box list opens every box whose image is in
 one of the selected folders (Alliance / Boss / Resource / Gems / Gold /
@@ -9,32 +9,9 @@ and acts on it.
 """
 from pathlib import Path
 
-from ._common import click_images, delay, exit_images, go_home, images_in
-
-SETUP = "OpenBox/Setup"
-
-# "Selection Gift Box" checkbox -> folder of box images (C# ListGiftBox 1..6).
-BOX_FOLDERS = {
-    "Gift Box Alliance": "OpenBox/Alliance",
-    "Gift Box Boss": "OpenBox/Boss",
-    "Gift Box Resource": "OpenBox/BoxResource",
-    "Gems": "OpenBox/Gems",
-    "Gold": "OpenBox/Gold",
-    "Etc": "OpenBox/etc",
-}
-ALL_BOXES = "All Gift Box"
-
-BOX_THRESHOLD = 0.8
-# Boxes whose top edge is below this are behind the bottom bar: scroll instead.
-MAX_BOX_Y = 650
-
-# What to do when each image is seen.
-CONFIRM = "confirm"
-BOX_LIST = "box_list"       # gift box list open -> tap the next wanted box
-MAX = "max"                 # quantity dialog -> Max, then Use
-TAP = "tap"
-USE = "use"                 # tap, and skip waiting for "success" after the next Max
-BACK = "back"
+from ...common import click_images, delay, exit_images, find_first, go_home, images_in
+from .constants import (ALL_BOXES, BACK, BOX_FOLDERS, BOX_LIST, BOX_THRESHOLD, CONFIRM, MAX,
+                        MAX_BOX_Y, SETUP, TAP, USE)
 
 
 def run(bot, settings: dict):
@@ -48,7 +25,7 @@ def run(bot, settings: dict):
 
     while True:
         screen = bot.screenshot()
-        action, pos = _find_first(bot, screen, targets)
+        action, pos = find_first(bot, screen, targets)
 
         if action == CONFIRM:
             bot.tap(*pos)
@@ -96,15 +73,6 @@ def _targets() -> list[tuple[str, str]]:
         (f"{SETUP}/Items.png", TAP),
         (f"{SETUP}/chucnang.png", TAP),
     ]
-
-
-def _find_first(bot, screen, targets):
-    """First (action, pos) in `targets` whose image is on screen, else (None, None)."""
-    for path, action in targets:
-        pos = bot.find(path, screen=screen)
-        if pos is not None:
-            return action, pos
-    return None, None
 
 
 def _any_found(bot, screen, images, threshold) -> bool:
