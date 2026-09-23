@@ -18,7 +18,7 @@ from typing import Callable
 
 from version import __version__
 
-GITHUB_REPO = "hoangkz/EvonyBot"   # owner/repo that hosts the releases (must be public)
+GITHUB_REPO = "Hoangkz/EvonyBot"   # owner/repo that hosts the releases (must be public)
 _API_LATEST = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
 _HEADERS = {"User-Agent": "EvonyBot-Updater", "Accept": "application/vnd.github+json"}
 
