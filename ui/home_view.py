@@ -1,7 +1,6 @@
 """
 home_view.py — landing screen: scans ADB ports and lists devices.
 """
-from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from PyQt5.QtCore import QThread, Qt, pyqtSignal
@@ -23,71 +22,9 @@ from PyQt5.QtWidgets import (
 import updater
 from version import __version__
 
-ADB_HOST = "127.0.0.1"
-PORT_START = 21503
-PORT_END = 25000
-PORT_STEP = 10
+from .workers import AdbScanWorker, UpdateCheckWorker, UpdateDownloadWorker
 
 TIMEOUT_OPTIONS = ["30", "60", "90", "120", "180", "240", "300", "360"]
-
-
-class AdbScanWorker(QThread):
-    """Connects to every port concurrently, waits for all, then lists devices."""
-
-    finished_scan = pyqtSignal(list)
-    failed = pyqtSignal(str)
-
-    def run(self):
-        try:
-            import adbutils
-
-            adb = adbutils.adb
-            addresses = [f"{ADB_HOST}:{p}" for p in range(PORT_START, PORT_END + 1, PORT_STEP)]
-
-            def connect(addr: str):
-                try:
-                    return adb.connect(addr, timeout=3.0)
-                except Exception:
-                    return None
-
-            # Fire all connects at once and wait for every one to finish (like Promise.all).
-            with ThreadPoolExecutor(max_workers=len(addresses)) as pool:
-                list(pool.map(connect, addresses))
-
-            serials = [d.serial for d in adb.device_list()]
-            self.finished_scan.emit(serials)
-        except Exception as e:
-            self.failed.emit(str(e))
-
-
-class UpdateCheckWorker(QThread):
-    """Asks GitHub for the latest release; result is None when up to date."""
-
-    result = pyqtSignal(object)
-    failed = pyqtSignal(str)
-
-    def run(self):
-        try:
-            self.result.emit(updater.check_latest())
-        except Exception as e:
-            self.failed.emit(str(e))
-
-
-class UpdateDownloadWorker(QThread):
-    progress = pyqtSignal(int)
-    downloaded = pyqtSignal(str)
-    failed = pyqtSignal(str)
-
-    def __init__(self, release: dict, parent=None):
-        super().__init__(parent)
-        self._release = release
-
-    def run(self):
-        try:
-            path = updater.download(self._release["url"], self._release["name"], self.progress.emit)
-            self.downloaded.emit(str(path))
-        except Exception as e:
-            self.failed.emit(str(e))
 
 
 class HomeView(QWidget):
@@ -116,9 +53,8 @@ class HomeView(QWidget):
         self.load_button.clicked.connect(self._load_devices)
         top.addWidget(self.load_button)
         top.addStretch(1)
-        top.addWidget(QLabel(f"Version {__version__}"))
-        self.update_button = QPushButton("Update")
-        self.update_button.setMinimumSize(125, 50)
+        self.update_button = QPushButton(f"Version {__version__}")
+        self.update_button.setFixedHeight(28)
         self.update_button.clicked.connect(self._check_update)
         top.addWidget(self.update_button)
         layout.addLayout(top)
@@ -266,7 +202,7 @@ class HomeView(QWidget):
 
     def _reset_update_button(self):
         self.update_button.setEnabled(True)
-        self.update_button.setText("Update")
+        self.update_button.setText(f"Version {__version__}")
 
     def set_devices(self, serials: list):
         self.table.setRowCount(0)
