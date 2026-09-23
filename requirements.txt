@@ -5,9 +5,8 @@ opencv-python
 numpy
 Pillow
 pytesseract
-pyinstaller
 
-# pyinstaller --noconfirm --onefile --windowed --name EvonyBot --icon Images/icon.ico --add-data "Images;Images" --add-data "ui/assets;ui/assets" --collect-all adbutils main.py
+# Installer: powershell -ExecutionPolicy Bypass -File installer/build.ps1   (version is read from version.py)
 
 # -i https://pypi.org/simple/
 # pip config --site set global.index-url https://mirrors.cloud.tencent.com/pypi/simple/

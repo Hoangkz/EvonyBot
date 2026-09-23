@@ -18,7 +18,8 @@ from datetime import datetime
 from pathlib import Path
 
 # %LOCALAPPDATA%\EvonyBot\evonybot.db — same place whether run from source or
-# from the .exe (a --onefile build unpacks into a temp folder wiped on exit).
+# installed (the installer also puts the app in %LOCALAPPDATA%\EvonyBot and
+# never ships/overwrites the database, so it survives upgrades and uninstall).
 DATA_DIR = Path(os.environ.get("LOCALAPPDATA", Path.home())) / "EvonyBot"
 DB_PATH = DATA_DIR / "evonybot.db"
 # Where the database used to live (next to this file).

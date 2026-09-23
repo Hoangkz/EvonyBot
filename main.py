@@ -6,10 +6,13 @@ listing connected devices (was `panelistbutton`) next to a content
 area (was `panelData`) that shows either the home/welcome screen or
 the selected device's tabbed control panel.
 """
+import ctypes
 import platform
 import sys
+from pathlib import Path
 
 from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import QApplication, QMainWindow, QStackedWidget, QWidget, QHBoxLayout
 
 from bot.worker import BotManager
@@ -176,7 +179,13 @@ def main():
     QApplication.setHighDpiScaleFactorRoundingPolicy(
         Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
     )
+    # The installed app runs as pythonw.exe; give it its own taskbar
+    # identity (matches the shortcut's AppUserModelID) and icon instead
+    # of Python's.
+    if sys.platform == "win32":
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("EvonyBot")
     app = QApplication(sys.argv)
+    app.setWindowIcon(QIcon(str(Path(__file__).resolve().parent / "Images" / "icon.ico")))
     theme.apply(app)
     window = MainWindow()
     window.show()
