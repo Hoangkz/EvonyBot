@@ -23,7 +23,7 @@ $Root = Split-Path $PSScriptRoot -Parent
 $Version = (Select-String -Path (Join-Path $Root "version.py") -Pattern '__version__\s*=\s*"([^"]+)"').Matches[0].Groups[1].Value
 if (-not $Version) { throw "__version__ not found in version.py" }
 Write-Host "Building EvonyBot $Version"
-$PyVersion = "3.12.10"   # must match the venv's major.minor so the wheels fit
+$PyVersion = "3.12.10"   # must match the venv's major.minor so its packages fit
 $Build = Join-Path $Root "build"
 $App = Join-Path $Build "app"
 $PyDir = Join-Path $App "python"
@@ -43,7 +43,7 @@ if (-not $Iscc) {
 }
 if (-not $Iscc) { throw "Inno Setup 6 (ISCC.exe) not found. Install it from https://jrsoftware.org/isdl.php" }
 
-# ---- host Python (used only to pip-install the wheels) ---------------
+# ---- venv (its site-packages is shipped as the libraries) ------------
 if (-not (Test-Path $HostPy)) { throw "venv not found: $HostPy" }
 $hostVer = (& $HostPy -c "import sys; print('%d.%d' % sys.version_info[:2])").Trim()
 $embedVer = ($PyVersion -split '\.')[0..1] -join '.'
@@ -74,9 +74,20 @@ Set-Content $pth.FullName -Encoding ascii -Value @(
 )
 
 # ---- libraries -------------------------------------------------------
-Write-Host "Installing requirements into the embedded runtime..."
-& $HostPy -m pip install --no-warn-script-location --target $SitePackages -r (Join-Path $Root "requirements.txt")
-if ($LASTEXITCODE -ne 0) { throw "pip install failed" }
+# Copied straight from the venv (same Python major.minor, checked above),
+# so whatever is installed there is what ships - run
+# `pip install -r requirements.txt` in the venv first. Build-only tools
+# (pip, setuptools, PyInstaller and its deps) are left out.
+Write-Host "Copying libraries from the venv..."
+$VenvSite = Join-Path $Root "venv\Lib\site-packages"
+$excludeDirs = @(
+    "__pycache__", "pip", "pip-*", "setuptools", "setuptools-*", "_distutils_hack", "pkg_resources",
+    "PyInstaller", "pyinstaller-*", "_pyinstaller_hooks_contrib", "pyinstaller_hooks_contrib-*",
+    "altgraph", "altgraph-*", "pefile-*", "ordlookup", "win32ctypes", "pywin32_ctypes-*"
+)
+$excludeFiles = @("distutils-precedence.pth", "pefile.py", "peutils.py")
+robocopy $VenvSite $SitePackages /E /MT:16 /NFL /NDL /NJH /NJS /NP /XD $excludeDirs /XF $excludeFiles | Out-Null
+if ($LASTEXITCODE -ge 8) { throw "copying site-packages failed (robocopy exit $LASTEXITCODE)" }
 
 # ---- app source + images ---------------------------------------------
 foreach ($f in @("main.py", "database.py", "version.py", "updater.py")) {
