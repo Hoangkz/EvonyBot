@@ -5,8 +5,7 @@ opencv-python
 numpy
 Pillow
 pytesseract
-
-# Installer: powershell -ExecutionPolicy Bypass -File installer/build.ps1   (version is read from version.py)
+certifi
 
 # -i https://pypi.org/simple/
 # pip config --site set global.index-url https://mirrors.cloud.tencent.com/pypi/simple/

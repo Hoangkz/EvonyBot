@@ -10,6 +10,7 @@ gets /RELAUNCH (see installer/EvonyBot.iss).
 import json
 import os
 import re
+import ssl
 import subprocess
 import tempfile
 import urllib.error
@@ -24,6 +25,19 @@ _API_LATEST = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
 _HEADERS = {"User-Agent": "EvonyBot-Updater", "Accept": "application/vnd.github+json"}
 
 
+def _ssl_context() -> ssl.SSLContext:
+    # A frozen (PyInstaller) build has no CA store of its own, so verify
+    # against certifi's bundle -> otherwise CERTIFICATE_VERIFY_FAILED.
+    try:
+        import certifi
+        return ssl.create_default_context(cafile=certifi.where())
+    except ImportError:
+        return ssl.create_default_context()
+
+
+_SSL = _ssl_context()
+
+
 def _parse_version(text: str) -> tuple[int, ...]:
     return tuple(int(n) for n in re.findall(r"\d+", text))
 
@@ -33,7 +47,7 @@ def check_latest() -> dict | None:
     app and has an .exe asset, else None."""
     req = urllib.request.Request(_API_LATEST, headers=_HEADERS)
     try:
-        with urllib.request.urlopen(req, timeout=15) as resp:
+        with urllib.request.urlopen(req, timeout=15, context=_SSL) as resp:
             release = json.load(resp)
     except urllib.error.HTTPError as e:
         if e.code == 404:   # no release published yet
@@ -52,7 +66,7 @@ def download(url: str, name: str, on_progress: Callable[[int], None] | None = No
     """Download the installer into %TEMP%; on_progress gets 0-100."""
     dest = Path(tempfile.gettempdir()) / name
     req = urllib.request.Request(url, headers={"User-Agent": _HEADERS["User-Agent"]})
-    with urllib.request.urlopen(req, timeout=30) as resp, open(dest, "wb") as f:
+    with urllib.request.urlopen(req, timeout=30, context=_SSL) as resp, open(dest, "wb") as f:
         total = int(resp.headers.get("Content-Length") or 0)
         done = 0
         while chunk := resp.read(256 * 1024):
