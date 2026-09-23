@@ -33,6 +33,7 @@ class BotWorker(QThread):
 
             device = adbutils.adb.device(serial=self.serial)
             self.ctx = BotContext(device, self._stop, None, self.log)
+            self.ctx.settings = self.settings
             while not self._stop.is_set():
                 for activity in self.activities:
                     if self._stop.is_set():
