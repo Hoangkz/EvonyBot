@@ -1,0 +1,24 @@
+# Project tasks (like "scripts" in package.json), run with poethepoet:
+#   poe setup     create the venv
+#   poe install   install requirements into the venv
+#   poe dev       run the app
+#   poe build     build the installer (installer/build.ps1)
+#   poe clean     remove build output (keeps the cached Python embed zip)
+# `poe` lives in the venv: activate it first (venv\Scripts\activate)
+# or call venv\Scripts\poe directly.
+
+[tool.poe.tasks]
+setup.cmd = "python -m venv venv"
+setup.help = "Create the venv"
+
+install.cmd = "venv/Scripts/python.exe -m pip install -r requirements.txt"
+install.help = "Install requirements into the venv"
+
+dev.cmd = "venv/Scripts/python.exe main.py"
+dev.help = "Run the app"
+
+build.cmd = "powershell -NoProfile -ExecutionPolicy Bypass -File installer/build.ps1"
+build.help = "Build the installer into dist/"
+
+clean.cmd = "powershell -NoProfile -Command \"Remove-Item -Recurse -Force build/app, build/nuitka, dist -ErrorAction SilentlyContinue; exit 0\""
+clean.help = "Remove build output"

@@ -8,6 +8,7 @@ pytesseract
 certifi
 # Build only (installer/build.ps1 compiles with them, does not ship them)
 nuitka
+poethepoet
 
 # powershell -ExecutionPolicy Bypass -File installer/build.ps1
 

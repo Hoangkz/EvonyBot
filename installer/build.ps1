@@ -93,7 +93,8 @@ $excludeDirs = @(
     "PyInstaller", "pyinstaller-*", "_pyinstaller_hooks_contrib", "pyinstaller_hooks_contrib-*",
     "altgraph", "altgraph-*", "pefile-*", "ordlookup", "win32ctypes", "pywin32_ctypes-*",
     "nuitka", "Nuitka-*", "ordered_set", "ordered_set-*", "zstandard", "zstandard-*",
-    "Cython", "cython-*", "pyximport"
+    "Cython", "cython-*", "pyximport",
+    "poethepoet", "poethepoet-*", "pastel", "pastel-*", "yaml", "_yaml", "PyYAML-*"
 )
 $excludeFiles = @("distutils-precedence.pth", "pefile.py", "peutils.py", "cython.py")
 robocopy $VenvSite $SitePackages /E /MT:16 /NFL /NDL /NJH /NJS /NP /XD $excludeDirs /XF $excludeFiles | Out-Null
