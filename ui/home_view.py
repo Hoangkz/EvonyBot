@@ -54,7 +54,7 @@ class HomeView(QWidget):
         top.addWidget(self.load_button)
         top.addStretch(1)
         self.update_button = QPushButton(f"Version {__version__}")
-        self.update_button.setFixedHeight(28)
+        self.update_button.setFixedHeight(32)
         self.update_button.clicked.connect(self._check_update)
         top.addWidget(self.update_button)
         layout.addLayout(top)
