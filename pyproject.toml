@@ -14,6 +14,9 @@ setup.help = "Create the venv"
 install.cmd = "venv/Scripts/python.exe -m pip install -r requirements.txt"
 install.help = "Install requirements into the venv"
 
+i.ref = "install"
+i.help = "Alias for install"
+
 dev.cmd = "venv/Scripts/python.exe main.py"
 dev.help = "Run the app"
 
