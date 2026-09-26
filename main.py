@@ -11,7 +11,7 @@ import platform
 import sys
 from pathlib import Path
 
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import QApplication, QMainWindow, QStackedWidget, QWidget, QHBoxLayout
 
@@ -46,6 +46,12 @@ class MainWindow(QMainWindow):
         self.stack.setCurrentWidget(self.home_view)
 
         self.device_views: dict[str, DeviceView] = {}
+        # Building a DeviceView is heavy (8 designer tabs), so new devices
+        # are registered one per event-loop tick to keep the UI responsive.
+        self._pending_devices: list[str] = []
+        self._register_timer = QTimer(self)
+        self._register_timer.setInterval(0)
+        self._register_timer.timeout.connect(self._register_next_device)
 
         self.bots = BotManager(self)
         self.bots.activity_changed.connect(
@@ -76,9 +82,17 @@ class MainWindow(QMainWindow):
         for device_id in list(self.device_views):
             if device_id not in serials:
                 self._unregister_device(device_id)
-        for serial in serials:
-            self._register_device(serial)
+        self._pending_devices = [s for s in serials if s not in self.device_views]
+        if self._pending_devices:
+            self._register_timer.start()
         self.home_view.set_all_running(self._all_running())
+
+    def _register_next_device(self):
+        if self._pending_devices:
+            self._register_device(self._pending_devices.pop(0))
+        if not self._pending_devices:
+            self._register_timer.stop()
+            self.home_view.set_all_running(self._all_running())
 
     def _unregister_device(self, device_id: str):
         self.sidebar.remove_device(device_id)
@@ -129,6 +143,7 @@ class MainWindow(QMainWindow):
             self.db.save_settings(device_id, view.get_settings())
 
     def closeEvent(self, event):
+        self._register_timer.stop()
         self.bots.stop_all(wait=True)
         self.db.close()
         super().closeEvent(event)

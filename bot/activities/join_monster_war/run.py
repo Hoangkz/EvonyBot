@@ -23,41 +23,6 @@ def run(bot, settings: dict):
     """`bot` is the device's BotContext; `settings` is the "Join Monster War" tab's config."""
     _Boss(bot, settings).run()
 
-
-def _exists(path: str) -> bool:
-    return (TEMPLATE_DIR / path).exists()
-
-
-def _near(point, points) -> bool:
-    return any(abs(px - point[0]) < SAME_SPOT and abs(py - point[1]) < SAME_SPOT
-               for px, py in points)
-
-
-def _troop(text) -> int:
-    """"Troop 3" -> 3 (Troop 1 when nothing is chosen)."""
-    try:
-        return int(str(text).split()[-1])
-    except (IndexError, ValueError):
-        return 1
-
-
-def _targets() -> list[tuple[str, str]]:
-    return [
-        ("click/lencap.png", TAP),
-        (f"{JB}/hettheluc.png", OUT_OF_STAMINA),
-        (MARCH, MARCH_SCREEN),
-        (JOIN, JOIN_LIST),
-        (f"{JB}/Joined.png", JOINED),
-        (f"{JB}/PvPWar.png", SCROLL),
-        (f"{JB}/checkChienTranh.png", SCROLL),
-        ("Items/outLM.png", LEAVE_ALLIANCE_POPUP),
-        (f"{JB}/chientranh.png", TAP),
-        *[(path, BACK) for path in exit_images()],
-        *[(path, TAP) for path in click_images()],
-        (f"{JB}/lienminh.png", ALLIANCE),
-    ]
-
-
 class _Boss:
     def __init__(self, bot, settings: dict):
         self.bot = bot
@@ -268,3 +233,36 @@ class _Boss:
         crop = self.bot.crop(screen, x - 12, y + join_h - 3, 60, 20)
         b, g, r = crop[..., 0], crop[..., 1], crop[..., 2]
         return int(((r > 180) & (g < 100) & (b < 100)).sum()) > 5
+
+def _exists(path: str) -> bool:
+    return (TEMPLATE_DIR / path).exists()
+
+
+def _near(point, points) -> bool:
+    return any(abs(px - point[0]) < SAME_SPOT and abs(py - point[1]) < SAME_SPOT
+               for px, py in points)
+
+
+def _troop(text) -> int:
+    """"Troop 3" -> 3 (Troop 1 when nothing is chosen)."""
+    try:
+        return int(str(text).split()[-1])
+    except (IndexError, ValueError):
+        return 1
+
+
+def _targets() -> list[tuple[str, str]]:
+    return [
+        ("click/lencap.png", TAP),
+        (f"{JB}/hettheluc.png", OUT_OF_STAMINA),
+        (MARCH, MARCH_SCREEN),
+        (JOIN, JOIN_LIST),
+        (f"{JB}/Joined.png", JOINED),
+        (f"{JB}/PvPWar.png", SCROLL),
+        (f"{JB}/checkChienTranh.png", SCROLL),
+        ("Items/outLM.png", LEAVE_ALLIANCE_POPUP),
+        (f"{JB}/chientranh.png", TAP),
+        *[(path, BACK) for path in exit_images()],
+        *[(path, TAP) for path in click_images()],
+        (f"{JB}/lienminh.png", ALLIANCE),
+    ]
