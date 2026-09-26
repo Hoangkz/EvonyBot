@@ -141,7 +141,11 @@ class MainWindow(QMainWindow):
         for device_id, view in self.device_views.items():
             if device_id != source_id:
                 view.set_settings(settings)
-            self.db.save_settings(device_id, view.get_settings())
+        # One transaction for every device: a commit per device (30+
+        # fsyncs) froze the UI for seconds.
+        self.db.save_many_settings(
+            {device_id: view.get_settings() for device_id, view in self.device_views.items()}
+        )
 
     def closeEvent(self, event):
         self._register_timer.stop()
