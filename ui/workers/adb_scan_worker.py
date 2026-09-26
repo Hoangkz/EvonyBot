@@ -1,6 +1,7 @@
 """
 adb_scan_worker.py — scans ADB ports and lists connected devices.
 """
+import time
 from concurrent.futures import ThreadPoolExecutor
 
 from PyQt5.QtCore import QThread, pyqtSignal
@@ -9,6 +10,8 @@ ADB_HOST = "127.0.0.1"
 PORT_START = 21503
 PORT_END = 25000
 PORT_STEP = 10
+SETTLE_RETRIES = 10
+SETTLE_DELAY = 0.5  # seconds
 
 
 class AdbScanWorker(QThread):
@@ -37,10 +40,19 @@ class AdbScanWorker(QThread):
             except Exception:
                 pass  # best-effort only
 
+            # Freshly connected devices report "offline" for a moment before
+            # turning "device"; poll until they settle (or give up).
+            infos = adb.list()
+            for _ in range(SETTLE_RETRIES):
+                if all(info.state == "device" for info in infos):
+                    break
+                time.sleep(SETTLE_DELAY)
+                infos = adb.list()
+
             # Closed emulators can linger as "offline"; disconnect them so
             # they don't show up again, and only list online devices.
             serials = []
-            for info in adb.list():
+            for info in infos:
                 if info.state == "device":
                     serials.append(info.serial)
                 elif ":" in info.serial:

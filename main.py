@@ -78,11 +78,12 @@ class MainWindow(QMainWindow):
         self.move(frame.topLeft())
 
     def _on_devices_loaded(self, serials: list):
-        # Drop devices that are no longer connected (emulator closed).
+        # Start over: drop every old device (stops its bot), then re-add
+        # the scanned ones from scratch.
+        self._register_timer.stop()
         for device_id in list(self.device_views):
-            if device_id not in serials:
-                self._unregister_device(device_id)
-        self._pending_devices = [s for s in serials if s not in self.device_views]
+            self._unregister_device(device_id)
+        self._pending_devices = list(serials)
         if self._pending_devices:
             self._register_timer.start()
         self.home_view.set_all_running(self._all_running())
