@@ -4,7 +4,6 @@ adbutils>=2.12.0
 opencv-python
 numpy
 Pillow
-pytesseract
 certifi
 # Build only (installer/build.ps1 compiles with them, does not ship them)
 nuitka

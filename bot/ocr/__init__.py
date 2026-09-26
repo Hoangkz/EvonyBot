@@ -1,7 +1,8 @@
 """
-ocr — read text out of small screen regions with Tesseract (port of the
-C# Xulyanh.RunOcr + Xulyanh.ImageToNumber). One module per reader, each
-exposing `run(image)`:
+ocr — read numbers out of small screen regions by matching each digit
+against samples of the game's font in Images/OCR/ (port of the C#
+Xulyanh.RunOcr + Xulyanh.ImageToNumber, which used Tesseract). One module
+per reader, each exposing `run(image)`:
 
 - read_number: digits -> int
 - read_coords: "X:Y" map coordinate -> (x, y)

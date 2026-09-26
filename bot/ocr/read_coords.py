@@ -2,27 +2,20 @@
 read_coords.py — a "X:Y" map coordinate in a screen region (port of the
 C# boss-coordinate OCR in Boss).
 """
-import re
-
-import cv2
 import numpy as np
 
-from ._tesseract import pytesseract
+from ._digits import read
+
+FONT = "Coords"
 
 
 def run(image: np.ndarray) -> tuple[int, int] | None:
     """A "X:Y" map coordinate in `image` (BGR), or None if it can't be read.
-    Scaled up 3x and turned black & white (threshold 150) first, like the
-    C# PreProcessImage."""
-    tess = pytesseract()
-    if image.size == 0:
+    `image` should start after the location pin."""
+    text = read(image, FONT)
+    if text is None:
         return None
-    big = cv2.resize(image, None, fx=3, fy=3, interpolation=cv2.INTER_CUBIC)
-    gray = cv2.cvtColor(big, cv2.COLOR_BGR2GRAY)
-    _, bw = cv2.threshold(gray, 149, 255, cv2.THRESH_BINARY)
-    text = tess.image_to_string(bw, config="--psm 7")
-    parts = re.sub(r"[^0-9:]", "", text).split(":")
-    try:
-        return int(parts[0]), int(parts[1])
-    except (IndexError, ValueError):
+    parts = text.replace(",", "").split(":")
+    if len(parts) != 2 or not all(parts):
         return None
+    return int(parts[0]), int(parts[1])

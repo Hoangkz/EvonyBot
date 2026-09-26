@@ -7,7 +7,6 @@ Stages everything the installer ships into build\app:
                            bot\, ui\) compiled by Nuitka into this one file
   EvonyBot.pyw             launcher stub (from main import main)
   ui\assets\, Images\
-  Tesseract-OCR\           only if a Tesseract-OCR folder exists in the project root
 then compiles installer\EvonyBot.iss with Inno Setup into dist\EvonyBot-Setup-<version>.exe.
 
 The installer installs per-user (no admin) into %LOCALAPPDATA%\EvonyBot.
@@ -124,10 +123,7 @@ Copy-Item (Join-Path $NuitkaOut "main*.pyd") $App
 # ---- data files ------------------------------------------------------
 New-Item -ItemType Directory -Force (Join-Path $App "ui") | Out-Null
 Copy-Item (Join-Path $Root "ui\assets") (Join-Path $App "ui\assets") -Recurse
-foreach ($d in @("Images", "Tesseract-OCR")) {
-    $src = Join-Path $Root $d
-    if (Test-Path $src) { Copy-Item $src (Join-Path $App $d) -Recurse }
-}
+Copy-Item (Join-Path $Root "Images") (Join-Path $App "Images") -Recurse
 
 # A .pyd can't be run as a script, so the shortcut starts this stub.
 Set-Content (Join-Path $App "EvonyBot.pyw") -Encoding ascii -Value @(
