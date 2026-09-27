@@ -1,267 +1,343 @@
 """
-run.py — Activity "Join Monster War" (port từ class Boss bên C#).
+run.py — Activity "Join Monster War": tham gia các rally đánh boss của liên minh.
 
-Mở danh sách War của liên minh và tham gia các rally đánh quái (boss): bấm
-"Join" vào rally chưa tham gia, chọn preset troop đã cấu hình rồi March.
-Bỏ qua rally của boss bị skip, hoặc rally có chữ đỏ dưới nút Join (không
-join được); khi không còn rally nào để join thì cuộn danh sách. Mỗi vòng
-lặp chụp 1 screenshot, tìm ảnh đầu tiên khớp (xét theo thứ tự trong list
-`_targets`) rồi xử lý theo ảnh đó. Khi hết thể lực: dùng item thể lực
-("Use Stamina" = ALL / 100), hoặc kết thúc activity nếu "Use Stamina" = No.
+Mỗi vòng lặp chụp 1 ảnh, nhận diện đang ở màn hình nào (chỉ dò ảnh trong
+vùng nhỏ nơi nó xuất hiện, nên rất nhẹ CPU) rồi xử lý:
+
+1.   Màn hình chính: có icon listboss -> bấm vào danh sách War; không có (chỉ
+     thấy nút Alliance) -> chờ tối đa 10s cho icon xuất hiện.
+2.   Danh sách War: chọn nút Join đầu tiên join được — bỏ qua boss trong
+     JoinBossNotParticipat/, rally có thời gian màu đỏ (không kịp) và rally đã
+     xử lý. Không còn Join nào: nếu thẻ dưới cùng có mặt thì cuộn xuống xem
+     tiếp, hết danh sách thì quay lên đầu và chờ tối đa 10s cho Join mới.
+3.   Màn hình March: bấm preset troop đã cấu hình.
+4.   Có ô chọn tướng -> chọn tướng đầu tiên; sau đó bấm March.
+5.   Popup hết thể lực -> dùng item thể lực ("Use Stamina" = ALL / 100), hoặc
+     kết thúc activity nếu "Use Stamina" = No.
+
+Không có delay cố định: sau mỗi thao tác đều chờ tới khi màn hình kế tiếp
+xuất hiện (wait_until), có giới hạn thời gian.
 """
-from ...common import click_images, delay, exit_images, find_first, go_home, wait_gone
-from ...context import TEMPLATE_DIR
+import numpy as np
+
+from ...common import click_images, exit_images, go_home, images_in, wait_until
 from ...ocr import read_coords
-from .constants import (BACK,CERBERUS, CHOOSE_DEVELOPMENT, CHOOSE_FAVORITE, JB, JOIN,
-                        JOIN_LIST, JOIN_MAX_Y, JOIN_MIN_Y, JOINED, LEAVE_ALLIANCE_POPUP, LOCATION,
-                        MARCH, MARCH_SCREEN, NOT_JOIN_LIMIT, OUT_OF_STAMINA, PLUS, SAME_SPOT,
-                        SCROLL, SELECT, SELECT_GENERAL, STAMINA_ITEM, TAP, TROOP_CHECK,
-                        USE_STAMINA)
+from .constants import (ALLIANCE_HOME, BOSS_MONSTER, BOTTOM_CARD_Y, FULL, IDLE_WAIT, JOIN,
+                        JOINED, LEAVE_ALLIANCE, LISTBOSS, LOCATION, MARCH, MAX_SCROLL,
+                        NOT_JOIN_LIMIT, OUT_OF_STAMINA, PLUS, PVP_WAR, REGIONS, ROI_LIST,
+                        ROI_TROOPS, S_BACK, S_GENERALS, S_HOME, S_LEAVE_ALLIANCE, S_LIST,
+                        S_MARCH, S_STAMINA_LIST, S_STAMINA_POPUP, S_TAP, SAME_SPOT, SELECT,
+                        SELECT_GENERAL, SKIP_DIR, STAMINA_ITEM, USE_STAMINA)
 
 
 def run(bot, settings: dict):
     """`bot` là BotContext của thiết bị; `settings` là cấu hình của tab "Join Monster War"."""
     _Boss(bot, settings).run()
 
+
 class _Boss:
     def __init__(self, bot, settings: dict):
         self.bot = bot
         self.troop = _troop(settings.get("troop"))          # số thứ tự preset troop (1, 2, 3...)
-        self.use_stamina = settings.get("use_stamina")   # "ALL" / "100" / "No"
-        self.skipped_bosses = [CERBERUS] if settings.get("skip_cerberus") else []
-        self.not_join: list[tuple[int, int]] = []           # toạ độ boss đã xử lý, không join lại (C# settingboss.ListBossNotJoin)
-        self.screen_blacklist: list[tuple[int, int]] = []   # vị trí nút Join đã xử lý trên màn hình hiện tại
-        self.swipe = 0                                      # bộ đếm chu kỳ cuộn (0,1: xuống; 2,3: lên)
-        self.previous = None                                # action của vòng lặp trước
-        # Chỉ chọn general khi có đủ các ảnh template cần thiết.
-        self.can_select_general = all(_exists(p) for p in (
-            SELECT_GENERAL, CHOOSE_DEVELOPMENT, CHOOSE_FAVORITE, SELECT))
-        # Chỉ đọc toạ độ boss (OCR) khi có ảnh icon Location.
-        self.can_read_coords = _exists(LOCATION)
+        self.use_stamina = settings.get("use_stamina")      # "ALL" / "100" / "No"
+        self.skip_bosses = images_in(SKIP_DIR)              # ảnh boss không join
+        self.not_join: list[tuple[int, int]] = []           # toạ độ boss đã xử lý, không join lại
+        self.screen_blacklist: list[tuple[int, int]] = []   # nút Join đã xử lý (khi không đọc được toạ độ)
+        self.scrolled = 0                                   # số lần đã cuộn xuống khỏi đầu danh sách
+        # Popup chung: chỉ dò khi không nhận ra màn hình nào của flow.
+        self.popups = ([(p, S_TAP) for p in click_images()]
+                       + [(p, S_BACK) for p in exit_images()])
 
     def run(self):
         """Vòng lặp chính: chụp màn hình -> nhận diện -> xử lý, cho tới khi hết thể lực."""
         bot = self.bot
-        targets = _targets()
-        screen = bot.screenshot()
         while True:
-            # Popup rời liên minh tap theo offset từ góc trên-trái của ảnh, nên lấy toạ độ góc.
-            action, pos = find_first(bot, screen, targets, top_left={LEAVE_ALLIANCE_POPUP})
-            # Vừa quay lại danh sách War (vòng trước ở màn khác) -> reset blacklist màn hình.
-            if action == JOIN_LIST and self.previous != JOIN_LIST:
+            screen = bot.screenshot()
+            kind, pos = self._classify(screen)
+            if kind != S_LIST:
+                # Rời danh sách -> vị trí nút trên màn hình không còn đúng.
                 self.screen_blacklist.clear()
-            self.previous = action
+                self.scrolled = 0
 
-            if action == OUT_OF_STAMINA:
-                # Hết thể lực: không cho dùng item -> kết thúc activity.
+            if kind == S_STAMINA_POPUP:
+                # (5) Hết thể lực: không cho dùng item -> kết thúc activity.
                 if self.use_stamina not in ("ALL", "100"):
                     return
                 bot.tap(*pos)
-                wait_gone(bot, targets, action, pos, **_WAIT)   # chờ mở danh sách item thể lực
-                self._use_stamina()
-            elif action == MARCH_SCREEN:
-                # Đang ở màn hình March (sau khi bấm Join) -> chọn troop và xuất quân.
+                self._wait(lambda s: self._find(s, STAMINA_ITEM), 5)
+            elif kind == S_STAMINA_LIST:
+                self._use_stamina(screen)
+            elif kind == S_MARCH:
                 self._march(screen, pos)
-            elif action == JOIN_LIST:
-                # Đang ở danh sách War -> tìm rally để join.
-                self._join(screen)
-            elif action == SCROLL:
-                # Đang ở tab War nhưng chưa thấy nút Join -> cuộn danh sách.
-                self._scroll()
-            elif action == JOINED:
-                # Rally hiện tại đã join rồi -> cuộn tiếp và dọn bớt not_join.
-                self._scroll()
-                self.not_join = [p for p in self.not_join if p[0] < 800 and p[1] < 800]
-            elif action == TAP:
-                bot.tap(*pos)
-            elif action == BACK:
-                bot.back()
-            elif action == LEAVE_ALLIANCE_POPUP:
+            elif kind == S_GENERALS:
+                # Kẹt ở danh sách tướng -> chọn tướng đầu tiên.
+                self._pick_general(screen)
+            elif kind == S_LIST:
+                self._list(screen)
+            elif kind == S_HOME:
+                self._home(screen)
+            elif kind == S_LEAVE_ALLIANCE:
                 # Đóng popup rời liên minh rồi back ra.
                 bot.tap(pos[0] + 40, pos[1] + 40)
-                wait_gone(bot, targets, action, pos, **_WAIT)
+                self._wait(lambda s: self._find(s, LEAVE_ALLIANCE) is None, 3)
                 bot.back()
+                self._wait_changed(screen)
+            elif kind == S_TAP:
+                bot.tap(*pos)
+                self._wait_changed(screen)
+            elif kind == S_BACK:
+                bot.back()
+                self._wait_changed(screen)
             else:
                 # Không nhận ra màn hình nào -> về màn hình chính.
                 go_home(bot, screen)
+                self._wait(lambda s: self._classify(s)[0], 3)
 
-            # Chờ màn hình đổi (action vừa xử lý biến mất) rồi dùng ảnh cuối cho vòng sau.
-            screen = wait_gone(bot, targets, action, pos, **_WAIT)
-
-
-    def _scroll(self):
-        """Cuộn danh sách War: xuống 2 lần, rồi lên 2 lần, cứ thế lặp lại."""
-        if self.swipe < 2:
-            self.bot.swipe_percent(50, 65, 50, 40, duration=1.0)   # vuốt lên = cuộn xuống
-        else:
-            self.bot.swipe_percent(50, 40, 50, 65, duration=1.0)   # vuốt xuống = cuộn lên
-        self.swipe = (self.swipe + 1) % 4
-
-    def _use_stamina(self):
-        """Danh sách item thể lực (C# Data.Stamina): tap item trên cùng, chọn
-        số lượng ("ALL": nút ở vị trí 28.9 % / 71.6 %, "100": nút bên phải
-        nút "+") rồi bấm Use, sau đó đóng danh sách."""
-        bot = self.bot
-        # Sắp xếp theo toạ độ y để lấy item nằm trên cùng.
-        items = sorted(bot.find_all(STAMINA_ITEM, center=False), key=lambda p: p[1])
-        if items:
-            bot.tap(*items[0])
-            delay(bot, 3)
-            use = bot.find(USE_STAMINA, center=False)
-            if use is None:
-                return
-            if self.use_stamina == "ALL":
-                bot.tap_percent(28.9, 71.6, count=2)
-            else:
-                # Chế độ "100": tap 2 lần vào nút ngay bên phải nút "+".
-                plus = bot.find(PLUS, center=False)
-                if plus is not None:
-                    pw, _ = bot.template_size(PLUS)
-                    bot.tap(plus[0] + pw, plus[1] + 5)
-                    bot.tap(plus[0] + pw, plus[1] + 5)
-            delay(bot, 2)
-            bot.tap(*use)
-        else:
-            # Không có item thể lực nào -> đóng danh sách.
-            bot.back()
-        delay(bot, 2)
-        bot.back()
-        delay(bot, 2)
-
-    # ---- màn hình March -----------------------------------------------
-    def _march(self, screen, march_pos):
-        """Màn hình March sau khi bấm Join: chọn preset troop rồi xuất quân."""
-        bot = self.bot
-        if bot.find(f"{JB}/bossMonster.png", screen=screen) is None:
-            bot.back()      # không phải rally đánh quái -> thoát ra
-            delay(bot, 2)
-            return
-
-        # Tap preset troop (mỗi preset cách nhau 11% chiều ngang), thử tối đa
-        # 7 lần cho tới khi thấy dấu tick xác nhận đã chọn.
-        for _ in range(7):
-            bot.tap_percent(self.troop * 11, 11)
-            delay(bot)
-            if bot.find(TROOP_CHECK) is not None:
-                break
-        else:
-            # Không chọn được troop -> thoát ra.
-            bot.back()
-            delay(bot, 2)
-            return
-
-        if self.can_select_general:
-            self._select_general()
-
-        # Bấm March (nếu không tìm lại được nút thì dùng vị trí cũ).
-        pos = bot.find(MARCH)
-        bot.tap(*(pos or march_pos))
-        delay(bot)
-        # Chờ màn hình March đóng; nếu không đóng thì back ra.
-        for _ in range(5):
-            if bot.find(TROOP_CHECK) is None:
-                return
-            delay(bot)
-        bot.back()
-        bot.back()
-        delay(bot, 2)
-
-    def _select_general(self):
-        """Chọn general: Select General -> Development -> Favorite -> Select (tối đa 2 lần)."""
-        bot = self.bot
-        for _ in range(2):
-            pos = bot.find(SELECT_GENERAL, threshold=0.7)
-            if pos is None:
-                return
-            bot.tap(*pos)
-            delay(bot, 2)
-            # Lọc danh sách general: tab Development -> Favorite.
-            pos = bot.find(CHOOSE_DEVELOPMENT)
+    # ---- nhận diện màn hình ------------------------------------------------
+    def _classify(self, screen):
+        """(tên màn hình, vị trí ảnh nhận diện) hoặc (None, None)."""
+        pos = self._find(screen, OUT_OF_STAMINA)
+        if pos is not None:
+            return S_STAMINA_POPUP, pos
+        checks = (
+            (STAMINA_ITEM, S_STAMINA_LIST),
+            (MARCH, S_MARCH),
+            (SELECT, S_GENERALS),
+            (PVP_WAR, S_LIST),
+            (ALLIANCE_HOME, S_HOME),
+        )
+        for path, kind in checks:
+            pos = self._find(screen, path)
             if pos is not None:
-                bot.tap(*pos)
-                delay(bot, 2)
-                pos = bot.find(CHOOSE_FAVORITE)
-                if pos is not None:
-                    bot.tap(*pos)
-                    delay(bot, 2)
-            pos = bot.find(SELECT)
+                return kind, pos
+        pos = self._find(screen, LEAVE_ALLIANCE, center=False)
+        if pos is not None:
+            return S_LEAVE_ALLIANCE, pos
+        # Popup chung không biết trước vị trí -> dò cả màn hình (chỉ khi không nhận ra gì).
+        for path, kind in self.popups:
+            pos = self._find(screen, path, region=FULL)
+            if pos is not None:
+                return kind, pos
+        return None, None
+
+    # ---- (1) màn hình chính ------------------------------------------------
+    def _home(self, screen):
+        """Có icon listboss -> mở danh sách War; không có -> chờ tối đa 10s cho nó xuất hiện."""
+        pos = self._find(screen, LISTBOSS)
+        if pos is None:
+            pos, screen = self._wait(lambda s: self._find(s, LISTBOSS),
+                                     IDLE_WAIT, interval=1.0)
             if pos is None:
                 return
-            bot.tap(*pos)
-            # Chờ quay lại màn hình March.
-            for _ in range(5):
-                delay(bot, 1)
-                if bot.find(MARCH) is not None:
-                    break
+        self.bot.tap(*pos)
+        self._wait(lambda s: self._find(s, PVP_WAR), 5)
 
-    # ---- danh sách War ------------------------------------------------
-    def _join(self, screen):
-        """Danh sách War: bấm Join vào rally đầu tiên join được, nếu không có thì cuộn."""
+    # ---- (2) danh sách War ---------------------------------------------------
+    def _list(self, screen):
+        """Bấm Join rally đầu tiên join được; không có thì cuộn / chờ."""
+        target = self._joinable(screen)
+        if target is not None:
+            center, corner, coords = target
+            self._remember(coords, *corner)
+            self.bot.tap(*center)
+            # Chờ màn hình March (3); không lên thì vòng sau xét lại danh sách.
+            self._wait(lambda s: self._find(s, MARCH), 5)
+            return
+
+        buttons = (self._find_all(screen, JOIN)
+                   + self._find_all(screen, JOINED))
+        bottom = screen.shape[0] * BOTTOM_CARD_Y / 100
+        # Thẻ dưới cùng có mặt -> có thể còn rally bên dưới -> cuộn xuống xem tiếp.
+        if any(y > bottom for _, y in buttons) and self.scrolled < MAX_SCROLL:
+            if self._scroll(down=True, before=screen):
+                self.scrolled += 1
+                return
+        # Danh sách trống / đã join hết / hết danh sách -> về đầu rồi chờ Join mới.
+        if self.scrolled:
+            self._scroll_to_top(screen)
+        self._wait(self._joinable, IDLE_WAIT, interval=1.0)
+
+    def _joinable(self, screen):
+        """(tâm nút Join, góc trên-trái nút Join, toạ độ boss) của rally đầu
+        tiên join được, hoặc None."""
         bot = self.bot
         jw, jh = bot.template_size(JOIN)
-        # Tìm mọi nút Join nằm trong vùng danh sách (bỏ các nút ngoài khoảng y hợp lệ).
-        points = [p for p in bot.find_all(JOIN, threshold=0.8, screen=screen, center=False)
-                  if JOIN_MIN_Y < p[1] < JOIN_MAX_Y]
-        # Bỏ các nút đã xử lý trước đó.
-        points = [p for p in points
-                  if not _near(p, self.not_join) and not _near(p, self.screen_blacklist)]
-        if not points:
-            self._scroll()
-            self.screen_blacklist.clear()
-            return
-
-        for x, y in points:
+        for cx, cy in sorted(self._find_all(screen, JOIN), key=lambda p: p[1]):
+            x, y = cx - jw // 2, cy - jh // 2           # góc trên-trái nút Join
+            if _near((x, y), self.screen_blacklist):
+                continue
             # Vùng thẻ rally chứa nút Join này (ảnh boss + toạ độ).
             region = bot.crop(screen, x - 90, y - 150, 160, 190)
-            coords = None
-            if self.can_read_coords:
-                # Đọc toạ độ boss bằng OCR, ngay bên phải icon Location.
-                pin = bot.find(LOCATION, screen=region, center=False)
-                if pin is not None:
-                    lw, _ = bot.template_size(LOCATION)
-                    coords = read_coords(bot.crop(region, pin[0] + lw, pin[1], 80, 15))
-                    if coords is None:
-                        continue
-                    # Boss này đã xử lý rồi -> bỏ qua.
-                    if coords in self.not_join:
-                        self.screen_blacklist.append((x, y))
-                        continue
-
-            # Boss nằm trong danh sách skip, hoặc chữ đỏ (không join được) -> ghi nhớ và bỏ qua.
-            skipped = any(bot.find(path, threshold=0.7, screen=region) is not None
-                          for path in self.skipped_bosses)
+            coords = self._coords(region)
+            if coords is not None and coords in self.not_join:
+                continue
+            # Boss bị bỏ qua, hoặc thời gian đỏ (không kịp join) -> ghi nhớ và bỏ qua.
+            skipped = any(bot.find(p, threshold=0.7, screen=region) is not None
+                          for p in self.skip_bosses)
             if skipped or self._join_text_is_red(screen, x, y, jh):
                 self._remember(coords, x, y)
                 continue
+            return (cx, cy), (x, y), coords
+        return None
 
-            # Bấm vào tâm nút Join -> vòng lặp sau sẽ gặp màn hình March.
-            bot.tap(x + jw // 2, y + jh // 2)
-            self._remember(coords, x, y)
-            break
-
-        # Giới hạn độ dài not_join, chỉ giữ các phần tử mới nhất.
-        self.not_join = self.not_join[-NOT_JOIN_LIMIT:]
+    def _coords(self, region):
+        """Toạ độ boss (OCR ngay bên phải icon Location) trong thẻ rally, hoặc None."""
+        pin = self.bot.find(LOCATION, screen=region, center=False)
+        if pin is None:
+            return None
+        lw, _ = self.bot.template_size(LOCATION)
+        return read_coords(self.bot.crop(region, pin[0] + lw, pin[1], 80, 15))
 
     def _remember(self, coords, x, y):
-        """Ghi nhớ rally đã xử lý: toạ độ boss (nếu đọc được) và vị trí nút trên màn hình."""
+        """Ghi nhớ rally đã xử lý: theo toạ độ boss nếu đọc được, không thì theo vị trí nút."""
         if coords is not None:
-            self.not_join.append(coords)
-        self.screen_blacklist.append((x, y))
+            self.not_join = (self.not_join + [coords])[-NOT_JOIN_LIMIT:]
+        else:
+            self.screen_blacklist.append((x, y))
 
     def _join_text_is_red(self, screen, x, y, join_h) -> bool:
-        """Chữ màu đỏ bên dưới nút Join nghĩa là rally này không join được."""
+        """Thời gian màu đỏ bên dưới chữ Join nghĩa là rally này không kịp join."""
         crop = self.bot.crop(screen, x - 12, y + join_h - 3, 60, 20)
         b, g, r = crop[..., 0], crop[..., 1], crop[..., 2]
         # Đếm số pixel đỏ (R cao, G và B thấp); nhiều hơn 5 pixel thì coi là chữ đỏ.
         return int(((r > 180) & (g < 100) & (b < 100)).sum()) > 5
 
-# Tham số chung cho wait_gone: cùng cách nhận diện như find_first ở vòng lặp chính.
-_WAIT = {"top_left": {LEAVE_ALLIANCE_POPUP}, "tolerance": SAME_SPOT}
+    def _scroll(self, down: bool, before) -> bool:
+        """Cuộn danh sách 1 lần, chờ danh sách đứng yên. Trả về False nếu danh
+        sách không đổi (đã tới cuối / đầu)."""
+        if down:
+            self.bot.swipe_percent(50, 70, 50, 40, duration=1.0)   # vuốt lên = cuộn xuống
+        else:
+            self.bot.swipe_percent(50, 40, 50, 70, duration=0.3)   # vuốt xuống = cuộn lên
+        self.screen_blacklist.clear()
+        after = self._settle(before)
+        return _differs(self._crop(before, ROI_LIST), self._crop(after, ROI_LIST))
+
+    def _scroll_to_top(self, screen):
+        """Cuộn lên tới khi danh sách không đổi nữa (tối đa MAX_SCROLL lần)."""
+        for _ in range(MAX_SCROLL):
+            if not self._scroll(down=False, before=screen):
+                break
+            screen = self.bot.screenshot()
+        self.scrolled = 0
+
+    def _settle(self, previous):
+        """Chờ danh sách ngừng trôi (2 ảnh liên tiếp gần như giống nhau, tối đa 3s)."""
+        state = {"prev": self._crop(previous, ROI_LIST)}
+
+        def still(s):
+            cur = self._crop(s, ROI_LIST)
+            same = not _differs(state["prev"], cur, 2.0)
+            state["prev"] = cur
+            return same
+
+        return self._wait(still, 3)[1]
+
+    # ---- (3, 4) màn hình March -------------------------------------------------
+    def _march(self, screen, march_pos):
+        """Chọn preset troop -> (chọn tướng nếu cần) -> March."""
+        bot = self.bot
+        if self._find(screen, BOSS_MONSTER) is None:
+            # Không phải rally đánh boss -> thoát ra.
+            bot.back()
+            self._wait(lambda s: self._find(s, MARCH) is None, 3)
+            return
+
+        # (3) Bấm preset troop (mỗi preset cách nhau 11% chiều ngang), chờ khung quân đổi.
+        before = self._crop(screen, ROI_TROOPS)
+        bot.tap_percent(self.troop * 11, 11)
+        _, screen = self._wait(lambda s: _differs(before, self._crop(s, ROI_TROOPS)), 2)
+
+        # (4) Chưa có tướng -> chọn tướng đầu tiên trong danh sách.
+        pos = self._find(screen, SELECT_GENERAL, threshold=0.8)
+        if pos is not None:
+            bot.tap(*pos)
+            found, screen = self._wait(lambda s: self._find(s, SELECT), 5)
+            if found is not None:
+                screen = self._pick_general(screen)
+
+        # Bấm March rồi chờ màn hình March đóng hoặc popup hết thể lực (5).
+        bot.tap(*(self._find(screen, MARCH) or march_pos))
+        done, _ = self._wait(lambda s: (self._find(s, OUT_OF_STAMINA) is not None
+                                        or self._find(s, MARCH) is None), 5)
+        if not done:
+            # Không March được (VD: không đủ quân) -> thoát ra, vòng sau xét lại danh sách.
+            bot.back()
+            self._wait(lambda s: self._find(s, MARCH) is None, 3)
+
+    def _pick_general(self, screen):
+        """(4.1) Bấm Select của tướng trên cùng, chờ quay lại màn hình March. Trả về ảnh cuối."""
+        selects = self._find_all(screen, SELECT)
+        if not selects:
+            return screen
+        self.bot.tap(*min(selects, key=lambda p: p[1]))
+        return self._wait(lambda s: self._find(s, MARCH), 5)[1]
+
+    # ---- (5) thể lực ------------------------------------------------------------
+    def _use_stamina(self, screen):
+        """Use Item: tap item trên cùng, chọn số lượng ("ALL": nút ở 28.9 % / 71.6 %,
+        "100": nút bên phải nút "+") rồi bấm Use, sau đó đóng danh sách."""
+        bot = self.bot
+        items = self._find_all(screen, STAMINA_ITEM)
+        if items:
+            bot.tap(*min(items, key=lambda p: p[1]))
+            use, screen = self._wait(lambda s: self._find(s, USE_STAMINA), 5)
+            if use is not None:
+                if self.use_stamina == "ALL":
+                    bot.tap_percent(28.9, 71.6, count=2)
+                else:
+                    # Chế độ "100": tap 2 lần vào nút ngay bên phải nút "+".
+                    plus = self._find(screen, PLUS, center=False)
+                    if plus is not None:
+                        pw, _ = bot.template_size(PLUS)
+                        bot.tap(plus[0] + pw, plus[1] + 5)
+                        bot.tap(plus[0] + pw, plus[1] + 5)
+                bot.tap(*use)
+                self._wait(lambda s: self._find(s, USE_STAMINA) is None, 5)
+        # Đóng danh sách item.
+        bot.back()
+        self._wait(lambda s: self._find(s, STAMINA_ITEM) is None, 5)
+
+    # ---- tiện ích ------------------------------------------------------------------
+    def _wait(self, check, timeout, interval=0.3):
+        return wait_until(self.bot, check, timeout=timeout, interval=interval)
+
+    def _wait_changed(self, screen, timeout=3):
+        """Chờ màn hình khác đi so với `screen`."""
+        before = self._crop(screen, FULL)
+        self._wait(lambda s: _differs(before, self._crop(s, FULL)), timeout)
+
+    def _crop(self, screen, roi):
+        return self.bot.crop(screen, *_rect(screen, roi))
+
+    def _find(self, screen, path, threshold=0.9, center=True, region=None):
+        """Vị trí ảnh `path` (tâm, hoặc góc trên-trái nếu center=False) trong
+        vùng REGIONS[path] (hoặc `region`), theo toạ độ màn hình; None nếu không thấy."""
+        x, y, w, h = _rect(screen, region or REGIONS.get(path, FULL))
+        pos = self.bot.find(path, threshold=threshold, center=center,
+                            screen=self.bot.crop(screen, x, y, w, h))
+        return None if pos is None else (pos[0] + x, pos[1] + y)
+
+    def _find_all(self, screen, path):
+        """Tâm mọi ảnh `path` trong vùng REGIONS[path], theo toạ độ màn hình."""
+        x, y, w, h = _rect(screen, REGIONS.get(path, FULL))
+        return [(px + x, py + y) for px, py in
+                self.bot.find_all(path, threshold=0.8, screen=self.bot.crop(screen, x, y, w, h))]
 
 
-def _exists(path: str) -> bool:
-    """Kiểm tra file ảnh template có tồn tại trong thư mục Images/ không."""
-    return (TEMPLATE_DIR / path).exists()
+def _rect(screen, roi):
+    """Vùng `roi` (% x0, y0, x1, y1) -> (x, y, w, h) pixel trên `screen`."""
+    h, w = screen.shape[:2]
+    x0, y0, x1, y1 = roi
+    return (int(w * x0 / 100), int(h * y0 / 100),
+            int(w * (x1 - x0) / 100), int(h * (y1 - y0) / 100))
+
+
+def _differs(a, b, threshold=8.0) -> bool:
+    """Hai vùng ảnh khác nhau rõ rệt (chênh lệch trung bình mỗi pixel > threshold)."""
+    if a.shape != b.shape:
+        return True
+    return float(np.mean(np.abs(a.astype(np.int16) - b.astype(np.int16)))) > threshold
 
 
 def _near(point, points) -> bool:
@@ -276,21 +352,3 @@ def _troop(text) -> int:
         return int(str(text).split()[-1])
     except (IndexError, ValueError):
         return 1
-
-
-def _targets() -> list[tuple[str, str]]:
-    """Danh sách (ảnh, action) để nhận diện màn hình; ảnh đứng trước được ưu tiên hơn."""
-    return [
-        ("click/lencap.png", TAP),                          # popup lên cấp
-        (f"{JB}/hettheluc.png", OUT_OF_STAMINA),            # hết thể lực
-        (MARCH, MARCH_SCREEN),                              # màn hình March
-        (JOIN, JOIN_LIST),                                  # danh sách War có nút Join
-        (f"{JB}/Joined.png", JOINED),                       # rally đã join
-        (f"{JB}/PvPWar.png", SCROLL),                       # tab War, chưa thấy nút Join
-        (f"{JB}/checkChienTranh.png", SCROLL),
-        ("Items/outLM.png", LEAVE_ALLIANCE_POPUP),          # popup rời liên minh
-        (f"{JB}/chientranh.png", TAP),                      # nút tab Chiến tranh
-        *[(path, BACK) for path in exit_images()],          # các nút thoát/đóng chung
-        *[(path, TAP) for path in click_images()],          # các nút cần bấm chung
-        (f"{JB}/listboss.png", TAP),                        # icon mở danh sách boss
-    ]
