@@ -12,7 +12,7 @@ Stamina" ALL / 100), or ends the activity with "Use Stamina" No.
 from ...common import click_images, delay, exit_images, find_first, go_home
 from ...context import TEMPLATE_DIR
 from ...ocr import read_coords
-from .constants import (ALLIANCE, BACK, CERBERUS, CHOOSE_DEVELOPMENT, CHOOSE_FAVORITE, JB, JOIN,
+from .constants import (BACK,CERBERUS, CHOOSE_DEVELOPMENT, CHOOSE_FAVORITE, JB, JOIN,
                         JOIN_LIST, JOIN_MAX_Y, JOIN_MIN_Y, JOINED, LEAVE_ALLIANCE_POPUP, LOCATION,
                         MARCH, MARCH_SCREEN, NOT_JOIN_LIMIT, OUT_OF_STAMINA, PLUS, SAME_SPOT,
                         SCROLL, SELECT, SELECT_GENERAL, STAMINA_ITEM, TAP, TROOP_CHECK,
@@ -42,9 +42,8 @@ class _Boss:
         targets = _targets()
         while True:
             screen = bot.screenshot()
-            # Alliance / leave-alliance taps are offsets from the image's top-left corner.
-            action, pos = find_first(bot, screen, targets,
-                                     top_left={ALLIANCE, LEAVE_ALLIANCE_POPUP})
+            # Leave-alliance taps are offsets from the image's top-left corner.
+            action, pos = find_first(bot, screen, targets, top_left={LEAVE_ALLIANCE_POPUP})
             if action == JOIN_LIST and self.previous != JOIN_LIST:
                 self.screen_blacklist.clear()
             self.previous = action
@@ -72,9 +71,6 @@ class _Boss:
             elif action == BACK:
                 bot.back()
                 delay(bot, 2)
-            elif action == ALLIANCE:
-                bot.tap(pos[0] + 20, pos[1] - 10)
-                delay(bot, 5)
             elif action == LEAVE_ALLIANCE_POPUP:
                 bot.tap(pos[0] + 40, pos[1] + 40)
                 delay(bot, 2)
@@ -264,5 +260,5 @@ def _targets() -> list[tuple[str, str]]:
         (f"{JB}/chientranh.png", TAP),
         *[(path, BACK) for path in exit_images()],
         *[(path, TAP) for path in click_images()],
-        (f"{JB}/lienminh.png", ALLIANCE),
+        (f"{JB}/listboss.png", TAP),
     ]
