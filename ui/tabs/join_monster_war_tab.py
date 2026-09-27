@@ -15,7 +15,9 @@ DESIGNER_DATA = {
     "checkBoxViking": {"loc": [59, 61], "size": [84, 28], "text": "Viking", "type": "CheckBox"},
     "comboBoxBuyStamina": {"loc": [168, 103], "size": [84, 30], "type": "ComboBox"},
     "comboBoxCrazyEggs": {"loc": [161, 48], "size": [53, 30], "type": "ComboBox"},
-    "groupBoss": {"children": ["checkBoxViking"], "loc": [20, 235], "size": [437, 228],
+    "cbSkipCerberus": {"checked": True, "loc": [181, 61], "size": [110, 28],
+                         "text": "Cerberus", "type": "CheckBox"},
+    "groupBoss": {"children": ["checkBoxViking", "cbSkipCerberus"], "loc": [20, 235], "size": [437, 228],
                   "text": "Setting", "type": "GroupBox"},
     "groupBox1": {"children": ["ChoiceTroop"], "loc": [20, 66], "size": [711, 150],
                   "text": "Troop", "type": "GroupBox"},
@@ -85,6 +87,7 @@ class JoinMonsterWarTab(DesignerTab):
             "crazy_eggs_time_check": c["comboBoxCrazyEggs"].currentText(),
             "buy_hammer": c["BuyHammer"].isChecked(),
             "speed_marching": speed,
+            "skip_cerberus": c["cbSkipCerberus"].isChecked(),
         }
 
     def set_settings(self, data: dict):
@@ -97,6 +100,8 @@ class JoinMonsterWarTab(DesignerTab):
             c["comboBoxCrazyEggs"].setCurrentText(str(data["crazy_eggs_time_check"]))
         if "buy_hammer" in data:
             c["BuyHammer"].setChecked(bool(data["buy_hammer"]))
+        if "skip_cerberus" in data:
+            c["cbSkipCerberus"].setChecked(bool(data["skip_cerberus"]))
         if "troop" in data:
             _set_radio(c, {n: c[n].text() for n in TROOP_RADIOS}, data["troop"])
         if "use_stamina" in data:
