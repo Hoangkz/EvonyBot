@@ -9,6 +9,7 @@ class and the image folders every activity scans). One function per module:
 - delay:         Utils.delay
 - current_focus: the focused Android window
 - go_home:       Utils.Home — recover when nothing known is on screen
+- wait_gone:     wait until a recognised screen goes away
 """
 from .click_images import click_images
 from .current_focus import current_focus
@@ -17,6 +18,7 @@ from .exit_images import exit_images
 from .find_first import find_first
 from .go_home import GAME_PACKAGE, go_home
 from .images_in import images_in
+from .wait_gone import wait_gone
 
 __all__ = ["GAME_PACKAGE", "click_images", "current_focus", "delay", "exit_images",
-           "find_first", "go_home", "images_in"]
+           "find_first", "go_home", "images_in", "wait_gone"]
