@@ -61,6 +61,7 @@ class MainWindow(QMainWindow):
             lambda serial, status: self.home_view.update_device(serial, status=status)
         )
         self.bots.running_changed.connect(self._on_bot_running_changed)
+        self.bots.server_found.connect(self._on_server_found)
         # Sub-tab index kept across devices, so switching device stays on
         # the same tab instead of jumping back to Initialization.
         self._current_tab_index = 0
@@ -113,6 +114,7 @@ class MainWindow(QMainWindow):
         view.start_requested.connect(self._on_start_requested)
         view.start_all_requested.connect(self._on_start_all_requested)
         view.apply_all_requested.connect(self._on_apply_all_requested)
+        view.server_changed.connect(self._on_server_changed)
         view.tabs.currentChanged.connect(self._on_tab_changed)
 
         # New device -> store its default config; known device -> restore it.
@@ -120,6 +122,9 @@ class MainWindow(QMainWindow):
             self.db.save_settings(device_id, view.get_settings())
         else:
             view.set_settings(self.db.load_settings(device_id))
+        self.home_view.update_device(
+            device_id, server=view.initialization_tab.get_settings()["server"]
+        )
 
         self.device_views[device_id] = view
         view.set_all_running(self._all_running())
@@ -193,6 +198,18 @@ class MainWindow(QMainWindow):
         self.home_view.set_all_running(all_running)
         for v in self.device_views.values():
             v.set_all_running(all_running)
+
+    def _on_server_changed(self, device_id: str, server: str):
+        """Server của thiết bị đổi -> lưu DB và cập nhật cột Server ở Home."""
+        self.db.set_server(device_id, server)
+        self.home_view.update_device(device_id, server=server)
+
+    def _on_server_found(self, device_id: str, server: str):
+        """Bot vừa đọc được server trong game -> lưu DB và hiện lên tab Initialization."""
+        self._on_server_changed(device_id, server)
+        view = self.device_views.get(device_id)
+        if view is not None:
+            view.initialization_tab.set_settings({"server": server})
 
     def _on_exit_all_requested(self):
         # TODO: wire up to the actual automation/bot backend.

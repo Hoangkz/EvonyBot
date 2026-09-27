@@ -97,8 +97,8 @@ class HomeView(QWidget):
         layout.addLayout(toolbar)
 
         # ---- Device table ----
-        self.table = QTableWidget(0, 3)
-        self.table.setHorizontalHeaderLabels(["DevicesName", "Activity", "Status"])
+        self.table = QTableWidget(0, 4)
+        self.table.setHorizontalHeaderLabels(["DevicesName", "Server", "Activity", "Status"])
         self.table.verticalHeader().setVisible(False)
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
@@ -108,6 +108,7 @@ class HomeView(QWidget):
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
         self.table.setStyleSheet(
             """
             QTableWidget { background: transparent; border: none; }
@@ -220,21 +221,25 @@ class HomeView(QWidget):
         label = "Stop All" if self._all_running else "Start All"
         self.start_all_button.setText(f"{label}({self._device_count})")
 
-    def add_device_row(self, serial: str, activity: str = "None", status: str = "InActive"):
+    def add_device_row(self, serial: str, activity: str = "None", status: str = "InActive",
+                       server: str = ""):
         row = self.table.rowCount()
         self.table.insertRow(row)
-        for col, text in enumerate((serial, activity, status)):
+        for col, text in enumerate((serial, server, activity, status)):
             item = QTableWidgetItem(text)
             item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             self.table.setItem(row, col, item)
 
-    def update_device(self, serial: str, activity: str | None = None, status: str | None = None):
+    def update_device(self, serial: str, activity: str | None = None, status: str | None = None,
+                      server: str | None = None):
         for row in range(self.table.rowCount()):
             if self.table.item(row, 0).text() == serial:
+                if server is not None:
+                    self.table.item(row, 1).setText(server)
                 if activity is not None:
-                    self.table.item(row, 1).setText(activity)
+                    self.table.item(row, 2).setText(activity)
                 if status is not None:
-                    self.table.item(row, 2).setText(status)
+                    self.table.item(row, 3).setText(status)
                 return
 
     @property

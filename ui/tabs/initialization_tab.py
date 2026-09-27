@@ -24,8 +24,11 @@ DESIGNER_DATA = {
         "loc": [13, 106], "size": [1062, 253], "text": "Select Activity", "type": "GroupBox",
     },
     "labelID": {"loc": [506, 18], "size": [200, 32], "text": "labelID", "type": "Label"},
+    "labelServer": {"loc": [13, 22], "size": [60, 28], "text": "Server:", "type": "Label"},
+    "textBoxServer": {"loc": [75, 22], "size": [200, 28], "type": "TextBox"},
     "tabPage1": {
-        "children": ["button9", "buttonInitializationApplyAll", "buttonStart", "labelID", "groupBox2"],
+        "children": ["button9", "buttonInitializationApplyAll", "buttonStart", "labelID",
+                     "labelServer", "textBoxServer", "groupBox2"],
         "loc": [4, 31], "size": [1088, 609], "text": "Initialization", "type": "TabPage",
     },
 }
@@ -64,6 +67,7 @@ QPushButton:checked:hover {{
 class InitializationTab(DesignerTab):
     start_clicked = pyqtSignal()
     start_all_clicked = pyqtSignal()
+    server_changed = pyqtSignal(str)   # server mới sau khi nhập xong
 
     def __init__(self, device_id="", parent=None):
         super().__init__("tabPage1", DESIGNER_DATA, COMBO_ITEMS, PAGE_SIZE, parent=parent)
@@ -72,6 +76,11 @@ class InitializationTab(DesignerTab):
         c["labelID"].setStyleSheet("font-size: 16.2pt;")
         if device_id:
             c["labelID"].setText(device_id)
+
+        # Server của thiết bị: không bắt buộc, riêng từng máy (Apply ALL không copy).
+        c["textBoxServer"].setPlaceholderText("(tuỳ chọn)")
+        c["textBoxServer"].editingFinished.connect(
+            lambda: self.server_changed.emit(c["textBoxServer"].text().strip()))
 
         c["buttonStart"].setStyleSheet("font-size: 13.8pt;")
         c["buttonStart"].clicked.connect(self.start_clicked.emit)
@@ -104,11 +113,14 @@ class InitializationTab(DesignerTab):
         return {
             "device_id": self.controls["labelID"].text(),
             "activities": self.selected_activities(),
+            "server": self.controls["textBoxServer"].text().strip(),
         }
 
     def set_settings(self, data: dict):
         if "device_id" in data:
             self.set_device_id(data["device_id"])
+        if "server" in data:
+            self.controls["textBoxServer"].setText(data["server"] or "")
         if "activities" in data:
             selected = set(data["activities"])
             for name, target in ACTIVITY_BUTTON_TARGETS.items():

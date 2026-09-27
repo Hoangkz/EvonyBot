@@ -12,6 +12,7 @@ class BotManager(QObject):
     activity_changed = pyqtSignal(str, str)   # (serial, activity)
     status_changed = pyqtSignal(str, str)     # (serial, status)
     running_changed = pyqtSignal(str, bool)   # (serial, running)
+    server_found = pyqtSignal(str, str)       # (serial, server)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -30,6 +31,7 @@ class BotManager(QObject):
         worker = BotWorker(serial, activities, settings, self)
         worker.activity_changed.connect(self.activity_changed.emit)
         worker.status_changed.connect(self.status_changed.emit)
+        worker.server_found.connect(self.server_found.emit)
         worker.finished.connect(lambda: self._on_finished(serial))
         self._workers[serial] = worker
         worker.start()

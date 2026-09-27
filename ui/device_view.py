@@ -27,6 +27,7 @@ class DeviceView(QWidget):
     # (device_id, settings) — settings keyed by tab title, to be copied
     # onto every other device.
     apply_all_requested = pyqtSignal(str, dict)
+    server_changed = pyqtSignal(str, str)   # (device_id, server)
 
     def __init__(self, device_id: str, parent=None):
         super().__init__(parent)
@@ -61,6 +62,9 @@ class DeviceView(QWidget):
             lambda: self.start_requested.emit(self.device_id)
         )
         self.initialization_tab.start_all_clicked.connect(self.start_all_requested.emit)
+        self.initialization_tab.server_changed.connect(
+            lambda server: self.server_changed.emit(self.device_id, server)
+        )
 
     def _add_tab(self, widget: QWidget, title: str):
         self.tabs.addTab(widget, title)
@@ -69,10 +73,10 @@ class DeviceView(QWidget):
 
     def _on_apply_all(self):
         # Every tab's Apply ALL copies this device's whole config (all
-        # tabs) onto every other device. The device id is never copied.
+        # tabs) onto every other device. The device id and server are never copied.
         settings = self.get_settings()
         settings["Initialization"] = {
-            k: v for k, v in settings["Initialization"].items() if k != "device_id"
+            k: v for k, v in settings["Initialization"].items() if k not in ("device_id", "server")
         }
         self.apply_all_requested.emit(self.device_id, settings)
 

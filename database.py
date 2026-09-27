@@ -2,7 +2,7 @@
 database.py — SQLite persistence for devices and their configuration.
 
 Tables:
-  devices          one row per ADB serial.
+  devices          one row per ADB serial (+ server nhập ở tab Initialization).
   device_settings  one JSON blob per (device, tab) — every tab except
                    Daily Activities.
   daily_tasks      Daily Activities split into one row per task, so we
@@ -33,11 +33,12 @@ DB_PATH = DATA_DIR / "evonybot.db"
 _LEGACY_DB_PATH = Path(__file__).resolve().parent / "evonybot.db"
 
 DAILY_TAB = "Daily Activities"
-INIT_TAB = "Initialization"  # device id is not stored, only the selected activities
+INIT_TAB = "Initialization"  # device id is not stored; server goes to devices.server
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS devices (
     serial      TEXT PRIMARY KEY,
+    server      TEXT,
     created_at  TEXT NOT NULL,
     updated_at  TEXT NOT NULL
 );
@@ -84,6 +85,10 @@ class Database:
             shutil.copy2(_LEGACY_DB_PATH, path)
         self.conn = _connect(path)
         self.conn.executescript(_SCHEMA)
+        # Database cũ chưa có cột server -> thêm vào.
+        columns = {row["name"] for row in self.conn.execute("PRAGMA table_info(devices)")}
+        if "server" not in columns:
+            self.conn.execute("ALTER TABLE devices ADD COLUMN server TEXT")
         self.conn.commit()
         # Serials known to be in `devices`, including inserts still queued.
         self._known = {row["serial"] for row in self.conn.execute("SELECT serial FROM devices")}
@@ -137,6 +142,14 @@ class Database:
         ))
         return True
 
+    def set_server(self, serial: str, server: str):
+        """Lưu server của thiết bị (rỗng -> NULL)."""
+        now = _now()
+        self._write(lambda conn: conn.execute(
+            "UPDATE devices SET server = ?, updated_at = ? WHERE serial = ?",
+            (server or None, now, serial),
+        ))
+
     # ---- settings ----------------------------------------------------
     def save_settings(self, serial: str, settings: dict):
         """Save a DeviceView.get_settings()-style dict (keyed by tab title)."""
@@ -170,6 +183,9 @@ class Database:
         }
         if daily:
             result[DAILY_TAB] = daily
+        row = self.conn.execute("SELECT server FROM devices WHERE serial = ?", (serial,)).fetchone()
+        if row is not None:
+            result.setdefault(INIT_TAB, {})["server"] = row["server"] or ""
         return result
 
     # ---- daily task progress -----------------------------------------
@@ -207,7 +223,12 @@ def _save_settings(conn: sqlite3.Connection, serial: str, settings: dict, now: s
     conn.execute("UPDATE devices SET updated_at = ? WHERE serial = ?", (now, serial))
     for tab, data in settings.items():
         if tab == INIT_TAB:
-            data = {k: v for k, v in data.items() if k != "device_id"}
+            # Server lưu ở cột devices.server; chỉ cập nhật khi dữ liệu có key này
+            # (Apply ALL bỏ key server nên không ghi đè server của máy khác).
+            if "server" in data:
+                conn.execute("UPDATE devices SET server = ? WHERE serial = ?",
+                             (data["server"] or None, serial))
+            data = {k: v for k, v in data.items() if k not in ("device_id", "server")}
         if tab == DAILY_TAB:
             _save_daily_tasks(conn, serial, data, now)
             continue

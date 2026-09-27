@@ -18,10 +18,12 @@ _SIZE = (12, 20)         # (w, h) characters are scaled to before comparing
 _fonts: dict[str, tuple[list[str], np.ndarray]] = {}
 
 
-def split(image: np.ndarray) -> list:
+def split(image: np.ndarray, max_ratio: float | None = None) -> list:
     """Characters of `image` (BGR or gray) left to right: "," for a short
     mark (comma / dot), ":" for a colon, else the character's black & white
-    crop. Split at native size — scaled up, digits 1px apart run together."""
+    crop. Split at native size — scaled up, digits 1px apart run together.
+    With `max_ratio`, a piece wider than `max_ratio` x its height (two digits
+    touching, e.g. "44") is cut at its thinnest column."""
     if image.size == 0:
         return []
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if image.ndim == 3 else image
@@ -32,9 +34,7 @@ def split(image: np.ndarray) -> list:
         if lit and start is None:
             start = x
         elif not lit and start is not None:
-            column = bw[:, start:x]
-            rows = np.flatnonzero(column.any(axis=1))
-            crops.append(column[rows[0]:rows[-1] + 1])
+            crops.extend(_cut(bw[:, start:x], max_ratio))
             start = None
     if not crops:
         return []
@@ -50,6 +50,28 @@ def split(image: np.ndarray) -> list:
         else:
             chars.append(c)
     return chars
+
+
+def _trim(piece: np.ndarray) -> np.ndarray:
+    """`piece` without its empty rows and columns around the edges."""
+    rows = np.flatnonzero(piece.any(axis=1))
+    cols = np.flatnonzero(piece.any(axis=0))
+    return piece[rows[0]:rows[-1] + 1, cols[0]:cols[-1] + 1]
+
+
+def _cut(piece: np.ndarray, max_ratio: float | None) -> list[np.ndarray]:
+    """`piece` trimmed; if wider than `max_ratio` x its height, cut at the
+    column with the least ink (in its middle 30-70 %), recursively."""
+    piece = _trim(piece)
+    h, w = piece.shape
+    if max_ratio is None or w <= h * max_ratio:
+        return [piece]
+    lo, hi = int(w * 0.3), int(w * 0.7)
+    x = lo + int(np.count_nonzero(piece[:, lo:hi + 1], axis=0).argmin())
+    left, right = piece[:, :x], piece[:, x + 1:]
+    if not left.any() or not right.any():
+        return [piece]
+    return _cut(left, max_ratio) + _cut(right, max_ratio)
 
 
 def _normalize(char: np.ndarray) -> np.ndarray:
@@ -79,9 +101,14 @@ def _samples(font: str) -> tuple[list[str], np.ndarray]:
 def read(image: np.ndarray, font: str) -> str | None:
     """Digits, "," and ":" in `image`, or None if there are no digits or
     one doesn't match any sample of `font` well enough."""
+    return read_chars(split(image), font)
+
+
+def read_chars(chars: list, font: str) -> str | None:
+    """read() on pieces already cut by split()."""
     digits, samples = _samples(font)
     text = ""
-    for char in split(image):
+    for char in chars:
         if isinstance(char, str):
             text += char
             continue

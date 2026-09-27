@@ -13,6 +13,7 @@ from PyQt5.QtWidgets import (
     QComboBox,
     QGroupBox,
     QLabel,
+    QLineEdit,
     QPushButton,
     QRadioButton,
     QWidget,
@@ -26,6 +27,7 @@ _FACTORY = {
     "CheckBox": lambda: QCheckBox(),
     "RadioButton": lambda: QRadioButton(),
     "ComboBox": lambda: QComboBox(),
+    "TextBox": lambda: QLineEdit(),
 }
 
 
