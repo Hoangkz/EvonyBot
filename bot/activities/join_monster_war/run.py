@@ -9,31 +9,18 @@ lặp chụp 1 screenshot, tìm ảnh đầu tiên khớp (xét theo thứ tự 
 `_targets`) rồi xử lý theo ảnh đó. Khi hết thể lực: dùng item thể lực
 ("Use Stamina" = ALL / 100), hoặc kết thúc activity nếu "Use Stamina" = No.
 """
-import time
-
 from ...common import click_images, delay, exit_images, find_first, go_home, wait_gone
 from ...context import TEMPLATE_DIR
 from ...ocr import read_coords
-from .constants import (ALLIANCE, BACK, CERBERUS, CHECK_MARCHING, CHOOSE_DEVELOPMENT,
-                        CHOOSE_FAVORITE, JB, JOIN,
+from .constants import (BACK,CERBERUS, CHOOSE_DEVELOPMENT, CHOOSE_FAVORITE, JB, JOIN,
                         JOIN_LIST, JOIN_MAX_Y, JOIN_MIN_Y, JOINED, LEAVE_ALLIANCE_POPUP, LOCATION,
                         MARCH, MARCH_SCREEN, NOT_JOIN_LIMIT, OUT_OF_STAMINA, PLUS, SAME_SPOT,
                         SCROLL, SELECT, SELECT_GENERAL, STAMINA_ITEM, TAP, TROOP_CHECK,
-                        USE_STAMINA, VIKING_SUMMON)
-from .support import buy_hammer, buy_stamina, crazy_eggs, speed_marching, viking
+                        USE_STAMINA)
 
 
 def run(bot, settings: dict):
     """`bot` là BotContext của thiết bị; `settings` là cấu hình của tab "Join Monster War"."""
-    quantity = _number(settings.get("buy_stamina"))
-    if quantity > 0:
-        bot.log(f"Join Monster War: buy {quantity} stamina")
-        buy_stamina(bot, quantity)
-        settings["buy_stamina"] = "0"
-    if settings.get("buy_hammer"):
-        bot.log("Join Monster War: buy hammer")
-        buy_hammer(bot)
-        settings["buy_hammer"] = False
     _Boss(bot, settings).run()
 
 class _Boss:
@@ -42,11 +29,6 @@ class _Boss:
         self.troop = _troop(settings.get("troop"))          # số thứ tự preset troop (1, 2, 3...)
         self.use_stamina = settings.get("use_stamina")   # "ALL" / "100" / "No"
         self.skipped_bosses = [CERBERUS] if settings.get("skip_cerberus") else []
-        self.viking_enabled = bool(settings.get("viking"))
-        self.crazy_hours = _hours(settings.get("crazy_eggs_time_check"))
-        self.speed_seconds = _seconds(settings.get("speed_marching"))
-        self.next_crazy = 0.0 if self.crazy_hours else float("inf")
-        self.next_viking = time.monotonic() + 600 if self.viking_enabled else float("inf")
         self.not_join: list[tuple[int, int]] = []           # toạ độ boss đã xử lý, không join lại (C# settingboss.ListBossNotJoin)
         self.screen_blacklist: list[tuple[int, int]] = []   # vị trí nút Join đã xử lý trên màn hình hiện tại
         self.swipe = 0                                      # bộ đếm chu kỳ cuộn (0,1: xuống; 2,3: lên)
@@ -60,23 +42,9 @@ class _Boss:
     def run(self):
         """Vòng lặp chính: chụp màn hình -> nhận diện -> xử lý, cho tới khi hết thể lực."""
         bot = self.bot
-        targets = _targets(self.viking_enabled, self.speed_seconds > 0)
+        targets = _targets()
         screen = bot.screenshot()
         while True:
-            now = time.monotonic()
-            if now >= self.next_crazy:
-                bot.log("Join Monster War: Crazy Eggs")
-                detected_hours = crazy_eggs(bot)
-                self.next_crazy = (time.monotonic() + detected_hours * 3600
-                                   if detected_hours else float("inf"))
-                screen = bot.screenshot()
-                continue
-            if now >= self.next_viking:
-                bot.log("Join Monster War: Viking check")
-                viking(bot)
-                self.next_viking = time.monotonic() + 600
-                screen = bot.screenshot()
-                continue
             # Popup rời liên minh tap theo offset từ góc trên-trái của ảnh, nên lấy toạ độ góc.
             action, pos = find_first(bot, screen, targets, top_left={LEAVE_ALLIANCE_POPUP})
             # Vừa quay lại danh sách War (vòng trước ở màn khác) -> reset blacklist màn hình.
@@ -104,14 +72,6 @@ class _Boss:
                 # Rally hiện tại đã join rồi -> cuộn tiếp và dọn bớt not_join.
                 self._scroll()
                 self.not_join = [p for p in self.not_join if p[0] < 800 and p[1] < 800]
-            elif action == VIKING_SUMMON:
-                viking(bot)
-                self.next_viking = time.monotonic() + 600
-            elif action == CHECK_MARCHING:
-                if not speed_marching(bot, self.speed_seconds):
-                    self._scroll()
-            elif action == ALLIANCE:
-                bot.tap(pos[0] + 20, pos[1] - 10, delay=5)
             elif action == TAP:
                 bot.tap(*pos)
             elif action == BACK:
@@ -318,27 +278,9 @@ def _troop(text) -> int:
         return 1
 
 
-def _number(value) -> int:
-    try:
-        return int(str(value).strip())
-    except (TypeError, ValueError):
-        return 0
-
-
-def _hours(value) -> int:
-    text = str(value or "0").upper().rstrip("H")
-    return _number(text)
-
-
-def _seconds(value) -> int:
-    text = str(value or "0").lower().rstrip("s")
-    return _number(text)
-
-
-def _targets(viking_enabled: bool = False,
-             speed_enabled: bool = False) -> list[tuple[str, str]]:
+def _targets() -> list[tuple[str, str]]:
     """Danh sách (ảnh, action) để nhận diện màn hình; ảnh đứng trước được ưu tiên hơn."""
-    targets = [
+    return [
         ("click/lencap.png", TAP),                          # popup lên cấp
         (f"{JB}/hettheluc.png", OUT_OF_STAMINA),            # hết thể lực
         (MARCH, MARCH_SCREEN),                              # màn hình March
@@ -351,10 +293,4 @@ def _targets(viking_enabled: bool = False,
         *[(path, BACK) for path in exit_images()],          # các nút thoát/đóng chung
         *[(path, TAP) for path in click_images()],          # các nút cần bấm chung
         (f"{JB}/listboss.png", TAP),                        # icon mở danh sách boss
-        (f"{JB}/lienminh.png", ALLIANCE),                    # mở Alliance từ màn hình chính
     ]
-    if speed_enabled:
-        targets.insert(3, (f"{JB}/CheckMarching.png", CHECK_MARCHING))
-    if viking_enabled:
-        targets.insert(0, ("Viking/Summom.png", VIKING_SUMMON))
-    return targets
