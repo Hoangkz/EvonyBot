@@ -28,12 +28,16 @@ def run(bot, settings: dict):
     quantity = _number(settings.get("buy_stamina"))
     if quantity > 0:
         bot.log(f"Join Monster War: buy {quantity} stamina")
-        buy_stamina(bot, quantity)
-        settings["buy_stamina"] = "0"
+        if buy_stamina(bot, quantity):
+            settings["buy_stamina"] = "0"
+        else:
+            bot.log("Join Monster War: stamina purchase not completed; will retry")
     if settings.get("buy_hammer"):
         bot.log("Join Monster War: buy hammer")
-        buy_hammer(bot)
-        settings["buy_hammer"] = False
+        if buy_hammer(bot):
+            settings["buy_hammer"] = False
+        else:
+            bot.log("Join Monster War: hammer purchase not completed; will retry")
     _Boss(bot, settings).run()
 
 class _Boss:
@@ -260,10 +264,9 @@ class _Boss:
                 if pin is not None:
                     lw, _ = bot.template_size(LOCATION)
                     coords = read_coords(bot.crop(region, pin[0] + lw, pin[1], 80, 15))
-                    if coords is None:
-                        continue
-                    # Boss này đã xử lý rồi -> bỏ qua.
-                    if coords in self.not_join:
+                    # OCR lỗi không được chặn rally. C# vẫn tiếp tục xét và
+                    # join khi không tách được cặp toạ độ hợp lệ.
+                    if coords is not None and coords in self.not_join:
                         self.screen_blacklist.append((x, y))
                         continue
 

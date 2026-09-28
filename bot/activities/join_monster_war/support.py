@@ -13,10 +13,10 @@ SPEED = "SpeedMarchBoss"
 _SPEED_LOCK = threading.Lock()
 
 
-def buy_stamina(bot, quantity: int):
-    """Port of Data.BuyStamina. Quantity is the UI's 10/16/20 value."""
+def buy_stamina(bot, quantity: int) -> bool:
+    """Buy stamina and report whether the purchase was completed."""
     if quantity <= 0:
-        return
+        return False
     targets = [
         (f"{BUY}/buystamina.png", "buy"),
         (f"{BUY}/stamina.png", "stamina"),
@@ -50,7 +50,7 @@ def buy_stamina(bot, quantity: int):
             for _ in range(max(0, quantity - 1)):
                 bot.tap(*plus, delay=1)
             bot.tap(screen.shape[1] // 2, plus[1] + 110, delay=5)
-            return
+            return True
         elif action == "tap":
             bot.tap(*pos, delay=2)
         elif action == "back":
@@ -59,10 +59,11 @@ def buy_stamina(bot, quantity: int):
             go_home(bot, screen)
             delay(bot, 2)
     bot.log("Buy Stamina stopped: navigation limit reached")
+    return False
 
 
-def buy_hammer(bot):
-    """Port of Data.BuyHammer."""
+def buy_hammer(bot) -> bool:
+    """Buy a hammer and report whether the purchase was completed."""
     targets = [
         (f"{BUY}/bua.png", "hammer"),
         (f"{BUY}/checkSpecial.png", "special_list"),
@@ -85,13 +86,14 @@ def buy_hammer(bot):
                 continue
             bot.tap(plus[0] - 20, plus[1] + 2, delay=1)
             bot.tap(screen.shape[1] // 2, plus[1] + 110, delay=5)
-            return
+            return True
         elif action == "special_list":
             bot.tap(*pos, delay=1)
             bot.tap_percent(87.5, 35, delay=2)
             special_clicks += 1
             if special_clicks > 5:
-                return
+                bot.log("Buy Hammer stopped: purchase entry not found")
+                return False
         elif action == "tap":
             bot.tap(*pos, delay=2)
         elif action == "back":
@@ -100,6 +102,7 @@ def buy_hammer(bot):
             go_home(bot, screen)
             delay(bot, 2)
     bot.log("Buy Hammer stopped: navigation limit reached")
+    return False
 
 
 def crazy_eggs(bot) -> int | None:
