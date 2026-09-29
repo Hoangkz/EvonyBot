@@ -1,4 +1,4 @@
-"""Compact, responsive Join Monster War settings."""
+"""Compact Join Monster War settings with responsive boss groups."""
 import json
 from pathlib import Path
 
@@ -7,7 +7,6 @@ from PyQt5.QtWidgets import (
     QCheckBox, QComboBox, QGridLayout, QGroupBox, QHBoxLayout, QLabel,
     QPushButton, QRadioButton, QScrollArea, QVBoxLayout, QWidget,
 )
-
 from .tab_placeholder import BaseTab
 
 TROOP_RADIOS = [f"troop_{i}" for i in range(1, 9)]
@@ -22,9 +21,7 @@ class JoinMonsterWarTab(BaseTab):
         self._boss_grids = []
         self._columns = None
         self.setStyleSheet("""
-            QCheckBox, QRadioButton, QLabel, QComboBox, QPushButton {
-                font-size: 12px;
-            }
+            QCheckBox, QRadioButton, QLabel, QComboBox, QPushButton { font-size: 12px; }
             QCheckBox, QRadioButton { spacing: 3px; padding: 0px; }
             QCheckBox::indicator, QRadioButton::indicator { width: 13px; height: 13px; }
             QGroupBox { font-size: 12px; margin-top: 9px; padding-top: 5px; }
@@ -32,20 +29,17 @@ class JoinMonsterWarTab(BaseTab):
         """)
         self.body_layout.setContentsMargins(8, 4, 8, 8)
         self.body_layout.setSpacing(6)
-        scroll = self.findChild(QScrollArea)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.findChild(QScrollArea).setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         troop = QGroupBox("Troop")
-        grid = QGridLayout(troop)
-        self._troop_grid = grid
-        grid.setContentsMargins(8, 8, 8, 6)
-        grid.setHorizontalSpacing(8)
-        grid.setVerticalSpacing(3)
-        grid.setAlignment(Qt.AlignLeft)
+        self._troop_grid = QGridLayout(troop)
+        self._troop_grid.setContentsMargins(8, 8, 8, 6)
+        self._troop_grid.setSpacing(4)
+        self._troop_grid.setAlignment(Qt.AlignLeft)
         for i, name in enumerate(TROOP_RADIOS):
             button = QRadioButton(f"Troop {i + 1}")
             button.setChecked(i == 0)
             self.controls[name] = button
-            grid.addWidget(button, i // 4, i % 4)
+            self._troop_grid.addWidget(button, i // 2, i % 2)
         self.add_row(troop)
         stamina = QGroupBox("Use Stamina")
         row = QGridLayout(stamina)
@@ -123,7 +117,6 @@ class JoinMonsterWarTab(BaseTab):
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        # Reflow the groups instead of retaining a fixed-width designer page.
         available = max(1, self.width() - 64)
         troop_columns = 4 if available >= 450 else 2
         for i, name in enumerate(TROOP_RADIOS):
@@ -187,6 +180,7 @@ class JoinMonsterWarTab(BaseTab):
                 enabled.setChecked(name == "Viking" and bool(data.get("viking", False)))
                 for box in levels.values():
                     box.setChecked(True)
+
 
 
 def _set_radio(controls, values_by_name: dict, value):
