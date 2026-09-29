@@ -39,6 +39,7 @@ _SCHEMA = """
 CREATE TABLE IF NOT EXISTS devices (
     serial      TEXT PRIMARY KEY,
     server      TEXT,
+    server_time TEXT,
     created_at  TEXT NOT NULL,
     updated_at  TEXT NOT NULL
 );
@@ -89,6 +90,9 @@ class Database:
         columns = {row["name"] for row in self.conn.execute("PRAGMA table_info(devices)")}
         if "server" not in columns:
             self.conn.execute("ALTER TABLE devices ADD COLUMN server TEXT")
+        # Tự nâng cấp DB cũ; giữ nguyên dữ liệu thiết bị/cấu hình hiện có.
+        if "server_time" not in columns:
+            self.conn.execute("ALTER TABLE devices ADD COLUMN server_time TEXT")
         self.conn.commit()
         # Serials known to be in `devices`, including inserts still queued.
         self._known = {row["serial"] for row in self.conn.execute("SELECT serial FROM devices")}
@@ -150,6 +154,14 @@ class Database:
             (server or None, now, serial),
         ))
 
+    def set_server_time(self, serial: str, server_time: str):
+        """Lưu thời điểm reset ISO theo giờ máy (có ngày để xử lý qua nửa đêm)."""
+        now = _now()
+        self._write(lambda conn: conn.execute(
+            "UPDATE devices SET server_time = ?, updated_at = ? WHERE serial = ?",
+            (server_time or None, now, serial),
+        ))
+
     # ---- settings ----------------------------------------------------
     def save_settings(self, serial: str, settings: dict):
         """Save a DeviceView.get_settings()-style dict (keyed by tab title)."""
@@ -183,9 +195,10 @@ class Database:
         }
         if daily:
             result[DAILY_TAB] = daily
-        row = self.conn.execute("SELECT server FROM devices WHERE serial = ?", (serial,)).fetchone()
+        row = self.conn.execute("SELECT server, server_time FROM devices WHERE serial = ?", (serial,)).fetchone()
         if row is not None:
             result.setdefault(INIT_TAB, {})["server"] = row["server"] or ""
+            result[INIT_TAB]["server_time"] = row["server_time"] or ""
         return result
 
     # ---- daily task progress -----------------------------------------
@@ -228,7 +241,8 @@ def _save_settings(conn: sqlite3.Connection, serial: str, settings: dict, now: s
             if "server" in data:
                 conn.execute("UPDATE devices SET server = ? WHERE serial = ?",
                              (data["server"] or None, serial))
-            data = {k: v for k, v in data.items() if k not in ("device_id", "server")}
+            # server_time chỉ được ghi qua set_server_time, không sao chép qua Apply ALL.
+            data = {k: v for k, v in data.items() if k not in ("device_id", "server", "server_time")}
         if tab == DAILY_TAB:
             _save_daily_tasks(conn, serial, data, now)
             continue

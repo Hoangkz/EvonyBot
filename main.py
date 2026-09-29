@@ -62,6 +62,7 @@ class MainWindow(QMainWindow):
         )
         self.bots.running_changed.connect(self._on_bot_running_changed)
         self.bots.server_found.connect(self._on_server_found)
+        self.bots.server_time_found.connect(self.db.set_server_time)
         # Sub-tab index kept across devices, so switching device stays on
         # the same tab instead of jumping back to Initialization.
         self._current_tab_index = 0
@@ -184,10 +185,16 @@ class MainWindow(QMainWindow):
         view = self.device_views.get(device_id)
         if view is None:
             return
+        settings = view.get_settings()
+        # Đây là dữ liệu riêng của thiết bị trong DB, không phải cấu hình Apply ALL.
+        saved = self.db.load_settings(device_id)
+        settings.setdefault("Initialization", {})["server_time"] = (
+            saved.get("Initialization", {}).get("server_time") or ""
+        )
         self.bots.start(
             device_id,
             view.initialization_tab.selected_activities(),
-            view.get_settings(),
+            settings,
         )
 
     def _on_bot_running_changed(self, device_id: str, running: bool):

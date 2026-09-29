@@ -11,5 +11,6 @@ per reader, each exposing `run(image)`:
 from .read_coords import run as read_coords
 from .read_number import run as read_number
 from .read_server import run as read_server
+from .read_server_time import run as read_server_time
 
-__all__ = ["read_coords", "read_number", "read_server"]
+__all__ = ["read_coords", "read_number", "read_server", "read_server_time"]
