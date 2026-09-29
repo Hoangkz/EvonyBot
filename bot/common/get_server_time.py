@@ -4,7 +4,6 @@ from datetime import datetime
 from ..ocr import read_server_time
 from .delay import delay
 from .go_home import go_home
-from .wait_gone import wait_gone
 
 SERVER_TIME = "Server/serverTime.png"
 LIST_ACTIVITY = "Server/listActivity.png"
@@ -14,7 +13,6 @@ VALUE_WIDTH = 190  # Đủ cho YYYY-MM-DD HH:MM:SS ở cỡ chữ của ảnh m�
 
 def get_server_time(bot) -> str | None:
     """Chưa đọc được thì trả None để worker thử lại trước activity sau."""
-    targets = [(LIST_ACTIVITY, "tap")]
     for _ in range(MAX_ROUNDS):
         screen = bot.screenshot()
         observed_at = datetime.now()
@@ -30,15 +28,16 @@ def get_server_time(bot) -> str | None:
                 bot.log(f"Server reset: {reset_at}")
                 return reset_at
             # Menu có thể đang chuyển cảnh: chờ rồi chụp lại, không lưu OCR lỗi.
-            delay(bot, 0.3)
+            delay(bot, 0.5)
             continue
 
         pos = bot.find(LIST_ACTIVITY, screen=screen)
         if pos is not None:
             bot.tap(*pos)
-            wait_gone(bot, targets, "tap", pos)
+            # Chỉ mở popup, nút vẫn còn: chờ 2 giây rồi vòng sau chụp lại.
+            delay(bot, 2)
         else:
             go_home(bot, screen)
-            delay(bot, 0.3)
+            delay(bot, 0.5)
     bot.log("Server time: không đọc được")
     return None
