@@ -1,10 +1,11 @@
 """Compact Join Monster War settings with responsive boss groups."""
 import json
+import textwrap
 from pathlib import Path
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
-    QCheckBox, QComboBox, QGridLayout, QGroupBox, QLabel,
+    QCheckBox, QComboBox, QGridLayout, QGroupBox, QHBoxLayout, QLabel, QPushButton,
     QRadioButton, QScrollArea, QVBoxLayout, QWidget,
 )
 from .tab_placeholder import BaseTab
@@ -15,24 +16,27 @@ STAMINA_RADIOS = {"stamina_all": "ALL", "stamina_100": "100", "stamina_no": "No"
 
 class JoinMonsterWarTab(BaseTab):
     def __init__(self, parent=None):
-        super().__init__(title="Join Monster War", parent=parent)
+        super().__init__(title="Join Monster War", show_apply_all=False, parent=parent)
         self.controls = {}
         self.boss_choices = []
         self._boss_grids = []
         self._columns = None
-        self._boss_style = """
-            QCheckBox, QRadioButton, QLabel, QComboBox, QPushButton { font-size: 12px; }
-            QCheckBox, QRadioButton { spacing: 3px; padding: 0px; }
-            QCheckBox::indicator, QRadioButton::indicator { width: 13px; height: 13px; }
-            QGroupBox { font-size: 12px; margin-top: 9px; padding-top: 5px; }
-            QPushButton { padding: 3px 8px; }
-        """
-        self.body_layout.setContentsMargins(8, 4, 8, 8)
-        self.body_layout.setSpacing(6)
+        self._boss_style = "QCheckBox { spacing: 3px; padding: 0px; }"
+        self.body_layout.setContentsMargins(20, 16, 21, 16)
+        self.body_layout.setSpacing(7)
+        apply_row = QWidget()
+        apply_layout = QHBoxLayout(apply_row)
+        apply_layout.setContentsMargins(0, 0, 0, 0)
+        apply_layout.addStretch()
+        self.apply_all_button = QPushButton("Apply ALL")
+        self.apply_all_button.setFixedSize(132, 43)
+        self.apply_all_button.clicked.connect(self.on_apply_all)
+        apply_layout.addWidget(self.apply_all_button)
+        self.add_row(apply_row)
         self.findChild(QScrollArea).setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         header = QWidget()
         self._header_grid = QGridLayout(header)
-        self._header_grid.setContentsMargins(12, 0, 12, 0)
+        self._header_grid.setContentsMargins(0, 0, 0, 0)
         self._header_grid.setSpacing(6)
         troop = QGroupBox("Troop")
         self._troop_group = troop
@@ -84,20 +88,25 @@ class JoinMonsterWarTab(BaseTab):
             group = QGroupBox(category["label"])
             group.setStyleSheet(self._boss_style)
             grid = QGridLayout(group)
-            grid.setContentsMargins(8, 8, 8, 6)
+            grid.setContentsMargins(32, 32, 32, 16)
             grid.setHorizontalSpacing(12)
-            grid.setVerticalSpacing(5)
+            grid.setVerticalSpacing(16)
             grid.setAlignment(Qt.AlignTop | Qt.AlignLeft)
             cards = []
             for boss in category["list"]:
                 levels = boss.get("levels", [boss["level"]] if "level" in boss else [])
                 card = QGroupBox(boss["name"]) if levels else QWidget()
                 row = QVBoxLayout(card)
-                row.setContentsMargins(6, 8, 6, 5) if levels else row.setContentsMargins(0, 0, 0, 0)
+                row.setContentsMargins(12, 20, 12, 12) if levels else row.setContentsMargins(0, 0, 0, 0)
                 row.setSpacing(2)
+                if levels and len(boss["name"]) > 20:
+                    card.setTitle("")
+                    title = QLabel(boss["name"])
+                    title.setWordWrap(True)
+                    row.addWidget(title)
                 enabled = None
                 if not levels:
-                    enabled = QCheckBox(boss["name"].replace(" / ", " /\n"))
+                    enabled = QCheckBox(textwrap.fill(boss["name"], width=22))
                     row.addWidget(enabled)
                 level_boxes = {}
                 level_grid = QGridLayout()
@@ -137,7 +146,9 @@ class JoinMonsterWarTab(BaseTab):
         super().resizeEvent(event)
         available = max(1, self.width() - 64)
         narrow = available < 400
-        self._header_grid.setContentsMargins(0 if narrow else 12, 0, 0 if narrow else 12, 0)
+        self.body_layout.setContentsMargins(8 if narrow else 20, 16, 8 if narrow else 21, 16)
+        for grid, _ in self._boss_grids:
+            grid.setContentsMargins(8 if narrow else 32, 32, 8 if narrow else 32, 16)
         self._troop_grid.setContentsMargins(8 if narrow else 32, 32, 8 if narrow else 32, 16)
         self._stamina_grid.setContentsMargins(8 if narrow else 29, 32, 8 if narrow else 18, 16)
         wide = available >= 1000
@@ -151,7 +162,7 @@ class JoinMonsterWarTab(BaseTab):
             self._troop_grid.addWidget(button, i // troop_columns, i % troop_columns)
         card_width = max((card.sizeHint().width() for _, cards in self._boss_grids
                           for card in cards), default=240)
-        columns = max(1, available // (card_width + 12))
+        columns = max(1, (available - (16 if narrow else 64)) // (card_width + 12))
         if columns == self._columns:
             return
         self._columns = columns
