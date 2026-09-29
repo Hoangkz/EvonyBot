@@ -1,118 +1,146 @@
-"""
-Join Monster War settings with a compact boss selection grid.
-"""
+"""Compact, responsive Join Monster War settings."""
 import json
 from pathlib import Path
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
-    QCheckBox, QGridLayout, QGroupBox, QHBoxLayout, QLabel, QPushButton,
-    QScrollArea, QTabWidget, QVBoxLayout, QWidget,
+    QCheckBox, QComboBox, QGridLayout, QGroupBox, QHBoxLayout, QLabel,
+    QPushButton, QRadioButton, QScrollArea, QVBoxLayout, QWidget,
 )
 
-from .tab_placeholder import DesignerTab
+from .tab_placeholder import BaseTab
 
-DESIGNER_DATA = {
-    "ChoiceSatamina": {"children": ["radioButton9", "radioButton12", "radioButton10"],
-                        "loc": [33, 39], "size": [273, 49], "type": "Panel"},
-    "ChoiceTroop": {"children": ["radioButton5", "radioButton6", "radioButton2", "radioButton7",
-                                  "radioButton3", "radioButton8", "radioButton1", "radioButton4"],
-                     "loc": [32, 39], "size": [655, 94], "type": "Panel"},
-    "buttonJoinBossApplyAll": {"loc": [935, 16], "size": [132, 43], "text": "Apply ALL", "type": "Button"},
-    "comboBoxBuyStamina": {"loc": [168, 103], "size": [84, 30], "type": "ComboBox"},
-    "groupBox1": {"children": ["ChoiceTroop"], "loc": [20, 66], "size": [711, 150],
-                  "text": "Troop", "type": "GroupBox"},
-    "groupBox4": {"children": ["label7", "comboBoxBuyStamina", "ChoiceSatamina"], "loc": [737, 66],
-                  "size": [325, 150], "text": "Use Stamina", "type": "GroupBox"},
-    "label7": {"loc": [29, 109], "size": [124, 24], "text": "Buy Stamina: ", "type": "Label"},
-    "radioButton1": {"checked": True, "loc": [33, 12], "size": [97, 28], "text": "Troop 1", "type": "RadioButton"},
-    "radioButton10": {"checked": True, "loc": [96, 11], "size": [61, 28], "text": "100", "type": "RadioButton"},
-    "radioButton12": {"loc": [176, 11], "size": [56, 28], "text": "No", "type": "RadioButton"},
-    "radioButton2": {"loc": [200, 12], "size": [97, 28], "text": "Troop 2", "type": "RadioButton"},
-    "radioButton3": {"loc": [33, 61], "size": [97, 28], "text": "Troop 5", "type": "RadioButton"},
-    "radioButton4": {"loc": [200, 61], "size": [97, 28], "text": "Troop 6", "type": "RadioButton"},
-    "radioButton5": {"loc": [520, 61], "size": [97, 28], "text": "Troop 8", "type": "RadioButton"},
-    "radioButton6": {"loc": [358, 12], "size": [97, 28], "text": "Troop 3", "type": "RadioButton"},
-    "radioButton7": {"loc": [358, 61], "size": [97, 28], "text": "Troop 7", "type": "RadioButton"},
-    "radioButton8": {"loc": [520, 12], "size": [97, 28], "text": "Troop 4", "type": "RadioButton"},
-    "radioButton9": {"loc": [16, 11], "size": [64, 28], "text": "ALL", "type": "RadioButton"},
-    "tabPage2": {"children": ["buttonJoinBossApplyAll", "groupBox4", "groupBox1"],
-                 "loc": [4, 31], "size": [1088, 609], "text": "Join Monster War", "type": "TabPage"},
-}
-COMBO_ITEMS = {"comboBoxBuyStamina": ["10", "16", "20"]}
-PAGE_SIZE = (1088, 700)
-
-TROOP_RADIOS = ["radioButton1", "radioButton2", "radioButton6", "radioButton8",
-                "radioButton3", "radioButton7", "radioButton5", "radioButton4"]
-STAMINA_RADIOS = {"radioButton9": "ALL", "radioButton10": "100", "radioButton12": "No"}
+TROOP_RADIOS = [f"troop_{i}" for i in range(1, 9)]
+STAMINA_RADIOS = {"stamina_all": "ALL", "stamina_100": "100", "stamina_no": "No"}
 
 
-class JoinMonsterWarTab(DesignerTab):
+class JoinMonsterWarTab(BaseTab):
     def __init__(self, parent=None):
-        super().__init__("tabPage2", DESIGNER_DATA, COMBO_ITEMS, PAGE_SIZE, parent=parent)
+        super().__init__(title="Join Monster War", parent=parent)
+        self.controls = {}
         self.boss_choices = []
+        self._boss_grids = []
+        self._columns = None
+        self.setStyleSheet("""
+            QCheckBox, QRadioButton, QLabel, QComboBox, QPushButton {
+                font-size: 12px;
+            }
+            QCheckBox, QRadioButton { spacing: 3px; padding: 0px; }
+            QCheckBox::indicator, QRadioButton::indicator { width: 13px; height: 13px; }
+            QGroupBox { font-size: 12px; margin-top: 9px; padding-top: 5px; }
+            QPushButton { padding: 3px 8px; }
+        """)
+        self.body_layout.setContentsMargins(8, 4, 8, 8)
+        self.body_layout.setSpacing(6)
+        scroll = self.findChild(QScrollArea)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        troop = QGroupBox("Troop")
+        grid = QGridLayout(troop)
+        self._troop_grid = grid
+        grid.setContentsMargins(8, 8, 8, 6)
+        grid.setHorizontalSpacing(8)
+        grid.setVerticalSpacing(3)
+        grid.setAlignment(Qt.AlignLeft)
+        for i, name in enumerate(TROOP_RADIOS):
+            button = QRadioButton(f"Troop {i + 1}")
+            button.setChecked(i == 0)
+            self.controls[name] = button
+            grid.addWidget(button, i // 4, i % 4)
+        self.add_row(troop)
+        stamina = QGroupBox("Use Stamina")
+        row = QGridLayout(stamina)
+        row.setContentsMargins(8, 8, 8, 6)
+        row.setSpacing(4)
+        row.setAlignment(Qt.AlignLeft)
+        for i, (name, label) in enumerate(STAMINA_RADIOS.items()):
+            button = QRadioButton(label)
+            button.setChecked(label == "100")
+            self.controls[name] = button
+            row.addWidget(button, 0, i)
+        row.addWidget(QLabel("Buy Stamina:"), 1, 0, 1, 2)
+        combo = QComboBox()
+        combo.addItems(["10", "16", "20"])
+        self.controls["comboBoxBuyStamina"] = combo
+        row.addWidget(combo, 1, 2)
+        self.add_row(stamina)
         self._build_boss_selector()
 
     def _build_boss_selector(self):
-        group = QGroupBox("Choose Boss", self.page)
-        group.setGeometry(20, 230, 1042, 450)
-        layout = QVBoxLayout(group)
         try:
             catalog = json.loads(Path(__file__).with_name("boss.json").read_text(encoding="utf-8-sig"))
         except (OSError, ValueError) as exc:
             error = QLabel(f"Cannot load boss.json: {exc}")
             error.setWordWrap(True)
-            layout.addWidget(error)
+            self.add_row(error)
             return
-
-        toolbar = QHBoxLayout()
+        toolbar = QWidget()
+        buttons = QHBoxLayout(toolbar)
+        buttons.setContentsMargins(0, 0, 0, 0)
+        buttons.setSpacing(4)
         for title, checked in (("Select All", True), ("Clear All", False)):
             button = QPushButton(title)
             button.clicked.connect(lambda _=False, value=checked: self._select_all_bosses(value))
-            toolbar.addWidget(button)
-        toolbar.addStretch()
-        layout.addLayout(toolbar)
-        tabs = QTabWidget()
-        layout.addWidget(tabs)
+            buttons.addWidget(button)
+        buttons.addStretch()
+        self.add_row(toolbar)
         for category in catalog["boss_categories"]:
-            scroll = QScrollArea()
-            scroll.setWidgetResizable(True)
-            content = QWidget()
-            rows = QGridLayout(content)
-            rows.setAlignment(Qt.AlignTop)
-            rows.setSpacing(8)
-            for column in range(3):
-                rows.setColumnStretch(column, 1)
-            for index, boss in enumerate(category["list"]):
-                card = QGroupBox()
+            group = QGroupBox(category["label"])
+            grid = QGridLayout(group)
+            grid.setContentsMargins(8, 8, 8, 6)
+            grid.setHorizontalSpacing(12)
+            grid.setVerticalSpacing(5)
+            grid.setAlignment(Qt.AlignTop | Qt.AlignLeft)
+            cards = []
+            for boss in category["list"]:
+                card = QWidget()
                 row = QVBoxLayout(card)
-                row.setContentsMargins(10, 8, 10, 8)
-                enabled = QCheckBox()
-                enabled.setAccessibleName(boss["name"])
-                enabled.setToolTip(boss["name"])
-                title = QLabel(boss["name"])
-                title.setWordWrap(True)
-                title.setBuddy(enabled)
-                heading = QHBoxLayout()
-                heading.addWidget(enabled)
-                heading.addWidget(title, 1)
-                row.addLayout(heading)
-                level_boxes = {}
+                row.setContentsMargins(0, 0, 0, 0)
+                row.setSpacing(2)
+                enabled = QCheckBox(boss["name"].replace(" / ", " /\n"))
+                row.addWidget(enabled)
                 levels = boss.get("levels", [boss["level"]] if "level" in boss else [])
+                level_boxes = {}
                 level_grid = QGridLayout()
-                for level_index, level in enumerate(levels):
-                    box = QCheckBox(f"Lv {level}")
+                level_grid.setContentsMargins(16, 0, 0, 0)
+                level_grid.setHorizontalSpacing(5)
+                level_grid.setVerticalSpacing(2)
+                level_grid.setAlignment(Qt.AlignLeft)
+                for i, level in enumerate(levels):
+                    box = QCheckBox(str(level))
+                    box.setToolTip(f"{boss['name']} - Level {level}")
                     box.setChecked(True)
                     box.setEnabled(False)
                     enabled.toggled.connect(box.setEnabled)
                     level_boxes[level] = box
-                    level_grid.addWidget(box, level_index // 3, level_index % 3)
+                    level_grid.addWidget(box, i // 4, i % 4)
                 if levels:
                     row.addLayout(level_grid)
-                rows.addWidget(card, index // 3, index % 3)
+                cards.append(card)
+                grid.addWidget(card, len(cards) - 1, 0, Qt.AlignTop)
                 self.boss_choices.append((category["category_key"], boss["name"], enabled, level_boxes))
-            scroll.setWidget(content)
-            tabs.addTab(scroll, category["label"])
+            self._boss_grids.append((grid, cards))
+            self.add_row(group)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        # Reflow the groups instead of retaining a fixed-width designer page.
+        available = max(1, self.width() - 64)
+        troop_columns = 4 if available >= 450 else 2
+        for i, name in enumerate(TROOP_RADIOS):
+            button = self.controls[name]
+            self._troop_grid.removeWidget(button)
+            self._troop_grid.addWidget(button, i // troop_columns, i % troop_columns)
+        card_width = max((card.sizeHint().width() for _, cards in self._boss_grids
+                          for card in cards), default=240)
+        columns = max(1, available // (card_width + 12))
+        if columns == self._columns:
+            return
+        self._columns = columns
+        for grid, cards in self._boss_grids:
+            for card in cards:
+                grid.removeWidget(card)
+            for i, card in enumerate(cards):
+                grid.addWidget(card, i // columns, i % columns, Qt.AlignTop)
 
     def _select_all_bosses(self, checked):
         for _, _, enabled, levels in self.boss_choices:
