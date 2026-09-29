@@ -17,6 +17,9 @@ class BotContext(FlowMixin, InputMixin, ScreenMixin):
         self.serial = device.serial
         self._stop = stop_event
         self._deadline = deadline    # time.monotonic() value, or None for no limit
+        self._boss_event = threading.Event()
+        self._boss_interrupt_enabled = False
+        self.report_boss = lambda coords: None
         self._log = log
         self._templates: dict[str, np.ndarray] = {}
         self._window_size: tuple[int, int] | None = None

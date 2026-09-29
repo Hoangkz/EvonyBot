@@ -241,6 +241,7 @@ class _Boss:
                 continue
 
             # 5. Tap nút Join
+            bot.report_boss(coords)
             bot.tap(x + jw // 2, y + jh // 2)
             self._remember(coords, x, y)
             self.idle_scrolls = 0

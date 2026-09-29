@@ -11,6 +11,7 @@ from ..activities import ACTIVITIES
 from ..activities.join_monster_war import IDLE as BOSS_IDLE
 from ..common import get_server, get_server_time
 from ..context import BotContext, BotInterrupted, TimedOut
+from ..context.errors import BossAvailable
 from .status import STATUS_ERROR, STATUS_RUNNING, STATUS_STOPPED
 
 JOIN_BOSS = "Join Monster War"
@@ -26,10 +27,11 @@ class BotWorker(QThread):
 
     server_time_found = pyqtSignal(str, str)  # (serial, thời điểm reset giờ máy)
 
-    def __init__(self, serial: str, activities: list[str], settings: dict, parent=None):
+    def __init__(self, serial: str, activities: list[str], settings: dict, parent=None, *, boss_board=None):
         super().__init__(parent)
         # Lưu thiết bị và sao chép danh sách activity cho lượt chạy.
         self.serial = serial
+        self.boss_board = boss_board
         self.activities = list(activities)
         # Nhận cấu hình từ UI; ở đây giữ tham chiếu, không sao chép settings.
         self.settings = settings            # DeviceView.get_settings() snapshot
@@ -56,6 +58,8 @@ class BotWorker(QThread):
             # Truyền cờ Stop, deadline None (không giới hạn) và hàm log.
             self.ctx = BotContext(device, self._stop, None, self.log)
             self.ctx.settings = self.settings
+            self.ctx.report_boss = self._report_boss
+            self._register_boss_listener()
             # Tách activity phụ để chọn chế độ điều phối.
             others = [a for a in self.activities if a != JOIN_BOSS]
             # Có cả boss và activity phụ thì ưu tiên boss; còn lại chạy theo danh sách.
@@ -72,6 +76,8 @@ class BotWorker(QThread):
             print(f"[{self.serial}] {status}")
         # Luôn xóa activity đang hiển thị và báo trạng thái cuối, kể cả khi lỗi.
         finally:
+            if self.boss_board is not None:
+                self.boss_board.unregister(self.serial)
             self.activity_changed.emit(self.serial, "None")
             self.status_changed.emit(self.serial, status)
 
@@ -109,6 +115,7 @@ class BotWorker(QThread):
             self._ensure_server_time()
             self._ensure_server()
             self.activity_changed.emit(self.serial, JOIN_BOSS)
+            self.ctx._boss_event.clear()
             # Tạo cấu hình tạm: boss trả về IDLE khi rảnh để nhường activity phụ; không sửa settings gốc.
             result = self._run_activity(JOIN_BOSS, {**self.settings.get(JOIN_BOSS, {}), "exit_when_idle": True})
             # Boss trả về khác IDLE: chạy nốt danh sách chờ rồi kết thúc.
@@ -120,9 +127,11 @@ class BotWorker(QThread):
             # Dùng monotonic để không bị ảnh hưởng bởi chỉnh giờ hệ thống.
             # Timeout chỉ phát hiện khi BotContext kiểm tra; không ngắt cưỡng chế.
             self.ctx._deadline = time.monotonic() + OTHERS_WINDOW
+            self.ctx._boss_interrupt_enabled = True
             try:
                 # Chạy lần lượt các activity còn chờ trong khoảng thời gian được cấp.
                 while pending:
+                    self.ctx.check()
                     self.activity_changed.emit(self.serial, pending[0])
                     self._run_activity(pending[0], self.settings.get(pending[0], {}))
                     # Chỉ xóa khi activity trả về bình thường; nếu timeout thì vẫn giữ trong pending.
@@ -131,8 +140,11 @@ class BotWorker(QThread):
             # Lượt sau gọi lại từ đầu hàm run(); worker không lưu điểm thực thi.
             except TimedOut:
                 pass    # hết 2 phút -> pending[0] là activity đang dở, lượt sau làm tiếp
+            except BossAvailable:
+                self.log("New boss on this server; switching to Join Monster War")
             # Luôn gỡ deadline, kể cả khi Stop/lỗi, để không ảnh hưởng lượt chạy boss.
             finally:
+                self.ctx._boss_interrupt_enabled = False
                 self.ctx._deadline = None
 
     def _ensure_server_time(self):
@@ -156,8 +168,17 @@ class BotWorker(QThread):
         server = get_server(self.ctx)
         if server:
             self.server = server
+            self._register_boss_listener()
             # Gửi server cho UI xử lý/lưu; worker chỉ cập nhật self.server.
             self.server_found.emit(self.serial, server)
+
+    def _register_boss_listener(self):
+        if self.boss_board is not None and JOIN_BOSS in self.activities:
+            self.boss_board.register(self.serial, self.server, self.ctx._boss_event)
+
+    def _report_boss(self, coords):
+        if self.boss_board is not None:
+            self.boss_board.publish(self.serial, self.server, coords)
 
     def _run_activity(self, activity: str, tab_settings: dict):
         # Tra registry để lấy hàm run theo tên activity.

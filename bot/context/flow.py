@@ -3,13 +3,15 @@ flow.py — flow control: stop / time-out checks, interruptible sleep, log.
 """
 import time
 
-from .errors import StopRequested, TimedOut
+from .errors import BossAvailable, StopRequested, TimedOut
 
 
 class FlowMixin:
     def check(self):
         if self._stop.is_set():
             raise StopRequested()
+        if self._boss_interrupt_enabled and self._boss_event.is_set():
+            raise BossAvailable()
         if self._deadline is not None and time.monotonic() >= self._deadline:
             raise TimedOut()
 
