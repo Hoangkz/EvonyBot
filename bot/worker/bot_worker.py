@@ -4,18 +4,22 @@ on its own QThread (Join Boss keeps going until it stops by itself or Stop).
 """
 import threading
 import time
+from datetime import datetime
 
 from PyQt5.QtCore import QThread, pyqtSignal
 
 from ..activities import ACTIVITIES
 from ..activities.join_monster_war import IDLE as BOSS_IDLE
 from ..common import get_server, get_server_time
+from ..daily_reset import done_today, last_reset
 from ..context import BotContext, BotInterrupted, TimedOut
 from ..context.errors import BossAvailable
 from .status import STATUS_ERROR, STATUS_RUNNING, STATUS_STOPPED
 
 JOIN_BOSS = "Join Monster War"
+DAILY = "Daily Activities"
 OTHERS_WINDOW = 120   # giây tối đa làm activity khác trước khi quay lại kiểm tra boss
+IDLE_WAIT = 5         # giây nghỉ khi boss rảnh mà không còn activity khác để làm
 
 
 # Điều phối activity của một thiết bị trên QThread riêng.
@@ -26,8 +30,10 @@ class BotWorker(QThread):
     server_found = pyqtSignal(str, str)       # (serial, server)
 
     server_time_found = pyqtSignal(str, str)  # (serial, thời điểm reset giờ máy)
+    daily_task_done = pyqtSignal(str, str)    # (serial, task Daily Activities vừa xong)
 
-    def __init__(self, serial: str, activities: list[str], settings: dict, parent=None, *, boss_board=None):
+    def __init__(self, serial: str, activities: list[str], settings: dict, parent=None, *,
+                 boss_board=None, daily_done: dict | None = None):
         super().__init__(parent)
         # Lưu thiết bị và sao chép danh sách activity cho lượt chạy.
         self.serial = serial
@@ -40,6 +46,9 @@ class BotWorker(QThread):
         # Cờ Stop dùng chung giữa UI và BotContext.
         self._stop = threading.Event()
         self.server_time = settings.get("Initialization", {}).get("server_time") or ""
+        # {task: done_at} lấy từ DB; task chỉ tính là xong nếu done_at sau mốc reset gần nhất.
+        self.daily_done = dict(daily_done or {})
+        self._daily_ran_for = None   # mốc reset của lần chạy Daily Activities gần nhất
 
     def stop(self):
         # Chỉ yêu cầu dừng; activity phải kiểm tra cờ, không cưỡng chế tắt thread.
@@ -59,6 +68,8 @@ class BotWorker(QThread):
             self.ctx = BotContext(device, self._stop, None, self.log)
             self.ctx.settings = self.settings
             self.ctx.report_boss = self._report_boss
+            self.ctx.is_daily_done = self._is_daily_done
+            self.ctx.mark_daily_done = self._mark_daily_done
             self._register_boss_listener()
             # Tách activity phụ để chọn chế độ điều phối.
             others = [a for a in self.activities if a != JOIN_BOSS]
@@ -106,8 +117,12 @@ class BotWorker(QThread):
         pending = list(others)   # activity chưa hoàn thành, pending[0] là cái đang dở
         # Lặp lịch ưu tiên boss cho đến khi Stop hoặc có nhánh return.
         while not self._stop.is_set():
+            # Qua mốc reset server -> Daily Activities được làm lại trong ngày mới.
+            if DAILY in others and DAILY not in pending and self._daily_reset_passed():
+                pending.append(DAILY)
             # Hết activity phụ: chạy boss với cấu hình gốc rồi kết thúc điều phối.
-            if not pending:
+            # Có Daily Activities thì vẫn giữ vòng lặp để chờ ngày mới.
+            if not pending and DAILY not in others:
                 self._run_once([JOIN_BOSS])
                 return
 
@@ -126,6 +141,10 @@ class BotWorker(QThread):
             # Boss rảnh: cấp chung 120 giây cho cả nhóm activity phụ, không phải từng activity.
             # Dùng monotonic để không bị ảnh hưởng bởi chỉnh giờ hệ thống.
             # Timeout chỉ phát hiện khi BotContext kiểm tra; không ngắt cưỡng chế.
+            if not pending:
+                # Chỉ còn chờ ngày mới cho Daily Activities: nghỉ ngắn rồi kiểm tra boss lại.
+                self.ctx.sleep(IDLE_WAIT)
+                continue
             self.ctx._deadline = time.monotonic() + OTHERS_WINDOW
             self.ctx._boss_interrupt_enabled = True
             try:
@@ -172,6 +191,16 @@ class BotWorker(QThread):
             # Gửi server cho UI xử lý/lưu; worker chỉ cập nhật self.server.
             self.server_found.emit(self.serial, server)
 
+    def _daily_reset_passed(self) -> bool:
+        return self._daily_ran_for is not None and last_reset(self.server_time) > self._daily_ran_for
+
+    def _is_daily_done(self, task: str) -> bool:
+        return done_today(self.daily_done.get(task), self.server_time)
+
+    def _mark_daily_done(self, task: str):
+        self.daily_done[task] = datetime.now().isoformat(timespec="seconds")
+        self.daily_task_done.emit(self.serial, task)
+
     def _register_boss_listener(self):
         if self.boss_board is not None and JOIN_BOSS in self.activities:
             self.boss_board.register(self.serial, self.server, self.ctx._boss_event)
@@ -188,6 +217,8 @@ class BotWorker(QThread):
             self.log(f"Unknown activity: {activity}")
             self.ctx.sleep(1.0)
             return None
+        if activity == DAILY:
+            self._daily_ran_for = last_reset(self.server_time)
         # Trả nguyên kết quả; để exception truyền lên cấp điều phối xử lý.
         return run(self.ctx, tab_settings)
 

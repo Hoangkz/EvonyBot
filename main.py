@@ -63,6 +63,7 @@ class MainWindow(QMainWindow):
         self.bots.running_changed.connect(self._on_bot_running_changed)
         self.bots.server_found.connect(self._on_server_found)
         self.bots.server_time_found.connect(self.db.set_server_time)
+        self.bots.daily_task_done.connect(self.db.mark_daily_task_done)
         # Sub-tab index kept across devices, so switching device stays on
         # the same tab instead of jumping back to Initialization.
         self._current_tab_index = 0
@@ -195,6 +196,7 @@ class MainWindow(QMainWindow):
             device_id,
             view.initialization_tab.selected_activities(),
             settings,
+            daily_done=self.db.daily_done(device_id),
         )
 
     def _on_bot_running_changed(self, device_id: str, running: bool):

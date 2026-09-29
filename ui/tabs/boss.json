@@ -5,96 +5,119 @@
             "label": "Boss Standard",
             "list": [
                 {
-                    "levels": [ ],
-                    "name": "Zombie"
+                    "levels": [],
+                    "name": "Zombie",
+                    "default": true
                 },
                 {
-                    "levels": [ ],
-                    "name": "Redcap"
+                    "levels": [],
+                    "name": "Redcap",
+                    "default": true
                 },
                 {
-                    "levels": [ ],
-                    "name": "Centaur"
+                    "levels": [],
+                    "name": "Centaur",
+                    "default": true
                 },
                 {
-                    "levels": [ ],
-                    "name": "Skeleton Dragon"
+                    "levels": [],
+                    "name": "Skeleton Dragon",
+                    "default": true
                 },
                 {
-                    "levels": [ ],
-                    "name": "Werewolf"
+                    "levels": [],
+                    "name": "Werewolf",
+                    "default": true
                 },
                 {
-                    "levels": [ ],
-                    "name": "Manticore"
+                    "levels": [],
+                    "name": "Manticore",
+                    "default": true
                 },
                 {
-                    "levels": [ ],
-                    "name": "Yasha"
+                    "levels": [],
+                    "name": "Yasha",
+                    "default": true
                 },
                 {
-                    "levels": [ ],
-                    "name": "Peryton"
+                    "levels": [],
+                    "name": "Peryton",
+                    "default": true
                 },
                 {
-                    "levels": [ ],
-                    "name": "Minotaur"
+                    "levels": [],
+                    "name": "Minotaur",
+                    "default": true
                 },
                 {
-                    "levels": [ ],
-                    "name": "Griffin"
+                    "levels": [],
+                    "name": "Griffin",
+                    "default": true
                 },
                 {
-                    "levels": [ ],
-                    "name": "Ifrit"
+                    "levels": [],
+                    "name": "Ifrit",
+                    "default": true
                 },
                 {
-                    "levels": [ ],
-                    "name": "Kamaitachi"
+                    "levels": [],
+                    "name": "Kamaitachi",
+                    "default": true
                 },
                 {
-                    "levels": [ ],
-                    "name": "Fafnir"
+                    "levels": [],
+                    "name": "Fafnir",
+                    "default": true
                 },
                 {
-                    "levels": [ ],
-                    "name": "Behemoth"
+                    "levels": [],
+                    "name": "Behemoth",
+                    "default": true
                 },
                 {
-                    "levels": [ ],
-                    "name": "Phoenix"
+                    "levels": [],
+                    "name": "Phoenix",
+                    "default": true
                 },
                 {
-                    "levels": [ ],
-                    "name": "Jormungandr"
+                    "levels": [],
+                    "name": "Jormungandr",
+                    "default": true
                 },
                 {
-                    "levels": [ ],
-                    "name": "Typhon"
+                    "levels": [],
+                    "name": "Typhon",
+                    "default": true
                 },
                 {
-                    "levels": [ ],
-                    "name": "Ammit"
+                    "levels": [],
+                    "name": "Ammit",
+                    "default": true
                 },
                 {
-                    "levels": [ ],
-                    "name": "Stymphalian Bird"
+                    "levels": [],
+                    "name": "Stymphalian Bird",
+                    "default": true
                 },
                 {
-                    "levels": [ ],
-                    "name": "Lernean Hydra"
+                    "levels": [],
+                    "name": "Lernean Hydra",
+                    "default": true
                 },
                 {
-                    "levels": [ ],
-                    "name": "Nian"
+                    "levels": [],
+                    "name": "Nian",
+                    "default": true
                 },
                 {
-                    "levels": [ ],
-                    "name": "Chocobo"
+                    "levels": [],
+                    "name": "Chocobo",
+                    "default": true
                 },
                 {
-                    "levels": [ ],
-                    "name": "Apex World Dragon"
+                    "levels": [],
+                    "name": "Apex World Dragon",
+                    "default": true
                 }
             ]
         },
@@ -104,51 +127,231 @@
             "list": [
                 {
                     "name": "Cerberus",
-                    "levels": [ 1, 2, 3, 4, 5 ]
+                    "levels": [
+                        1,
+                        2,
+                        3,
+                        4,
+                        5
+                    ],
+                    "default": []
                 },
                 {
                     "name": "Ymir",
-                    "levels": [ 1, 2, 3, 4, 5, 6, 7 ]
+                    "levels": [
+                        1,
+                        2,
+                        3,
+                        4,
+                        5,
+                        6,
+                        7
+                    ],
+                    "default": [
+                        2,
+                        3,
+                        4,
+                        5,
+                        6,
+                        7
+                    ]
                 },
                 {
                     "name": "Sphinx",
-                    "levels": [ 1, 2, 3, 4, 5, 6, 7, 8 ]
+                    "levels": [
+                        1,
+                        2,
+                        3,
+                        4,
+                        5,
+                        6,
+                        7,
+                        8
+                    ],
+                    "default": [
+                        2,
+                        3,
+                        4,
+                        5,
+                        6,
+                        7,
+                        8
+                    ]
                 },
                 {
                     "name": "Knight Bayard",
-                    "levels": [ 1, 2, 3, 4, 5 ]
+                    "levels": [
+                        1,
+                        2,
+                        3,
+                        4,
+                        5
+                    ],
+                    "default": [
+                        2,
+                        3,
+                        4,
+                        5
+                    ]
                 },
                 {
                     "name": "Warlord",
-                    "levels": [ 1, 2, 3, 4, 5, 6, 7 ]
+                    "levels": [
+                        1,
+                        2,
+                        3,
+                        4,
+                        5,
+                        6,
+                        7
+                    ],
+                    "default": [
+                        2,
+                        3,
+                        4,
+                        5,
+                        6,
+                        7
+                    ]
                 },
                 {
                     "name": "Golem",
-                    "levels": [ 1, 2, 3, 4, 5, 6, 7 ]
+                    "levels": [
+                        1,
+                        2,
+                        3,
+                        4,
+                        5,
+                        6,
+                        7
+                    ],
+                    "default": [
+                        2,
+                        3,
+                        4,
+                        5,
+                        6,
+                        7
+                    ]
                 },
                 {
                     "name": "Witch",
-                    "levels": [ 1, 2, 3, 4, 5, 6, 7 ]
+                    "levels": [
+                        1,
+                        2,
+                        3,
+                        4,
+                        5,
+                        6,
+                        7
+                    ],
+                    "default": [
+                        2,
+                        3,
+                        4,
+                        5,
+                        6,
+                        7
+                    ]
                 },
                 {
                     "name": "Hydra",
-                    "levels": [ 1, 2, 3, 4, 5, 6 ]
+                    "levels": [
+                        1,
+                        2,
+                        3,
+                        4,
+                        5,
+                        6
+                    ],
+                    "default": [
+                        1,
+                        2,
+                        3,
+                        4,
+                        5,
+                        6
+                    ]
                 },
                 {
                     "name": "Lava Turtle",
-                    "levels": [ 1, 2, 3, 4, 5, 6, 7 ]
+                    "levels": [
+                        1,
+                        2,
+                        3,
+                        4,
+                        5,
+                        6,
+                        7
+                    ],
+                    "default": [
+                        2,
+                        3,
+                        4,
+                        5,
+                        6,
+                        7
+                    ]
                 },
                 {
                     "name": "Pan",
-                    "levels": [ 1, 2, 3, 4, 5, 6, 7 ]
+                    "levels": [
+                        1,
+                        2,
+                        3,
+                        4,
+                        5,
+                        6,
+                        7
+                    ],
+                    "default": [
+                        2,
+                        3,
+                        4,
+                        5,
+                        6,
+                        7
+                    ]
                 },
                 {
                     "name": "Pumpkin Monster",
-                    "levels": [ 1, 2, 3, 4, 5, 6, 7, 8 ]
+                    "levels": [
+                        1,
+                        2,
+                        3,
+                        4,
+                        5,
+                        6,
+                        7,
+                        8
+                    ],
+                    "default": [
+                        2,
+                        3,
+                        4,
+                        5,
+                        6,
+                        7,
+                        8
+                    ]
                 },
                 {
                     "name": "Nian",
-                    "levels": [ 1, 2, 3, 4, 5, 6 ]
+                    "levels": [
+                        1,
+                        2,
+                        3,
+                        4,
+                        5,
+                        6
+                    ],
+                    "default": [
+                        2,
+                        3,
+                        4,
+                        5,
+                        6
+                    ]
                 }
             ]
         },
@@ -158,64 +361,168 @@
             "list": [
                 {
                     "name": "Viking",
-                    "levels": [ ]
+                    "levels": [],
+                    "default": true
                 },
                 {
                     "name": "Aglaope",
-                    "levels": [ ]
+                    "levels": [
+                        1
+                    ],
+                    "default": [
+                        1
+                    ]
                 },
-
                 {
                     "name": "Garuda",
-                    "levels": [ 1, 2, 3 ]
+                    "levels": [
+                        1,
+                        2,
+                        3
+                    ],
+                    "default": [
+                        1,
+                        2,
+                        3
+                    ]
                 },
                 {
                     "name": "Savage Tiger Gladiator",
-                    "levels": [ 1, 2, 3 ]
+                    "levels": [
+                        1,
+                        2,
+                        3
+                    ],
+                    "default": [
+                        1,
+                        2,
+                        3
+                    ]
                 },
                 {
                     "name": "Taotie",
-                    "levels": [ 1, 2, 3 ]
+                    "levels": [
+                        1,
+                        2,
+                        3
+                    ],
+                    "default": [
+                        1,
+                        2,
+                        3
+                    ]
                 },
                 {
                     "name": "Arachne",
-                    "levels": [ 1, 2 ]
+                    "levels": [
+                        1,
+                        2
+                    ],
+                    "default": [
+                        1,
+                        2
+                    ]
                 },
                 {
                     "name": "Carcinus",
-                    "levels": [ 1, 2 ]
+                    "levels": [
+                        1,
+                        2
+                    ],
+                    "default": [
+                        1,
+                        2
+                    ]
                 },
                 {
                     "name": "Harpy",
-                    "levels": [ 1, 2 ]
+                    "levels": [
+                        1,
+                        2
+                    ],
+                    "default": [
+                        1,
+                        2
+                    ]
                 },
                 {
                     "name": "Serpopard",
-                    "levels": [ 1, 2 ]
+                    "levels": [
+                        1,
+                        2
+                    ],
+                    "default": [
+                        1,
+                        2
+                    ]
                 },
                 {
                     "name": "Gugler Knight",
-                    "levels": [ 1, 2 ]
+                    "levels": [
+                        1,
+                        2
+                    ],
+                    "default": [
+                        1,
+                        2
+                    ]
                 },
                 {
                     "name": "Nasu",
-                    "levels": [ 1, 2 ]
+                    "levels": [
+                        1,
+                        2
+                    ],
+                    "default": [
+                        1,
+                        2
+                    ]
                 },
                 {
                     "name": "Barbary Pirate",
-                    "levels": [ 1, 2 ]
+                    "levels": [
+                        1,
+                        2
+                    ],
+                    "default": [
+                        1,
+                        2
+                    ]
                 },
                 {
                     "name": "Outlander Elites",
-                    "levels": [ 1, 2 ]
+                    "levels": [
+                        1,
+                        2
+                    ],
+                    "default": [
+                        1,
+                        2
+                    ]
                 },
                 {
                     "name": "Temple Guard",
-                    "levels": [ 1, 2 ]
+                    "levels": [
+                        1,
+                        2
+                    ],
+                    "default": [
+                        1,
+                        2
+                    ]
                 },
                 {
                     "name": "Fenrir",
-                    "levels": [ 1, 2, 3 ]
+                    "levels": [
+                        1,
+                        2,
+                        3
+                    ],
+                    "default": [
+                        1,
+                        2,
+                        3
+                    ]
                 }
             ]
         }

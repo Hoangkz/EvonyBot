@@ -8,7 +8,7 @@ Worker gọi `run(bot, settings)`, tạo một đối tượng `_Boss` mới r�
 
 | Cấu hình | Cách sử dụng |
 | --- | --- |
-| `troop` | Lấy số ở cuối chuỗi để chọn preset quân; nếu không đọc được thì dùng 1. |
+| `troop` | Danh sách preset quân (vd `["Troop 1", "Troop 3"]`, vẫn nhận chuỗi đơn kiểu cũ); lấy số ở cuối mỗi chuỗi, xoay vòng qua từng preset mỗi lần march; nếu không đọc được thì dùng 1. |
 | `use_stamina` | Chỉ `ALL` hoặc `100` cho phép xử lý bổ sung thể lực; giá trị khác khiến activity kết thúc khi gặp hết thể lực. |
 | `skip_cerberus` | Nếu bật, bỏ qua thẻ boss nhận diện được bằng ảnh Cerberus. |
 | `exit_when_idle` | Mặc định False. Worker bật True khi còn activity phụ để Join Boss trả quyền điều khiển lúc rảnh. |
@@ -151,7 +151,7 @@ Chi tiết triển khai nằm ở [boss_board.py](../../worker/boss_board.py) v�
 ## 7. Hành quân: `_march()`
 
 1. Kiểm tra BOSS_MONSTER trong vùng quy định. Không thấy thì Back và trả về vòng chính.
-2. Thử chọn preset tối đa 5 lần: tap tại `(troop × 11%, 11%)`, chờ 0,5 giây, tìm TROOP_CHECK.
+2. Lấy preset kế tiếp trong danh sách `troop` (xoay vòng), thử chọn tối đa 5 lần: tap tại `(troop × 11%, 11%)`, chờ 0,5 giây, tìm TROOP_CHECK.
 3. Nếu cả 5 lần không thấy TROOP_CHECK, Back và trả về.
 4. Nếu đủ template chọn tướng, gọi `_select_general()`.
 5. Tìm lại MARCH; tap vị trí mới nếu có, nếu không dùng vị trí MARCH đã nhận diện ở vòng chính.

@@ -1,17 +1,17 @@
 """Compact Join Monster War settings with responsive boss groups."""
 import json
-import textwrap
 from pathlib import Path
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
     QCheckBox, QComboBox, QGridLayout, QGroupBox, QHBoxLayout, QLabel, QPushButton,
-    QRadioButton, QScrollArea, QVBoxLayout, QWidget,
+    QScrollArea, QVBoxLayout, QWidget,
 )
 from .tab_placeholder import BaseTab
 
 TROOP_RADIOS = [f"troop_{i}" for i in range(1, 9)]
-STAMINA_RADIOS = {"stamina_all": "ALL", "stamina_100": "100", "stamina_no": "No"}
+STAMINA_OPTIONS = ["ALL", "100", "No"]
+HAMMER_OPTIONS = ["No", "10", "9", "8", "7", "6","5","4","3","2","1"]
 
 
 class JoinMonsterWarTab(BaseTab):
@@ -41,28 +41,27 @@ class JoinMonsterWarTab(BaseTab):
         troop.setGeometry(0, 0, 711, 150)
         self._troop_group = troop
         troop_panel = QWidget(troop)
-        troop_panel.setGeometry(32, 39, 655, 94)
+        troop_panel.setGeometry(32, 43, 655, 94)
         for i, name in enumerate(TROOP_RADIOS):
-            button = QRadioButton(f"Troop {i + 1}", troop_panel)
-            button.setGeometry((33, 200, 358, 520)[i % 4], 12 if i < 4 else 61, 97, 28)
+            button = QCheckBox(f"Troop {i + 1}", troop_panel)
+            button.setGeometry((33, 200, 358, 520)[i % 4], 0 if i < 4 else 50, 97, 28)
             button.setChecked(i == 0)
             self.controls[name] = button
-        stamina = QGroupBox("Use Stamina", header)
+        stamina = QGroupBox("Setting", header)
         stamina.setGeometry(717, 0, 325, 150)
         self._stamina_group = stamina
-        stamina_panel = QWidget(stamina)
-        stamina_panel.setGeometry(33, 39, 273, 49)
-        for (name, label), x, width in zip(STAMINA_RADIOS.items(), (16, 96, 176), (64, 61, 56)):
-            button = QRadioButton(label, stamina_panel)
-            button.setGeometry(x, 11, width, 28)
-            button.setChecked(label == "100")
-            self.controls[name] = button
-        label = QLabel("Buy Stamina: ", stamina)
-        label.setGeometry(29, 109, 124, 24)
-        combo = QComboBox(stamina)
-        combo.setGeometry(168, 103, 84, 30)
-        combo.addItems(["10", "16", "20"])
-        self.controls["comboBoxBuyStamina"] = combo
+        for y, (name, text, items, current) in zip((36, 72, 108), (
+            ("comboBoxUseStamina", "Use Stamina: ", STAMINA_OPTIONS, "100"),
+            ("comboBoxBuyStamina", "Buy Stamina: ", ["10", "16", "20"], "10"),
+            ("comboBoxBuyHammer", "Buy Hammer: ", HAMMER_OPTIONS, "No"),
+        )):
+            label = QLabel(text, stamina)
+            label.setGeometry(29, y + 3, 124, 24)
+            combo = QComboBox(stamina)
+            combo.setGeometry(168, y, 84, 30)
+            combo.addItems(items)
+            combo.setCurrentText(current)
+            self.controls[name] = combo
         self.add_row(header)
         self._build_boss_selector()
 
@@ -74,6 +73,7 @@ class JoinMonsterWarTab(BaseTab):
             error.setWordWrap(True)
             self.add_row(error)
             return
+        defaults = {}
         for category in catalog["boss_categories"]:
             standard = category["category_key"] == "standard_bosses"
             group = QGroupBox(category["label"])
@@ -82,35 +82,46 @@ class JoinMonsterWarTab(BaseTab):
             grid.setContentsMargins(16, 8, 16, 6)
             grid.setHorizontalSpacing(12)
             grid.setVerticalSpacing(4)
-            grid.setAlignment(Qt.AlignTop | Qt.AlignLeft)
+            grid.setAlignment(Qt.AlignTop | Qt.AlignLeft if standard else Qt.AlignTop)
             cards = []
             for boss in category["list"]:
+                defaults[(category["category_key"], boss["name"])] = boss.get("default", False)
                 levels = boss.get("levels", [boss["level"]] if "level" in boss else [])
-                card = QGroupBox(boss["name"]) if levels else QWidget()
+                boxed = bool(levels) or not standard
+                card = QGroupBox(boss["name"]) if boxed else QWidget()
                 row = QVBoxLayout(card)
-                row.setContentsMargins(8, 8, 8, 4) if levels else row.setContentsMargins(0, 0, 0, 0)
+                row.setContentsMargins(8, 8, 8, 4) if boxed else row.setContentsMargins(0, 0, 0, 0)
                 row.setSpacing(2)
-                if levels and len(boss["name"]) > 20:
-                    card.setTitle("")
-                    title = QLabel(boss["name"])
-                    title.setWordWrap(True)
-                    row.addWidget(title)
                 enabled = None
                 if not levels:
-                    enabled = QCheckBox(textwrap.fill(boss["name"], width=8 if standard else 22))
-                    row.addWidget(enabled)
+                    enabled = QCheckBox(boss["name"] if standard else "Join")
+                    if boxed and boss["name"] == "Viking":
+                        options = QHBoxLayout()
+                        options.setContentsMargins(0, 0, 0, 0)
+                        options.setSpacing(12)
+                        options.addWidget(enabled)
+                        summon = QCheckBox("Summon")
+                        self.controls["viking_summon"] = summon
+                        options.addWidget(summon)
+                        options.addStretch()
+                        row.addLayout(options)
+                    else:
+                        row.addWidget(enabled)
                 level_boxes = {}
                 level_grid = QGridLayout()
                 level_grid.setContentsMargins(0, 0, 0, 0)
                 level_grid.setHorizontalSpacing(5)
                 level_grid.setVerticalSpacing(2)
                 level_grid.setAlignment(Qt.AlignLeft)
-                for i, level in enumerate(levels):
+                offset = 1 if len(levels) > 1 else 0
+                for i, level in enumerate(levels, offset):
                     box = QCheckBox(str(level))
                     box.setToolTip(f"{boss['name']} - Level {level}")
                     level_boxes[level] = box
-                    level_grid.addWidget(box, (i + 1) // 4, (i + 1) % 4)
+                    level_grid.addWidget(box, i // 4, i % 4)
                 if levels:
+                    row.addLayout(level_grid)
+                if len(levels) > 1:
                     select_all = QCheckBox("All")
                     select_all.clicked.connect(
                         lambda checked, boxes=level_boxes: self._select_levels(boxes, checked)
@@ -121,12 +132,32 @@ class JoinMonsterWarTab(BaseTab):
                             all_box.setChecked(all(level.isChecked() for level in boxes.values()))
                         )
                     level_grid.addWidget(select_all, 0, 0)
-                    row.addLayout(level_grid)
                 cards.append(card)
                 grid.addWidget(card, len(cards) - 1, 0, Qt.AlignTop)
                 self.boss_choices.append((category["category_key"], boss["name"], enabled, level_boxes))
+            if standard:
+                boss_boxes = {name: box for key, name, box, _ in self.boss_choices
+                              if key == category["category_key"] and box is not None}
+                select_all = QCheckBox("All")
+                select_all.clicked.connect(
+                    lambda checked, boxes=boss_boxes: self._select_levels(boxes, checked)
+                )
+                for box in boss_boxes.values():
+                    box.toggled.connect(
+                        lambda _checked, boxes=boss_boxes, all_box=select_all:
+                        all_box.setChecked(all(boss.isChecked() for boss in boxes.values()))
+                    )
+                cards.insert(0, select_all)
+                grid.addWidget(select_all, len(cards) - 1, 0, Qt.AlignTop)
             self._boss_grids.append((grid, cards, standard))
             self.add_row(group)
+        # "default" in boss.json: true for a plain boss, a list of levels otherwise.
+        for category, name, enabled, levels in self.boss_choices:
+            default = defaults[(category, name)]
+            if enabled is not None:
+                enabled.setChecked(default is True)
+            for level, box in levels.items():
+                box.setChecked(isinstance(default, list) and level in default)
 
     @staticmethod
     def _select_levels(boxes, checked):
@@ -135,31 +166,40 @@ class JoinMonsterWarTab(BaseTab):
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        available = max(1, self.width() - 64)
-        card_width = max((card.sizeHint().width() for _, cards, _ in self._boss_grids
-                          for card in cards), default=240)
-        columns = max(1, (available - 128) // (card_width + 12))
-        if columns == self._columns:
+        available = max(1, self.width() - 96)
+        layout = []
+        for _, cards, _ in self._boss_grids:
+            width = max((card.sizeHint().width() for card in cards), default=120)
+            columns = max(1, min(len(cards), available // (width + 12)))
+            layout.append((width, columns))
+        if layout == self._columns:
             return
-        self._columns = columns
-        for grid, cards, standard in self._boss_grids:
+        self._columns = layout
+        for (grid, cards, standard), (width, columns) in zip(self._boss_grids, layout):
             for card in cards:
                 grid.removeWidget(card)
+            for col in range(grid.columnCount()):
+                grid.setColumnMinimumWidth(col, 0)
+                grid.setColumnStretch(col, 0)
             for i, card in enumerate(cards):
                 if standard:
-                    rows = max(1, (len(cards) + 5) // 6)
-                    grid.addWidget(card, i % rows, i // rows, Qt.AlignTop)
+                    rows = max(1, -(-len(cards) // columns))
+                    grid.addWidget(card, i % rows, i // rows, Qt.AlignTop | Qt.AlignLeft)
+                    grid.setColumnMinimumWidth(i // rows, width)
                 else:
                     grid.addWidget(card, i // columns, i % columns, Qt.AlignTop)
+            if not standard:
+                for col in range(columns):
+                    grid.setColumnStretch(col, 1)
 
     def get_settings(self) -> dict:
         c = self.controls
-        troop = next((c[n].text() for n in TROOP_RADIOS if c[n].isChecked()), None)
-        stamina = next((v for n, v in STAMINA_RADIOS.items() if c[n].isChecked()), None)
         return {
-            "troop": troop,
-            "use_stamina": stamina,
+            "troop": [c[n].text() for n in TROOP_RADIOS if c[n].isChecked()],
+            "use_stamina": c["comboBoxUseStamina"].currentText(),
             "buy_stamina": c["comboBoxBuyStamina"].currentText(),
+            "buy_hammer": c["comboBoxBuyHammer"].currentText(),
+            "viking_summon": c["viking_summon"].isChecked() if "viking_summon" in c else False,
             "selected_bosses": [
                 {"category_key": category, "name": name,
                  "levels": [level for level, box in levels.items() if box.isChecked()]}
@@ -173,9 +213,15 @@ class JoinMonsterWarTab(BaseTab):
         if "buy_stamina" in data:
             c["comboBoxBuyStamina"].setCurrentText(str(data["buy_stamina"]))
         if "troop" in data:
-            _set_radio(c, {n: c[n].text() for n in TROOP_RADIOS}, data["troop"])
+            troops = data["troop"] if isinstance(data["troop"], list) else [data["troop"]]
+            for n in TROOP_RADIOS:
+                c[n].setChecked(c[n].text() in troops)
         if "use_stamina" in data:
-            _set_radio(c, STAMINA_RADIOS, data["use_stamina"])
+            c["comboBoxUseStamina"].setCurrentText(str(data["use_stamina"]))
+        if "buy_hammer" in data:
+            c["comboBoxBuyHammer"].setCurrentText(str(data["buy_hammer"]))
+        if "viking_summon" in c:
+            c["viking_summon"].setChecked(bool(data.get("viking_summon", False)))
         if "selected_bosses" in data:
             selected = {(boss["category_key"], boss["name"]): boss.get("levels", [])
                         for boss in data["selected_bosses"]}
@@ -193,14 +239,3 @@ class JoinMonsterWarTab(BaseTab):
                 for box in levels.values():
                     box.setChecked(False)
 
-
-
-def _set_radio(controls, values_by_name: dict, value):
-    """Check the radio whose value matches; with no match (e.g. None) leave
-    them all unchecked, so an applied config fully replaces the old one."""
-    for n, v in values_by_name.items():
-        btn = controls[n]
-        # Auto-exclusive radios refuse to be unchecked directly.
-        btn.setAutoExclusive(False)
-        btn.setChecked(v == value)
-        btn.setAutoExclusive(True)

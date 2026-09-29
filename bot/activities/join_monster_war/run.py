@@ -28,7 +28,8 @@ def run(bot, settings: dict):
 class _Boss:
     def __init__(self, bot, settings: dict):
         self.bot = bot
-        self.troop = _troop(settings.get("troop"))          # Số thứ tự preset troop (1, 2, 3...)
+        self.troops = _troops(settings.get("troop"))        # Các preset troop được chọn (1, 2, 3...)
+        self.troop_index = 0                                # Preset dùng cho lần march tiếp theo
         self.use_stamina = settings.get("use_stamina")     # "ALL" / "100" / "No"
         self.skipped_bosses = [CERBERUS] if settings.get("skip_cerberus") else []
         self.not_join: list[tuple[int, int]] = []           # Tọa độ boss đã xử lý (X, Y in-game)
@@ -151,9 +152,11 @@ class _Boss:
             bot.back()
             return
 
-        # Chọn preset troop
+        # Chọn preset troop, xoay vòng qua các preset được chọn
+        troop = self.troops[self.troop_index % len(self.troops)]
+        self.troop_index += 1
         for _ in range(5):
-            bot.tap_percent(self.troop * 11, 11)
+            bot.tap_percent(troop * 11, 11)
             delay(bot, 0.5)
             if bot.find(TROOP_CHECK) is not None:
                 break
@@ -271,11 +274,15 @@ def _near(point, points) -> bool:
     return any(abs(px - point[0]) < SAME_SPOT and abs(py - point[1]) < SAME_SPOT for px, py in points)
 
 
-def _troop(text) -> int:
-    try:
-        return int(str(text).split()[-1])
-    except (IndexError, ValueError):
-        return 1
+def _troops(value) -> list[int]:
+    """'Troop 2' hoặc ['Troop 1', 'Troop 3'] -> [2] / [1, 3]; không đọc được thì [1]."""
+    troops = []
+    for text in value if isinstance(value, list) else [value]:
+        try:
+            troops.append(int(str(text).split()[-1]))
+        except (IndexError, ValueError):
+            pass
+    return troops or [1]
 
 
 def _targets() -> list[tuple[str, str]]:

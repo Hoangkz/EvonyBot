@@ -16,6 +16,7 @@ class BotManager(QObject):
     server_found = pyqtSignal(str, str)       # (serial, server)
 
     server_time_found = pyqtSignal(str, str)  # (serial, thời điểm reset giờ máy)
+    daily_task_done = pyqtSignal(str, str)    # (serial, task Daily Activities vừa xong)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -25,18 +26,21 @@ class BotManager(QObject):
     def is_running(self, serial: str) -> bool:
         return serial in self._workers
 
-    def start(self, serial: str, activities: list[str], settings: dict) -> bool:
+    def start(self, serial: str, activities: list[str], settings: dict,
+              daily_done: dict | None = None) -> bool:
         if self.is_running(serial):
             return False
         if not activities:
             print(f"[{serial}] No activity selected")
             return False
 
-        worker = BotWorker(serial, activities, settings, self, boss_board=self.boss_board)
+        worker = BotWorker(serial, activities, settings, self,
+                           boss_board=self.boss_board, daily_done=daily_done)
         worker.activity_changed.connect(self.activity_changed.emit)
         worker.status_changed.connect(self.status_changed.emit)
         worker.server_found.connect(self.server_found.emit)
         worker.server_time_found.connect(self.server_time_found.emit)
+        worker.daily_task_done.connect(self.daily_task_done.emit)
         worker.finished.connect(lambda: self._on_finished(serial))
         self._workers[serial] = worker
         worker.start()

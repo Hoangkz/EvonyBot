@@ -12,6 +12,7 @@ from ...common import click_images, delay, exit_images, find_first, go_home
 ROOT = "DailyActivites"
 USE_ALL = f"{ROOT}/UseAllActivities"
 DONE, BACK, TAP, SCROLL, OPEN = "done", "back", "tap", "scroll", "open"
+REWARDS = "Activity Rewards"   # key trong daily_done cho bước nhận thưởng cuối
 
 
 @dataclass(frozen=True)
@@ -33,23 +34,36 @@ def run(bot, settings: dict):
         bot.log("Daily Activities not implemented by DailyActivities1234.cs: "
                 + ", ".join(unsupported))
 
+    if all(bot.is_daily_done(task.label) for task in selected) and bot.is_daily_done(REWARDS):
+        bot.log("Daily Activities: all done today")
+        return
+
     # DailyActivities1234.DailyActivities made five passes. Completed tasks
-    # return immediately when their Finish template is found.
+    # return immediately when their Finish template is found; a task whose
+    # Finish template was seen since the last server reset is skipped.
     for _ in range(5):
         for task in selected:
+            if bot.is_daily_done(task.label):
+                continue
             bot.check()
             bot.log(f"Daily Activities: {task.label}")
-            _run_task(bot, task)
-    _collect_activity_rewards(bot)
+            if _run_task(bot, task):
+                bot.mark_daily_done(task.label)
+    if not bot.is_daily_done(REWARDS):
+        _collect_activity_rewards(bot)
+        # Chỉ coi là nhận xong khi mọi task đã xong, để lần chạy sau trong ngày còn nhận tiếp.
+        if all(bot.is_daily_done(task.label) for task in selected):
+            bot.mark_daily_done(REWARDS)
 
 
-def _run_task(bot, task: Task):
+def _run_task(bot, task: Task) -> bool:
+    """True khi thấy ảnh Finish của task (đã hoàn thành trong ngày)."""
     targets = _targets(task)
     while True:
         screen = bot.screenshot()
         action, pos = find_first(bot, screen, targets)
         if action == DONE:
-            return
+            return True
         if action == BACK:
             bot.back(delay=1)
         elif action == TAP:
@@ -59,12 +73,12 @@ def _run_task(bot, task: Task):
             _scroll_up(bot)
         elif action == OPEN:
             if not _open_task_row(bot, screen, pos, task.center_after_open):
-                return
+                return False
         elif action is None:
             go_home(bot, screen)
             delay(bot)
         elif task.handler(bot, action, pos, screen):
-            return
+            return False
 
 
 def _targets(task: Task) -> list[tuple[str, str]]:
