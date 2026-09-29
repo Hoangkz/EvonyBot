@@ -1,0 +1,223 @@
+{
+    "boss_categories": [
+        {
+            "category_key": "standard_bosses",
+            "label": "Boss Standard",
+            "list": [
+                {
+                    "levels": [ ],
+                    "name": "Zombie"
+                },
+                {
+                    "levels": [ ],
+                    "name": "Redcap"
+                },
+                {
+                    "levels": [ ],
+                    "name": "Centaur"
+                },
+                {
+                    "levels": [ ],
+                    "name": "Skeleton Dragon"
+                },
+                {
+                    "levels": [ ],
+                    "name": "Werewolf"
+                },
+                {
+                    "levels": [ ],
+                    "name": "Manticore"
+                },
+                {
+                    "levels": [ ],
+                    "name": "Yasha"
+                },
+                {
+                    "levels": [ ],
+                    "name": "Peryton"
+                },
+                {
+                    "levels": [ ],
+                    "name": "Minotaur"
+                },
+                {
+                    "levels": [ ],
+                    "name": "Griffin"
+                },
+                {
+                    "levels": [ ],
+                    "name": "Ifrit"
+                },
+                {
+                    "levels": [ ],
+                    "name": "Kamaitachi"
+                },
+                {
+                    "levels": [ ],
+                    "name": "Fafnir"
+                },
+                {
+                    "levels": [ ],
+                    "name": "Behemoth"
+                },
+                {
+                    "levels": [ ],
+                    "name": "Phoenix"
+                },
+                {
+                    "levels": [ ],
+                    "name": "Jormungandr"
+                },
+                {
+                    "levels": [ ],
+                    "name": "Typhon"
+                },
+                {
+                    "levels": [ ],
+                    "name": "Ammit"
+                },
+                {
+                    "levels": [ ],
+                    "name": "Stymphalian Bird"
+                },
+                {
+                    "levels": [ ],
+                    "name": "Lernean Hydra"
+                },
+                {
+                    "levels": [ ],
+                    "name": "Nian (Standard B21)"
+                },
+                {
+                    "levels": [ ],
+                    "name": "Chocobo / Fenrir (High B22)"
+                },
+                {
+                    "levels": [ ],
+                    "name": "Apex World Dragon"
+                }
+            ]
+        },
+        {
+            "category_key": "special_and_recurring_event_bosses",
+            "label": "Boss Event",
+            "list": [
+                {
+                    "name": "Cerberus",
+                    "levels": [ 1, 2, 3, 4, 5 ]
+                },
+                {
+                    "name": "Ymir",
+                    "levels": [ 1, 2, 3, 4, 5, 6, 7 ]
+                },
+                {
+                    "name": "Sphinx",
+                    "levels": [ 1, 2, 3, 4, 5, 6, 7, 8 ]
+                },
+                {
+                    "name": "Knight Bayard",
+                    "levels": [ 1, 2, 3, 4, 5 ]
+                },
+                {
+                    "name": "Warlord",
+                    "levels": [ 1, 2, 3, 4, 5, 6, 7 ]
+                },
+                {
+                    "name": "Golem",
+                    "levels": [ 1, 2, 3, 4, 5, 6, 7 ]
+                },
+                {
+                    "name": "Witch",
+                    "levels": [ 1, 2, 3, 4, 5, 6, 7 ]
+                },
+                {
+                    "name": "Hydra",
+                    "levels": [ 1, 2, 3, 4, 5, 6 ]
+                },
+                {
+                    "name": "Lava Turtle",
+                    "levels": [ 1, 2, 3, 4, 5, 6, 7 ]
+                },
+                {
+                    "name": "Pan",
+                    "levels": [ 1, 2, 3, 4, 5, 6, 7 ]
+                },
+                {
+                    "name": "Pumpkin Monster",
+                    "levels": [ 1, 2, 3, 4, 5, 6, 7, 8 ]
+                },
+                {
+                    "name": "Nian",
+                    "levels": [ 1, 2, 3, 4, 5, 6 ]
+                }
+            ]
+        },
+        {
+            "category_key": "mythical_and_elite_bosses",
+            "label": "Boss Special",
+            "list": [
+                {
+                    "name": "Viking",
+                    "levels": [ ]
+                },
+                {
+                    "name": "Aglaope",
+                    "levels": [ ]
+                },
+
+                {
+                    "name": "Garuda",
+                    "levels": [ 1, 2, 3 ]
+                },
+                {
+                    "name": "Savage Tiger Gladiator",
+                    "levels": [ 1, 2, 3 ]
+                },
+                {
+                    "name": "Taotie",
+                    "levels": [ 1, 2, 3 ]
+                },
+                {
+                    "name": "Arachne",
+                    "levels": [ 1, 2 ]
+                },
+                {
+                    "name": "Carcinus",
+                    "levels": [ 1, 2 ]
+                },
+                {
+                    "name": "Harpy",
+                    "levels": [ 1, 2 ]
+                },
+                {
+                    "name": "Serpopard",
+                    "levels": [ 1, 2 ]
+                },
+                {
+                    "name": "Gugler Knight",
+                    "levels": [ 1, 2 ]
+                },
+                {
+                    "name": "Nasu",
+                    "levels": [ 1, 2 ]
+                },
+                {
+                    "name": "Barbary Pirate",
+                    "levels": [ 1, 2 ]
+                },
+                {
+                    "name": "Outlander Elites",
+                    "levels": [ 1, 2 ]
+                },
+                {
+                    "name": "Temple Guard",
+                    "levels": [ 1, 2 ]
+                },
+                {
+                    "name": "Fenrir",
+                    "levels": [ 1, 2, 3 ]
+                }
+            ]
+        }
+    ]
+}

@@ -2,6 +2,14 @@
 join_monster_war_tab.py — 1:1 rebuild of tabPage2 ("Join Monster War")
 from Form3_Designer.cs.
 """
+import json
+from pathlib import Path
+
+from PyQt5.QtWidgets import (
+    QCheckBox, QGroupBox, QHBoxLayout, QLabel, QPushButton,
+    QScrollArea, QTabWidget, QVBoxLayout, QWidget,
+)
+
 from .tab_placeholder import DesignerTab
 
 DESIGNER_DATA = {
@@ -56,7 +64,7 @@ DESIGNER_DATA = {
                  "loc": [4, 31], "size": [1088, 609], "text": "Join Monster War", "type": "TabPage"},
 }
 COMBO_ITEMS = {"comboBoxBuyStamina": ["10", "16", "20"], "comboBoxCrazyEggs": ["0", "1H", "2H", "3H", "4H"]}
-PAGE_SIZE = (1088, 609)
+PAGE_SIZE = (1088, 950)
 
 TROOP_RADIOS = ["radioButton1", "radioButton2", "radioButton6", "radioButton8",
                 "radioButton3", "radioButton7", "radioButton5", "radioButton4"]
@@ -71,6 +79,67 @@ SPEED_MARCH_RADIOS = {
 class JoinMonsterWarTab(DesignerTab):
     def __init__(self, parent=None):
         super().__init__("tabPage2", DESIGNER_DATA, COMBO_ITEMS, PAGE_SIZE, parent=parent)
+        self.boss_choices = []
+        self._build_boss_selector()
+
+    def _build_boss_selector(self):
+        group = QGroupBox("Choose Boss", self.page)
+        group.setGeometry(20, 480, 1042, 450)
+        layout = QVBoxLayout(group)
+        try:
+            catalog = json.loads(Path(__file__).with_name("boss.json").read_text(encoding="utf-8-sig"))
+        except (OSError, ValueError) as exc:
+            error = QLabel(f"Cannot load boss.json: {exc}")
+            error.setWordWrap(True)
+            layout.addWidget(error)
+            return
+
+        toolbar = QHBoxLayout()
+        for title, checked in (("Select All", True), ("Clear All", False)):
+            button = QPushButton(title)
+            button.clicked.connect(lambda _=False, value=checked: self._select_all_bosses(value))
+            toolbar.addWidget(button)
+        toolbar.addStretch()
+        layout.addLayout(toolbar)
+        tabs = QTabWidget()
+        layout.addWidget(tabs)
+        for category in catalog["boss_categories"]:
+            scroll = QScrollArea()
+            scroll.setWidgetResizable(True)
+            content = QWidget()
+            rows = QVBoxLayout(content)
+            for boss in category["list"]:
+                row = QHBoxLayout()
+                enabled = QCheckBox(boss["name"])
+                enabled.setMinimumWidth(280)
+                row.addWidget(enabled)
+                level_boxes = {}
+                levels = boss.get("levels", [boss["level"]] if "level" in boss else [])
+                for level in levels:
+                    box = QCheckBox(f"Lv {level}")
+                    box.setChecked(True)
+                    box.setEnabled(False)
+                    enabled.toggled.connect(box.setEnabled)
+                    level_boxes[level] = box
+                    row.addWidget(box)
+                row.addStretch()
+                rows.addLayout(row)
+                self.boss_choices.append((category["category_key"], boss["name"], enabled, level_boxes))
+                if boss["name"] == "Viking":
+                    legacy = self.controls["checkBoxViking"]
+                    enabled.setChecked(legacy.isChecked())
+                    enabled.toggled.connect(legacy.setChecked)
+                    legacy.toggled.connect(enabled.setChecked)
+            rows.addStretch()
+            scroll.setWidget(content)
+            tabs.addTab(scroll, category["label"])
+
+    def _select_all_bosses(self, checked):
+        for _, _, enabled, levels in self.boss_choices:
+            if checked:
+                for box in levels.values():
+                    box.setChecked(True)
+            enabled.setChecked(checked)
 
     def get_settings(self) -> dict:
         c = self.controls
@@ -85,6 +154,12 @@ class JoinMonsterWarTab(DesignerTab):
             "crazy_eggs_time_check": c["comboBoxCrazyEggs"].currentText(),
             "buy_hammer": c["BuyHammer"].isChecked(),
             "speed_marching": speed,
+            "selected_bosses": [
+                {"category_key": category, "name": name,
+                 "levels": [level for level, box in levels.items() if box.isChecked()]}
+                for category, name, enabled, levels in self.boss_choices
+                if enabled.isChecked()
+            ],
         }
 
     def set_settings(self, data: dict):
@@ -103,6 +178,20 @@ class JoinMonsterWarTab(DesignerTab):
             _set_radio(c, STAMINA_RADIOS, data["use_stamina"])
         if "speed_marching" in data:
             _set_radio(c, SPEED_MARCH_RADIOS, data["speed_marching"])
+        if "selected_bosses" in data:
+            selected = {(boss["category_key"], boss["name"]): boss.get("levels", [])
+                        for boss in data["selected_bosses"]}
+            for category, name, enabled, levels in self.boss_choices:
+                key = (category, name)
+                enabled.setChecked(key in selected)
+                for level, box in levels.items():
+                    box.setChecked(level in selected[key] if key in selected else True)
+        else:
+            # Older device settings only had a Viking checkbox.
+            for _, name, enabled, levels in self.boss_choices:
+                enabled.setChecked(name == "Viking" and bool(data.get("viking", False)))
+                for box in levels.values():
+                    box.setChecked(True)
 
 
 def _set_radio(controls, values_by_name: dict, value):
