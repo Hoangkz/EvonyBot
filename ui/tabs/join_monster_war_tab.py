@@ -5,7 +5,7 @@ from pathlib import Path
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
     QCheckBox, QComboBox, QGridLayout, QGroupBox, QLabel,
-    QPushButton, QRadioButton, QScrollArea, QVBoxLayout, QWidget,
+    QRadioButton, QScrollArea, QVBoxLayout, QWidget,
 )
 from .tab_placeholder import BaseTab
 
@@ -109,13 +109,18 @@ class JoinMonsterWarTab(BaseTab):
                     box = QCheckBox(str(level))
                     box.setToolTip(f"{boss['name']} - Level {level}")
                     level_boxes[level] = box
-                    level_grid.addWidget(box, i // 4, i % 4)
+                    level_grid.addWidget(box, (i + 1) // 4, (i + 1) % 4)
                 if levels:
-                    select_all = QPushButton("All")
+                    select_all = QCheckBox("All")
                     select_all.clicked.connect(
-                        lambda _=False, boxes=level_boxes: self._select_levels(boxes)
+                        lambda checked, boxes=level_boxes: self._select_levels(boxes, checked)
                     )
-                    row.addWidget(select_all, alignment=Qt.AlignLeft)
+                    for box in level_boxes.values():
+                        box.toggled.connect(
+                            lambda _checked, boxes=level_boxes, all_box=select_all:
+                            all_box.setChecked(all(level.isChecked() for level in boxes.values()))
+                        )
+                    level_grid.addWidget(select_all, 0, 0)
                     row.addLayout(level_grid)
                 cards.append(card)
                 grid.addWidget(card, len(cards) - 1, 0, Qt.AlignTop)
@@ -124,9 +129,9 @@ class JoinMonsterWarTab(BaseTab):
             self.add_row(group)
 
     @staticmethod
-    def _select_levels(boxes):
+    def _select_levels(boxes, checked):
         for box in boxes.values():
-            box.setChecked(True)
+            box.setChecked(checked)
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
