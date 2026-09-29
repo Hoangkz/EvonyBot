@@ -3,7 +3,7 @@ import json
 import textwrap
 from pathlib import Path
 
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QSize
 from PyQt5.QtWidgets import (
     QCheckBox, QComboBox, QGridLayout, QGroupBox, QHBoxLayout, QLabel, QPushButton,
     QRadioButton, QScrollArea, QVBoxLayout, QWidget,
@@ -12,6 +12,29 @@ from .tab_placeholder import BaseTab
 
 TROOP_RADIOS = [f"troop_{i}" for i in range(1, 9)]
 STAMINA_RADIOS = {"stamina_all": "ALL", "stamina_100": "100", "stamina_no": "No"}
+
+
+class _BossCheckBox(QCheckBox):
+    """Keep six even columns; expose long names in the tooltip."""
+
+    def __init__(self, name):
+        super().__init__(name)
+        self._full_name = name
+        self.setToolTip(name)
+        self.setAccessibleName(name)
+        self.setMinimumHeight(32)
+
+    def minimumSizeHint(self):
+        return QSize(0, super().minimumSizeHint().height())
+
+    def sizeHint(self):
+        return QSize(130, max(32, super().sizeHint().height()))
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self.setText(self.fontMetrics().elidedText(
+            self._full_name, Qt.ElideRight, max(0, self.width() - 30)
+        ))
 
 
 class JoinMonsterWarTab(BaseTab):
@@ -83,6 +106,13 @@ class JoinMonsterWarTab(BaseTab):
             grid.setHorizontalSpacing(12)
             grid.setVerticalSpacing(4)
             grid.setAlignment(Qt.AlignTop | Qt.AlignLeft)
+            if standard:
+                grid.setAlignment(Qt.AlignTop)
+                grid.setHorizontalSpacing(14)
+                grid.setVerticalSpacing(6)
+                grid.setContentsMargins(16, 12, 16, 10)
+                for column in range(6):
+                    grid.setColumnStretch(column, 1)
             cards = []
             for boss in category["list"]:
                 levels = boss.get("levels", [boss["level"]] if "level" in boss else [])
@@ -97,7 +127,8 @@ class JoinMonsterWarTab(BaseTab):
                     row.addWidget(title)
                 enabled = None
                 if not levels:
-                    enabled = QCheckBox(textwrap.fill(boss["name"], width=8 if standard else 22))
+                    enabled = (_BossCheckBox(boss["name"]) if standard else
+                               QCheckBox(textwrap.fill(boss["name"], width=22)))
                     row.addWidget(enabled)
                 level_boxes = {}
                 level_grid = QGridLayout()
