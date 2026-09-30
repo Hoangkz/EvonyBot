@@ -95,10 +95,12 @@ class ScreenMixin:
         ys, xs = np.where(result >= threshold)
         # Best scores first, then drop hits that overlap one already kept.
         hits = sorted(zip(xs, ys), key=lambda p: result[p[1], p[0]], reverse=True)
+        # Compared in the area's own coordinates; offset to the screen afterwards.
         kept: list[tuple[int, int]] = []
         for x, y in hits:
             if all(abs(x - kx) >= w // 2 or abs(y - ky) >= h // 2 for kx, ky in kept):
-                kept.append((int(x) + ox, int(y) + oy))
+                kept.append((int(x), int(y)))
+        kept = [(x + ox, y + oy) for x, y in kept]
         if not center:
             return kept
         return [(x + w // 2, y + h // 2) for x, y in kept]

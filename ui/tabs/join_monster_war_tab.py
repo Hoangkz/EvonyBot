@@ -73,7 +73,7 @@ class JoinMonsterWarTab(BaseTab):
             error.setWordWrap(True)
             self.add_row(error)
             return
-        defaults = {}
+        actives = []   # (checkbox, "active" in boss.json): ticked by default
         for category in catalog["boss_categories"]:
             standard = category["category_key"] == "standard_bosses"
             group = QGroupBox(category["label"])
@@ -85,8 +85,11 @@ class JoinMonsterWarTab(BaseTab):
             grid.setAlignment(Qt.AlignTop | Qt.AlignLeft if standard else Qt.AlignTop)
             cards = []
             for boss in category["list"]:
-                defaults[(category["category_key"], boss["name"])] = boss.get("default", False)
-                levels = boss.get("levels", [boss["level"]] if "level" in boss else [])
+                # "levels": [{"level", "tier"?, "power"}] (or plain level numbers). A
+                # standard boss's own "level" is its rank, not something to tick.
+                infos = {(info["level"] if isinstance(info, dict) else info):
+                         (info if isinstance(info, dict) else {}) for info in boss.get("levels", [])}
+                levels = list(infos)
                 boxed = bool(levels) or not standard
                 card = QGroupBox(boss["name"]) if boxed else QWidget()
                 row = QVBoxLayout(card)
@@ -107,6 +110,7 @@ class JoinMonsterWarTab(BaseTab):
                         row.addLayout(options)
                     else:
                         row.addWidget(enabled)
+                    actives.append((enabled, bool(boss.get("active"))))
                 level_boxes = {}
                 level_grid = QGridLayout()
                 level_grid.setContentsMargins(0, 0, 0, 0)
@@ -116,8 +120,10 @@ class JoinMonsterWarTab(BaseTab):
                 offset = 1 if len(levels) > 1 else 0
                 for i, level in enumerate(levels, offset):
                     box = QCheckBox(str(level))
-                    box.setToolTip(f"{boss['name']} - Level {level}")
+                    detail = ", ".join(str(infos[level][k]) for k in ("tier", "power") if infos[level].get(k))
+                    box.setToolTip(f"{boss['name']} - Level {level}" + (f" ({detail})" if detail else ""))
                     level_boxes[level] = box
+                    actives.append((box, bool(infos[level].get("active"))))
                     level_grid.addWidget(box, i // 4, i % 4)
                 if levels:
                     row.addLayout(level_grid)
@@ -151,13 +157,10 @@ class JoinMonsterWarTab(BaseTab):
                 grid.addWidget(select_all, len(cards) - 1, 0, Qt.AlignTop)
             self._boss_grids.append((grid, cards, standard))
             self.add_row(group)
-        # "default" in boss.json: true for a plain boss, a list of levels otherwise.
-        for category, name, enabled, levels in self.boss_choices:
-            default = defaults[(category, name)]
-            if enabled is not None:
-                enabled.setChecked(default is True)
-            for level, box in levels.items():
-                box.setChecked(isinstance(default, list) and level in default)
+        # "active" in boss.json (on a plain boss, or on each level) = ticked by
+        # default. Set after the "All" boxes are wired so they follow.
+        for box, active in actives:
+            box.setChecked(active)
 
     @staticmethod
     def _select_levels(boxes, checked):

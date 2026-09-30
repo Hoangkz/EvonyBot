@@ -128,7 +128,7 @@ Assert `device.reported` có đúng 1 phần tử: toạ độ OCR được, ho�
 Nhánh phụ, mỗi nhánh một method:
 - **Hết thể lực**, `use_stamina: "No"`: màn hình `hettheluc.png` → `end(None)`.
 - **Không có boss**, `exit_when_idle: True`: màn hình chính có `lienminh.png`, không có `listboss.png` → `end(IDLE)`.
-- **Boss chữ đỏ / Cerberus bị skip**: nút Join không được tap, bot cuộn (`swipe`).
+- **Boss chữ đỏ / boss không được tích** (`selected_bosses` không có tên đó): nút Join không được tap, toạ độ vào BossMemory `SKIPPED`, bot cuộn (`swipe`).
 - **Dùng thể lực**, `use_stamina: "ALL"`: `tap(hettheluc)`, `tap(theluc)`, `tap_pct(28.9, 71.6, count=2)`, `tap(usetheluc)`, `back()`.
 
 ## Event — `tests/event/`

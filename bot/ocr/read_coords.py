@@ -7,12 +7,15 @@ import numpy as np
 from ._digits import read
 
 FONT = "Coords"
+# A Coords digit is ~0.65 x as wide as it is tall; a piece wider than its
+# height is two digits run together (e.g. "64" in "0649") and gets cut.
+MAX_RATIO = 1.0
 
 
 def run(image: np.ndarray) -> tuple[int, int] | None:
     """A "X:Y" map coordinate in `image` (BGR), or None if it can't be read.
     `image` should start after the location pin."""
-    text = read(image, FONT)
+    text = read(image, FONT, MAX_RATIO)
     if text is None:
         return None
     parts = text.replace(",", "").split(":")

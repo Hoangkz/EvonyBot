@@ -10,7 +10,11 @@ def wait_gone(bot, targets, action, pos, top_left=(), timeout=10.0, interval=0.3
               tolerance=10):
     """Trong tối đa `timeout` giây, cứ `interval` giây chụp màn hình 1 lần và
     kiểm tra `action` còn ở vị trí `pos` không (lệch dưới `tolerance` pixel vẫn
-    coi là cùng chỗ); hết thì dừng ngay. Trả về ảnh chụp cuối cùng.
+    coi là cùng chỗ); hết thì dừng ngay.
+
+    Trả về ảnh vừa chụp khi đã xác nhận màn hình đổi (hoặc không có gì để chờ),
+    để vòng lặp kế tiếp dùng luôn, không chụp lại. Hết `timeout` mà ảnh vẫn còn
+    thì trả None: ảnh đó là màn hình cũ, nơi gọi phải chụp lại.
 
     Để nhẹ CPU, chỉ dò các ảnh của `action` trong `targets` và chỉ trong vùng
     nhỏ quanh `pos`, không quét lại toàn bộ `targets` trên cả màn hình."""
@@ -23,10 +27,11 @@ def wait_gone(bot, targets, action, pos, top_left=(), timeout=10.0, interval=0.3
         # Không nhận ra màn hình nào (action None) -> không có gì để chờ.
         if action is None or pos is None:
             return screen
-        # Màn hình đã đổi hoặc hết thời gian chờ -> trả về ảnh vừa chụp.
-        if not _still_there(bot, screen, paths, pos, action in top_left, tolerance) \
-                or time.monotonic() >= end:
+        # Màn hình đã đổi -> trả về ảnh vừa chụp; hết thời gian chờ -> None.
+        if not _still_there(bot, screen, paths, pos, action in top_left, tolerance):
             return screen
+        if time.monotonic() >= end:
+            return None
 
 
 def _still_there(bot, screen, paths, pos, is_top_left, tolerance) -> bool:

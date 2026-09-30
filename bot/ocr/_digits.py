@@ -98,10 +98,10 @@ def _samples(font: str) -> tuple[list[str], np.ndarray]:
     return _fonts[font]
 
 
-def read(image: np.ndarray, font: str) -> str | None:
+def read(image: np.ndarray, font: str, max_ratio: float | None = None) -> str | None:
     """Digits, "," and ":" in `image`, or None if there are no digits or
-    one doesn't match any sample of `font` well enough."""
-    return read_chars(split(image), font)
+    one doesn't match any sample of `font` well enough. `max_ratio` as in split()."""
+    return read_chars(split(image, max_ratio), font)
 
 
 def read_chars(chars: list, font: str) -> str | None:

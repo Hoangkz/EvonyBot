@@ -93,7 +93,10 @@ Mỗi `Step(screen, *actions)` nghĩa là: khi thiết bị đang hiển thị `
    - `ctx.settings = ctx_settings or {}`.
    - `is_daily_done` / `mark_daily_done` dùng một dict thật, khởi tạo từ `daily_done`.
    - `report_boss` ghi vào `device.reported` để test assert được.
-7. `run_flow` trả về device để test assert thêm, VD `device.reported == [(951, 663)]`.
+7. `run_flow` trả về device để test assert thêm, VD `device.reported == [(951, 663)]`; `device.ctx` là BotContext đã dùng.
+8. `setup=lambda ctx: ...` được gọi ngay trước khi chạy, trong đồng hồ giả, để nạp sẵn trạng thái (VD `ctx.boss_memory` đã nhớ một boss).
+9. Trạng thái có hạn dùng `time.monotonic()` (VD BossMemory) phải assert trong `with device.fake_time():`. Ra ngoài đồng hồ giả, nó bị so với giờ thật và coi như đã hết hạn.
+10. Ảnh biến thể: `Step("x.png?ten_bien_the", ...)` + `run_flow(..., variants={"ten_bien_the": fn})`, trong đó `fn(ảnh BGR) -> ảnh BGR`. Đây là **ảnh tổng hợp** cho trạng thái chưa có ảnh chụp thật (VD Join Boss: `war_off` xoá dấu tích ô War). Chỉ dùng khi phần bị sửa không liên quan tới điều đang test, và thay bằng ảnh thật khi có.
 
 Không dùng pytest. Chạy toàn bộ bằng:
 

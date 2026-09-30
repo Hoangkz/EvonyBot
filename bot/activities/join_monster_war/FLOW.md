@@ -10,7 +10,7 @@ Worker gọi `run(bot, settings)`, tạo một đối tượng `_Boss` mới r�
 | --- | --- |
 | `troop` | Danh sách preset quân (vd `["Troop 1", "Troop 3"]`, vẫn nhận chuỗi đơn kiểu cũ); lấy số ở cuối mỗi chuỗi, xoay vòng qua từng preset mỗi lần march; nếu không đọc được thì dùng 1. |
 | `use_stamina` | Chỉ `ALL` hoặc `100` cho phép xử lý bổ sung thể lực; giá trị khác khiến activity kết thúc khi gặp hết thể lực. |
-| `skip_cerberus` | Nếu bật, bỏ qua thẻ boss nhận diện được bằng ảnh Cerberus. |
+| `selected_bosses` | Boss được tích ở tab (`[{category_key, name, levels}]`). Chỉ Join boss có tên trong danh sách; boss có cấp chỉ Join khi cấp đọc được nằm trong `levels`. Không có key này (cấu hình cũ) thì không lọc theo tên. |
 | `exit_when_idle` | Mặc định False. Worker bật True khi còn activity phụ để Join Boss trả quyền điều khiển lúc rảnh. |
 
 Khi module được import, code kiểm tra template một lần:
@@ -18,13 +18,13 @@ Khi module được import, code kiểm tra template một lần:
 - `CAN_READ_COORDS`: có ảnh LOCATION thì mới thử OCR tọa độ.
 - `CAN_SELECT_GENERAL`: phải có đủ bốn ảnh chọn tướng thì mới chạy bước chọn tướng.
 
-Mỗi lần gọi activity sẽ khởi tạo lại `not_join`, `screen_blacklist`, bộ đếm cuộn và trạng thái nhận diện trước đó. Dữ liệu BossBoard dùng chung nằm ngoài đối tượng này.
+Mỗi lần gọi activity sẽ khởi tạo lại `screen_blacklist`, bộ đếm cuộn và trạng thái nhận diện trước đó. `BossMemory` (toạ độ boss đã tham gia / bỏ qua, mục 5) gắn với BotContext nên **không** bị reset: nó còn qua các lần worker gọi lại Join Boss và chỉ mất khi bấm Stop. Dữ liệu BossBoard dùng chung nằm ngoài cả hai.
 
 ## 2. Vòng lặp chính
 
 ```mermaid
 flowchart TD
-    A[run: tạo _Boss] --> B{Đã cuộn ít nhất 4 lần?}
+    A[run: tạo _Boss] --> B{Đã cuộn 6 lần không thấy boss mới?}
     B -->|Có| C[_idle]
     C -->|Cho phép thoát khi rảnh| R[Trả về IDLE]
     C -->|Tiếp tục theo dõi| D[Chụp màn hình mới]
@@ -66,6 +66,14 @@ JOIN và JOINED được xét trước PVP_WAR. LISTBOSS được xét trước 
 
 Các template có trong `REGIONS` chỉ được tìm trong vùng phần trăm màn hình quy định ở constants.py.
 
+### Ô "War" trên danh sách War
+
+Khi đang ở danh sách War (JOIN_LIST / JOINED / SCROLL, hoặc NO_BOSS mà thấy tab PvP War), nếu ô **"War"** (rally đánh người chơi, cạnh ô "Monster War") đang tích thì bot bấm bỏ tích **trước khi xét boss**, rồi chờ tối đa 3 giây cho dấu tích mất; ảnh xác nhận được dùng cho vòng lặp kế tiếp.
+
+- Nhận diện bằng ảnh mẫu `JoinBoss/warTicked.png` (ô hình thoi có dấu tích, cắt từ ảnh chụp thật), chỉ tìm trong `REGIONS[WAR_TICKED]` vì ô "Monster War" giống hệt (khớp 0,92). Điểm khớp: đang tích 1,00; đã bỏ tích ~0,67; ngưỡng 0,9. Bấm vào đúng vị trí tìm thấy.
+- Mỗi lượt chạy bấm tối đa `WAR_UNTICK_TRIES = 3` lần, để game chậm không làm bot bấm qua bấm lại (tích lại).
+- Ô "Monster War" không bị đụng tới.
+
 ## 4. Xử lý từng action
 
 | Action | Hành vi |
@@ -73,14 +81,14 @@ Các template có trong `REGIONS` chỉ được tìm trong vùng phần trăm m
 | OUT_OF_STAMINA | Nếu không cho dùng vật phẩm thì trả về None; nếu cho phép thì tap, chờ trạng thái cũ biến mất và gọi `_use_stamina()`. |
 | NO_BOSS | Gọi `_idle()`; trả IDLE hoặc chờ rồi quét lại, bỏ qua `wait_gone` cuối vòng. |
 | MARCH_SCREEN | Gọi `_march(screen, pos)`. |
-| JOIN_LIST | Gọi `_join(screen)`. |
-| SCROLL / JOINED | Gọi `_scroll()`. Với JOINED, chỉ giữ các tọa độ trong `not_join` có cả x và y nhỏ hơn 800. |
+| JOIN_LIST | Gọi `_join(screen)`. Không tap Join nào (bỏ qua hết, hoặc đã cuộn) thì bỏ qua `wait_gone` cuối vòng. |
+| SCROLL / JOINED | Gọi `_scroll()`, bỏ qua `wait_gone` cuối vòng. |
 | TAP | Tap vào vị trí nhận diện. |
 | BACK | Gửi Back. |
 | LEAVE_ALLIANCE_POPUP | Tap tại góc trên trái template cộng `(40, 40)`, chờ rồi Back. |
 | Không nhận diện được | Chờ 1 giây, chụp lại màn hình rồi gọi `go_home()`. |
 
-Sau các nhánh không return/continue, code gọi `wait_gone()` với action và vị trí cũ trước khi bắt đầu vòng tiếp theo.
+Sau các nhánh không return/continue, code gọi `wait_gone()` với action và vị trí cũ trước khi bắt đầu vòng tiếp theo. `wait_gone` chờ tới 10 giây cho ảnh vừa nhận diện biến mất, nên chỉ dùng khi bot đã tap / back làm màn hình đổi; lượt không thao tác (bỏ qua hết boss) hoặc vừa cuộn thì không gọi.
 
 ## 5. Chọn boss: `_join()`
 
@@ -88,20 +96,20 @@ Sau các nhánh không return/continue, code gọi `wait_gone()` với action v�
 flowchart TD
     A[Tìm tất cả nút Join] --> B[Lọc vùng Y và screen_blacklist]
     B --> C{Còn nút?}
-    C -->|Không| D[Cuộn; xóa screen_blacklist; return]
+    C -->|Không| D[_scroll: cuộn hoặc rảnh; xóa screen_blacklist; return False]
     C -->|Có| E[Lấy nút tiếp theo và crop thẻ boss]
     E --> F[Thử OCR tọa độ nếu được hỗ trợ]
-    F --> G{Tọa độ đã có trong not_join?}
+    F --> G{Tọa độ còn trong BossMemory?}
     G -->|Có| H[Thêm vị trí nút vào screen_blacklist]
-    G -->|Không| I{Boss bị skip hoặc có chữ đỏ?}
-    I -->|Có| J[Ghi nhớ tọa độ và vị trí nút]
+    G -->|Không| I{OCR tên: boss không được tích, hoặc chữ Join đỏ?}
+    I -->|Có| J[BossMemory: SKIPPED; thêm vị trí nút vào screen_blacklist]
     I -->|Không| K[report_boss: báo boss cho worker cùng server]
-    K --> L[Tap Join; ghi nhớ; reset idle_scrolls]
+    K --> L[Tap Join; pending = tọa độ; reset idle_scrolls]
     L --> M[Dừng duyệt nút trong lượt này]
     H --> N{Còn nút để duyệt?}
     J --> N
     N -->|Có| E
-    N -->|Không| O[Giữ tối đa 30 tọa độ gần nhất; return]
+    N -->|Không| O[return]
     M --> O
 ```
 
@@ -112,12 +120,26 @@ Chi tiết bộ lọc:
 - Loại nút gần một vị trí trong `screen_blacklist`: chênh lệch cả x và y đều nhỏ hơn 10 pixel.
 - Crop thẻ boss tại `(x - 90, y - 150)` với kích thước `160 × 190`.
 - Nếu tìm được LOCATION, OCR vùng `80 × 15` ngay bên phải icon để lấy tọa độ.
-- Tìm ảnh boss bị skip với threshold 0,7.
+- OCR nhãn tên "(Boss) <tên>" hoặc "<tier> <tên>" tại `(x - 95, y - 90)`, kích thước `168 × 30` ([read_boss_name.py](../../ocr/read_boss_name.py), mẫu chữ trong `Images/OCR/Name/`). Tên dài xuống 2 dòng ("(Boss) Skeleton" / "Dragon") được tách theo hàng trống, đọc từng dòng rồi ghép bằng dấu cách. Sau đó khớp với `ui/tabs/boss.json` ([boss_names.py](boss_names.py)): `?` (mảnh chưa có mẫu) được coi là 1–3 chữ bất kỳ, ngoài ra so gần đúng (difflib ≥ 0,75), kể cả khi game đảo thứ tự từ ("Senior Bayar Knight").
+- Cấp của boss có `levels` trong boss.json: có chữ tier trong tên (Junior, Senior...) thì tra bảng tier **của chính boss đó**; không có tier thì OCR lực của boss tại `(x - 10, y - 180)`, `65 × 20` ([read_power.py](../../ocr/read_power.py), mẫu trong `Images/OCR/Power/`) và chọn cấp có `power` gần nhất (lệch tối đa ×1,3). Boss thường, và boss mà boss.json không cho tier lẫn power ở cấp nào (VD Aglaope), chỉ cần kiểm tra tên.
+- Tên không nhận ra, boss không được tích, cấp đọc được mà không được tích, hoặc boss có dữ liệu cấp mà không xác định được cấp = không tham gia. Riêng tên có cả bản không cấp (Nian ở Boss Standard) thì không xác định được cấp vẫn Join nếu bản không cấp được tích. Mỗi thẻ được ghi log `Boss (x, y): '<chữ OCR>' [power N] -> <tên> [lv N]: join / không tham gia`.
 - Nhận diện chữ đỏ bằng vùng crop dưới nút Join: có hơn 5 pixel thỏa `R > 160`, `G < 110`, `B < 110` thì bỏ qua.
 
 Mỗi lần `_join()` chỉ tap tối đa một nút Join. Nếu các nút đều bị bỏ qua, hàm trở về vòng quét; lần sau các nút đã ghi nhớ sẽ bị lọc.
 
-`not_join` nghĩa là tọa độ đã xử lý, gồm cả boss bị bỏ qua và boss đã tap Join. Nó không phải danh sách xác nhận tham gia thành công.
+### BossMemory — boss đã tham gia / bỏ qua
+
+[boss_memory.py](boss_memory.py) lưu `tọa độ -> (trạng thái, hết hạn)` riêng cho từng giả lập, trong bộ nhớ:
+
+| Trạng thái | Khi nào được ghi |
+| --- | --- |
+| `SKIPPED` | Boss không được tích ở tab (hoặc không nhận ra tên), hoặc nút Join chữ đỏ. |
+| `JOINED` | Trong `_march()`, khi màn hình March đóng lại sau khi tap hành quân. Tap Join chỉ đặt `pending`; mọi nhánh Back của `_march()` (không phải boss, không chọn được quân, March không đóng) bỏ `pending`, nên boss đó được thử lại. |
+
+- Mỗi tọa độ hết hạn sau 6 phút (`TTL`), sau đó boss ở tọa độ đó được xét lại như mới.
+- Thấy lại tọa độ còn hạn: không OCR tên, không kiểm tra chữ đỏ, không Join, chỉ thêm vị trí nút vào `screen_blacklist`.
+- Khóa là tọa độ boss, nên hai rally trên cùng một con boss được tính là một: join một rally thì rally còn lại bị bỏ qua.
+- Không đọc được tọa độ (OCR `None`) thì không lưu được; nút chỉ bị lọc bằng `screen_blacklist` trong màn hình hiện tại.
 
 ## 6. Báo boss cho các giả lập cùng server
 
@@ -155,7 +177,7 @@ Chi tiết triển khai nằm ở [boss_board.py](../../worker/boss_board.py) v�
 3. Nếu cả 5 lần không thấy TROOP_CHECK, Back và trả về.
 4. Nếu đủ template chọn tướng, gọi `_select_general()`.
 5. Tìm lại MARCH; tap vị trí mới nếu có, nếu không dùng vị trí MARCH đã nhận diện ở vòng chính.
-6. Tối đa 5 lần, mỗi lần chờ 0,8 giây và kiểm tra TROOP_CHECK. Nếu ảnh này biến mất thì trả về.
+6. Tối đa 5 lần, mỗi lần chờ 0,8 giây và kiểm tra TROOP_CHECK. Nếu ảnh này biến mất thì ghi tọa độ boss vừa Join vào BossMemory là `JOINED` rồi trả về.
 7. Nếu vẫn còn TROOP_CHECK sau các lần chờ, Back.
 
 Việc TROOP_CHECK biến mất được dùng làm dấu hiệu thoát màn hình March; code không đọc kết quả từ server game để xác nhận rally đã tham gia thành công.
@@ -186,21 +208,26 @@ Tên cấu hình ALL/100 được chuyển thành các thao tác UI trên; hàm 
 
 ## 9. Cuộn danh sách và trạng thái rảnh
 
-`_scroll()` tăng `idle_scrolls` và chạy chu kỳ 4 bước:
+`_scroll(screen)`:
+
+- Nếu đang ở đầu danh sách (`swipe == 0`) và danh sách đã hiện hết thì **không cuộn**: đặt `idle_scrolls = 4` để vòng lặp kế tiếp gọi `_idle()` ngay. Mọi boss trên màn hình đã được xét và đều không tham gia (hoặc chỉ còn Joined).
+  - "Hiện hết" = dải `LIST_END_REGION` (ngay trên nút Battle Logs / Auto-Join) chỉ có nền tối: pixel sáng nhất < 80. Còn thẻ bị che thì dải này có chữ / viền sáng tới ~250.
+  - `swipe != 0` (đang giữa chu kỳ trên danh sách dài) thì vẫn cuộn tiếp để quay về đầu danh sách.
+- Ngược lại tăng `idle_scrolls`, vuốt theo chu kỳ 4 bước, chờ 0,5 giây cho danh sách dừng trôi rồi **chụp ảnh luôn** (`next_screen`) cho vòng lặp kế tiếp, không qua `wait_gone`:
 
 | Giá trị `swipe` | Thao tác |
 | --- | --- |
-| 0, 1 | Vuốt từ `(50%, 65%)` tới `(50%, 40%)`, thời lượng 0,8 giây. |
-| 2, 3 | Vuốt ngược từ `(50%, 40%)` tới `(50%, 65%)`, thời lượng 0,8 giây. |
+| 0, 1, 2 | Vuốt xuống: từ `(50%, 65%)` tới `(50%, 40%)`, thời lượng 0,8 giây. |
+| 3, 4, 5 | Vuốt lên: từ `(50%, 40%)` tới `(50%, 65%)`, thời lượng 0,8 giây. |
 
-Sau mỗi lần vuốt, `swipe = (swipe + 1) % 4`.
+Sau mỗi lần vuốt, `swipe = (swipe + 1) % 6` (`SCROLLS_EACH_WAY = 3`: 3 lần xuống rồi 3 lần lên).
 
-`_idle()` được gọi khi nhận diện NO_BOSS hoặc khi đầu vòng lặp thấy `idle_scrolls >= 4`. Nó luôn reset `idle_scrolls` về 0:
+`_idle()` được gọi khi nhận diện NO_BOSS hoặc khi đầu vòng lặp thấy `idle_scrolls >= 6` (`IDLE_SCROLLS`: cuộn hết một chu kỳ mà không thấy boss mới). Nó luôn reset `idle_scrolls` về 0:
 
 - `exit_when_idle=True`: trả True để vòng chính trả về chuỗi `IDLE`.
 - `exit_when_idle=False`: chờ 5 giây rồi trả False để tiếp tục quét.
 
-Tap một nút Join cũng reset `idle_scrolls` về 0. Bộ đếm này phản ánh các lần cuộn kể từ lần reset, không xác nhận đã đọc hết mọi rally trên server.
+`idle_scrolls` được reset về 0 khi thấy một **boss mới** (đọc được tọa độ và tọa độ chưa có trong BossMemory, dù sau đó Join hay không tham gia) và khi tap Join. Thẻ không đọc được tọa độ không reset, để một thẻ OCR lỗi không làm bot cuộn mãi. Chu kỳ xuống / lên (`swipe`) không bị reset, vẫn chạy tiếp.
 
 ## 10. Kết thúc và quan hệ với worker
 
@@ -213,4 +240,4 @@ Tap một nút Join cũng reset `idle_scrolls` về 0. Bộ đếm này phản �
 
 Activity không tự bắt exception và không tạo thread mới. Các thao tác qua BotContext cung cấp điểm kiểm tra ngắt; lời gọi thiết bị đang bị chặn phải kết thúc trước khi code kiểm tra tiếp được.
 
-Khi worker gọi lại Join Boss, một `_Boss` mới được tạo. Các danh sách ghi nhớ cục bộ được reset, còn bản ghi chống trùng trong BossBoard vẫn tồn tại đến khi hết hạn và được dọn ở lần publish tiếp theo.
+Khi worker gọi lại Join Boss, một `_Boss` mới được tạo. `screen_blacklist` và bộ đếm được reset; `BossMemory` giữ nguyên (tới khi hết hạn hoặc Stop); bản ghi chống trùng trong BossBoard vẫn tồn tại đến khi hết hạn và được dọn ở lần publish tiếp theo.

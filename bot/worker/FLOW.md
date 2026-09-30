@@ -103,8 +103,8 @@ Trong `_Boss._join()`:
 
 1. Tìm nút Join trong vùng màn hình hợp lệ.
 2. Loại các nút đã xử lý trong màn hình hiện tại.
-3. Nếu có template hỗ trợ, OCR tọa độ boss; bỏ qua tọa độ đã có trong `not_join` của lượt Join Boss này.
-4. Bỏ qua boss bị cấu hình skip hoặc nút có chữ đỏ theo bộ nhận diện hiện tại.
+3. Nếu có template hỗ trợ, OCR tọa độ boss; bỏ qua tọa độ còn trong `BossMemory` của giả lập (đã tham gia hoặc đã bỏ qua trong 6 phút gần nhất).
+4. OCR tên boss; bỏ qua boss không được tích ở tab Join Monster War (hoặc không nhận ra tên) và nút có chữ đỏ.
 5. Gọi `bot.report_boss(coords)` ngay trước khi tap Join.
 6. Tap Join, ghi nhớ boss đã xử lý và tiếp tục flow tham gia rally.
 
