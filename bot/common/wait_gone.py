@@ -6,7 +6,7 @@ import time
 from .delay import delay
 
 
-def wait_gone(bot, targets, action, pos, top_left=(), timeout=10.0, interval=0.3,
+def wait_gone(bot, targets, action, pos, top_left=(), timeout=10.0, interval=0.7,
               tolerance=10):
     """Trong tối đa `timeout` giây, cứ `interval` giây chụp màn hình 1 lần và
     kiểm tra `action` còn ở vị trí `pos` không (lệch dưới `tolerance` pixel vẫn

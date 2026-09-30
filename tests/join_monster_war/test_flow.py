@@ -6,10 +6,13 @@ BossMemory (boss đã tham gia / bỏ qua) trên danh sách War
 Ảnh trong screens/ là ảnh chụp nguyên màn hình giả lập, cùng độ phân giải
 bot chạy (REGIONS của Join Boss đo trên 396x704).
 """
+import threading
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 
 import cv2
+import numpy as np
 
 from bot.activities import join_monster_war
 from bot.activities.join_monster_war.boss_memory import JOINED, SKIPPED, BossMemory
@@ -17,8 +20,8 @@ from bot.activities.join_monster_war.constants import (FAVORITE_OFF, IDLE, JOIN,
                                                      NOT_ENOUGH_STAMINA, PRESET_DX, PRESET_X0, PRESET_Y,
                                                      REGIONS, SELECT_GENERAL, STAMINA_SLIDER_END,
                                                      STAMINA_USE, WAR_TICKED)
-from bot.activities.join_monster_war.run import _is_green_button
-from bot.context import TEMPLATE_DIR
+from bot.activities.join_monster_war.run import _Boss, _is_green_button
+from bot.context import TEMPLATE_DIR, BotContext
 from tests.flow import Step, back, end, run_flow, swipe, tap, tap_at, tap_pct
 
 SCREENS = Path(__file__).parent / "screens"
@@ -63,9 +66,16 @@ def no_items(screen):
     return screen
 
 
+def unknown(screen):
+    """ẢNH TỔNG HỢP: màn hình không ảnh mẫu nào khớp (nhiễu), như hiệu ứng tạm sau khi bấm
+    Join. (Làm tối ảnh thật không đủ: so khớp ảnh mẫu không phụ thuộc độ sáng.)"""
+    screen[:] = np.random.default_rng(0).integers(0, 255, screen.shape, dtype=np.uint8)
+    return screen
+
+
 def run_join(testcase, flow, settings, **kwargs):
     return run_flow(testcase, join_monster_war.run, SCREENS, flow, settings,
-                    variants={"war_off": war_off, "no_items": no_items}, **kwargs)
+                    variants={"war_off": war_off, "no_items": no_items, "unknown": unknown}, **kwargs)
 
 
 def remember(coords, status):
@@ -90,6 +100,23 @@ SKIP_RED_JOIN = [
     Step(W("war_list_join_red.png"), end(IDLE)),
 ]
 
+# Bấm Join Peryton -> thông báo "You cannot send more troops." (hết đội quân), vẫn ở danh sách.
+# Không bỏ qua: lượt sau xét lại chính nút đó, thời gian không đỏ -> bấm Join lại.
+CANNOT_SEND_MORE = "war_cannot_send_more_troops.png"
+PERYTON_2 = (731, 917)   # Peryton trên ảnh này
+JOIN_AGAIN_AFTER_CANNOT_SEND = [
+    Step(CANNOT_SEND_MORE, tap(JOIN)),
+    Step(CANNOT_SEND_MORE, tap(JOIN)),
+    Step(CANNOT_SEND_MORE, tap(JOIN)),
+]
+# Aglaope (thẻ trên, được tích) bấm Join mà không vào được màn March: không tính là đã xử lý,
+# không cuộn tìm boss khác, bấm lại chính nút Join đó.
+AGLAOPE = (673, 850)
+JOIN_AGAIN_AGLAOPE = [
+    Step("war_aglaope_join.png", tap(JOIN)),
+    Step("war_aglaope_join.png", tap(JOIN)),
+    Step("war_aglaope_join.png", tap(JOIN)),
+]
 # Thẻ trên đang Attacking (không có Join), thẻ dưới Yasha có Join y = 562.
 JOIN_BELOW_ATTACKING = [
     Step(W("war_list_attacking_join.png"), tap(JOIN)),
@@ -386,6 +413,17 @@ def next_troop(troop):
 ALL_JOINED_SHORT_LIST = [
     Step("war_epic_cerberus_skeleton.png", end(IDLE)),
 ]
+# Danh sách đã cuộn: thẻ trên cùng (Medium Cerberus) có Join nhưng ngoài dải hợp lệ (y ~235),
+# các thẻ còn lại đang "Attacking" -> không thấy Join / Joined nào nhưng danh sách chưa hết ->
+# cuộn tiếp, không được rảnh.
+SCROLLED_ONLY_ATTACKING = [
+    Step("war_scrolled_only_attacking.png", swipe(50, 65, 50, 40)),
+]
+# 2 thẻ đều "Attacking" (không Join / Joined), có khoảng hở nhỏ ngay trên 2 nút xanh cuối
+# (Battle Logs / Auto-Join) = danh sách đã hiện hết -> rảnh ngay, không cuộn.
+TWO_ATTACKING_LIST_END = [
+    Step("war_two_attacking_list_end.png", end(IDLE)),
+]
 # Cuối một danh sách dài: thẻ cuối sát nút Battle Logs (không có khoảng trống), mọi boss
 # đã biết -> không được rảnh ngay, vẫn cuộn theo vòng 3 xuống / 3 lên.
 BOTTOM_OF_LONG_LIST = [
@@ -526,6 +564,14 @@ class JoinMonsterWarFlow(unittest.TestCase):
         self.assertEqual(device.events, [])
         self.assertEqual(device.reported, [])
 
+    def test_scrolled_list_without_join_keeps_scrolling(self):
+        device = run_join(self, SCROLLED_ONLY_ATTACKING, IDLE_SETTINGS)
+        self.assertNotIn("Rảnh: không còn boss để tham gia", device.logs)
+
+    def test_short_list_without_join_idles(self):
+        device = run_join(self, TWO_ATTACKING_LIST_END, IDLE_SETTINGS)
+        self.assertEqual(device.events, [])     # không cuộn, không bấm
+
     def test_bottom_of_long_list_keeps_scrolling(self):
         device = run_join(self, BOTTOM_OF_LONG_LIST, with_bayard([2]),
                           setup=remember(BAYARD_SENIOR, JOINED))
@@ -578,10 +624,53 @@ class JoinMonsterWarFlow(unittest.TestCase):
         device = run_join(self, SKIP_RED_JOIN, IDLE_SETTINGS)
         self.assertEqual(device.reported, [])
         self.assertEqual(device.events, [])     # không bấm, không cuộn
+        self.assertIn("Boss (633, 941): thời gian đỏ, bỏ qua lần này", device.logs)
         with device.fake_time():
-            self.assertEqual(device.ctx.boss_memory.status(MANTICORE), SKIPPED)
+            # Chỉ bỏ qua lần này, không nhớ: lần quét sau kiểm tra lại, hết đỏ thì Join
+            self.assertIsNone(device.ctx.boss_memory.status(MANTICORE))
         # Không còn chờ wait_gone 10 giây mỗi lượt (trước đây ~82 giây).
         self.assertLess(device.clock.now - 1000, 2)
+
+    def test_red_timer_detection_on_real_buttons(self):
+        # Chỉ Manticore có thời gian đỏ. Nút Join ở y 365 của war_list_bottom (thời gian trắng)
+        # trước đây bị nhận nhầm là đỏ vì vùng kiểm tra chạm viền đỏ của thẻ bên dưới.
+        checker = SimpleNamespace(bot=BotContext(SimpleNamespace(serial="t"), threading.Event(), None,
+                                                 lambda _: None))
+        jh = checker.bot.template_size(JOIN)[1]
+        cases = [("war_list_join_red.png", (319, 331), True),
+                 ("war_list_bottom.png", (319, 365), False),
+                 ("war_list_bottom.png", (319, 596), False),
+                 ("02_war_list_join.png", (319, 331), False),
+                 ("war_joined_and_join.png", (319, 562), False),
+                 ("war_cannot_send_more_troops.png", (319, 562), False)]
+        for screen, (x, y), red in cases:
+            image = cv2.imread(str(SCREENS / screen))
+            if image is None:
+                self.skipTest(f"thiếu ảnh {screen}")
+            with self.subTest(screen=screen, y=y):
+                self.assertEqual(_Boss._join_text_is_red(checker, image, x, y, jh), red)
+
+    def test_unknown_screen_retries_before_go_home(self):
+        # Màn hình không nhận ra: chụp lại 3 lần (mỗi lần 1 s) rồi mới go_home (Back).
+        device = run_join(self, [Step("02_war_list_join.png?unknown", back())], IDLE_SETTINGS)
+        self.assertEqual(device.shots, 1 + 3)
+        self.assertIn("Màn hình vẫn không nhận ra: go_home", device.logs)
+
+    def test_join_again_after_cannot_send_more_troops(self):
+        device = run_join(self, JOIN_AGAIN_AFTER_CANNOT_SEND, IDLE_SETTINGS)
+        self.assertEqual(device.reported, [PERYTON_2] * 3)            # bấm lại cùng một boss
+        with device.fake_time():
+            self.assertIsNone(device.ctx.boss_memory.status(PERYTON_2))   # không bị bỏ qua
+        # Mỗi lần bấm cách nhau ~5 giây (JOIN_TAP_WAIT), không phải 10 giây của wait_gone:
+        # 3 lần bấm = 2 khoảng chờ trước lần bấm cuối.
+        self.assertLess(device.clock.now - 1000, 12)
+
+    def test_join_again_same_boss_not_scroll_away(self):
+        settings = {**IDLE_SETTINGS, "selected_bosses": [
+            {"category_key": "mythical_and_elite_bosses", "name": "Aglaope", "levels": [1]}]}
+        device = run_join(self, JOIN_AGAIN_AGLAOPE, settings)
+        self.assertEqual(device.reported, [AGLAOPE] * 3)
+        self.assertFalse(any(event[0] == "swipe" for _, event in device.events))
 
     def test_join_below_attacking(self):
         device = run_join(self, JOIN_BELOW_ATTACKING, SETTINGS)

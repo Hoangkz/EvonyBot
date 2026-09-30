@@ -79,9 +79,9 @@ Khi đang ở danh sách War (JOIN_LIST / JOINED / SCROLL, hoặc NO_BOSS mà th
 | Action | Hành vi |
 | --- | --- |
 | OUT_OF_STAMINA | Nếu không cho dùng vật phẩm thì trả về None; nếu cho phép thì tap, chờ trạng thái cũ biến mất và gọi `_use_stamina()`. |
-| NO_BOSS | Gọi `_idle()`; trả IDLE hoặc chờ rồi quét lại, bỏ qua `wait_gone` cuối vòng. |
+| NO_BOSS | Từ tab **PvP War** (danh sách War không thấy Join / Joined nào trong dải hợp lệ): gọi `_scroll()`. Đầu danh sách mà danh sách trống / đã hiện hết thì rảnh; đã cuộn tới đoạn toàn thẻ "Attacking" hoặc còn thẻ bị che thì cuộn tiếp. Từ **màn hình chính** (nút Liên minh, không có listboss): gọi `_idle()`, trả IDLE hoặc chờ rồi quét lại. Cả hai bỏ qua `wait_gone` cuối vòng. |
 | MARCH_SCREEN | Gọi `_march(screen, pos)`. |
-| JOIN_LIST | Gọi `_join(screen)`. Không tap Join nào (bỏ qua hết, hoặc đã cuộn) thì bỏ qua `wait_gone` cuối vòng. |
+| JOIN_LIST | Gọi `_join(screen)`. Đã tap Join: chờ 5 giây rồi quét lại (không `wait_gone`). Không tap Join nào (bỏ qua hết, hoặc đã cuộn): quét lại ngay. |
 | SCROLL / JOINED | Gọi `_scroll()`, bỏ qua `wait_gone` cuối vòng. |
 | TAP | Tap vào vị trí nhận diện. |
 | BACK | Gửi Back. |
@@ -123,7 +123,8 @@ Chi tiết bộ lọc:
 - OCR nhãn tên "(Boss) <tên>" hoặc "<tier> <tên>" tại `(x - 95, y - 90)`, kích thước `168 × 30` ([read_boss_name.py](../../ocr/read_boss_name.py), mẫu chữ trong `Images/OCR/Name/`). Tên dài xuống 2 dòng ("(Boss) Skeleton" / "Dragon") được tách theo hàng trống, đọc từng dòng rồi ghép bằng dấu cách. Sau đó khớp với `ui/tabs/boss.json` ([boss_names.py](boss_names.py)): `?` (mảnh chưa có mẫu) được coi là 1–3 chữ bất kỳ, ngoài ra so gần đúng (difflib ≥ 0,75), kể cả khi game đảo thứ tự từ ("Senior Bayar Knight").
 - Cấp của boss có `levels` trong boss.json: có chữ tier trong tên (Junior, Senior...) thì tra bảng tier **của chính boss đó**; không có tier thì OCR lực của boss tại `(x - 10, y - 180)`, `65 × 20` ([read_power.py](../../ocr/read_power.py), mẫu trong `Images/OCR/Power/`) và chọn cấp có `power` gần nhất (lệch tối đa ×1,3). Boss thường, và boss mà boss.json không cho tier lẫn power ở cấp nào (VD Aglaope), chỉ cần kiểm tra tên.
 - Tên không nhận ra, boss không được tích, cấp đọc được mà không được tích, hoặc boss có dữ liệu cấp mà không xác định được cấp = không tham gia. Riêng tên có cả bản không cấp (Nian ở Boss Standard) thì không xác định được cấp vẫn Join nếu bản không cấp được tích. Mỗi thẻ được ghi log `Boss (x, y): '<chữ OCR>' [power N] -> <tên> [lv N]: join / không tham gia`.
-- Nhận diện chữ đỏ bằng vùng crop dưới nút Join: có hơn 5 pixel thỏa `R > 160`, `G < 110`, `B < 110` thì bỏ qua.
+- Nhận diện chữ đỏ bằng dòng chữ thời gian bên trong nút Join (vùng `x - 6`, `y + chiều cao chữ Join`, rộng 46, cao 12): có hơn 5 pixel thỏa `R > 160`, `G < 110`, `B < 110` thì **bỏ qua lần này** (không lưu vào BossMemory, lần quét sau kiểm tra lại; không reset bộ đếm cuộn), log `Boss (…): thời gian đỏ, bỏ qua lần này`. Vùng cũ (rộng 60, cao 20) chạm viền đỏ của thẻ bên dưới khi nút ở vị trí lệch sau khi cuộn, nên nhận nhầm thời gian trắng là đỏ.
+- Nút Join vừa bấm **không** đưa vào `screen_blacklist`. Bấm mà không vào được màn March (VD thông báo "You cannot send more troops.", bot không đọc thông báo này) thì lượt sau xét lại chính nút đó: thời gian đỏ thì bỏ qua, không đỏ thì bấm Join lại. Sau mỗi lần bấm Join bot chờ cố định `JOIN_TAP_WAIT = 5` giây rồi chụp lại, **không** gọi `wait_gone` (nút Join còn nguyên khi Join không được nên `wait_gone` sẽ chờ hết 10 giây).
 
 Mỗi lần `_join()` chỉ tap tối đa một nút Join. Nếu các nút đều bị bỏ qua, hàm trở về vòng quét; lần sau các nút đã ghi nhớ sẽ bị lọc.
 

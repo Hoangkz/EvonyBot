@@ -73,6 +73,8 @@ class _Boss:
             # Reset blacklist nút khi vừa chuyển trạng thái quay lại JOIN_LIST
             if action == JOIN_LIST and self.previous != JOIN_LIST:
                 self.screen_blacklist.clear()
+            if action != self.previous:
+                bot.log(f"Màn hình: {action or 'không nhận ra'}{f' tại {pos}' if pos else ''}")
             self.previous = action
 
             # Danh sách War mà ô "War" (rally đánh người chơi) đang tích -> bấm bỏ tích trước
@@ -88,8 +90,13 @@ class _Boss:
                 continue   # _use_stamina đã March lại, hoặc (hết vật phẩm) đánh dấu rảnh
 
             elif action == NO_BOSS:
-                # Th1: màn hình chính có Liên minh nhưng không có listboss
-                # Th2: PvPWar nhưng không có nút Join / Joined nào -> rảnh
+                # Th2: danh sách War (tab PvP War) không thấy nút Join / Joined nào trong dải hợp
+                # lệ: có thể trống thật, hoặc đã cuộn tới đoạn toàn thẻ "Attacking" -> xử lý như
+                # cuộn (_scroll: đầu danh sách mà đã hiện hết -> rảnh, còn thẻ bị che -> cuộn tiếp)
+                if bot.find(PVP_WAR, screen=screen, region=REGIONS[PVP_WAR]) is not None:
+                    self._scroll(screen)
+                    continue
+                # Th1: màn hình chính có Liên minh nhưng không có listboss -> rảnh
                 if self._idle():
                     return IDLE
                 continue   # màn hình không đổi -> không cần wait_gone
@@ -98,8 +105,12 @@ class _Boss:
                 self._march(screen, pos)
 
             elif action == JOIN_LIST:
-                if not self._join(screen):
-                    continue   # không tap Join (bỏ qua hết / đã cuộn) -> màn hình không cần chờ đổi
+                # Đã tap Join: chờ cố định JOIN_TAP_WAIT giây rồi chụp lại (không wait_gone: nếu
+                # không Join được thì nút Join vẫn còn, wait_gone sẽ chờ hết 10 giây).
+                # Không tap (bỏ qua hết / đã cuộn): quét lại ngay.
+                if self._join(screen):
+                    delay(bot, JOIN_TAP_WAIT)
+                continue
 
             elif action in (SCROLL, JOINED):
                 self._scroll(screen)
@@ -117,9 +128,20 @@ class _Boss:
                 bot.back()
 
             else:
-                # Không nhận diện được màn hình -> Chờ nhẹ 1s rồi mới tính chuyện go_home
-                delay(bot, 1)
-                go_home(bot, bot.screenshot())
+                # Không nhận diện được màn hình: thường là hiệu ứng tạm (màn tối / thông báo sau
+                # khi bấm Join) -> chụp lại vài lần; nhận ra được thì đi tiếp, không thì go_home
+                # (go_home nhấn Back, có thể thoát khỏi danh sách War).
+                for _ in range(UNKNOWN_RETRIES):
+                    delay(bot, 1)
+                    shot = bot.screenshot()
+                    if find_first(bot, shot, targets, top_left={LEAVE_ALLIANCE_POPUP},
+                                  regions=REGIONS)[0] is not None:
+                        self.next_screen = shot
+                        break
+                else:
+                    bot.log("Màn hình vẫn không nhận ra: go_home")
+                    go_home(bot, shot)
+                continue
 
             # Chờ hành động cũ biến mất; ảnh xác nhận đã chuyển màn được dùng luôn cho
             # vòng lặp mới (None = hết giờ mà màn hình chưa đổi -> vòng lặp tự chụp lại)
@@ -157,6 +179,7 @@ class _Boss:
         """Không có boss để join. Có activity khác -> True (thoát cho worker làm
         activity khác); chỉ có Join Boss -> chờ IDLE_WAIT giây rồi kiểm tra lại."""
         self.idle_scrolls = 0
+        self.bot.log("Rảnh: không còn boss để tham gia")
         if self.exit_when_idle:
             return True
         delay(self.bot, IDLE_WAIT)
@@ -172,6 +195,7 @@ class _Boss:
             self.idle_scrolls = IDLE_SCROLLS
             return
         self.idle_scrolls += 1
+        bot.log(f"Cuộn {'xuống' if self.swipe < SCROLLS_EACH_WAY else 'lên'} ({self.idle_scrolls}/{IDLE_SCROLLS})")
         if self.swipe < SCROLLS_EACH_WAY:
             bot.swipe_percent(50, 65, 50, 40, duration=0.8)
         else:
@@ -419,29 +443,42 @@ class _Boss:
                     if coords and self.memory.status(coords) is not None:
                         self.screen_blacklist.append((x, y))
                         continue
-                    # Boss mới (dù sau đó Join hay không tham gia) -> đếm lại số lần cuộn
-                    if coords:
-                        self.idle_scrolls = 0
 
-            # 4. OCR tên boss (kèm cấp): boss không được tích ở tab, hoặc chữ Join đỏ
-            #    -> nhớ là không tham gia
-            if not self._boss_is_wanted(screen, x, y, coords) or self._join_text_is_red(screen, x, y, jh):
+            # 4. OCR tên boss (kèm cấp): boss mới không được tích ở tab -> nhớ là không tham gia,
+            #    đếm lại số lần cuộn
+            if not self._boss_is_wanted(screen, x, y, coords):
+                if coords:
+                    self.idle_scrolls = 0
                 self.memory.mark(coords, MEMORY_SKIPPED)
                 self.screen_blacklist.append((x, y))
                 continue
 
-            # 5. Tap nút Join; boss chỉ được nhớ là đã tham gia khi hành quân xong (_march)
+            # 5. Thời gian dưới nút Join màu đỏ (VD vừa bấm Join mà không đủ đội quân) -> bỏ qua
+            #    LẦN NÀY: không nhớ vào BossMemory (lần quét sau kiểm tra lại, hết đỏ thì Join),
+            #    không đếm lại số lần cuộn (boss đỏ không giữ bot khỏi rảnh)
+            if self._join_text_is_red(screen, x, y, jh):
+                bot.log(f"Boss {coords}: thời gian đỏ, bỏ qua lần này")
+                self.screen_blacklist.append((x, y))
+                continue
+
+            # 6. Tap nút Join; boss chỉ được nhớ là đã tham gia khi hành quân xong (_march).
+            #    Không đưa nút vào screen_blacklist: nếu bấm mà không vào được màn March (VD
+            #    thông báo "You cannot send more troops.") thì lượt sau xét lại chính nút này
+            #    (thời gian đỏ -> bỏ qua, không đỏ -> bấm Join lại), không bỏ sang Join khác.
             bot.report_boss(coords)
             bot.tap(x + jw // 2, y + jh // 2)
             self.pending = coords
-            self.screen_blacklist.append((x, y))
             self.idle_scrolls = 0   # cả khi không đọc được tọa độ
             return True
         return False
 
     def _join_text_is_red(self, screen, x, y, join_h) -> bool:
-        """Tối ưu thuật toán đếm pixel đỏ: linh hoạt hơn với render đồ họa khác nhau."""
-        crop = self.bot.crop(screen, x - 12, y + join_h - 3, 60, 20)
+        print(f"Đếm pixel đỏ ở nút Join tại {x},{y} (cao {join_h})")
+        """Tối ưu thuật toán đếm pixel đỏ: linh hoạt hơn với render đồ họa khác nhau.
+        Chỉ lấy dòng chữ thời gian bên trong nút (dưới chữ "Join"): vùng rộng hơn trước đây
+        chạm viền đỏ của thẻ bên dưới khi nút ở vị trí lệch (sau khi cuộn), bị nhận nhầm là
+        thời gian đỏ. Đo: thời gian trắng 0 pixel đỏ, thời gian đỏ ~94."""
+        crop = self.bot.crop(screen, x - 6, y + join_h, 46, 12)
         b, g, r = crop[..., 0], crop[..., 1], crop[..., 2]
         # Hạ tiêu chuẩn Red xuống > 160 và G/B < 110 để tránh lệch màu giữa các máy giả lập
         return int(((r > 160) & (g < 110) & (b < 110)).sum()) > 5
@@ -479,6 +516,8 @@ IDLE_WAIT = 5      # giây chờ khi rảnh mà chỉ chạy Join Boss
 SCROLL_SETTLE = 0.5   # giây chờ danh sách dừng trôi sau khi vuốt, trước khi chụp
 GENERAL_TAP_DELAY = 2   # giây chờ thêm sau mỗi lần bấm khi chọn tướng ("+", trái tim, Select, Back)
 MARCH_TAP_DELAY = 2     # giây chờ sau khi bấm March, trước khi kiểm tra màn March đã đóng / popup thể lực
+UNKNOWN_RETRIES = 3     # màn hình không nhận ra: chụp lại tối đa bấy nhiêu lần (mỗi lần 1 s) trước khi go_home
+JOIN_TAP_WAIT = 3       # giây chờ sau khi tap Join (vào màn March, hoặc không Join được thì tap lại)
 _WAIT = {"top_left": {LEAVE_ALLIANCE_POPUP}, "tolerance": SAME_SPOT}
 
 
