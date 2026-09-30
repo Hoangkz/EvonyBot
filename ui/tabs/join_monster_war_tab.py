@@ -38,18 +38,27 @@ class JoinMonsterWarTab(BaseTab):
         header = QWidget()
         header.setFixedHeight(150)
         troop = QGroupBox("Troop", header)
-        troop.setGeometry(0, 0, 711, 150)
+        troop.setGeometry(0, 0, 470, 150)
         self._troop_group = troop
         troop_panel = QWidget(troop)
-        troop_panel.setGeometry(32, 43, 655, 94)
+        troop_panel.setGeometry(32, 43, 410, 94)
         for i, name in enumerate(TROOP_RADIOS):
             button = QCheckBox(f"Troop {i + 1}", troop_panel)
-            button.setGeometry((33, 200, 358, 520)[i % 4], 0 if i < 4 else 50, 97, 28)
+            button.setGeometry((10, 110, 210, 310)[i % 4], 0 if i < 4 else 50, 97, 28)
             button.setChecked(i == 0)
             self.controls[name] = button
         stamina = QGroupBox("Setting", header)
-        stamina.setGeometry(717, 0, 325, 150)
+        stamina.setGeometry(476, 0, 566, 150)
         self._stamina_group = stamina
+        # Chọn tướng khi hành quân; tướng phụ chỉ đi cùng khi có chọn tướng.
+        general = QCheckBox("Select General", stamina)
+        general.setGeometry(290, 39, 250, 28)
+        assistant = QCheckBox("With Assistant General", stamina)
+        assistant.setGeometry(290, 75, 250, 28)
+        assistant.setEnabled(False)
+        general.toggled.connect(assistant.setEnabled)
+        self.controls["checkBoxSelectGeneral"] = general
+        self.controls["checkBoxAssistantGeneral"] = assistant
         for y, (name, text, items, current) in zip((36, 72, 108), (
             ("comboBoxUseStamina", "Use Stamina: ", STAMINA_OPTIONS, "100"),
             ("comboBoxBuyStamina", "Buy Stamina: ", ["10", "16", "20"], "10"),
@@ -202,6 +211,8 @@ class JoinMonsterWarTab(BaseTab):
             "use_stamina": c["comboBoxUseStamina"].currentText(),
             "buy_stamina": c["comboBoxBuyStamina"].currentText(),
             "buy_hammer": c["comboBoxBuyHammer"].currentText(),
+            "select_general": c["checkBoxSelectGeneral"].isChecked(),
+            "select_assistant_general": c["checkBoxAssistantGeneral"].isChecked(),
             "viking_summon": c["viking_summon"].isChecked() if "viking_summon" in c else False,
             "selected_bosses": [
                 {"category_key": category, "name": name,
@@ -223,6 +234,8 @@ class JoinMonsterWarTab(BaseTab):
             c["comboBoxUseStamina"].setCurrentText(str(data["use_stamina"]))
         if "buy_hammer" in data:
             c["comboBoxBuyHammer"].setCurrentText(str(data["buy_hammer"]))
+        c["checkBoxSelectGeneral"].setChecked(bool(data.get("select_general", False)))
+        c["checkBoxAssistantGeneral"].setChecked(bool(data.get("select_assistant_general", False)))
         if "viking_summon" in c:
             c["viking_summon"].setChecked(bool(data.get("viking_summon", False)))
         if "selected_bosses" in data:

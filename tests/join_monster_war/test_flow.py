@@ -13,9 +13,13 @@ import cv2
 
 from bot.activities import join_monster_war
 from bot.activities.join_monster_war.boss_memory import JOINED, SKIPPED, BossMemory
-from bot.activities.join_monster_war.constants import IDLE, JOIN, LISTBOSS, REGIONS, WAR_TICKED
+from bot.activities.join_monster_war.constants import (FAVORITE_OFF, IDLE, JOIN, LISTBOSS, MARCH,
+                                                     NOT_ENOUGH_STAMINA, PRESET_DX, PRESET_X0, PRESET_Y,
+                                                     REGIONS, SELECT_GENERAL, STAMINA_SLIDER_END,
+                                                     STAMINA_USE, WAR_TICKED)
+from bot.activities.join_monster_war.run import _is_green_button
 from bot.context import TEMPLATE_DIR
-from tests.flow import Step, end, run_flow, swipe, tap, tap_at
+from tests.flow import Step, back, end, run_flow, swipe, tap, tap_at, tap_pct
 
 SCREENS = Path(__file__).parent / "screens"
 # Như tab thật: boss được tích nằm trong selected_bosses (boss thường không có cấp).
@@ -52,9 +56,16 @@ def W(screen):
     return f"{screen}?war_off"
 
 
+def no_items(screen):
+    """ẢNH TỔNG HỢP: xoá cột nút "Use ( N )" của màn Use Item (không còn vật phẩm thể lực).
+    Thay bằng ảnh chụp thật khi có."""
+    screen[300:, 255:370] = (20, 20, 20)
+    return screen
+
+
 def run_join(testcase, flow, settings, **kwargs):
     return run_flow(testcase, join_monster_war.run, SCREENS, flow, settings,
-                    variants={"war_off": war_off}, **kwargs)
+                    variants={"war_off": war_off, "no_items": no_items}, **kwargs)
 
 
 def remember(coords, status):
@@ -205,6 +216,171 @@ ALL_JOINED = [
 SCROLLED_JOIN_GOLEM = [
     Step(W("war_scrolled_join_cut_top.png"), tap_at(335, 604, tol=8)),
 ]
+# ---- Màn March (march_preset_2_unlocked.png: ô 1-2 mở, 3-8 khoá; đội đang chọn có tướng chính)
+def preset(troop):
+    """Bấm ô preset `troop` ở hàng trên cùng màn March."""
+    return tap_pct(PRESET_X0 + (troop - 1) * PRESET_DX, PRESET_Y, tol=8)
+
+
+MARCH_SCREEN = "march_preset_2_unlocked.png"
+ALL_TROOPS = {**IDLE_SETTINGS, "troop": [f"Troop {i}" for i in range(1, 9)]}
+
+# Join Peryton -> màn March: chọn đội 1 (có tướng chính) -> March -> màn March đóng
+# (quay về danh sách) -> nhớ Peryton là đã tham gia -> không còn boss mới -> rảnh.
+JOIN_AND_MARCH = [
+    Step(W("02_war_list_join.png"), tap(JOIN)),
+    Step(MARCH_SCREEN, preset(1)),
+    Step(MARCH_SCREEN, tap(MARCH)),
+    Step(W("02_war_list_join.png"), end(IDLE)),
+]
+# Lần Join trước dùng đội 1 -> lần này bắt đầu từ đội 2.
+MARCH_NEXT_TROOP = [
+    Step(MARCH_SCREEN, preset(2)),
+    Step(MARCH_SCREEN, tap(MARCH)),
+]
+# Lần trước dùng đội 2, chỉ mở 2 ô -> quay vòng về đội 1.
+MARCH_WRAP_TROOP = [
+    Step(MARCH_SCREEN, preset(1)),
+    Step(MARCH_SCREEN, tap(MARCH)),
+]
+# Người dùng chỉ chọn đội 3, 4 nhưng các ô đó đang khoá -> không đội nào dùng được -> Back.
+MARCH_ONLY_LOCKED = [
+    Step(MARCH_SCREEN, back()),
+]
+
+
+# Chọn tướng phụ (tab tích "Select General" + "With Assistant General"): đội 1 đã có tướng
+# chính, ô tướng phụ trống ("+") -> bấm "+" -> màn Select a General: trái tim lọc chưa tích
+# -> bấm tích -> bấm Select tướng đầu tiên -> về màn March, ô tướng phụ đã có tướng -> March.
+WITH_GENERALS = {**ALL_TROOPS, "select_general": True, "select_assistant_general": True}
+CHOOSE_ASSISTANT = [
+    Step("march_main_general_chosen.png", preset(1)),
+    Step("march_main_general_chosen.png", tap(SELECT_GENERAL)),
+    Step("select_general_fav_off.png", tap(FAVORITE_OFF)),
+    Step("select_general_fav_on.png", tap_at(329, 373, tol=8)),
+    Step("march_preset_2_unlocked.png", tap(MARCH)),
+    Step("war_epic_cerberus_skeleton.png", end(IDLE)),
+]
+# Trái tim lọc đã tích sẵn -> không bấm lại, bấm luôn Select.
+CHOOSE_ASSISTANT_FAV_ALREADY_ON = [
+    Step("march_main_general_chosen.png", preset(1)),
+    Step("march_main_general_chosen.png", tap(SELECT_GENERAL)),
+    Step("select_general_fav_on.png", tap_at(329, 373, tol=8)),
+    Step("march_preset_2_unlocked.png", tap(MARCH)),
+]
+# Màn chọn tướng phụ: King Arthur (tướng chính) có nút Select XÁM, không chọn được ->
+# bỏ qua, bấm Select của Hudson (tướng đầu tiên có nút xanh).
+CHOOSE_ASSISTANT_SKIP_MAIN = [
+    Step("march_main_general_chosen.png", preset(1)),
+    Step("march_main_general_chosen.png", tap(SELECT_GENERAL)),
+    Step("select_assistant_main_disabled.png", tap(FAVORITE_OFF)),
+    Step("select_assistant_main_disabled.png", tap_at(329, 627, tol=8)),
+    Step("march_preset_2_unlocked.png", tap(MARCH)),
+]
+# Màn chọn tướng phụ nhưng không còn tướng yêu thích nào ("No favorite General", tim đã
+# tích) -> Back về màn March -> vẫn March với tướng chính, không có tướng phụ.
+ASSISTANT_NO_FAVORITE = [
+    Step("march_main_general_chosen.png", preset(1)),
+    Step("march_main_general_chosen.png", tap(SELECT_GENERAL)),
+    Step("select_general_no_favorite.png", back()),
+    Step("march_main_general_chosen.png", tap(MARCH)),
+]
+# march_no_main_general.png: ô Main General trống (dấu "+"), rally đang "Attacking".
+NO_MAIN = "march_no_main_general.png"
+# Đội 1 không có tướng chính -> thử đội 2 (có tướng chính) -> dùng đội 2.
+SKIP_TROOP_WITHOUT_GENERAL = [
+    Step(NO_MAIN, preset(1)),
+    Step(NO_MAIN, preset(2)),
+    Step(MARCH_SCREEN, tap(MARCH)),
+]
+# Đội 1, 2 đều không có tướng chính, tích "Select General" -> bấm "+" ô Main General ->
+# Select tướng đầu tiên -> về màn March, ô đã có tướng -> March.
+CHOOSE_MAIN_GENERAL = [
+    Step(NO_MAIN, preset(1)),
+    Step(NO_MAIN, preset(2)),
+    Step(NO_MAIN, tap(SELECT_GENERAL)),
+    Step("select_general_fav_on.png", tap_at(329, 373, tol=8)),
+    Step("march_main_general_chosen.png", tap(MARCH)),
+]
+# Chọn tướng chính không được (không có tướng yêu thích) -> Back -> vẫn tham gia boss (March).
+NO_MAIN_GENERAL_STILL_MARCH = [
+    Step(NO_MAIN, preset(1)),
+    Step(NO_MAIN, preset(2)),
+    Step(NO_MAIN, tap(SELECT_GENERAL)),
+    Step("select_general_no_favorite.png", back()),
+    Step(NO_MAIN, tap(MARCH)),
+]
+# Không tích "Select General" -> Back như cũ.
+NO_MAIN_GENERAL_BACK = [
+    Step(NO_MAIN, preset(1)),
+    Step(NO_MAIN, preset(2)),
+    Step(NO_MAIN, back()),
+]
+# Ảnh thật trước / sau khi bấm March (đủ thể lực): màn March (đội có tướng chính và tướng phụ)
+# -> March -> quay về danh sách War, thẻ Manticore đã "Joined", ô War đang tích -> bỏ tích ->
+# chỉ còn thẻ Joined, danh sách đã hiện hết -> rảnh.
+MARCH_THEN_BACK_TO_LIST = [
+    Step("march_ready.png", preset(1)),
+    Step("march_ready.png", tap(MARCH)),
+    Step("war_after_march_joined.png", tap_at(201, 118, tol=8)),
+    Step(W("war_after_march_joined.png"), end(IDLE)),
+]
+# Bấm March mà không đủ thể lực -> popup "Get more now?" (Cancel / Confirm).
+# use_stamina = No -> dừng hẳn Join Boss (trả None); ALL / 100 -> bấm Confirm để lấy thể lực.
+STAMINA_POPUP = "march_not_enough_stamina.png"
+NO_STAMINA_STOP = [
+    Step(W("02_war_list_join.png"), tap(JOIN)),
+    Step(MARCH_SCREEN, preset(1)),
+    Step(MARCH_SCREEN, tap(MARCH)),
+    Step(STAMINA_POPUP, end(None)),
+]
+NO_STAMINA_CONFIRM = [
+    Step(MARCH_SCREEN, preset(1)),
+    Step(MARCH_SCREEN, tap(MARCH)),
+    Step(STAMINA_POPUP, tap(NOT_ENOUGH_STAMINA)),
+]
+# Dùng vật phẩm thể lực: Confirm -> màn Use Item: bấm Use đầu tiên -> popup số lượng
+# (100: Use luôn; ALL: bấm cuối thanh trượt rồi Use) -> chờ 5 s, Back -> màn March -> March lại.
+def refill(slider_step):
+    return [
+        Step(W("02_war_list_join.png"), tap(JOIN)),
+        Step(MARCH_SCREEN, preset(1)),
+        Step(MARCH_SCREEN, tap(MARCH)),
+        Step(STAMINA_POPUP, tap(NOT_ENOUGH_STAMINA)),
+        Step("stamina_use_item_list.png", tap_at(292, 360, tol=8)),   # Use ( 90 ) của vật phẩm đầu
+        *slider_step,
+        Step("stamina_after_use.png", back()),       # bấm Use xong: về danh sách Use Item -> sau 5 s Back
+        Step("march_after_refill.png", tap(MARCH)),   # về màn March, thể lực 101/20 -> March lại
+        Step("war_epic_cerberus_skeleton.png", end(IDLE)),            # đã hành quân, không còn boss mới
+    ]
+
+
+# Hết vật phẩm thể lực: màn Use Item không còn nút Use -> Back 2 lần -> không dừng (thể lực
+# tự hồi): nhớ boss là đã tham gia và coi như rảnh (trả IDLE khi còn activity khác).
+OUT_OF_STAMINA_ITEMS = [
+    Step(W("02_war_list_join.png"), tap(JOIN)),
+    Step(MARCH_SCREEN, preset(1)),
+    Step(MARCH_SCREEN, tap(MARCH)),
+    Step(STAMINA_POPUP, tap(NOT_ENOUGH_STAMINA)),
+    Step("stamina_after_use.png?no_items", back(2)),
+    Step(W("war_after_march_joined.png"), end(IDLE)),
+]
+REFILL_100 = refill([Step("stamina_use_popup_100.png", tap(STAMINA_USE))])   # mặc định 10/87 (= 100)
+REFILL_ALL = refill([Step("stamina_use_popup.png", tap_pct(*STAMINA_SLIDER_END, tol=8)),
+                     Step("stamina_use_popup_all.png", tap(STAMINA_USE))])
+# Tướng phụ đã có sẵn -> không chọn gì thêm, March luôn.
+ASSISTANT_ALREADY_THERE = [
+    Step(MARCH_SCREEN, preset(1)),
+    Step(MARCH_SCREEN, tap(MARCH)),
+]
+
+
+def next_troop(troop):
+    def setup(ctx):
+        ctx.next_troop = troop
+    return setup
+
+
 # Ảnh thật, ô War đã bỏ tích; hai thẻ đều "Joined" và danh sách đã hiện hết -> rảnh,
 # không bấm gì (không bấm ô War, không cuộn).
 ALL_JOINED_SHORT_LIST = [
@@ -246,6 +422,104 @@ class JoinMonsterWarFlow(unittest.TestCase):
     def test_scrolled_list_joins_golem_not_joined_button(self):
         device = run_join(self, SCROLLED_JOIN_GOLEM, with_golem([1]))
         self.assertEqual(device.reported, [GOLEM])
+
+    def test_join_then_march_marks_joined(self):
+        device = run_join(self, JOIN_AND_MARCH, ALL_TROOPS)
+        self.assertEqual(device.reported, [PERYTON])
+        self.assertIn("Chọn đội quân 1", device.logs)
+        with device.fake_time():
+            self.assertEqual(device.ctx.boss_memory.status(PERYTON), JOINED)
+        self.assertEqual(device.ctx.next_troop, 2)
+
+    def test_march_starts_from_next_troop(self):
+        device = run_join(self, MARCH_NEXT_TROOP, ALL_TROOPS, setup=next_troop(2))
+        self.assertIn("Chọn đội quân 2", device.logs)
+
+    def test_march_troop_rotation_wraps(self):
+        device = run_join(self, MARCH_WRAP_TROOP, ALL_TROOPS, setup=next_troop(3))
+        self.assertIn("Chọn đội quân 1", device.logs)
+
+    def test_march_only_locked_troops_backs_out(self):
+        device = run_join(self, MARCH_ONLY_LOCKED, {**IDLE_SETTINGS, "troop": ["Troop 3", "Troop 4"]})
+        self.assertIn("Đội quân đã chọn [3, 4] đều đang khoá (6 ô khoá)", device.logs)
+
+    def test_choose_assistant_general(self):
+        device = run_join(self, CHOOSE_ASSISTANT, WITH_GENERALS)
+        self.assertIn("Chọn đội quân 1", device.logs)
+        self.assertIn("Đã chọn tướng phụ", device.logs)
+
+    def test_choose_assistant_when_favorite_filter_already_on(self):
+        device = run_join(self, CHOOSE_ASSISTANT_FAV_ALREADY_ON, WITH_GENERALS)
+        self.assertIn("Đã chọn tướng phụ", device.logs)
+
+    def test_assistant_skips_disabled_main_general(self):
+        device = run_join(self, CHOOSE_ASSISTANT_SKIP_MAIN, WITH_GENERALS)
+        self.assertIn("Đã chọn tướng phụ", device.logs)
+
+    def test_assistant_no_favorite_backs_and_marches(self):
+        device = run_join(self, ASSISTANT_NO_FAVORITE, WITH_GENERALS)
+        self.assertIn("Chọn tướng phụ: không có tướng nào để chọn", device.logs)
+        self.assertNotIn("Đã chọn tướng phụ", device.logs)
+
+    def test_skip_troop_without_main_general(self):
+        device = run_join(self, SKIP_TROOP_WITHOUT_GENERAL, ALL_TROOPS)
+        self.assertIn("Chọn đội quân 2", device.logs)
+
+    def test_choose_main_general(self):
+        device = run_join(self, CHOOSE_MAIN_GENERAL, {**WITH_GENERALS, "select_assistant_general": False})
+        self.assertIn("Đã chọn tướng chính", device.logs)
+        self.assertEqual(device.ctx.next_troop, 3)
+
+    def test_no_main_general_still_joins_when_select_general_ticked(self):
+        device = run_join(self, NO_MAIN_GENERAL_STILL_MARCH, {**WITH_GENERALS, "select_assistant_general": False})
+        self.assertIn("Đội quân 2: không chọn được tướng chính, vẫn tham gia boss", device.logs)
+        self.assertEqual(device.ctx.next_troop, 3)
+
+    def test_no_main_general_backs_when_select_general_not_ticked(self):
+        device = run_join(self, NO_MAIN_GENERAL_BACK, ALL_TROOPS)
+        self.assertIn("Không có đội quân nào có tướng chính", device.logs)
+
+    def test_march_returns_to_war_list(self):
+        device = run_join(self, MARCH_THEN_BACK_TO_LIST, ALL_TROOPS)
+        self.assertIn("Chọn đội quân 1", device.logs)
+        self.assertIn("Bỏ tích ô War (chỉ giữ rally đánh boss)", device.logs)
+
+    def test_not_enough_stamina_stops_join_boss(self):
+        device = run_join(self, NO_STAMINA_STOP, {**ALL_TROOPS, "use_stamina": "No"})
+        with device.fake_time():
+            self.assertIsNone(device.ctx.boss_memory.status(PERYTON))   # chưa tham gia được
+
+    def test_not_enough_stamina_confirms_when_allowed(self):
+        run_join(self, NO_STAMINA_CONFIRM, {**ALL_TROOPS, "use_stamina": "ALL"})
+
+    def test_refill_stamina_100_then_march_again(self):
+        device = run_join(self, REFILL_100, {**ALL_TROOPS, "use_stamina": "100"})
+        self.assertIn("Dùng vật phẩm thể lực (100)", device.logs)
+        with device.fake_time():
+            self.assertEqual(device.ctx.boss_memory.status(PERYTON), JOINED)
+
+    def test_refill_stamina_all_then_march_again(self):
+        device = run_join(self, REFILL_ALL, {**ALL_TROOPS, "use_stamina": "ALL"})
+        self.assertIn("Dùng vật phẩm thể lực (ALL)", device.logs)
+        with device.fake_time():
+            self.assertEqual(device.ctx.boss_memory.status(PERYTON), JOINED)
+
+    def test_out_of_stamina_items_marks_joined_and_idles(self):
+        device = run_join(self, OUT_OF_STAMINA_ITEMS, {**ALL_TROOPS, "use_stamina": "ALL"})
+        self.assertIn("Hết vật phẩm thể lực", device.logs)
+        with device.fake_time():
+            self.assertEqual(device.ctx.boss_memory.status(PERYTON), JOINED)
+
+    def test_green_select_buttons_only(self):
+        image = cv2.imread(str(SCREENS / "select_assistant_main_disabled.png"))
+        if image is None:
+            self.skipTest("thiếu ảnh")
+        self.assertFalse(_is_green_button(image, (329, 373)))   # King Arthur: nút xám
+        self.assertTrue(_is_green_button(image, (329, 627)))    # Hudson: nút xanh
+
+    def test_assistant_already_there_marches_directly(self):
+        device = run_join(self, ASSISTANT_ALREADY_THERE, WITH_GENERALS)
+        self.assertNotIn("Đã chọn tướng phụ", device.logs)
 
     def test_all_joined_short_list_idles(self):
         device = run_join(self, ALL_JOINED_SHORT_LIST, IDLE_SETTINGS)

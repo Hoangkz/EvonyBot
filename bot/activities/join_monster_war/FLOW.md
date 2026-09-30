@@ -172,15 +172,32 @@ Chi tiết triển khai nằm ở [boss_board.py](../../worker/boss_board.py) v�
 
 ## 7. Hành quân: `_march()`
 
-1. Kiểm tra BOSS_MONSTER trong vùng quy định. Không thấy thì Back và trả về vòng chính.
-2. Lấy preset kế tiếp trong danh sách `troop` (xoay vòng), thử chọn tối đa 5 lần: tap tại `(troop × 11%, 11%)`, chờ 0,5 giây, tìm TROOP_CHECK.
-3. Nếu cả 5 lần không thấy TROOP_CHECK, Back và trả về.
-4. Nếu đủ template chọn tướng, gọi `_select_general()`.
-5. Tìm lại MARCH; tap vị trí mới nếu có, nếu không dùng vị trí MARCH đã nhận diện ở vòng chính.
-6. Tối đa 5 lần, mỗi lần chờ 0,8 giây và kiểm tra TROOP_CHECK. Nếu ảnh này biến mất thì ghi tọa độ boss vừa Join vào BossMemory là `JOINED` rồi trả về.
-7. Nếu vẫn còn TROOP_CHECK sau các lần chờ, Back.
+1. Kiểm tra chữ "Boss Monster" (`bossMonsterText.png`) trong vùng quy định. Không thấy thì Back và trả về vòng chính. (Trước đây dùng lá cờ xanh `bossMonster.png`, nhưng rally đang "Attacking" thì chỗ đó là hai thanh kiếm, nên bot sẽ Back nhầm.)
+2. Chọn đội quân bằng `_pick_troop()`:
+   - Đếm ổ khoá (`presetLocked.png`) ở hàng 8 ô preset trên cùng; số ô mở = 8 − số khoá (các ô mở luôn là các ô đầu).
+   - Đội dùng được = đội người dùng chọn ở tab (`troop`, tăng dần) có số ≤ số ô mở. VD chọn cả 8 mà chỉ mở 2 thì dùng {1, 2}; chọn {2, 3} mà mở 3 thì dùng {2, 3}.
+   - Thử lần lượt, bắt đầu từ đội sau đội đã dùng ở lần Join trước (`ctx.next_troop`, lưu trên BotContext). VD chọn 1, 2, 3, lần trước dùng 1 thì thử 2 → 3 → 1.
+   - Bấm ô preset (tâm x = 10,4% + (i − 1) × 11,3%, y = 11%), chờ tối đa 1,5 giây. Thấy kính lúp (`generalSearch.png`) ở ô Main General (có tướng chính) thì đội đạt.
+3. Không đội nào đạt:
+   - Tab tích **"Select General"**: gọi `_choose_general(MAIN_GENERAL)` để chọn tướng chính cho đội vừa thử cuối cùng. Chọn **không được** (không có tướng yêu thích...) thì **vẫn tham gia boss** với đội đó. Lượt xoay lần sau bắt đầu từ đội kế tiếp.
+   - Không tích: log, Back, boss được thử lại sau.
+   - Xong phần chọn tướng (hoặc bỏ qua) thì bấm **March** để tham gia boss (bước 5).
+4. Tab tích thêm **"With Assistant General"**: gọi `_choose_general(ASSISTANT_GENERAL)`. Ô tướng phụ đã có tướng thì không làm gì.
 
-Việc TROOP_CHECK biến mất được dùng làm dấu hiệu thoát màn hình March; code không đọc kết quả từ server game để xác nhận rally đã tham gia thành công.
+`_choose_general(ô)` (dùng chung cho tướng chính và tướng phụ; `ô` là vùng % của ô đó trên màn March):
+- Ô không có dấu "+" (`selectGeneral.png`) thì coi là đã có tướng, trả True nếu thấy kính lúp trong ô.
+- Bấm "+", chờ màn "Select a General". Màn này được nhận bằng trái tim lọc (`favoriteOn.png` / `favoriteOff.png`), vì khi không có tướng yêu thích ("No favorite General") thì không có nút Select nào.
+- Không còn nút Select xanh nào (không có tướng yêu thích, hoặc chỉ còn tướng chính): nhấn Back về màn March, bỏ qua phần chọn tướng, trả False.
+- Trái tim lọc tướng yêu thích chưa tích (`favoriteOff.png`, không thấy `favoriteOn.png`) thì bấm tích.
+- Bấm nút "Select" **màu xanh** trên cùng. Tướng đang là tướng chính có nút Select xám (không chọn được làm tướng phụ) và bị bỏ qua, dù nút xám vẫn khớp ảnh mẫu tới 0,88.
+- Chờ về màn March, thấy kính lúp trong ô thì đã chọn xong.
+5. Tìm lại MARCH; tap vị trí mới nếu có, nếu không dùng vị trí MARCH đã nhận diện ở vòng chính.
+6. Tối đa 5 lần, mỗi lần chờ 0,8 giây và kiểm tra:
+   - Popup **không đủ thể lực** ("Get more now?", nút Confirm `hettheluc.png`): trả màn này cho vòng lặp chính (giữ tọa độ boss). Vòng lặp chính gặp `OUT_OF_STAMINA`: `use_stamina = No` thì **dừng hẳn Join Boss**; `ALL` / `100` thì bấm Confirm rồi `_use_stamina()`. Popup đè lên màn March nhưng nút March mờ vẫn khớp ảnh mẫu (0,99), nên phải kiểm tra popup trước.
+   - Nút MARCH biến mất (màn March đã đóng): ghi tọa độ boss vừa Join vào BossMemory là `JOINED` rồi trả về.
+7. Nếu nút MARCH vẫn còn sau các lần chờ, Back.
+
+Việc nút MARCH biến mất được dùng làm dấu hiệu thoát màn hình March; code không đọc kết quả từ server game để xác nhận rally đã tham gia thành công. (Trước đây dùng `checkLocam.png`, nhưng ảnh này không có trên màn March thật, khớp 0,77.)
 
 ### Chọn tướng: `_select_general()`
 
@@ -196,13 +213,15 @@ Hàm không trả cờ thành công/thất bại. Khi nó trả về, `_march()`
 
 ## 8. Bổ sung thể lực: `_use_stamina()`
 
-1. Tìm các STAMINA_ITEM và sắp xếp theo tọa độ y.
-2. Nếu có vật phẩm, tap vật phẩm trên cùng rồi chờ 2 giây.
-3. Tìm USE_STAMINA; nếu không thấy thì return ngay.
-4. Với `ALL`, tap hai lần tại `(28,9%, 71,6%)`. Với `100`, nếu tìm được PLUS thì tap hai lần tại vị trí offset bên phải ảnh PLUS.
-5. Chờ 1 giây rồi tap USE_STAMINA.
-6. Nếu không có vật phẩm, gửi Back.
-7. Trừ nhánh return sớm ở bước 3, cuối hàm luôn chờ 1 giây rồi Back.
+Được gọi khi vòng lặp chính gặp popup không đủ thể lực (`OUT_OF_STAMINA`) mà `use_stamina` là `ALL` / `100`: bấm Confirm rồi:
+
+1. Màn **Use Item**: tìm các nút "Use ( N )" (`staminaItemUse.png`, chỉ trong cột nút bên phải), bấm nút **trên cùng** (vật phẩm đầu tiên). Không có nút nào (hết vật phẩm thể lực): log "Hết vật phẩm thể lực", **Back 2 lần** (thoát màn Use Item, rồi màn March). **Không dừng** Join Boss (thể lực tự hồi theo thời gian): nhớ boss vừa Join là `JOINED` (6 phút không thử lại) và **đánh dấu rảnh**. Còn activity khác thì trả `IDLE`; chỉ chạy Join Boss thì chờ 5 giây rồi quét lại.
+2. **Popup số lượng** (nút Use lớn `staminaUse.png`):
+   - `100`: bấm Use luôn (số lượng mặc định);
+   - `ALL`: bấm gần cuối thanh trượt (`STAMINA_SLIDER_END`, dùng hết), rồi bấm Use.
+3. Chờ 5 giây (`STAMINA_REFILL_WAIT`), Back về màn March, rồi **bấm March lại** (`_press_march`, giữ nguyên đội đã chọn). Màn March đóng thì boss được nhớ là đã tham gia.
+
+`use_stamina = No` (hoặc đã hết vật phẩm): gặp popup không đủ thể lực thì Join Boss dừng hẳn (trả `None`).
 
 Tên cấu hình ALL/100 được chuyển thành các thao tác UI trên; hàm không OCR lượng thể lực thực tế đã sử dụng.
 

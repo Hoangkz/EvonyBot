@@ -116,7 +116,7 @@ Xem thêm [bot/activities/join_monster_war/FLOW.md](../../../bot/activities/join
 | 01 | Màn hình chính có `listboss.png` | `tap("JoinBoss/listboss.png")` |
 | 02 | Danh sách War có nút Join (chữ không đỏ, 262 < y < 615) | `tap("JoinBoss/thamgia.png")` |
 | 03 | Màn hình March (`hanhquan.png` + `bossMonster.png`) | `tap_pct(11, 11)` (Troop 1) |
-| 04 | Màn hình March đã chọn quân (`checkLocam.png`) | `tap("JoinBoss/hanhquan.png")`. Nếu ảnh có `selectGeneral.png` thì chèn thêm các bước chọn tướng trước |
+| 04 | Màn hình March đã chọn đội có tướng chính (kính lúp `generalSearch.png` ở Main General) | `tap("JoinBoss/hanhquan.png")`. Nếu ảnh có `selectGeneral.png` thì chèn thêm các bước chọn tướng trước |
 | 05 | Danh sách War chỉ còn `Joined.png` | `swipe(50, 65, 50, 40)` |
 | 06 | (dùng lại ảnh 05) | `swipe(50, 65, 50, 40)` |
 | 07 | (dùng lại ảnh 05) | `swipe(50, 40, 50, 65)` |
