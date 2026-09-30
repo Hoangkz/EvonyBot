@@ -125,6 +125,7 @@ New-Item -ItemType Directory -Force (Join-Path $App "ui") | Out-Null
 Copy-Item (Join-Path $Root "ui\assets") (Join-Path $App "ui\assets") -Recurse
 New-Item -ItemType Directory -Force (Join-Path $App "ui\tabs") | Out-Null
 Copy-Item (Join-Path $Root "ui\tabs\boss.json") (Join-Path $App "ui\tabs\boss.json")
+Copy-Item (Join-Path $Root "ui\tabs\event.json") (Join-Path $App "ui\tabs\event.json")
 Copy-Item (Join-Path $Root "Images") (Join-Path $App "Images") -Recurse
 
 # A .pyd can't be run as a script, so the shortcut starts this stub.
