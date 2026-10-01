@@ -17,6 +17,8 @@ from . import _pieces
 FONT = "Name"
 SPACE_GAP = 4           # px of empty columns between two words
 MIN_LINE_HEIGHT = 5     # rows: a shorter run of text pixels is a speck, not a line
+LINE_PITCH = 15         # rows from one line's top to the next ("Legendary Bayar" / "Knight")
+MAX_LINE_HEIGHT = 20    # rows: a taller run is two lines touching (descender of g/y on K/h)
 MIN_SCORE = 0.75        # below this a piece reads as "?"
 
 
@@ -41,14 +43,19 @@ def split(image: np.ndarray) -> list:
 def lines(image: np.ndarray) -> list[np.ndarray]:
     """The label's text lines, top to bottom: a long name wraps onto two lines
     ("(Boss) Skeleton" / "Dragon"). Lines are split at empty rows; runs shorter
-    than MIN_LINE_HEIGHT rows are specks, not text."""
+    than MIN_LINE_HEIGHT rows are specks, not text. A run taller than
+    MAX_LINE_HEIGHT is two lines with no empty row between them (a descender
+    touches the line below), cut LINE_PITCH rows below its top."""
     lit = list(mask(image).any(axis=1)) + [False]
     result, start = [], None
     for y, on in enumerate(lit):
         if on and start is None:
             start = y
         elif not on and start is not None:
-            if y - start >= MIN_LINE_HEIGHT:
+            if y - start > MAX_LINE_HEIGHT:
+                result.append(image[max(start - 1, 0):start + LINE_PITCH])
+                result.append(image[start + LINE_PITCH:y + 1])
+            elif y - start >= MIN_LINE_HEIGHT:
                 result.append(image[max(start - 1, 0):y + 1])
             start = None
     return result
