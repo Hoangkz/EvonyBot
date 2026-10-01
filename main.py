@@ -64,6 +64,7 @@ class MainWindow(QMainWindow):
         self.bots.server_found.connect(self._on_server_found)
         self.bots.server_time_found.connect(self.db.set_server_time)
         self.bots.daily_task_done.connect(self.db.mark_daily_task_done)
+        self.bots.bubble_found.connect(self._on_bubble_found)
         # Sub-tab index kept across devices, so switching device stays on
         # the same tab instead of jumping back to Initialization.
         self._current_tab_index = 0
@@ -223,6 +224,12 @@ class MainWindow(QMainWindow):
         view = self.device_views.get(device_id)
         if view is not None:
             view.initialization_tab.set_settings({"server": server})
+
+    def _on_bubble_found(self, device_id: str, seconds: int):
+        """Bot vừa đọc / gia hạn bubble -> đếm ngược ở tab Initialization."""
+        view = self.device_views.get(device_id)
+        if view is not None:
+            view.initialization_tab.set_bubble_remaining(seconds or None)
 
     def _on_exit_all_requested(self):
         # TODO: wire up to the actual automation/bot backend.

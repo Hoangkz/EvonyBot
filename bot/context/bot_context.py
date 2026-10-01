@@ -19,6 +19,8 @@ class BotContext(FlowMixin, InputMixin, ScreenMixin):
         self._deadline = deadline    # time.monotonic() value, or None for no limit
         self._boss_event = threading.Event()
         self._boss_interrupt_enabled = False
+        # time.monotonic() lúc cần quay lại xử lý bubble (None = không theo dõi).
+        self._bubble_due_at: float | None = None
         self.report_boss = lambda coords: None
         # Daily Activities: task đã xong từ lần reset gần nhất chưa / đánh dấu xong.
         self.is_daily_done = lambda task: False

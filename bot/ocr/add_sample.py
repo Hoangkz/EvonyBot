@@ -25,6 +25,11 @@ The event quest progress font ("Progress", read_progress.py) is split the
 same way; "/" and "," are recognised by shape (not saved). Example:
 
     python -m bot.ocr.add_sample Progress progress.png "6|0|0|/|1|,|0|0|0"
+
+The bubble timer font ("Timer", read_bubble_time.py) is split by colour too;
+":" is recognised by shape (not saved). Example for "06:55:22":
+
+    python -m bot.ocr.add_sample Timer timer.png "0|6|:|5|5|:|2|2"
 """
 import sys
 from pathlib import Path
@@ -34,6 +39,8 @@ import numpy as np
 
 from ._digits import OCR_DIR, split
 from .read_boss_name import FONT as NAME_FONT
+from .read_bubble_time import FONT as TIMER_FONT
+from .read_bubble_time import split as split_timer
 from .read_boss_name import split as split_name
 from .read_power import FONT as POWER_FONT
 from .read_power import split as split_power
@@ -41,7 +48,8 @@ from .read_progress import FONT as PROGRESS_FONT
 from .read_progress import split as split_progress
 
 # Fonts split into pieces by their own splitter (see _pieces.py / read_progress.py).
-PIECE_FONTS = {NAME_FONT: split_name, POWER_FONT: split_power, PROGRESS_FONT: split_progress}
+PIECE_FONTS = {NAME_FONT: split_name, POWER_FONT: split_power, PROGRESS_FONT: split_progress,
+               TIMER_FONT: split_timer}
 
 
 def add_sample(font: str, image_path: str, text: str) -> list[Path]:

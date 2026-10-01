@@ -17,6 +17,7 @@ class BotManager(QObject):
 
     server_time_found = pyqtSignal(str, str)  # (serial, thời điểm reset giờ máy)
     daily_task_done = pyqtSignal(str, str)    # (serial, task Daily Activities vừa xong)
+    bubble_found = pyqtSignal(str, int)       # (serial, giây bubble còn lại; 0 = không có)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -41,6 +42,7 @@ class BotManager(QObject):
         worker.server_found.connect(self.server_found.emit)
         worker.server_time_found.connect(self.server_time_found.emit)
         worker.daily_task_done.connect(self.daily_task_done.emit)
+        worker.bubble_found.connect(self.bubble_found.emit)
         worker.finished.connect(lambda: self._on_finished(serial))
         self._workers[serial] = worker
         worker.start()
