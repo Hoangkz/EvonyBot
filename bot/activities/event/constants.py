@@ -1,3 +1,78 @@
 """
 constants.py — Event image folders, limits and action names.
 """
+EV = "Event"
+
+# ---- Quà đăng nhập (Login Gifts) ---------------------------------------
+# Icon dấu tích của nút "Login Gifts" trên màn hình chính (cột phải và góc dưới trái
+# đều có; nút biến mất khi đã nhận). Khớp 1,00 trên màn chính; tab "Login Gifts" trong
+# màn Super Value Return cũng khớp 0,88 -> LOGIN_GIFT_TITLE được xét trước để màn đó
+# không bị nhận nhầm là màn chính.
+LOGIN_GIFT_ICON = f"{EV}/LoginGift/icon.png"
+# Chữ vàng "Login Gifts" trên banner màn Super Value Return (khớp 0,96 tại (56, 141);
+# màn khác cao nhất 0,60).
+LOGIN_GIFT_TITLE = f"{EV}/LoginGift/title.png"
+# Ô quà cột "Rewards" tính từ tâm chữ "Login Gifts": (56, 141) -> quà (122, 587).
+# Đo trên ảnh Day 5 (hàng 5 của danh sách).
+LOGIN_GIFT_REWARD_OFFSET = (66, 446)
+
+# ---- Màn hình chính -----------------------------------------------------
+# Nút "•••" ở cột phải màn hình chính (dùng chung với get_server): khớp 0,96 trên mọi
+# ảnh màn chính, màn khác <= 0,59. Thấy nút này mới đi tìm Event Center.
+MAIN_SCREEN = "Server/listActivity.png"
+
+# ---- Event Center ------------------------------------------------------
+# Chữ "Event Center" ở cột phải màn hình chính; nút event nằm ngay dưới. Icon cúp có
+# hiệu ứng lấp lánh nên chỉ lấy phần chữ, và ảnh là TRUNG VỊ của 60 khung hình chụp
+# trong 1 phút (tests/event/screens/event_center, vùng x 336-383, y 228-254) để không
+# lệch theo một khung hiệu ứng nào.
+EVENT_CENTER = f"{EV}/eventCenter.png"
+# Vị trí không cố định (bị đẩy lên/xuống theo số nút phía trên) nhưng luôn ở góc trên
+# bên phải: chỉ tìm trong vùng này (% màn hình). Đã gặp: y 161 / 229 / ~310 trên 704.
+EVENT_CENTER_REGION = (60, 0, 100, 50)
+# Tìm lần lượt trên CÙNG một ảnh chụp, ngưỡng giảm dần (cùng ảnh thì điểm khớp cố định:
+# ngưỡng trước không thấy thì chỉ còn ý nghĩa thử ngưỡng thấp hơn).
+# Đo 80 ảnh màn chính (2 máy, nhiều nền, ảnh 2025) / 57 màn khác:
+#   0,85 / 0,80 -> thấy 80/80 (thấp nhất 0,883), không khớp nhầm màn nào.
+#   0,75 .. 0,65: dự phòng nền hay hiệu ứng lạ; màn khác cao nhất 0,436.
+EVENT_CENTER_THRESHOLDS = (0.85, 0.80, 0.75, 0.70, 0.65)
+# Nút event ngay dưới chữ "Event Center": bấm lệch so với tâm chữ (x, y).
+EVENT_BUTTON_OFFSET = (10, 40)
+# Không thấy Event Center trên màn chính: kéo màn hình rồi quét lại. Toạ độ % màn hình
+# (x1, y1, x2, y2) của một lần vuốt; mỗi chiều vuốt 3 lần.
+SWIPE_RIGHT = (30, 50, 70, 50)   # ngón tay kéo từ trái sang phải
+SWIPE_UP = (50, 70, 50, 30)      # ngón tay kéo từ dưới lên
+SWIPE_TIMES = 3
+
+# ---- Danh sách event (màn mở ra sau khi bấm nút dưới Event Center) -----
+# VD màn "Wine Festival Event": Login Rewards rồi danh sách event (Gather Troops,
+# Historic General Summoning, ...). Không thấy icon event cần tìm thì cuộn xuống,
+# quá EVENT_LIST_MAX_SCROLLS lần vẫn không thấy thì BACK.
+EVENT_LIST_SWIPE = (50, 80, 50, 50)   # % màn hình, ngón tay kéo lên = cuộn danh sách xuống
+EVENT_LIST_MAX_SCROLLS = 4
+# Icon event Gather Troops trong danh sách: khớp 1,00 tại (50, 362); 126 màn khác <= 0,23.
+GATHER_TROOPS_ICON = f"{EV}/GatherTroops/icon.png"
+
+# ---- Màn một event (Gather Troops, King's Path, ...) -------------------
+# Nút "Claim All" ở cuối màn event: thấy là bấm trước mọi thứ khác. Khớp 1,00;
+# màn khác <= 0,66 (nút "Claimed").
+CLAIM_ALL = f"{EV}/claimAll.png"
+# Nút "Go" của mỗi dòng nhiệm vụ (cột phải, x ~335): khớp 0,99; màn khác <= 0,60.
+GO_BUTTON = f"{EV}/goButton.png"
+GO_REGION = (70, 35, 100, 100)   # % màn hình: cột nút dưới hàng tab
+# Tiến độ "300 / 500" của dòng nhiệm vụ, căn phải ngay trên nút Go: vùng cắt (dx, dy, w, h)
+# tính từ tâm nút Go (đo: tâm Go (335, 344) -> chữ x 315-374, y 297-309). Đọc bằng
+# bot.ocr.read_progress (font Images/OCR/Progress).
+PROGRESS_FROM_GO = (-70, -48, 111, 14)
+
+# Ngưỡng riêng của ảnh dùng chung; nhiệm vụ ghép thêm ngưỡng của mình
+# ({**THRESHOLDS, ...} trong constants.py của nhiệm vụ).
+THRESHOLDS = {
+    LOGIN_GIFT_TITLE: 0.85,
+}
+
+# ---- Actions -----------------------------------------------------------
+CLAIM_LOGIN_GIFT = "claim_login_gift"
+OPEN_LOGIN_GIFT = "open_login_gift"
+ON_MAIN_SCREEN = "on_main_screen"
+BACK, TAP = "back", "tap"

@@ -20,6 +20,11 @@ The boss power font ("Power", read_power.py) works the same way; "." is
 the decimal point (recognised by height, not saved). Example for "6.5M":
 
     python -m bot.ocr.add_sample Power power.png "6|.|5|m"
+
+The event quest progress font ("Progress", read_progress.py) is split the
+same way; "/" and "," are recognised by shape (not saved). Example:
+
+    python -m bot.ocr.add_sample Progress progress.png "6|0|0|/|1|,|0|0|0"
 """
 import sys
 from pathlib import Path
@@ -32,9 +37,11 @@ from .read_boss_name import FONT as NAME_FONT
 from .read_boss_name import split as split_name
 from .read_power import FONT as POWER_FONT
 from .read_power import split as split_power
+from .read_progress import FONT as PROGRESS_FONT
+from .read_progress import split as split_progress
 
-# Fonts split by colour into pieces (see _pieces.py), with their splitter.
-PIECE_FONTS = {NAME_FONT: split_name, POWER_FONT: split_power}
+# Fonts split into pieces by their own splitter (see _pieces.py / read_progress.py).
+PIECE_FONTS = {NAME_FONT: split_name, POWER_FONT: split_power, PROGRESS_FONT: split_progress}
 
 
 def add_sample(font: str, image_path: str, text: str) -> list[Path]:

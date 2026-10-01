@@ -9,12 +9,15 @@ per reader, each exposing `run(image)`:
 - read_server: "S. 1257" (sau "Empire Name:") -> "1257"
 - read_boss_name: "(Boss) Peryton" trên thẻ rally -> "(boss) peryton"
 - read_power: lực boss "6.5M" trên thẻ rally -> 6500000
+- read_progress: tiến độ nhiệm vụ event "300 / 500" -> 300 (số đã làm)
 """
 from .read_boss_name import run as read_boss_name
 from .read_coords import run as read_coords
 from .read_number import run as read_number
 from .read_power import run as read_power
+from .read_progress import run as read_progress
 from .read_server import run as read_server
 from .read_server_time import run as read_server_time
 
-__all__ = ["read_boss_name", "read_coords", "read_number", "read_power", "read_server", "read_server_time"]
+__all__ = ["read_boss_name", "read_coords", "read_number", "read_power", "read_progress",
+           "read_server", "read_server_time"]

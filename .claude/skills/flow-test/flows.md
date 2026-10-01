@@ -1,4 +1,4 @@
-# Flow chính dự kiến của từng activity
+﻿# Flow chính dự kiến của từng activity
 
 Các flow dưới đây được suy ra từ code (`_targets()` và các handler). Khi chụp ảnh thật, nếu màn hình game khác với mô tả thì sửa file này cùng `FLOW` trong test. Đường dẫn template tính từ `Images/`.
 
@@ -131,5 +131,33 @@ Nhánh phụ, mỗi nhánh một method:
 - **Boss chữ đỏ / boss không được tích** (`selected_bosses` không có tên đó): nút Join không được tap, toạ độ vào BossMemory `SKIPPED`, bot cuộn (`swipe`).
 - **Dùng thể lực**, `use_stamina: "ALL"`: `tap(hettheluc)`, `tap(theluc)`, `tap_pct(28.9, 71.6, count=2)`, `tap(usetheluc)`, `back()`.
 
-## Event — `tests/event/`
+## Event — `tests/event/<event>/<nhiệm vụ>/` (VD `tests/event/gather_troops/cultivate_generals/`)
 Hiện chỉ là stub (`TODO: real automation`, chỉ log và sleep 1 s). Flow test tạm thời là `[Step("01_home.png", end())]`. Khi activity được viết thật thì thay bằng flow đầy đủ.
+
+## Event — `tests/event/<event>/<nhiệm vụ>/` (VD `tests/event/gather_troops/cultivate_generals/`)
+Settings: `{"gather_troops_cultivate_generals": {"enabled": True, "day": 1}}`
+Hiện chỉ có nhiệm vụ Cultivate Generals (Gather Troops), đi qua dòng Go "300 / 500" (OCR 300) rồi bấm Cultivate x100 / Cancel 7 lần tới 1000.
+
+| # | Màn hình | Action |
+| --- | --- | --- |
+| 01 | Màn hình chính còn quà đăng nhập | `tap_at(361, 148)` (icon `Event/LoginGift/icon.png`) |
+| 02 | Super Value Return, tab Login Gifts | `tap_at(122, 587)` (chữ `LoginGift/title.png` + (66, 446)), `back()` |
+| 03 | Màn hình chính (`Server/listActivity.png`) | `tap_at(369, 281)` (chữ `Event/eventCenter.png` + (10, 40)) |
+| 04 | Danh sách event (Wine Festival Event) | `tap("Event/GatherTroops/icon.png")` |
+| 05 | Gather Troops, tab "Be Prepared" | `tap("Event/GatherTroops/recruitMore.png")` |
+| 06 | Gather Troops, tab "Recruit More" | `tap_at(335, 344)` (Go gần tab nhất) |
+| 07 | Danh sách Generals, tim lọc đang tích (`JoinBoss/favoriteOn.png`) | `tap_at(139, 208)` (bỏ tích) |
+| 07 | Danh sách Generals, tim lọc đã bỏ tích (biến thể `heart_off`) | `swipe(50, 85, 50, 15)` × 3, `tap_at(40, 634)` (10%, 90%), chờ màn đổi |
+| 09 | Chi tiết tướng, hàng 3 nút | `tap("Event/GatherTroops/CultivateButton/1.png")` |
+| 12 | Chi tiết tướng, hàng 4 nút (có Specialty) | `tap("Event/GatherTroops/CultivateButton/2.png")` |
+| 10 | Màn Cultivate, tab "Cultivate Once" | `tap("Event/GatherTroops/quickCultivate.png")` |
+| 11 | Tab "Quick Cultivate" (`quickCultivateSelected.png`), có nút x100 | `tap("Event/GatherTroops/cultivateX100.png")` (đã làm += 100) |
+| 13 | Tab "Quick Cultivate", nút đổi thành Cancel | `tap("Event/GatherTroops/cancel.png")`, quay lại 11; đạt 1000 thì `end()` và đánh dấu xong |
+
+Nhánh phụ:
+- `08` có nút "Claim All": `tap("Event/claimAll.png")` trước mọi thứ.
+- Tab Recruit More hết Go: `end()`, đánh dấu `gather_troops_cultivate_generals` đã xong.
+- Đã xong từ lần reset gần nhất / ô không tích: `end()` ngay.
+- Danh sách event không có Gather Troops: `swipe(50, 80, 50, 50)` × 4, `back()`, rồi `end()`.
+- Không qua dòng Go (không biết số đã làm): tới tab Quick Cultivate thì `end()`, không bấm x100.
+- Event Center không có test riêng (theo yêu cầu).
