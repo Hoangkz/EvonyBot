@@ -11,8 +11,8 @@ from ...constants import EV
 # ---- Thành chính sau khi bấm Go -----------------------------------------------------
 # Bấm Go -> game đưa về thành, kéo doanh trại (Barracks / Stables ...) vào giữa màn hình.
 # Chờ GO_WAIT giây rồi bấm giữa màn hình để mở menu công trình; menu hiện icon "Train" (hai
-# thanh kiếm). Barracks (110, 234): khớp 1,00; Stables (115, 233): 0,91; trước khi bấm
-# <= 0,58; 136 màn khác <= 0,68 -> ngưỡng TRAIN_THRESHOLD.
+# thanh kiếm). Barracks (110, 234): khớp 1,00; Stables (115, 233): 0,91; Archer Camp
+# (107, 238): 0,86; trước khi bấm <= 0,58; 136 màn khác <= 0,68 -> ngưỡng TRAIN_THRESHOLD.
 TRAIN = f"{EV}/GatherTroops/Train/train.png"
 TRAIN_THRESHOLD = 0.8
 GO_WAIT = 10              # giây chờ sau khi bấm Go

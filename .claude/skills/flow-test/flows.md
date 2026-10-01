@@ -202,3 +202,15 @@ Settings: `{"mounted_troop": {"value": 20000, "level": 13, "day": 3}}`. Flow chu
 - 3 ổ khoá (Day 3..5 khoá, biến thể `day3_locked` trên ảnh tạm `06_day_locked_tmp.png`): lưu `mounted_troop_locked`.
 - Ảnh thật `locked_1754xx.png` (chỉ mở cấp I): mở ở I → lưu `mounted_troop_locked`; `locked_175511` (X..XIII khoá) → bấm X, IX → thấy VI..IX khoá → lưu `mounted_troop_locked`.
 - Màn Training Speedup / hộp Finish All dùng chung ảnh với Ground Troop (chép `speedup*.png`).
+
+### Ranged Troop — `tests/event/gather_troops/ranged_troop/`
+Settings: `{"ranged_troop": {"value": 20000, "level": 13, "day": 3}}`. Giống Mounted Troop (cùng Day 3, cùng ảnh `MountedTroop/day3.png`), nhưng tab phụ bên phải:
+
+| # | Màn hình | Action |
+| --- | --- | --- |
+| 08 | Day 3, tab Mounted Troop (mặc định) | `tap("Event/GatherTroops/RangedTroop/rangedTroop.png")` |
+| 09 | Day 3, tab Ranged Troop (`rangedTroopSelected.png`) | OCR "0 / 500", `tap_at(335, 344)` |
+| train_tNN | Màn Train lính cung (`RangedTroop/Tier/<cấp>.png`, I..XVI) | giống Ground Troop; `train_t13` OCR 28266 / lần |
+
+- `locked_180037` (I..IV) → bấm IV → `locked_180045` (V, VI khoá) → lưu `ranged_troop_locked`; `locked_180117` (XII..XVI khoá) → bấm XII, X, VIII → `locked_180100` → lưu `ranged_troop_locked`.
+- `10_after_go.png` / `11_train_menu.png`: trại cung (Archer Camp); icon Train trên menu này chỉ khớp 0,86 (ngưỡng 0,8).
