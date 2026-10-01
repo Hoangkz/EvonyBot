@@ -25,6 +25,14 @@ BUBBLE_RENEW_BEFORE = 3600   # bubble còn <= 1 tiếng -> dùng bubble mới
 BUBBLE_RETRY = 300           # đọc / dùng bubble không được -> 5 phút sau thử lại
 
 
+def _seconds_until(iso) -> float | None:
+    """Số giây từ bây giờ tới thời điểm ISO (giờ máy); None nếu rỗng / sai định dạng."""
+    try:
+        return (datetime.fromisoformat(iso) - datetime.now()).total_seconds()
+    except (TypeError, ValueError):
+        return None
+
+
 # Điều phối activity của một thiết bị trên QThread riêng.
 class BotWorker(QThread):
     # Gửi serial kèm dữ liệu để UI cập nhật đúng thiết bị.
@@ -60,6 +68,12 @@ class BotWorker(QThread):
         self.bubble_type = init.get("bubble_type") or "24h"
         self._bubble_expiry = None       # time.monotonic() lúc bubble hết; None = chưa biết
         self._bubble_next_check = 0.0    # time.monotonic() lần xử lý bubble tiếp theo
+        # Thời điểm bubble hết đã lưu trong DB: còn hơn 1 tiếng thì không vào game
+        # kiểm tra, hẹn lúc còn 1 tiếng.
+        left = _seconds_until(init.get("bubble_until"))
+        if left is not None and left > 0:
+            self._bubble_expiry = time.monotonic() + left
+            self._bubble_next_check = self._bubble_expiry - BUBBLE_RENEW_BEFORE
 
     def stop(self):
         # Chỉ yêu cầu dừng; activity phải kiểm tra cờ, không cưỡng chế tắt thread.

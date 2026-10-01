@@ -124,7 +124,10 @@ flowchart TD
 - Hẹn lần sau: bubble còn hơn 1 tiếng thì hẹn đúng lúc còn 1 tiếng; đọc hoặc dùng không được thì 5 phút sau thử lại (`BUBBLE_RETRY`), không đọc lại trước từng activity.
 - Tới hẹn, `ctx.check()` ném `BubbleDue` ở bất kỳ activity nào, kể cả Join Boss. Thứ tự ưu tiên: Stop → Bubble → thông báo boss → timeout.
 - `_with_bubble()` bắt `BubbleDue`, xử lý bubble rồi gọi lại activity từ đầu (giống khi timeout). Bước bubble không bị deadline 120 giây hoặc thông báo boss cắt ngang.
-- Mỗi lần biết thời gian, worker phát `bubble_found(serial, giây)`; UI đếm ngược ở tab Initialization và ẩn khi không có bubble.
+- Mỗi lần biết thời gian, worker phát `bubble_found(serial, giây)`; main lưu thời điểm bubble hết vào cột `devices.bubble_until` và UI đếm ngược ở tab Initialization (ẩn khi không có bubble).
+- Lần chạy sau, worker đọc `bubble_until` từ DB: còn hơn 1 tiếng thì không vào game kiểm tra, chỉ hẹn lúc còn 1 tiếng. `bubble_until` không bị chép qua Apply ALL.
+- OCR thời gian (font `Timer`): dưới 1 ngày game hiện `06:55:22`, từ 1 ngày trở lên hiện `2d 23:38`.
+- Không đủ kim cương (khi có ảnh `Bubble/noGems.png`): bỏ tích Bubble và không thử lại.
 
 ## 4. Khi nào Join Boss phát thông báo?
 

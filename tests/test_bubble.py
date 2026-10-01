@@ -1,6 +1,10 @@
+import sqlite3
+import tempfile
 import threading
 import time
 import unittest
+from datetime import datetime, timedelta
+from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
 
@@ -11,10 +15,11 @@ from bot.worker import bot_worker
 from bot.worker.bot_worker import BUBBLE_RENEW_BEFORE, BUBBLE_RETRY, BotWorker
 
 
-def make_worker(bubble=True, bubble_type="3d", activities=("secondary",)):
+def make_worker(bubble=True, bubble_type="3d", activities=("secondary",), bubble_until=""):
     worker = BotWorker("b", list(activities), {
         "Initialization": {"server": "1", "server_time": "known",
-                           "bubble": bubble, "bubble_type": bubble_type},
+                           "bubble": bubble, "bubble_type": bubble_type,
+                           "bubble_until": bubble_until},
     })
     worker.ctx = BotContext(SimpleNamespace(serial="b"), worker._stop, None, worker.log)
     worker.found = []
@@ -127,6 +132,49 @@ class BubbleFlowTests(unittest.TestCase):
         # Bước bubble không làm mất deadline / ngắt boss của cửa sổ activity phụ.
         self.assertEqual(worker.ctx._deadline, saved_deadline)
         self.assertTrue(worker.ctx._boss_interrupt_enabled)
+
+    def test_saved_bubble_skips_check_until_one_hour_left(self):
+        until = (datetime.now() + timedelta(hours=5)).isoformat(timespec="seconds")
+        worker = make_worker(bubble_until=until)
+        game = FakeGame([])
+        with game.patch():
+            self.assertFalse(worker._ensure_bubble())
+        self.assertEqual(game.calls, [])
+        self.assertAlmostEqual(worker.ctx._bubble_due_at - time.monotonic(),
+                               4 * 3600, delta=5)
+
+    def test_saved_bubble_almost_over_is_checked(self):
+        until = (datetime.now() + timedelta(minutes=30)).isoformat(timespec="seconds")
+        worker = make_worker(bubble_until=until)
+        game = FakeGame([24 * 3600])
+        with game.patch():
+            self.assertTrue(worker._ensure_bubble())
+        self.assertEqual(game.calls, ["3d"])
+
+    def test_database_keeps_bubble_until_and_migrates_old_db(self):
+        from database import Database
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "old.db"
+            # DB cũ chưa có cột bubble_until: phải giữ nguyên dữ liệu.
+            db = Database(path)
+            db.add_device("b")
+            db.set_server("b", "123")
+            db.close()
+            conn = sqlite3.connect(path)
+            conn.execute("ALTER TABLE devices DROP COLUMN bubble_until")
+            conn.commit()
+            conn.close()
+
+            db = Database(path)
+            self.assertEqual(db.load_settings("b")["Initialization"]["server"], "123")
+            db.set_bubble_until("b", "2026-10-05T10:00:00")
+            self.assertEqual(db.load_settings("b")["Initialization"]["bubble_until"],
+                             "2026-10-05T10:00:00")
+            # Lưu tab Initialization (Apply ALL) không ghi đè bubble_until.
+            db.save_settings("b", {"Initialization": {"bubble": True, "bubble_until": ""}})
+            self.assertEqual(db.load_settings("b")["Initialization"]["bubble_until"],
+                             "2026-10-05T10:00:00")
+            db.close()
 
     def test_check_priority_stop_then_bubble_then_boss(self):
         ctx = BotContext(SimpleNamespace(serial="b"), threading.Event(), None, lambda _: None)

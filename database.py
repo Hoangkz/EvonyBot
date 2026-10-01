@@ -2,7 +2,7 @@
 database.py — SQLite persistence for devices and their configuration.
 
 One table, `devices`: one row per ADB serial. Besides the device columns
-(server nhập ở tab Initialization, server_time, timestamps) every tab has
+(server nhập ở tab Initialization, server_time, bubble_until, timestamps) every tab has
 its own column holding that tab's settings as JSON (see TAB_COLUMNS).
 Daily Activities stores {task: enabled}; which tasks are done today lives
 in `daily_done` ({task: done_at}) so saving the tab never clears it.
@@ -54,6 +54,7 @@ CREATE TABLE IF NOT EXISTS devices (
     serial      TEXT PRIMARY KEY,
     server      TEXT,
     server_time TEXT,
+    bubble_until TEXT,
     {json_columns},
     created_at  TEXT NOT NULL,
     updated_at  TEXT NOT NULL
@@ -83,12 +84,20 @@ def _reset_old_layout(conn: sqlite3.Connection):
             conn.execute(f"DROP TABLE IF EXISTS {table}")
 
 
+def _add_missing_columns(conn: sqlite3.Connection):
+    """Thêm cột mới vào DB cũ mà không xoá dữ liệu."""
+    columns = {row["name"] for row in conn.execute("PRAGMA table_info(devices)")}
+    if "bubble_until" not in columns:
+        conn.execute("ALTER TABLE devices ADD COLUMN bubble_until TEXT")
+
+
 class Database:
     def __init__(self, path: Path = DB_PATH):
         path.parent.mkdir(parents=True, exist_ok=True)
         self.conn = _connect(path)
         _reset_old_layout(self.conn)
         self.conn.executescript(_SCHEMA)
+        _add_missing_columns(self.conn)
         self.conn.commit()
         # Serials known to be in `devices`, including inserts still queued.
         self._known = {row["serial"] for row in self.conn.execute("SELECT serial FROM devices")}
@@ -162,6 +171,14 @@ class Database:
             (server_time or None, now, serial),
         ))
 
+    def set_bubble_until(self, serial: str, bubble_until: str):
+        """Lưu thời điểm bubble hết (ISO theo giờ máy; rỗng -> NULL = chưa biết)."""
+        now = _now()
+        self._write(lambda conn: conn.execute(
+            "UPDATE devices SET bubble_until = ?, updated_at = ? WHERE serial = ?",
+            (bubble_until or None, now, serial),
+        ))
+
     # ---- settings ----------------------------------------------------
     def save_settings(self, serial: str, settings: dict):
         """Save a DeviceView.get_settings()-style dict (keyed by tab title)."""
@@ -187,6 +204,7 @@ class Database:
         result = {tab: data for tab, data in result.items() if data}
         result.setdefault(INIT_TAB, {})["server"] = row["server"] or ""
         result[INIT_TAB]["server_time"] = row["server_time"] or ""
+        result[INIT_TAB]["bubble_until"] = row["bubble_until"] or ""
         return result
 
     # ---- daily task progress -----------------------------------------
@@ -244,8 +262,9 @@ def _save_settings(conn: sqlite3.Connection, serial: str, settings: dict, now: s
             if "server" in data:
                 conn.execute("UPDATE devices SET server = ? WHERE serial = ?",
                              (data["server"] or None, serial))
-            # server_time chỉ được ghi qua set_server_time, không sao chép qua Apply ALL.
-            data = {k: v for k, v in data.items() if k not in ("device_id", "server", "server_time")}
+            # server_time / bubble_until chỉ được ghi qua set_*, không sao chép qua Apply ALL.
+            data = {k: v for k, v in data.items()
+                    if k not in ("device_id", "server", "server_time", "bubble_until")}
         conn.execute(
             f"UPDATE devices SET {column} = ? WHERE serial = ?",
             (json.dumps(data, ensure_ascii=False), serial),

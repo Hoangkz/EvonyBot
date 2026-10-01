@@ -9,6 +9,7 @@ the selected device's tabbed control panel.
 import ctypes
 import platform
 import sys
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from PyQt5.QtCore import Qt, QTimer
@@ -195,9 +196,10 @@ class MainWindow(QMainWindow):
         settings = view.get_settings()
         # Đây là dữ liệu riêng của thiết bị trong DB, không phải cấu hình Apply ALL.
         saved = self.db.load_settings(device_id)
-        settings.setdefault("Initialization", {})["server_time"] = (
-            saved.get("Initialization", {}).get("server_time") or ""
-        )
+        init = settings.setdefault("Initialization", {})
+        init["server_time"] = saved.get("Initialization", {}).get("server_time") or ""
+        # Bubble còn hạn trong DB thì bot không cần vào game kiểm tra lại.
+        init["bubble_until"] = saved.get("Initialization", {}).get("bubble_until") or ""
         self.bots.start(
             device_id,
             view.initialization_tab.selected_activities(),
@@ -227,7 +229,9 @@ class MainWindow(QMainWindow):
             view.initialization_tab.set_settings({"server": server})
 
     def _on_bubble_found(self, device_id: str, seconds: int):
-        """Bot vừa đọc / gia hạn bubble -> đếm ngược ở tab Initialization."""
+        """Bot vừa đọc / gia hạn bubble -> lưu DB và đếm ngược ở tab Initialization."""
+        until = datetime.now() + timedelta(seconds=seconds) if seconds else None
+        self.db.set_bubble_until(device_id, until.isoformat(timespec="seconds") if until else "")
         view = self.device_views.get(device_id)
         if view is not None:
             view.initialization_tab.set_bubble_remaining(seconds or None)

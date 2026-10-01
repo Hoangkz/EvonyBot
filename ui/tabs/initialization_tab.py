@@ -3,6 +3,7 @@ initialization_tab.py — 1:1 rebuild of tabPage1 ("Initialization") from
 Form3_Designer.cs: same controls, same nesting, same X/Y/W/H.
 """
 import time
+from datetime import datetime
 
 from PyQt5.QtCore import QTimer, pyqtSignal
 
@@ -56,6 +57,14 @@ ACTIVITY_BUTTON_TARGETS = {
     "button7": "Battlefield Shop",
     "button10": "Event",
 }
+
+def seconds_until(iso: str) -> float | None:
+    """Số giây từ bây giờ tới thời điểm ISO (giờ máy); None nếu rỗng / sai định dạng."""
+    try:
+        return (datetime.fromisoformat(iso) - datetime.now()).total_seconds()
+    except (TypeError, ValueError):
+        return None
+
 
 def format_remaining(seconds: float) -> str:
     """Giây còn lại -> '2d 03:15:20' / '05:00:00'."""
@@ -187,6 +196,9 @@ class InitializationTab(DesignerTab):
             self.controls["textBoxServer"].setText(data["server"] or "")
         if "bubble" in data:
             self.controls["checkBoxBubble"].setChecked(bool(data["bubble"]))
+        if "bubble_until" in data:
+            # Thời điểm bubble hết đã lưu trong DB -> đếm ngược tiếp khi mở app.
+            self.set_bubble_remaining(seconds_until(data["bubble_until"]))
         if data.get("bubble_type") in BUBBLE_TYPES:
             self.controls["comboBoxBubbleType"].setCurrentText(data["bubble_type"])
         if "activities" in data:

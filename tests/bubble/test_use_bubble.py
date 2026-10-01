@@ -8,6 +8,7 @@ from tests.flow import Step, back, end, run_flow, tap, tap_at
 SCREENS = Path(__file__).parent / "screens"
 CITY_BUFF_TIME = 6 * 3600 + 55 * 60 + 22    # city_buff_time.png: 06:55:22
 AFTER_USE = 7 * 3600 + 57 * 60 + 10         # use_item_after.png: 07:57:10
+CITY_BUFF_DAYS = 2 * 86400 + 23 * 3600 + 38 * 60   # city_buff_days.png: 2d 23:38
 
 
 def run(ctx, settings):
@@ -21,6 +22,14 @@ class KeepBubbleFlowTests(unittest.TestCase):
             Step("city_buff_time.png", back(), end(CITY_BUFF_TIME)),
         ]
         run_flow(self, run, SCREENS, flow, {"type": "24h", "renew": 3600})
+
+    def test_days_format(self):
+        # Từ 1 ngày trở lên game hiện "2d 23:38" (không có giây).
+        flow = [
+            Step("home.png", tap(BUFF_ICON)),
+            Step("city_buff_days.png", back(), end(CITY_BUFF_DAYS)),
+        ]
+        run_flow(self, run, SCREENS, flow, {"type": "3d", "renew": 3600})
 
     def test_renew_8h_replaces_active_bubble(self):
         # renew lớn hơn 06:55:22 -> phải dùng bubble mới.

@@ -1,23 +1,26 @@
 """
-read_bubble_time.py — thời gian bubble còn lại "06:55:22" trên thanh xanh
-(City Buff, dòng Truce Agreement) hoặc "Remaining Time:06:52:45" (Use Item)
--> số giây.
+read_bubble_time.py — thời gian bubble còn lại trên thanh xanh (City Buff,
+dòng Truce Agreement) hoặc sau "Remaining Time:" (Use Item) -> số giây.
+Dưới 1 ngày game hiện "06:55:22" (giờ:phút:giây), từ 1 ngày trở lên hiện
+"2d 23:38" (ngày, giờ:phút).
 
 Chữ màu kem trên nền thanh xanh lá / xám tối: tách chữ theo màu (R, G, B
 đều sáng; nền xanh có R thấp), chỉ giữ dải hàng của chữ để bỏ vệt sáng ở mép
-thanh. Đọc từ phải sang trái tới dấu ":" thứ ba hoặc mảnh không phải chữ số
-(chữ "Remaining Time:"), nên vùng cắt được phép rộng hơn phần số.
+thanh. Đọc từ phải sang trái tới dấu ":" của nhãn "Remaining Time:" (dấu ":"
+thứ ba, hoặc dấu ":" sau chữ "d") hoặc mảnh không nhận ra, nên vùng cắt được
+phép rộng hơn phần số.
 """
 import re
 
 import cv2
 import numpy as np
 
-from ._digits import read_chars
+from ._digits import MIN_SCORE, _normalize, _samples
 from ._digits import split as split_digits
 
 FONT = "Timer"
-_TIME = re.compile(r"(\d+):(\d{2}):(\d{2})")
+_CLOCK = re.compile(r"(\d+):(\d{2}):(\d{2})")     # 06:55:22
+_DAYS = re.compile(r"(\d+)d(\d{1,2}):(\d{2})")     # 2d 23:38 (dấu cách không thành mảnh)
 
 
 def mask(image: np.ndarray) -> np.ndarray:
@@ -49,24 +52,35 @@ def ink(image: np.ndarray) -> bool:
     return image.size > 0 and bool(mask(image).any())
 
 
+def _char(piece: np.ndarray) -> str | None:
+    """Chữ số hoặc "d" của mảnh, None nếu không giống mẫu nào."""
+    labels, samples = _samples(FONT)
+    scores = samples @ _normalize(piece)
+    best = int(scores.argmax())
+    return labels[best] if scores[best] >= MIN_SCORE else None
+
+
 def run(image: np.ndarray) -> int | None:
     """Số giây còn lại, hoặc None nếu không đọc được."""
-    pieces = split(image)
-    text, colons = "", 0
-    for piece in reversed(pieces):
+    text = ""
+    for piece in reversed(split(image)):
         if isinstance(piece, str):
-            if piece != ":":
-                break
-            colons += 1
-            if colons == 3:
+            # Dấu ":" thứ ba / sau "d" là của nhãn "Remaining Time:".
+            if piece != ":" or text.count(":") == 2 or "d" in text:
                 break
             text = ":" + text
             continue
-        char = read_chars([piece], FONT)
+        char = _char(piece)
         if char is None:
             break
         text = char + text
-    match = _TIME.search(text)
+    match = _DAYS.fullmatch(text)
+    if match is not None:
+        days, hours, minutes = map(int, match.groups())
+        if hours >= 24 or minutes >= 60:
+            return None
+        return days * 86400 + hours * 3600 + minutes * 60
+    match = _CLOCK.fullmatch(text)
     if match is None:
         return None
     hours, minutes, seconds = map(int, match.groups())
