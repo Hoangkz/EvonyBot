@@ -8,6 +8,7 @@ common.py. `state` giữ qua các nhiệm vụ để quà đăng nhập chỉ nh
 """
 from .common import EventState
 from .gather_troops import cultivate_generals, ground_troop, mounted_troop, ranged_troop, siege_machine, defense_force
+from .kings_path import city_tax, donate, heal, offer, patrol, train_troop, wheel
 
 # (key trong settings / event.json, hàm chạy nhiệm vụ) theo thứ tự chạy.
 TASKS = [
@@ -17,6 +18,13 @@ TASKS = [
     (ranged_troop.KEY, ranged_troop.run),
     (siege_machine.KEY, siege_machine.run),
     (defense_force.KEY, defense_force.run),
+    (city_tax.KEY, city_tax.run),
+    (patrol.KEY, patrol.run),
+    (donate.KEY, donate.run),
+    (train_troop.KEY, train_troop.run),
+    (offer.KEY, offer.run),
+    (heal.KEY, heal.run),
+    (wheel.KEY, wheel.run),
 ]
 
 
