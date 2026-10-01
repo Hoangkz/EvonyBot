@@ -7,10 +7,11 @@
 
 - [ ] **Lực có chữ số `0`**
   - VD: Pumpkin Monster 708.5K, Achelois 187.7M...
-  - `8`, `K`, `B` đã có mẫu. Còn thiếu `0`, nên boss không có tier có lực chứa `0` sẽ không suy ra được cấp và bị bỏ qua.
+  -  Còn thiếu `0`, nên boss không có tier có lực chứa `0` sẽ không suy ra được cấp và bị bỏ qua.
   - Việc cần làm: thêm mẫu (`add_sample Power`), thêm thẻ vào `CARDS` trong `test_boss_names.py`.
-- [ ] **Tier Legendary / Mythical / Excellent / Supreme / Grand**
-  - Font `Name` đã có `E` hoa (Epic). Còn thiếu `L` hoa và `x`.
+- [x] **Tier Legendary**: đã có mẫu `L` hoa, `ry` (`war_legendary_cerberus_bayar.png`).
+- [ ] **Tier Mythical / Excellent / Supreme / Grand**
+  - Font `Name` còn thiếu `x` và có thể thêm vài chữ khác.
   - Không bắt buộc: bot vẫn nhận gần đúng được nhờ `?`.
   - Việc cần làm: thêm mẫu, thêm thẻ vào `CARDS`.
 
@@ -23,4 +24,4 @@
 ## Đang dùng ảnh tổng hợp
 
 - [ ] Các kịch bản dùng `W("...")` (ảnh gốc bị xoá dấu tích ô War): thay bằng ảnh chụp thật khi ô War đã bỏ tích.
-  - Hiện chỉ có `war_list_long_name.png` và `war_epic_cerberus_skeleton.png` là ảnh thật ở trạng thái này.
+  - Hiện chỉ có `war_list_long_name.png`, `war_epic_cerberus_skeleton.png` và `war_legendary_cerberus_bayar.png` là ảnh thật ở trạng thái này.
