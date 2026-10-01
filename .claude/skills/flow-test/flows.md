@@ -249,3 +249,9 @@ Settings: `{"defense_force": {"value": 7000, "level": 6, "day": 4}}`. Flow chung
 ### Quy tắc chung các nhiệm vụ Gather Troops (Cultivate Generals + 5 nhiệm vụ train)
 Mỗi nhiệm vụ phải đi qua màn Gather Troops trong lượt chạy của nó: mở từ danh sách event, hoặc đang ở sẵn màn Gather Troops thì làm luôn tại đó (lần đầu thấy màn này: kiểm tra Day khoá). Rồi tab → bấm Go (đọc số đã làm) → các màn sau Go. Gặp màn sau Go (menu công trình / màn Train / speedup / danh sách Generals / Cultivate) trước khi bấm Go → `back()` (log `"<tên>: <action> before Go, back"`) cho tới khi về lại Gather Troops. Test: `test_started_on_train_screen_goes_back_to_event`, `test_started_on_gather_troops_continues_there`, `test_started_on_gather_troops_day_locked` (Mounted Troop); `test_started_on_gather_troops_continues_there`, `test_started_mid_flow_goes_back_to_event` (Cultivate Generals).
 Sau Go: mỗi lần bấm giữa màn hình chờ thêm 2 s (`CENTER_TAP_EXTRA`) cho menu công trình hiện.
+
+## Event / King's Path — `tests/event/kings_path/test_flow.py`
+Settings: `{"kings_path_patrol": {"value": 200, "day": 2}}` (mỗi nhiệm vụ một key `kings_path_*`).
+Chưa có ảnh icon King's Path trong danh sách event: test bắt đầu ngay ở màn King's Path và tạm patch `path_task.KINGS_PATH_ICON` sang icon Gather Troops.
+Flow chung (path_task.py): Day khoá? -> tab Day -> tab phụ -> nút Go của nhiệm vụ (dòng trên cùng, hoặc dòng có tiêu đề `row_title`) -> OCR "a / b" -> đạt mục tiêu thì xong, chưa thì bấm Go (phần sau Go: TODO).
+Biến thể ảnh: `claimed` (xoá nút Claim All), `not_kp` (xoá tiêu đề "King's Path" -> bot phải Back).

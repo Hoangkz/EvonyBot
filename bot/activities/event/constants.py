@@ -53,6 +53,9 @@ EVENT_LIST_SWIPE = (50, 80, 50, 50)   # % màn hình, ngón tay kéo lên = cu�
 EVENT_LIST_MAX_SCROLLS = 4
 # Icon event Gather Troops trong danh sách: khớp 1,00 tại (50, 362); 126 màn khác <= 0,23.
 GATHER_TROOPS_ICON = f"{EV}/GatherTroops/icon.png"
+# Icon event King's Path trong danh sách. TODO: chưa có ảnh -> nhiệm vụ King's Path bỏ qua
+# (xem kings_path/path_task.py) cho tới khi cắt ảnh này từ màn danh sách event.
+KINGS_PATH_ICON = f"{EV}/KingsPath/icon.png"
 
 # ---- Màn một event (Gather Troops, King's Path, ...) -------------------
 # Nút "Claim All" ở cuối màn event: thấy là bấm trước mọi thứ khác. Khớp 1,00;
