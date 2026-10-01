@@ -80,6 +80,20 @@ class ScreenMixin:
         h, w = tpl.shape[:2]
         return x + w // 2, y + h // 2
 
+    def best_match(self, template: "str | np.ndarray", screen: np.ndarray | None = None,
+                   region=None) -> tuple[float, tuple[int, int] | None]:
+        """(điểm khớp cao nhất, tâm chỗ khớp) của `template`, kể cả khi dưới mọi ngưỡng —
+        để so sánh nhiều ảnh mẫu tại cùng một chỗ. (0, None) nếu ảnh mẫu không vừa."""
+        screen = self.screenshot() if screen is None else screen
+        area, ox, oy = self._region(screen, region)
+        tpl = self._template(template)
+        result = self._match(area, tpl)
+        if result is None:
+            return 0.0, None
+        _, max_val, _, (x, y) = cv2.minMaxLoc(result)
+        h, w = tpl.shape[:2]
+        return float(max_val), (x + ox + w // 2, y + oy + h // 2)
+
     def find_all(self, template: "str | np.ndarray", threshold: float = DEFAULT_THRESHOLD,
                  screen: np.ndarray | None = None, center: bool = True,
                  region=None) -> list[tuple[int, int]]:

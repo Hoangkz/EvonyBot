@@ -7,7 +7,7 @@ với hàm `run(bot, task, state)`; phần đi từ màn hình chính tới nút
 common.py. `state` giữ qua các nhiệm vụ để quà đăng nhập chỉ nhận 1 lần mỗi lượt.
 """
 from .common import EventState
-from .gather_troops import cultivate_generals, ground_troop, mounted_troop, ranged_troop, siege_machine
+from .gather_troops import cultivate_generals, ground_troop, mounted_troop, ranged_troop, siege_machine, defense_force
 
 # (key trong settings / event.json, hàm chạy nhiệm vụ) theo thứ tự chạy.
 TASKS = [
@@ -16,6 +16,7 @@ TASKS = [
     (mounted_troop.KEY, mounted_troop.run),
     (ranged_troop.KEY, ranged_troop.run),
     (siege_machine.KEY, siege_machine.run),
+    (defense_force.KEY, defense_force.run),
 ]
 
 

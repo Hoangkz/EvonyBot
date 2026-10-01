@@ -99,9 +99,14 @@ class TroopTask:
     day_tab: str                  # ảnh tab "Day N" khi CHƯA chọn
     tab: str                      # ảnh tab phụ khi chưa chọn
     tab_selected: str             # ảnh tab phụ khi đang chọn
-    tiers: dict[int, str]         # {cấp: ảnh cấp lính} (troop_tier.tier_images)
+    # {cấp: ảnh cấp lính} (troop_tier.tier_images), hoặc {cấp: [ảnh từng loại]} khi một cấp
+    # có nhiều vòng tròn (bẫy: troop_tier.kind_images)
+    tiers: dict
     # Ngưỡng riêng của ảnh tab Day / tab phụ (đo chéo chưa chọn - đang chọn).
     thresholds: dict[str, float] = field(default_factory=dict)
+    lowest: int = LOWEST_TIER     # cấp thấp nhất nhiệm vụ tính ("tier 7 and above")
+    menu_icon: str = TRAIN        # icon mở màn Train trong menu công trình (bẫy: "Build")
+    speedup_title: str = SPEEDUP_TITLE   # tiêu đề màn speedup (bẫy: "Trap Building Speedup")
 
     @property
     def locked_key(self) -> str:
@@ -121,7 +126,7 @@ def run(bot, task: dict, state: EventState, troop: TroopTask):
         return
     day = int(task.get("day") or troop.day)
     target = int(task.get("value") or 0)   # tổng số lính cần train
-    level = int(task.get("level") or LOWEST_TIER)   # cấp lính người dùng chọn
+    level = int(task.get("level") or troop.lowest)   # cấp lính người dùng chọn
     done = None   # số đã làm, đọc ở dòng có nút Go (None = chưa đọc / đọc lỗi)
     plan = _Plan()
     targets_by_tier = tier_targets(key)
@@ -148,7 +153,7 @@ def run(bot, task: dict, state: EventState, troop: TroopTask):
             else:
                 bot.log(f"{name}: done {done}, remaining {max(0, target - done)}")
             bot.tap(*go, delay=GO_WAIT)
-            _open_building_menu(bot, name)
+            _open_building_menu(bot, name, troop.menu_icon)
         elif action == ON_SPEED_UP_MENU:
             # Công trình đang train (không phải của nhiệm vụ): Finish All ở màn speedup rồi
             # mở lại menu (xem nhánh ON_SPEEDUP).
@@ -168,9 +173,9 @@ def run(bot, task: dict, state: EventState, troop: TroopTask):
                     bot.log(f"{name}: troops already training, finishing them first (not counted)")
                     bot.tap(*speedup, delay=BUTTON_WAIT)
                     return HANDLED
-                tier = choose_tier(bot, troop.tiers, level, LOWEST_TIER)
+                tier = choose_tier(bot, troop.tiers, level, troop.lowest)
                 if tier is None:
-                    bot.log(f"{name}: tier {LOWEST_TIER} locked, cannot do this task yet")
+                    bot.log(f"{name}: tier {troop.lowest} locked, cannot do this task yet")
                     bot.mark_daily_done(locked_key)
                     return STOP
                 goal = target if tier == level else targets_by_tier.get(tier, 0)
@@ -193,7 +198,7 @@ def run(bot, task: dict, state: EventState, troop: TroopTask):
                     # Mở từ menu công trình: Finish All đưa về lại thành (công trình vẫn ở
                     # giữa) chứ không về màn Train -> mở lại menu như sau khi bấm Go.
                     plan.from_menu = False
-                    _open_building_menu(bot, name)
+                    _open_building_menu(bot, name, troop.menu_icon)
         else:
             return None
         return HANDLED
@@ -202,14 +207,14 @@ def run(bot, task: dict, state: EventState, troop: TroopTask):
              targets=_targets(troop), regions=_regions(troop), thresholds=_thresholds(troop))
 
 
-def _open_building_menu(bot, name: str):
+def _open_building_menu(bot, name: str, menu_icon: str = TRAIN):
     """Sau khi bấm Go (công trình ở giữa màn hình): bấm giữa màn hình; thấy icon Train thì
     chờ MENU_WAIT giây, không thấy thì chờ MENU_WAIT giây, bấm thêm 1 lần rồi chờ
     MENU_WAIT giây. Vòng lặp kế tiếp tự nhận ra menu (ON_TRAIN_MENU)."""
     bot.tap_percent(*CENTER, delay=MENU_CHECK_DELAY)
     screen = bot.screenshot()
     if (bot.find(SPEED_UP, threshold=TRAIN_THRESHOLD, screen=screen) is not None
-            or bot.find(TRAIN, threshold=TRAIN_THRESHOLD, screen=screen) is not None):
+            or bot.find(menu_icon, threshold=TRAIN_THRESHOLD, screen=screen) is not None):
         bot.sleep(MENU_WAIT)
         return
     bot.log(f"{name}: Train menu not shown, tapping center again")
@@ -292,25 +297,31 @@ def _targets(troop: TroopTask) -> list[tuple[str, str]]:
     xét trước. Tab Day đang chọn vẫn khớp khá cao ảnh "chưa chọn" -> xét sau tab phụ."""
     return [
         (FINISH_ALL_TITLE, ON_FINISH_ALL_DIALOG),
-        (SPEEDUP_TITLE, ON_SPEEDUP),
-        *[(path, ON_TRAIN_SCREEN) for path in troop.tiers.values()],
+        (troop.speedup_title, ON_SPEEDUP),
+        *[(path, ON_TRAIN_SCREEN) for path in _tier_paths(troop)],
         (SPEED_UP, ON_SPEED_UP_MENU),   # trước TRAIN: icon "View" của menu này khớp nhầm TRAIN
-        (TRAIN, ON_TRAIN_MENU),
+        (troop.menu_icon, ON_TRAIN_MENU),
         (troop.tab_selected, ON_TAB),
         (troop.tab, OPEN_TAB),
         (troop.day_tab, OPEN_DAY),
     ]
 
 
+def _tier_paths(troop: TroopTask) -> list[str]:
+    """Mọi ảnh vòng tròn cấp (một hoặc nhiều ảnh mỗi cấp)."""
+    return [path for paths in troop.tiers.values()
+            for path in ([paths] if isinstance(paths, str) else paths)]
+
+
 def _regions(troop: TroopTask) -> dict[str, tuple]:
-    return {path: TIER_ROW_REGION for path in troop.tiers.values()}
+    return {path: TIER_ROW_REGION for path in _tier_paths(troop)}
 
 
 def _thresholds(troop: TroopTask) -> dict[str, float]:
     return {
         **EVENT_THRESHOLDS,
-        TRAIN: TRAIN_THRESHOLD,
+        troop.menu_icon: TRAIN_THRESHOLD,
         SPEED_UP: TRAIN_THRESHOLD,
         **troop.thresholds,
-        **{path: TIER_THRESHOLD for path in troop.tiers.values()},
+        **{path: TIER_THRESHOLD for path in _tier_paths(troop)},
     }

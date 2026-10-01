@@ -7,5 +7,6 @@ gather_troops — nhiệm vụ của event "Gather Troops". Mỗi nhiệm vụ m
 - mounted_troop/:      Mounted Troop (`mounted_troop`, Day 3)
 - ranged_troop/:       Ranged Troop (`ranged_troop`, Day 3)
 - siege_machine/:      Siege Machine (`siege_machine`, Day 4)
+- defense_force/:      Defense Force (`defense_force`, Day 4, xây bẫy)
 - train_troop/:        flow chung của các nhiệm vụ train lính (TroopTask)
 """
