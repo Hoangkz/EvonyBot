@@ -187,3 +187,18 @@ Tab Ground Troop hết Go (biến thể `no_go`): `end()`, đánh dấu `ground_
 
 TODO: `06_day_locked_tmp.png` là ảnh tạm (màn King's Path); biến thể `day2_locked` dán thêm ổ khoá lên Day 2, Day 3. Thay bằng ảnh Gather Troops thật khi có.
 Nhánh phụ: đã lưu `ground_troop_locked` / ô chọn 0 → `end()` ngay; danh sách event không có Gather Troops → giống Cultivate Generals.
+
+### Mounted Troop — `tests/event/gather_troops/mounted_troop/`
+Settings: `{"mounted_troop": {"value": 20000, "level": 13, "day": 3}}`. Flow chung với Ground Troop (`gather_troops/train_troop/`, mỗi nhiệm vụ khai báo một `TroopTask`), chỉ khác:
+
+| # | Màn hình | Action |
+| --- | --- | --- |
+| 07 | Gather Troops, tab Day 1 | `tap("Event/GatherTroops/MountedTroop/day3.png")` |
+| 08 | Day 3, tab phụ "Mounted Troop" (mặc định, `mountedTroopSelected.png`) | OCR "0 / 500", `tap_at(335, 344)` |
+| 09 | Day 3, tab phụ "Ranged Troop" đang chọn | `tap("Event/GatherTroops/MountedTroop/mountedTroop.png")` |
+| 10 / 11 | Thành, chuồng ngựa (Stables) ở giữa / menu Stables | giống Ground Troop |
+| train_tNN | Màn Train lính kỵ (ảnh cấp `MountedTroop/Tier/<cấp>.png`, I..XV) | giống Ground Troop; `train_t13` OCR 40785 / lần |
+
+- 3 ổ khoá (Day 3..5 khoá, biến thể `day3_locked` trên ảnh tạm `06_day_locked_tmp.png`): lưu `mounted_troop_locked`.
+- Ảnh thật `locked_1754xx.png` (chỉ mở cấp I): mở ở I → lưu `mounted_troop_locked`; `locked_175511` (X..XIII khoá) → bấm X, IX → thấy VI..IX khoá → lưu `mounted_troop_locked`.
+- Màn Training Speedup / hộp Finish All dùng chung ảnh với Ground Troop (chép `speedup*.png`).
