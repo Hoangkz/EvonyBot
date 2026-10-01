@@ -15,9 +15,13 @@ Flow:
 5. Tab phụ đang chọn: tìm nút "Go" đầu tiên (gần tab nhất), đọc số đã làm ở "0 / 500"
    ngay trên nút (OCR) rồi bấm Go. Không còn Go nào -> đánh dấu xong.
 6. Bấm Go -> chờ 10 s (game đưa về thành, công trình ở giữa màn hình) -> bấm giữa màn
-   hình. Thấy icon "Train" thì chờ 3 s; không thấy thì chờ 3 s, bấm giữa thêm 1 lần, chờ
-   3 s. Rồi quét lại.
-7. Menu công trình: bấm icon "Train" -> màn Train.
+   hình. Thấy menu (icon "Train" hoặc "Speed Up") thì chờ 3 s; không thấy thì chờ 3 s, bấm
+   giữa thêm 1 lần, chờ 3 s. Rồi quét lại.
+7. Menu công trình:
+   - Có icon "Speed Up" (công trình đang có mẻ train, không có "Train"): bấm -> màn Training
+     Speedup -> Finish All như bước 10 (không tính) -> về lại thành (công trình vẫn ở giữa)
+     -> làm lại bước 6 (bấm giữa màn hình), lúc này menu có "Train".
+   - Có icon "Train": bấm -> màn Train.
 8. Màn Train: chọn cấp (troop_tier.choose_tier): bấm cấp phải nhất để đi lên (cấp vừa bấm
    nhảy ra giữa) tới khi thấy cấp người dùng chọn hoặc thấy ổ khoá; cấp chọn bị khoá thì
    lấy cấp mở cao nhất dưới nó, mục tiêu đổi theo cấp đó (bảng trong event.json). Cấp 7
@@ -64,21 +68,24 @@ from .constants import (
     ON_FINISH_ALL_DIALOG,
     ON_SPEEDUP,
     ON_TAB,
+    ON_SPEED_UP_MENU,
     ON_TRAIN_MENU,
     ON_TRAIN_SCREEN,
     OPEN_DAY,
     OPEN_TAB,
     SPEEDUP_SETTINGS,
     SPEEDUP_SETTINGS_POS,
+    SPEED_UP,
     SPEEDUP_TITLE,
     TRAIN,
     TRAIN_BUTTON,
-    TRAIN_BUTTON_ANY,
     TRAIN_BUTTON_POS,
     TRAIN_BUTTON_REGION,
     TRAIN_COUNT_BOX,
     TRAIN_THRESHOLD,
     TRAIN_WAIT,
+    TRAINING_SPEEDUP,
+    TRAINING_SPEEDUP_THRESHOLD,
     tier_targets,
 )
 
@@ -142,16 +149,24 @@ def run(bot, task: dict, state: EventState, troop: TroopTask):
                 bot.log(f"{name}: done {done}, remaining {max(0, target - done)}")
             bot.tap(*go, delay=GO_WAIT)
             _open_building_menu(bot, name)
+        elif action == ON_SPEED_UP_MENU:
+            # Công trình đang train (không phải của nhiệm vụ): Finish All ở màn speedup rồi
+            # mở lại menu (xem nhánh ON_SPEEDUP).
+            bot.log(f"{name}: building already training, Speed Up from menu (not counted)")
+            bot.tap(*pos, delay=BUTTON_WAIT)
+            plan.from_menu = True
         elif action == ON_TRAIN_MENU:
             bot.tap(*pos, delay=TRAIN_WAIT)
         elif action == ON_TRAIN_SCREEN:
             if plan.times is None:
-                if bot.find(TRAIN_BUTTON, threshold=TRAIN_BUTTON_ANY, screen=screen,
-                            region=TRAIN_BUTTON_REGION) is None:
+                speedup = _find_training_speedup(bot, screen)
+                if speedup is not None:
                     # Vừa vào đã có mẻ đang train (không phải của nhiệm vụ): Finish All nó
-                    # trước (không tính vào số lần), rồi mới chọn cấp / tính kế hoạch.
+                    # trước (không tính vào số lần), rồi mới chọn cấp / tính kế hoạch. Phải
+                    # làm trước choose_tier: đang train thì không có nút "+", cấp ở giữa sẽ
+                    # bị coi là khoá.
                     bot.log(f"{name}: troops already training, finishing them first (not counted)")
-                    bot.tap(*TRAIN_BUTTON_POS, delay=BUTTON_WAIT)
+                    bot.tap(*speedup, delay=BUTTON_WAIT)
                     return HANDLED
                 tier = choose_tier(bot, troop.tiers, level, LOWEST_TIER)
                 if tier is None:
@@ -174,6 +189,11 @@ def run(bot, task: dict, state: EventState, troop: TroopTask):
             else:
                 bot.log(f"{name}: Finish All (batch {plan.started}/{plan.times})")
                 bot.tap(*_pos_of(bot, screen, FINISH_ALL, FINISH_ALL_POS), delay=FINISH_WAIT)
+                if plan.from_menu:
+                    # Mở từ menu công trình: Finish All đưa về lại thành (công trình vẫn ở
+                    # giữa) chứ không về màn Train -> mở lại menu như sau khi bấm Go.
+                    plan.from_menu = False
+                    _open_building_menu(bot, name)
         else:
             return None
         return HANDLED
@@ -187,7 +207,9 @@ def _open_building_menu(bot, name: str):
     chờ MENU_WAIT giây, không thấy thì chờ MENU_WAIT giây, bấm thêm 1 lần rồi chờ
     MENU_WAIT giây. Vòng lặp kế tiếp tự nhận ra menu (ON_TRAIN_MENU)."""
     bot.tap_percent(*CENTER, delay=MENU_CHECK_DELAY)
-    if bot.find(TRAIN, threshold=TRAIN_THRESHOLD) is not None:
+    screen = bot.screenshot()
+    if (bot.find(SPEED_UP, threshold=TRAIN_THRESHOLD, screen=screen) is not None
+            or bot.find(TRAIN, threshold=TRAIN_THRESHOLD, screen=screen) is not None):
         bot.sleep(MENU_WAIT)
         return
     bot.log(f"{name}: Train menu not shown, tapping center again")
@@ -201,6 +223,7 @@ class _Plan:
     times: int | None = None      # số lần cần bấm Train (None = chưa chọn cấp / tính)
     started: int = 0              # số lần đã bấm Train
     settings_done: bool = False   # đã tích ô trong Speedup Settings (lần đầu vào màn speedup)
+    from_menu: bool = False       # màn speedup mở từ menu công trình (Speed Up), không từ màn Train
 
 
 def _plan_batches(bot, plan: _Plan, count: int, name: str, key: str) -> bool:
@@ -225,9 +248,12 @@ def _train_step(bot, plan: _Plan, name: str, key: str):
     train) -> bấm mở màn speedup. Đã bấm đủ số lần và nút Train hiện lại -> xong.
     Mỗi lượt chỉ bấm 1 lần rồi quét lại (nút "Use" của màn speedup ở gần đúng chỗ nút Train)."""
     screen = bot.screenshot()
-    train = bot.find(TRAIN_BUTTON, screen=screen, region=TRAIN_BUTTON_REGION)
-    if train is None:
-        bot.tap(*TRAIN_BUTTON_POS, delay=BUTTON_WAIT)     # Training Speedup
+    speedup = _find_training_speedup(bot, screen)
+    train = None if speedup else bot.find(TRAIN_BUTTON, screen=screen, region=TRAIN_BUTTON_REGION)
+    if speedup is not None:
+        bot.tap(*speedup, delay=BUTTON_WAIT)
+    elif train is None:
+        bot.tap(*TRAIN_BUTTON_POS, delay=BUTTON_WAIT)     # không nhận ra nút: bấm chỗ nút
     elif plan.started >= plan.times:
         bot.log(f"{name}: trained {plan.started} batch(es), done")
         bot.mark_daily_done(key)
@@ -237,6 +263,12 @@ def _train_step(bot, plan: _Plan, name: str, key: str):
         bot.log(f"{name}: Train batch {plan.started}/{plan.times}")
         bot.tap(*train, delay=BUTTON_WAIT)
     return HANDLED
+
+
+def _find_training_speedup(bot, screen):
+    """Tâm nút "Training Speedup" (có mẻ đang train) trên `screen`, hoặc None."""
+    return bot.find(TRAINING_SPEEDUP, threshold=TRAINING_SPEEDUP_THRESHOLD, screen=screen,
+                    region=TRAIN_BUTTON_REGION)
 
 
 def _confirm_finish_all(bot, screen):
@@ -262,6 +294,7 @@ def _targets(troop: TroopTask) -> list[tuple[str, str]]:
         (FINISH_ALL_TITLE, ON_FINISH_ALL_DIALOG),
         (SPEEDUP_TITLE, ON_SPEEDUP),
         *[(path, ON_TRAIN_SCREEN) for path in troop.tiers.values()],
+        (SPEED_UP, ON_SPEED_UP_MENU),   # trước TRAIN: icon "View" của menu này khớp nhầm TRAIN
         (TRAIN, ON_TRAIN_MENU),
         (troop.tab_selected, ON_TAB),
         (troop.tab, OPEN_TAB),
@@ -277,6 +310,7 @@ def _thresholds(troop: TroopTask) -> dict[str, float]:
     return {
         **EVENT_THRESHOLDS,
         TRAIN: TRAIN_THRESHOLD,
+        SPEED_UP: TRAIN_THRESHOLD,
         **troop.thresholds,
         **{path: TIER_THRESHOLD for path in troop.tiers.values()},
     }

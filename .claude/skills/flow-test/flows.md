@@ -176,7 +176,7 @@ Bước 01–04 giống hệt Cultivate Generals (ảnh chép sang `screens/`); 
 | 10 | Thành, doanh trại ở giữa màn hình | `tap_at(198, 352)` (giữa màn hình); chưa thấy Train thì chờ 3 s, bấm giữa thêm 1 lần |
 | 11 | Menu doanh trại (`Event/GatherTroops/Train/train.png`) | `tap("Event/GatherTroops/Train/train.png")` |
 | train_tNN | Màn Train, cấp NN đang ở giữa (mở ở cấp train lần trước) | Chọn cấp (`gather_troops/troop_tier.py`): bấm cấp phải nhất để đi lên / trái nhất để đi xuống (cấp vừa bấm nhảy ra giữa) tới cấp người dùng chọn, hoặc cấp mở cao nhất dưới ổ khoá đầu tiên; cấp kết quả ở giữa thì OCR số tối đa một lần train (ô bên phải nút "+", font `TrainCount`), tính số lần, `tap(".../Train/trainButton.png")` |
-| train_t13?training | Nút đã thành "Training Speedup" (biến thể, chưa có ảnh thật) | `tap_at(295, 668)` |
+| train_t13?training | Nút đã thành "Training Speedup" (biến thể: dán đáy ảnh thật `train_training.png`, không còn nút "+") | `tap(".../Train/trainingSpeedup.png")` (≈ (295, 672)) |
 | speedup | Màn Training Speedup | Lần đầu: `tap(".../Train/speedupSettings.png")`; sau đó `tap(".../Train/finishAll.png")` |
 | speedup_settings(_ticked) | Hộp Finish All | Ô góc dưới trái chưa tích thì `tap(".../Train/checkboxOff.png")`, rồi `tap(".../Train/confirm.png")` |
 | train_t13 (sau Finish All) | Nút Train hiện lại, đã bấm đủ số lần | `end()`, đánh dấu `ground_troop` đã xong |
@@ -202,6 +202,7 @@ Settings: `{"mounted_troop": {"value": 20000, "level": 13, "day": 3}}`. Flow chu
 - 3 ổ khoá (Day 3..5 khoá, biến thể `day3_locked` trên ảnh tạm `06_day_locked_tmp.png`): lưu `mounted_troop_locked`.
 - Ảnh thật `locked_1754xx.png` (chỉ mở cấp I): mở ở I → lưu `mounted_troop_locked`; `locked_175511` (X..XIII khoá) → bấm X, IX → thấy VI..IX khoá → lưu `mounted_troop_locked`.
 - Màn Training Speedup / hộp Finish All dùng chung ảnh với Ground Troop (chép `speedup*.png`).
+- `train_training.png` (ảnh thật, Mounted / Ranged / Siege mỗi loại một ảnh): vừa vào màn Train đã đang train → `tap(".../Train/trainingSpeedup.png")`, Finish All trước rồi mới chọn cấp (không lưu `*_locked` dù cấp ở giữa không có nút "+").
 
 ### Ranged Troop — `tests/event/gather_troops/ranged_troop/`
 Settings: `{"ranged_troop": {"value": 20000, "level": 13, "day": 3}}`. Giống Mounted Troop (cùng Day 3, cùng ảnh `MountedTroop/day3.png`), nhưng tab phụ bên phải:
@@ -214,3 +215,18 @@ Settings: `{"ranged_troop": {"value": 20000, "level": 13, "day": 3}}`. Giống M
 
 - `locked_180037` (I..IV) → bấm IV → `locked_180045` (V, VI khoá) → lưu `ranged_troop_locked`; `locked_180117` (XII..XVI khoá) → bấm XII, X, VIII → `locked_180100` → lưu `ranged_troop_locked`.
 - `10_after_go.png` / `11_train_menu.png`: trại cung (Archer Camp); icon Train trên menu này chỉ khớp 0,86 (ngưỡng 0,8).
+
+### Siege Machine — `tests/event/gather_troops/siege_machine/`
+Settings: `{"siege_machine": {"value": 20000, "level": 13, "day": 4}}`. Giống Mounted Troop nhưng Day 4:
+
+| # | Màn hình | Action |
+| --- | --- | --- |
+| 07 / 07_gather_day3 | Gather Troops, tab Day 1 / Day 3 | `tap("Event/GatherTroops/SiegeMachine/day4.png")` |
+| 08 | Day 4, tab Siege Machine (mặc định, `siegeMachineSelected.png`) | OCR "0 / 500", `tap_at(335, 344)` |
+| 09 | Day 4, tab Defense Force đang chọn | `tap("Event/GatherTroops/SiegeMachine/siegeMachine.png")` |
+| train_tNN | Màn Train xe công thành (`SiegeMachine/Tier/<cấp>.png`, I..XV) | giống Ground Troop; `train_t13` OCR 20812 / lần |
+
+- `06_day_locked_tmp.png` (Day 4, 5 khoá) dùng thẳng, không cần biến thể: lưu `siege_machine_locked`.
+- `locked_201311` (I..IV) → bấm IV → `locked_201315` (V, VI khoá) → lưu `siege_machine_locked`; `locked_201352` (XII..XVI khoá) → bấm XII, X, VIII → `locked_201328` → lưu `siege_machine_locked`.
+- `10_after_go.png` / `11_train_menu.png`: xưởng (Workshop) thật.
+- Xưởng đang có mẻ train (áp dụng cho mọi loại lính, flow chung): bấm giữa sau Go → `11_speed_up_menu.png` (menu có Speed Up / Instant Finish / Cancel / View, không có Train; icon View khớp nhầm `train.png` 0,92) → `tap(".../Train/speedUp.png")` → `speedup_workshop.png` (Speedup Settings → Confirm → Finish All) → `12_after_finish_all.png` (về thành) → `tap_at(198, 352)` lần nữa → `11_train_menu.png` → Train như thường.

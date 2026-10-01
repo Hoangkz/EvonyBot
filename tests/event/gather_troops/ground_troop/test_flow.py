@@ -104,6 +104,14 @@ def _day2_locked(bgr):
     return bgr
 
 
+def _training(bgr):
+    """Biến thể ảnh: dán đáy màn Train đang train (ảnh thật train_training.png: dòng "Training
+    Troops" thay thanh kéo / nút "+", nút "Training Speedup" thay nút Train)."""
+    real = cv2.imread(str(SCREENS / "train_training.png"))
+    bgr[560:] = real[560:]
+    return bgr
+
+
 VARIANTS = {
     # Màn chính đã nhận quà: không còn icon Login Gifts (cột phải + góc dưới trái).
     "claimed": lambda bgr: _blank(525, 575, 0, 60)(_blank(130, 170, 330, 396)(bgr)),
@@ -117,8 +125,8 @@ VARIANTS = {
     "locked_12": _tier_locks(11, 12, 13),
     # Màn Train: cấp ở giữa khoá (không có thanh kéo / nút "+"), các vòng khác không có ổ khoá.
     "center_locked": _blank(560, 600, 0, 396),
-    # Màn Train đang train: nút "Train" đã đổi thành "Training Speedup" (chưa có ảnh thật).
-    "training": _blank(648, 695, 210, 385),
+    # Màn Train đang train: đáy màn hình (nút "Training Speedup", không có nút "+") từ ảnh thật.
+    "training": _training,
 }
 
 
@@ -304,6 +312,25 @@ class GroundTroopFlow(unittest.TestCase):
             Step("locked_140715.png", end()),
         )
         self.assertIn(LOCKED_KEY, device.daily_done)
+
+    def test_building_busy_speed_up_from_menu(self):
+        """Sau Go, doanh trại đang có mẻ train (ảnh thật 11_speed_up_menu.png: menu có "Speed
+        Up", không có Train; icon "View" khớp nhầm ảnh Train 0,84) -> Speed Up -> màn Training
+        Speedup (speedup_barracks.png) -> Speedup Settings, Confirm -> Finish All -> về lại
+        thành (dùng lại 10_after_go.png) -> bấm giữa lần nữa -> menu có Train -> Train."""
+        flow = [
+            *TO_EVENT, *TO_FIRST_GO[:4],
+            Step("11_speed_up_menu.png", tap(f"{TRAIN_DIR}/speedUp.png")),
+            Step("speedup_barracks.png", tap(f"{TRAIN_DIR}/speedupSettings.png")),
+            Step("speedup_settings_ticked.png", tap(f"{TRAIN_DIR}/confirm.png")),
+            Step("speedup_barracks.png", tap(f"{TRAIN_DIR}/finishAll.png")),
+            Step("10_after_go.png", tap_at(*CENTER)),
+            *TO_FIRST_GO[4:],
+        ]
+        device = run_flow(self, event.run, SCREENS, flow, SETTINGS, variants=VARIANTS)
+        self.assertIn("Ground Troop: building already training, Speed Up from menu (not counted)",
+                      device.logs)
+        self.assertNotIn(LOCKED_KEY, device.daily_done)
 
     def test_no_go_marks_done(self):
         """Tab Ground Troop không còn Go: đánh dấu nhiệm vụ đã xong rồi kết thúc."""

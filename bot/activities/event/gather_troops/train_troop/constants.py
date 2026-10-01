@@ -15,6 +15,12 @@ from ...constants import EV
 # (107, 238): 0,86; trước khi bấm <= 0,58; 136 màn khác <= 0,68 -> ngưỡng TRAIN_THRESHOLD.
 TRAIN = f"{EV}/GatherTroops/Train/train.png"
 TRAIN_THRESHOLD = 0.8
+# Công trình đang có mẻ train: menu không có "Train" mà có View / Cancel / Instant Finish
+# (tốn gems) / Speed Up / Detail. Icon "View" (hai thanh kiếm) khớp nhầm ảnh TRAIN 0,84-0,94
+# -> xét SPEED_UP trước TRAIN. Icon "Speed Up" (tia sét + chữ, cắt gọn ít nền, Workshop
+# (101, 301)): Workshop 1,00, Archer Camp 0,96, Barracks 0,95, Stables 0,92; màn khác <= 0,44. Bấm -> màn Training Speedup -> Finish All -> về lại thành (công
+# trình vẫn ở giữa) -> mở lại menu, lúc này có "Train".
+SPEED_UP = f"{EV}/GatherTroops/Train/speedUp.png"
 GO_WAIT = 10              # giây chờ sau khi bấm Go
 CENTER = (50, 50)         # % màn hình: công trình sau khi bấm Go
 MENU_CHECK_DELAY = 1      # giây chờ menu hiện trước khi tìm icon Train
@@ -29,11 +35,14 @@ TRAIN_COUNT_BOX = (282, 570, 104, 24)       # (x, y, w, h) px trên màn 396x704
 # Bấm Train -> nút đổi thành "Training Speedup" ở cùng chỗ -> bấm tiếp mở màn speedup.
 TRAIN_BUTTON = f"{EV}/GatherTroops/Train/trainButton.png"
 TRAIN_BUTTON_POS = (295, 668)               # px: nút Train / Training Speedup
-# Ngưỡng nhận nút "Train" cả xanh lẫn xám (cấp khoá 0,77): không thấy cả hai = nút đã là
-# "Training Speedup" (có mẻ đang train). TODO: đo lại khi có ảnh nút Training Speedup thật.
-TRAIN_BUTTON_ANY = 0.7
+# Nút "Training Speedup" (có mẻ đang train; cùng chỗ nút Train, tâm (295, 672)): chữ
+# "Training Speedup" khớp 1,00 (ảnh thật Mounted Troop, Siege Machine); 161 màn khác <= 0,63
+# -> ngưỡng 0,85. (Không dùng "không thấy nút Train": chữ "Training Speedup" khớp nhầm
+# ảnh nút Train 0,71.) Khi đang train, thanh kéo số lượng và nút "+" cũng biến mất.
+TRAINING_SPEEDUP = f"{EV}/GatherTroops/Train/trainingSpeedup.png"
+TRAINING_SPEEDUP_THRESHOLD = 0.85
 # Chữ "Train" của nút "Instant Train" (tốn gems, nửa trái, tâm (128, 664)) cũng khớp
-# 0,71-0,74 -> CHỈ tìm nút Train ở nửa phải đáy màn hình (% màn hình).
+# 0,71-0,74 -> CHỈ tìm nút Train / Training Speedup ở nửa phải đáy màn hình (% màn hình).
 TRAIN_BUTTON_REGION = (52, 90, 100, 100)
 BUTTON_WAIT = 2                             # giây chờ sau mỗi lần bấm nút
 
@@ -73,6 +82,7 @@ OPEN_DAY = "open_day"                       # tab Day của nhiệm vụ chưa c
 OPEN_TAB = "open_tab"                       # tab phụ của nhiệm vụ chưa chọn -> bấm
 ON_TAB = "on_tab"                           # tab phụ đang chọn -> bấm Go đầu tiên
 ON_TRAIN_MENU = "on_train_menu"             # menu công trình đã mở (có icon Train) -> bấm
+ON_SPEED_UP_MENU = "on_speed_up_menu"       # menu công trình đang train (có Speed Up) -> bấm
 ON_TRAIN_SCREEN = "on_train_screen"         # màn Train (hàng cấp lính) -> chọn cấp, train
 ON_FINISH_ALL_DIALOG = "on_finish_all_dialog"   # hộp Finish All -> tích ô, Confirm
 ON_SPEEDUP = "on_speedup"                   # màn Training Speedup -> (settings) Finish All
