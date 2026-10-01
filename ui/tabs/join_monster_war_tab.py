@@ -57,8 +57,14 @@ class JoinMonsterWarTab(BaseTab):
         assistant.setGeometry(290, 75, 250, 28)
         assistant.setEnabled(False)
         general.toggled.connect(assistant.setEnabled)
+        # Khi chọn tướng: bấm tab Development, chỉ chọn tướng phát triển.
+        development = QCheckBox("Development General", stamina)
+        development.setGeometry(290, 111, 250, 28)
+        development.setEnabled(False)
+        general.toggled.connect(development.setEnabled)
         self.controls["checkBoxSelectGeneral"] = general
         self.controls["checkBoxAssistantGeneral"] = assistant
+        self.controls["checkBoxDevelopmentGeneral"] = development
         for y, (name, text, items, current) in zip((36, 72, 108), (
             ("comboBoxUseStamina", "Use Stamina: ", STAMINA_OPTIONS, "100"),
             ("comboBoxBuyStamina", "Buy Stamina: ", ["10", "16", "20"], "10"),
@@ -213,6 +219,7 @@ class JoinMonsterWarTab(BaseTab):
             "buy_hammer": c["comboBoxBuyHammer"].currentText(),
             "select_general": c["checkBoxSelectGeneral"].isChecked(),
             "select_assistant_general": c["checkBoxAssistantGeneral"].isChecked(),
+            "development_general": c["checkBoxDevelopmentGeneral"].isChecked(),
             "viking_summon": c["viking_summon"].isChecked() if "viking_summon" in c else False,
             "selected_bosses": [
                 {"category_key": category, "name": name,
@@ -236,6 +243,7 @@ class JoinMonsterWarTab(BaseTab):
             c["comboBoxBuyHammer"].setCurrentText(str(data["buy_hammer"]))
         c["checkBoxSelectGeneral"].setChecked(bool(data.get("select_general", False)))
         c["checkBoxAssistantGeneral"].setChecked(bool(data.get("select_assistant_general", False)))
+        c["checkBoxDevelopmentGeneral"].setChecked(bool(data.get("development_general", False)))
         if "viking_summon" in c:
             c["viking_summon"].setChecked(bool(data.get("viking_summon", False)))
         if "selected_bosses" in data:

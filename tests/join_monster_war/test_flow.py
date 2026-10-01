@@ -16,7 +16,7 @@ import numpy as np
 
 from bot.activities import join_monster_war
 from bot.activities.join_monster_war.boss_memory import JOINED, SKIPPED, BossMemory
-from bot.activities.join_monster_war.constants import (FAVORITE_OFF, IDLE, JOIN, LISTBOSS, MARCH,
+from bot.activities.join_monster_war.constants import (CHOOSE_DEVELOPMENT, FAVORITE_OFF, IDLE, JOIN, LISTBOSS, MARCH,
                                                      NOT_ENOUGH_STAMINA, PRESET_DX, PRESET_X0, PRESET_Y,
                                                      REGIONS, SELECT_GENERAL, STAMINA_SLIDER_END,
                                                      STAMINA_USE, WAR_TICKED)
@@ -295,6 +295,16 @@ CHOOSE_ASSISTANT_FAV_ALREADY_ON = [
     Step("select_general_fav_on.png", tap_at(329, 373, tol=8)),
     Step("march_preset_2_unlocked.png", tap(MARCH)),
 ]
+# Tích "Development General": màn Select a General -> bấm tab Development (cái búa) trước
+# rồi mới tích trái tim lọc và Select. (Ảnh sau khi bấm búa dùng lại ảnh tab All.)
+CHOOSE_ASSISTANT_DEVELOPMENT = [
+    Step("march_main_general_chosen.png", preset(1)),
+    Step("march_main_general_chosen.png", tap(SELECT_GENERAL)),
+    Step("select_general_fav_off.png", tap(CHOOSE_DEVELOPMENT)),
+    Step("select_general_fav_off.png", tap(FAVORITE_OFF)),
+    Step("select_general_fav_on.png", tap_at(329, 373, tol=8)),
+    Step("march_preset_2_unlocked.png", tap(MARCH)),
+]
 # Màn chọn tướng phụ: King Arthur (tướng chính) có nút Select XÁM, không chọn được ->
 # bỏ qua, bấm Select của Hudson (tướng đầu tiên có nút xanh).
 CHOOSE_ASSISTANT_SKIP_MAIN = [
@@ -488,6 +498,10 @@ class JoinMonsterWarFlow(unittest.TestCase):
 
     def test_choose_assistant_when_favorite_filter_already_on(self):
         device = run_join(self, CHOOSE_ASSISTANT_FAV_ALREADY_ON, WITH_GENERALS)
+        self.assertIn("Đã chọn tướng phụ", device.logs)
+
+    def test_assistant_development_tab(self):
+        device = run_join(self, CHOOSE_ASSISTANT_DEVELOPMENT, {**WITH_GENERALS, "development_general": True})
         self.assertIn("Đã chọn tướng phụ", device.logs)
 
     def test_assistant_skips_disabled_main_general(self):

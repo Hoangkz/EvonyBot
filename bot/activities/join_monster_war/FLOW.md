@@ -188,6 +188,7 @@ Chi tiết triển khai nằm ở [boss_board.py](../../worker/boss_board.py) v�
 `_choose_general(ô)` (dùng chung cho tướng chính và tướng phụ; `ô` là vùng % của ô đó trên màn March):
 - Ô không có dấu "+" (`selectGeneral.png`) thì coi là đã có tướng, trả True nếu thấy kính lúp trong ô.
 - Bấm "+", chờ màn "Select a General". Màn này được nhận bằng trái tim lọc (`favoriteOn.png` / `favoriteOff.png`), vì khi không có tướng yêu thích ("No favorite General") thì không có nút Select nào.
+- Tab tích **"Development General"**: bấm tab Development (cái búa `chooseDevelopment.png`, vùng hàng tab). Không thấy cái búa thì coi như tab đang chọn sẵn (tab đang chọn hiện chữ "Development").
 - Không còn nút Select xanh nào (không có tướng yêu thích, hoặc chỉ còn tướng chính): nhấn Back về màn March, bỏ qua phần chọn tướng, trả False.
 - Trái tim lọc tướng yêu thích chưa tích (`favoriteOff.png`, không thấy `favoriteOn.png`) thì bấm tích.
 - Bấm nút "Select" **màu xanh** trên cùng. Tướng đang là tướng chính có nút Select xám (không chọn được làm tướng phụ) và bị bỏ qua, dù nút xám vẫn khớp ảnh mẫu tới 0,88.

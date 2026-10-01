@@ -8,7 +8,8 @@ from . import boss_names
 from .boss_memory import JOINED as MEMORY_JOINED
 from .boss_memory import SKIPPED as MEMORY_SKIPPED
 from .boss_memory import BossMemory
-from .constants import (ALLIANCE_ICON, ASSISTANT_GENERAL, BACK, BOSS_MONSTER, FAVORITE_OFF, FAVORITE_ON,
+from .constants import (ALLIANCE_ICON, ASSISTANT_GENERAL, BACK, BOSS_MONSTER, CHOOSE_DEVELOPMENT,
+                        FAVORITE_OFF, FAVORITE_ON,
                         GENERAL_SEARCH, IDLE, JB, JOIN, JOIN_LIST, JOIN_MAX_Y, JOIN_MIN_Y, MAIN_GENERAL,
                         JOIN_THRESHOLD, JOINED, JOINED_BUTTON, JOINED_OVERLAP, LEAVE_ALLIANCE_POPUP,
                         LIST_END_MAX_LIGHT, LIST_END_REGION, LISTBOSS, LOCATION, MARCH, MARCH_SCREEN,
@@ -41,6 +42,7 @@ class _Boss:
         self.last_troop = None                              # Đội vừa bấm chọn trên màn March
         self.select_general = bool(settings.get("select_general"))            # Tích "Select General"
         self.select_assistant = bool(settings.get("select_assistant_general"))  # Tích "With Assistant General"
+        self.development_general = bool(settings.get("development_general"))  # Tích "Development General"
         self.use_stamina = settings.get("use_stamina")     # "ALL" / "100" / "No"
         self.selected = boss_names.selection(settings)         # Boss được tích ở tab: {tên: cấp được tích}
         self.memory: BossMemory = bot.boss_memory           # Tọa độ boss đã tham gia / bỏ qua (X, Y in-game)
@@ -350,9 +352,10 @@ class _Boss:
         """Chọn tướng cho ô `slot` (MAIN_GENERAL / ASSISTANT_GENERAL, vùng % trên màn March).
         True nếu ô đã có tướng (sẵn có, hoặc vừa chọn xong).
 
-        Ô trống (dấu "+") -> bấm "+" -> màn "Select a General": trái tim lọc (chỉ hiện tướng
-        yêu thích) chưa tích thì bấm tích -> bấm nút "Select" đầu tiên -> quay về màn March,
-        ô đã có tướng (thấy kính lúp trong ô)."""
+        Ô trống (dấu "+") -> bấm "+" -> màn "Select a General": tích "Development General" thì
+        bấm tab Development (cái búa) -> trái tim lọc (chỉ hiện tướng yêu thích) chưa tích thì
+        bấm tích -> bấm nút "Select" đầu tiên -> quay về màn March, ô đã có tướng (thấy kính
+        lúp trong ô)."""
         bot = self.bot
         name = "tướng chính" if slot == MAIN_GENERAL else "tướng phụ"
         plus = bot.find(SELECT_GENERAL, region=slot)
@@ -371,6 +374,14 @@ class _Boss:
         else:
             bot.log(f"Chọn {name}: không mở được màn Select a General")
             return False
+
+        # Chỉ hiện tướng phát triển: bấm tab Development (không thấy cái búa = tab đang chọn sẵn)
+        if self.development_general:
+            hammer = bot.find(CHOOSE_DEVELOPMENT, screen=screen, region=REGIONS[CHOOSE_DEVELOPMENT])
+            if hammer is not None:
+                bot.tap(*hammer)
+                delay(bot, 1 + GENERAL_TAP_DELAY)
+                screen = bot.screenshot()
 
         # Chỉ hiện tướng yêu thích: trái tim lọc chưa tích thì bấm tích
         if bot.find(FAVORITE_ON, screen=screen, region=REGIONS[FAVORITE_ON]) is None:

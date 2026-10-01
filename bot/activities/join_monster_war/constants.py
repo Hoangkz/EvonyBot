@@ -11,6 +11,9 @@ SELECT_GENERAL = f"{JB}/selectGeneral.png"
 SELECT = f"{JB}/Select.png"
 FAVORITE_ON = f"{JB}/favoriteOn.png"      # trái tim lọc đã tích (khớp 1,00; chưa tích 0,19)
 FAVORITE_OFF = f"{JB}/favoriteOff.png"    # trái tim lọc chưa tích (khớp 1,00; đã tích 0,07)
+# Tab "Development" (cái búa) ở hàng tab của màn chọn tướng, khi chưa chọn (khớp 0,99;
+# đang chọn thì tab thành chữ "Development", khớp 0,61) -> tab tích "Development General".
+CHOOSE_DEVELOPMENT = f"{JB}/chooseDevelopment.png"
 # Ô tướng trên màn March (% màn hình), dùng làm vùng tìm "+" / kính lúp của ô đó.
 MAIN_GENERAL = (3, 47, 97, 63)            # đo: y 330-443, kính lúp (348, 388)
 ASSISTANT_GENERAL = (3, 64, 97, 79)       # đo: y 452-555, "+" (65, 502), kính lúp (348, 502)
@@ -51,6 +54,7 @@ REGIONS = {
     SELECT: (65, 10, 100, 100),           # đo: nút Select (329, 373) / (329, 627), mỗi tướng 1 nút
     FAVORITE_ON: (30, 15, 40, 20),        # đo: trái tim lọc (139, 124); tim của từng tướng ở x 358: ngoài vùng
     FAVORITE_OFF: (30, 15, 40, 20),
+    CHOOSE_DEVELOPMENT: (45, 5, 75, 28),  # đo: búa (219, 77) màn Select a General / (219, 161) màn Generals
     WAR_TICKED: (44, 12, 58, 21),         # đo: ô War x48-54 y15-18 (ô Monster War ở x9-19: ngoài vùng)
     PRESET_LOCKED: (0, 7, 100, 16),       # hàng preset, đo: y 9-13
     STAMINA_ITEM_USE: (65, 40, 95, 100),  # cột nút Use, đo: (292, 360), (296, 479), (288, 598)
