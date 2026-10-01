@@ -177,11 +177,12 @@ Chi tiết triển khai nằm ở [boss_board.py](../../worker/boss_board.py) v�
 2. Chọn đội quân bằng `_pick_troop()`:
    - Đếm ổ khoá (`presetLocked.png`) ở hàng 8 ô preset trên cùng; số ô mở = 8 − số khoá (các ô mở luôn là các ô đầu).
    - Đội dùng được = đội người dùng chọn ở tab (`troop`, tăng dần) có số ≤ số ô mở. VD chọn cả 8 mà chỉ mở 2 thì dùng {1, 2}; chọn {2, 3} mà mở 3 thì dùng {2, 3}.
-   - Thử lần lượt, bắt đầu từ đội sau đội đã dùng ở lần Join trước (`ctx.next_troop`, lưu trên BotContext). VD chọn 1, 2, 3, lần trước dùng 1 thì thử 2 → 3 → 1.
+   - Lần nào cũng thử lần lượt từ đội nhỏ nhất, không xoay vòng. VD chọn 1, 2, 3 thì luôn thử 1 → 2 → 3.
    - Bấm ô preset (tâm x = 10,4% + (i − 1) × 11,3%, y = 11%), chờ tối đa 1,5 giây. Thấy kính lúp (`generalSearch.png`) ở ô Main General (có tướng chính) thì đội đạt.
-3. Không đội nào đạt:
-   - Tab tích **"Select General"**: gọi `_choose_general(MAIN_GENERAL)` để chọn tướng chính cho đội vừa thử cuối cùng. Chọn **không được** (không có tướng yêu thích...) thì **vẫn tham gia boss** với đội đó. Lượt xoay lần sau bắt đầu từ đội kế tiếp.
-   - Không tích: log, Back, boss được thử lại sau.
+3. Không đội nào đạt: **vẫn tham gia boss** với đội vừa thử cuối cùng.
+   - Tab tích **"Select General"**: gọi `_choose_general(MAIN_GENERAL)` để chọn tướng chính cho đội đó trước. Chọn **không được** (không có tướng yêu thích...) thì vẫn March.
+   - Không tích: log rồi March luôn.
+   - Chỉ khi mọi đội đã chọn đều đang khoá (không có đội nào để thử) thì Back, boss được thử lại sau.
    - Xong phần chọn tướng (hoặc bỏ qua) thì bấm **March** để tham gia boss (bước 5).
 4. Tab tích thêm **"With Assistant General"**: gọi `_choose_general(ASSISTANT_GENERAL)`. Ô tướng phụ đã có tướng thì không làm gì.
 

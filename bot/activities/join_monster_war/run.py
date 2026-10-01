@@ -275,19 +275,20 @@ class _Boss:
             bot.back()
             return
 
-        # Chọn đội quân (preset) có tướng chính, xoay vòng qua các đội người dùng chọn.
-        # Không đội nào có tướng chính:
-        # - tab có tích "Select General": chọn tướng chính cho đội vừa thử cuối cùng; chọn
-        #   không được (không có tướng yêu thích...) thì VẪN tham gia boss với đội đó;
-        # - không tích: bỏ (Back, boss được thử lại sau).
+        # Chọn đội quân (preset) có tướng chính, thử lần lượt các đội người dùng chọn.
+        # Không đội nào có tướng chính thì VẪN tham gia boss với đội vừa thử cuối cùng:
+        # - tab có tích "Select General": chọn tướng chính cho đội đó trước (chọn không
+        #   được, VD không có tướng yêu thích, thì vẫn March);
+        # - không tích: March luôn.
+        # Chỉ bỏ (Back, boss được thử lại sau) khi mọi đội đã chọn đều đang khoá.
         if self._pick_troop(screen) is None:
-            if not (self.select_general and self.last_troop is not None):
-                bot.log("Không có đội quân nào có tướng chính")
+            if self.last_troop is None:
                 bot.back()
                 return
-            if not self._choose_general(MAIN_GENERAL):
+            if not self.select_general:
+                bot.log(f"Đội quân {self.last_troop}: không có tướng chính, vẫn tham gia boss")
+            elif not self._choose_general(MAIN_GENERAL):
                 bot.log(f"Đội quân {self.last_troop}: không chọn được tướng chính, vẫn tham gia boss")
-            bot.next_troop = self.last_troop + 1
 
         # Tích "With Assistant General": ô tướng phụ đang trống thì chọn luôn
         if self.select_general and self.select_assistant:
@@ -325,25 +326,22 @@ class _Boss:
 
         - Đội dùng được = đội người dùng chọn ở tab, trừ các ô đang khoá (đếm ổ khoá ở
           hàng preset; các ô mở luôn là các ô đầu).
-        - Thử lần lượt, bắt đầu từ đội sau đội đã dùng lần Join trước (VD chọn 1, 2, 3,
-          lần trước dùng 1 -> thử 2, 3, 1). Lượt xoay lưu trên BotContext nên còn qua
-          các lần Join Boss được gọi lại.
+        - Lần nào cũng thử lần lượt từ đội nhỏ nhất (VD chọn 1, 2, 3 -> luôn thử 1, 2, 3),
+          không xoay vòng theo lần Join trước.
         - Một đội đạt khi chọn xong thấy kính lúp ở ô Main General (có tướng chính)."""
         bot = self.bot
+        self.last_troop = None
         locked = len(bot.find_all(PRESET_LOCKED, screen=screen, region=REGIONS[PRESET_LOCKED]))
         usable = [t for t in self.troops if t <= PRESET_COUNT - locked]
         if not usable:
             bot.log(f"Đội quân đã chọn {self.troops} đều đang khoá ({locked} ô khoá)")
             return None
-        start = getattr(bot, "next_troop", None)
-        first = next((i for i, t in enumerate(usable) if start is not None and t >= start), 0)
-        for troop in usable[first:] + usable[:first]:
+        for troop in usable:
             self.last_troop = troop   # đội đang được chọn trên màn March (nếu cần chọn tướng cho nó)
             bot.tap_percent(PRESET_X0 + (troop - 1) * PRESET_DX, PRESET_Y)
             for _ in range(3):
                 delay(bot, 0.5)
                 if bot.find(GENERAL_SEARCH, region=REGIONS[GENERAL_SEARCH]) is not None:
-                    bot.next_troop = troop + 1   # lần Join sau bắt đầu từ đội kế tiếp
                     bot.log(f"Chọn đội quân {troop}")
                     return troop
         return None

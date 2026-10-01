@@ -260,16 +260,6 @@ JOIN_AND_MARCH = [
     Step(MARCH_SCREEN, tap(MARCH)),
     Step(W("02_war_list_join.png"), end(IDLE)),
 ]
-# Lần Join trước dùng đội 1 -> lần này bắt đầu từ đội 2.
-MARCH_NEXT_TROOP = [
-    Step(MARCH_SCREEN, preset(2)),
-    Step(MARCH_SCREEN, tap(MARCH)),
-]
-# Lần trước dùng đội 2, chỉ mở 2 ô -> quay vòng về đội 1.
-MARCH_WRAP_TROOP = [
-    Step(MARCH_SCREEN, preset(1)),
-    Step(MARCH_SCREEN, tap(MARCH)),
-]
 # Người dùng chỉ chọn đội 3, 4 nhưng các ô đó đang khoá -> không đội nào dùng được -> Back.
 MARCH_ONLY_LOCKED = [
     Step(MARCH_SCREEN, back()),
@@ -347,11 +337,11 @@ NO_MAIN_GENERAL_STILL_MARCH = [
     Step("select_general_no_favorite.png", back()),
     Step(NO_MAIN, tap(MARCH)),
 ]
-# Không tích "Select General" -> Back như cũ.
-NO_MAIN_GENERAL_BACK = [
+# Không tích "Select General" -> không chọn tướng, vẫn March với đội thử cuối (đội 2).
+NO_MAIN_GENERAL_MARCH = [
     Step(NO_MAIN, preset(1)),
     Step(NO_MAIN, preset(2)),
-    Step(NO_MAIN, back()),
+    Step(NO_MAIN, tap(MARCH)),
 ]
 # Ảnh thật trước / sau khi bấm March (đủ thể lực): màn March (đội có tướng chính và tướng phụ)
 # -> March -> quay về danh sách War, thẻ Manticore đã "Joined", ô War đang tích -> bỏ tích ->
@@ -410,12 +400,6 @@ ASSISTANT_ALREADY_THERE = [
     Step(MARCH_SCREEN, preset(1)),
     Step(MARCH_SCREEN, tap(MARCH)),
 ]
-
-
-def next_troop(troop):
-    def setup(ctx):
-        ctx.next_troop = troop
-    return setup
 
 
 # Ảnh thật, ô War đã bỏ tích; hai thẻ đều "Joined" và danh sách đã hiện hết -> rảnh,
@@ -477,15 +461,6 @@ class JoinMonsterWarFlow(unittest.TestCase):
         self.assertIn("Chọn đội quân 1", device.logs)
         with device.fake_time():
             self.assertEqual(device.ctx.boss_memory.status(PERYTON), JOINED)
-        self.assertEqual(device.ctx.next_troop, 2)
-
-    def test_march_starts_from_next_troop(self):
-        device = run_join(self, MARCH_NEXT_TROOP, ALL_TROOPS, setup=next_troop(2))
-        self.assertIn("Chọn đội quân 2", device.logs)
-
-    def test_march_troop_rotation_wraps(self):
-        device = run_join(self, MARCH_WRAP_TROOP, ALL_TROOPS, setup=next_troop(3))
-        self.assertIn("Chọn đội quân 1", device.logs)
 
     def test_march_only_locked_troops_backs_out(self):
         device = run_join(self, MARCH_ONLY_LOCKED, {**IDLE_SETTINGS, "troop": ["Troop 3", "Troop 4"]})
@@ -520,16 +495,15 @@ class JoinMonsterWarFlow(unittest.TestCase):
     def test_choose_main_general(self):
         device = run_join(self, CHOOSE_MAIN_GENERAL, {**WITH_GENERALS, "select_assistant_general": False})
         self.assertIn("Đã chọn tướng chính", device.logs)
-        self.assertEqual(device.ctx.next_troop, 3)
 
     def test_no_main_general_still_joins_when_select_general_ticked(self):
         device = run_join(self, NO_MAIN_GENERAL_STILL_MARCH, {**WITH_GENERALS, "select_assistant_general": False})
         self.assertIn("Đội quân 2: không chọn được tướng chính, vẫn tham gia boss", device.logs)
-        self.assertEqual(device.ctx.next_troop, 3)
 
-    def test_no_main_general_backs_when_select_general_not_ticked(self):
-        device = run_join(self, NO_MAIN_GENERAL_BACK, ALL_TROOPS)
-        self.assertIn("Không có đội quân nào có tướng chính", device.logs)
+    def test_no_main_general_still_joins_when_select_general_not_ticked(self):
+        device = run_join(self, NO_MAIN_GENERAL_MARCH, ALL_TROOPS)
+        self.assertIn("Đội quân 2: không có tướng chính, vẫn tham gia boss", device.logs)
+        self.assertNotIn("Đã chọn tướng chính", device.logs)
 
     def test_march_returns_to_war_list(self):
         device = run_join(self, MARCH_THEN_BACK_TO_LIST, ALL_TROOPS)
