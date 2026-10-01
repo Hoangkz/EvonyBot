@@ -11,8 +11,8 @@ Flow:
 3. Tab "Recruit More" đang chọn: đọc số đã làm ở "300 / 500" trên nút "Go" gần tab nhất
    (OCR) rồi bấm "Go" -> danh sách Generals.
    Không còn nút "Go" nào -> nhiệm vụ đã xong: đánh dấu xong (tới lần reset server).
-4. Danh sách Generals: tim lọc yêu thích đang tích thì bỏ tích; rồi kéo nhanh xuống cuối
-   3 lần, bấm thẻ tướng cuối (10%, 90%) và chờ màn đổi (tối đa 15 s).
+4. Danh sách Generals: tim lọc yêu thích chưa tích thì bấm tích; rồi kéo nhanh xuống cuối
+   6 lần, bấm thẻ tướng cuối (10%, 90%) và chờ màn đổi (tối đa 15 s).
 5. Màn chi tiết tướng: bấm "Cultivate".
 6. Màn Cultivate (mở ở tab "Cultivate Once"): bấm tab "Quick Cultivate".
 7. Tab Quick Cultivate (trên cùng ảnh chụp):
@@ -52,7 +52,7 @@ from .constants import (
     REGIONS,
     THRESHOLDS,
     TOTAL,
-    UNTICK_FAVORITE,
+    TICK_FAVORITE,
     X100_WAIT,
 )
 
@@ -90,7 +90,7 @@ def run(bot, task: dict, state: EventState):
             wait_gone(bot, [(CULTIVATE_X100, _X100)], _X100, x100, timeout=X100_WAIT)
         elif action in (OPEN_QUICK_CULTIVATE, OPEN_CULTIVATE, OPEN_RECRUIT_MORE):
             bot.tap(*pos, delay=2)
-        elif action == UNTICK_FAVORITE:
+        elif action == TICK_FAVORITE:
             bot.tap(*pos, delay=1)
         elif action == ON_GENERALS_LIST:
             _open_last_general(bot)
@@ -116,8 +116,8 @@ _TARGETS = [
     (QUICK_CULTIVATE_SELECTED, ON_QUICK_CULTIVATE),
     (QUICK_CULTIVATE, OPEN_QUICK_CULTIVATE),
     *[(path, OPEN_CULTIVATE) for path in CULTIVATE_BUTTONS],
-    (FAVORITE_ON, UNTICK_FAVORITE),
-    (FAVORITE_OFF, ON_GENERALS_LIST),
+    (FAVORITE_OFF, TICK_FAVORITE),
+    (FAVORITE_ON, ON_GENERALS_LIST),
     (RECRUIT_MORE_SELECTED, ON_RECRUIT_MORE),
     (RECRUIT_MORE, OPEN_RECRUIT_MORE),
 ]

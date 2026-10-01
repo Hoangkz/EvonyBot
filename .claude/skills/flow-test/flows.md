@@ -144,15 +144,15 @@ Hiện chỉ có nhiệm vụ Cultivate Generals (Gather Troops), đi qua dòng 
 | 02 | Super Value Return, tab Login Gifts | `tap_at(122, 587)` (chữ `LoginGift/title.png` + (66, 446)), `back()` |
 | 03 | Màn hình chính (`Server/listActivity.png`) | `tap_at(369, 281)` (chữ `Event/eventCenter.png` + (10, 40)) |
 | 04 | Danh sách event (Wine Festival Event) | `tap("Event/GatherTroops/icon.png")` |
-| 05 | Gather Troops, tab "Be Prepared" | `tap("Event/GatherTroops/recruitMore.png")` |
+| 05 | Gather Troops, tab "Be Prepared" | `tap("Event/GatherTroops/CultivateGenerals/recruitMore.png")` |
 | 06 | Gather Troops, tab "Recruit More" | `tap_at(335, 344)` (Go gần tab nhất) |
-| 07 | Danh sách Generals, tim lọc đang tích (`JoinBoss/favoriteOn.png`) | `tap_at(139, 208)` (bỏ tích) |
-| 07 | Danh sách Generals, tim lọc đã bỏ tích (biến thể `heart_off`) | `swipe(50, 85, 50, 15)` × 3, `tap_at(40, 634)` (10%, 90%), chờ màn đổi |
-| 09 | Chi tiết tướng, hàng 3 nút | `tap("Event/GatherTroops/CultivateButton/1.png")` |
-| 12 | Chi tiết tướng, hàng 4 nút (có Specialty) | `tap("Event/GatherTroops/CultivateButton/2.png")` |
-| 10 | Màn Cultivate, tab "Cultivate Once" | `tap("Event/GatherTroops/quickCultivate.png")` |
-| 11 | Tab "Quick Cultivate" (`quickCultivateSelected.png`), có nút x100 | `tap("Event/GatherTroops/cultivateX100.png")` (đã làm += 100) |
-| 13 | Tab "Quick Cultivate", nút đổi thành Cancel | `tap("Event/GatherTroops/cancel.png")`, quay lại 11; đạt 1000 thì `end()` và đánh dấu xong |
+| 07 | Danh sách Generals, tim lọc chưa tích (`07_generals_heart_off.png`, `JoinBoss/favoriteOff.png`) | `tap_at(139, 208)` (bấm tích) |
+| 07 | Danh sách Generals, tim lọc đã tích (`JoinBoss/favoriteOn.png`) | `swipe(50, 85, 50, 15)` × 6, `tap_at(40, 634)` (10%, 90%), chờ màn đổi |
+| 09 | Chi tiết tướng, hàng 3 nút | `tap("Event/GatherTroops/CultivateGenerals/CultivateButton/1.png")` |
+| 12 | Chi tiết tướng, hàng 4 nút (có Specialty) | `tap("Event/GatherTroops/CultivateGenerals/CultivateButton/2.png")` |
+| 10 | Màn Cultivate, tab "Cultivate Once" | `tap("Event/GatherTroops/CultivateGenerals/quickCultivate.png")` |
+| 11 | Tab "Quick Cultivate" (`quickCultivateSelected.png`), có nút x100 | `tap("Event/GatherTroops/CultivateGenerals/cultivateX100.png")` (đã làm += 100) |
+| 13 | Tab "Quick Cultivate", nút đổi thành Cancel | `tap("Event/GatherTroops/CultivateGenerals/cancel.png")`, quay lại 11; đạt 1000 thì `end()` và đánh dấu xong |
 
 Nhánh phụ:
 - `08` có nút "Claim All": `tap("Event/claimAll.png")` trước mọi thứ.
@@ -164,5 +164,26 @@ Nhánh phụ:
 
 ### Ground Troop — `tests/event/gather_troops/ground_troop/`
 Settings: `{"ground_troop": {"value": 20000, "level": 13, "day": 2}}` (ô chọn 0 = tắt).
-Bước 01–04 giống hệt Cultivate Generals (ảnh chép sang `screens/`); tới `05_gather_be_prepared.png` thì `end()` — các bước sau chưa làm.
-Nhánh phụ: ô chọn 0 → `end()` ngay; danh sách event không có Gather Troops → giống Cultivate Generals.
+Bước 01–04 giống hệt Cultivate Generals (ảnh chép sang `screens/`); tới màn Gather Troops thì đếm ổ khoá `Event/dayLock.png` trên hàng tab Day:
+- 4 ổ khoá (Day 2..5 khoá): lưu `ground_troop_locked` vào daily_done (bỏ qua tới lần reset) rồi `end()`.
+- Ít hơn (VD `07_gather_day1.png` không khoá, `06_day_locked_tmp.png` chỉ Day 4–5 khoá): đi tiếp.
+
+| # | Màn hình | Action |
+| --- | --- | --- |
+| 07 | Gather Troops, tab Day 1 | `tap("Event/GatherTroops/GroundTroop/day2.png")` |
+| 08 | Day 2, tab phụ "Seize Time" | `tap("Event/GatherTroops/GroundTroop/groundTroop.png")` |
+| 09 | Day 2, tab "Ground Troop" (`groundTroopSelected.png`) | OCR "0 / 500" trên Go đầu tiên, `tap_at(335, 344)` (chờ 10 s) |
+| 10 | Thành, doanh trại ở giữa màn hình | `tap_at(198, 352)` (giữa màn hình); chưa thấy Train thì chờ 3 s, bấm giữa thêm 1 lần |
+| 11 | Menu doanh trại (`Event/GatherTroops/Train/train.png`) | `tap("Event/GatherTroops/Train/train.png")` |
+| train_tNN | Màn Train, cấp NN đang ở giữa (mở ở cấp train lần trước) | Chọn cấp (`gather_troops/troop_tier.py`): bấm cấp phải nhất để đi lên / trái nhất để đi xuống (cấp vừa bấm nhảy ra giữa) tới cấp người dùng chọn, hoặc cấp mở cao nhất dưới ổ khoá đầu tiên; cấp kết quả ở giữa thì OCR số tối đa một lần train (ô bên phải nút "+", font `TrainCount`), tính số lần, `tap(".../Train/trainButton.png")` |
+| train_t13?training | Nút đã thành "Training Speedup" (biến thể, chưa có ảnh thật) | `tap_at(295, 668)` |
+| speedup | Màn Training Speedup | Lần đầu: `tap(".../Train/speedupSettings.png")`; sau đó `tap(".../Train/finishAll.png")` |
+| speedup_settings(_ticked) | Hộp Finish All | Ô góc dưới trái chưa tích thì `tap(".../Train/checkboxOff.png")`, rồi `tap(".../Train/confirm.png")` |
+| train_t13 (sau Finish All) | Nút Train hiện lại, đã bấm đủ số lần | `end()`, đánh dấu `ground_troop` đã xong |
+
+Biến thể màn Train: `locked_12` (dán ổ khoá lên XII, XIII của `train_t11`) → train cấp 11, mục tiêu 10000 theo event.json; ảnh thật `locked_1407xx.png` (tài khoản chỉ mở cấp I, cấp II+ khoá): mở ở VII → lưu `ground_troop_locked`; mở ở XII → bấm cấp trái nhất (X, VIII) tới khi thấy VII khoá → lưu `ground_troop_locked`.
+
+Tab Ground Troop hết Go (biến thể `no_go`): `end()`, đánh dấu `ground_troop` đã xong.
+
+TODO: `06_day_locked_tmp.png` là ảnh tạm (màn King's Path); biến thể `day2_locked` dán thêm ổ khoá lên Day 2, Day 3. Thay bằng ảnh Gather Troops thật khi có.
+Nhánh phụ: đã lưu `ground_troop_locked` / ô chọn 0 → `end()` ngay; danh sách event không có Gather Troops → giống Cultivate Generals.

@@ -65,6 +65,15 @@ GO_REGION = (70, 35, 100, 100)   # % màn hình: cột nút dưới hàng tab
 # bot.ocr.read_progress (font Images/OCR/Progress).
 PROGRESS_FROM_GO = (-70, -48, 111, 14)
 
+# Ổ khoá trên tab "Day N" chưa mở (hàng tab Day 1..Day 5, y ~209). Ngày khoá luôn là các
+# ngày cuối: đếm được N ổ khoá thì DAY_TABS - N + 1 .. DAY_TABS đang khoá (VD 4 -> Day 2..5).
+# Đo trên King's Path (Day 4, Day 5 khoá): Day 4 khớp 1,00, Day 5 0,74 (nền tab lệch);
+# hàng tab không khoá <= 0,43, 148 màn khác <= 0,57 -> ngưỡng 0,7, chỉ tìm ở hàng tab.
+DAY_LOCK = f"{EV}/dayLock.png"
+DAY_LOCK_THRESHOLD = 0.7
+DAY_TABS_REGION = (0, 26, 100, 33)   # % màn hình: hàng tab Day
+DAY_TABS = 5
+
 # Ngưỡng riêng của ảnh dùng chung; nhiệm vụ ghép thêm ngưỡng của mình
 # ({**THRESHOLDS, ...} trong constants.py của nhiệm vụ).
 THRESHOLDS = {

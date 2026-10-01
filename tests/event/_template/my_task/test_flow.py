@@ -64,7 +64,7 @@ class MyTaskFlow(unittest.TestCase):
         flow = [
             *TO_EVENT,
             # TODO: thay bằng các bước riêng của nhiệm vụ, bước cuối end().
-            Step("05_gather_be_prepared.png", tap("Event/GatherTroops/recruitMore.png")),
+            Step("05_gather_be_prepared.png", tap("Event/GatherTroops/CultivateGenerals/recruitMore.png")),
             Step("06_gather_recruit_more.png", end()),
         ]
         run_flow(self, _run, SCREENS, flow, SETTINGS, variants=VARIANTS)

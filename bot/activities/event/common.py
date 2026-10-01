@@ -34,22 +34,30 @@ handle_common() lo (quà, Event Center, BACK, go_home...).
 from dataclasses import dataclass
 
 from ...common import click_images, delay, exit_images, find_first, go_home
+from ...ocr import read_progress
 from .constants import (
     BACK,
     CLAIM_ALL,
     CLAIM_LOGIN_GIFT,
+    DAY_LOCK,
+    DAY_LOCK_THRESHOLD,
+    DAY_TABS,
+    DAY_TABS_REGION,
     EVENT_BUTTON_OFFSET,
     EVENT_CENTER,
     EVENT_CENTER_REGION,
     EVENT_CENTER_THRESHOLDS,
     EVENT_LIST_MAX_SCROLLS,
     EVENT_LIST_SWIPE,
+    GO_BUTTON,
+    GO_REGION,
     LOGIN_GIFT_ICON,
     LOGIN_GIFT_REWARD_OFFSET,
     LOGIN_GIFT_TITLE,
     MAIN_SCREEN,
     ON_MAIN_SCREEN,
     OPEN_LOGIN_GIFT,
+    PROGRESS_FROM_GO,
     SWIPE_RIGHT,
     SWIPE_TIMES,
     SWIPE_UP,
@@ -162,6 +170,30 @@ def open_event(bot, icon: str) -> bool:
     bot.log(f"Event: {icon} not found after {EVENT_LIST_MAX_SCROLLS} scrolls")
     bot.back(delay=1)
     return False
+
+
+def day_locked(bot, screen, day: int) -> bool:
+    """Tab "Day `day`" của màn event đang khoá. Ngày khoá luôn là các ngày cuối nên chỉ
+    cần đếm ổ khoá trên hàng tab: N ổ khoá -> Day DAY_TABS - N + 1 .. DAY_TABS khoá
+    (VD 4 ổ khoá -> Day 2 khoá)."""
+    locks = len(bot.find_all(DAY_LOCK, threshold=DAY_LOCK_THRESHOLD, screen=screen,
+                             region=DAY_TABS_REGION))
+    bot.log(f"Event: {locks} locked day(s)")
+    return day > DAY_TABS - locks
+
+
+def nearest_go(bot, screen, tab):
+    """Nút "Go" gần `tab` nhất (tức dòng nhiệm vụ chưa xong trên cùng), hoặc None."""
+    gos = bot.find_all(GO_BUTTON, screen=screen, region=GO_REGION)
+    if not gos:
+        return None
+    return min(gos, key=lambda p: (p[0] - tab[0]) ** 2 + (p[1] - tab[1]) ** 2)
+
+
+def read_go_progress(bot, screen, go) -> int | None:
+    """Số đã làm ở "300 / 500" ngay trên nút `go` (OCR), hoặc None nếu đọc lỗi."""
+    dx, dy, w, h = PROGRESS_FROM_GO
+    return read_progress(bot.crop(screen, go[0] + dx, go[1] + dy, w, h))
 
 
 def find_event_center(bot, screen):

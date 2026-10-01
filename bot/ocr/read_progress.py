@@ -17,6 +17,9 @@ from ._digits import read_chars
 FONT = "Progress"
 CELL = 7          # bề rộng một chữ số (6 px nét + 1 px khoảng)
 _GROUP_GAP = 2    # khe <= 2 px vẫn cùng một số; trước "/" là khe ~3-4 px
+# Tiến độ căn phải; khe > _TEXT_GAP px là chữ khác lấn vào vùng cắt (VD đuôi tiêu đề
+# "...Ground Troop(s)." cách "0 / 500" ~53 px) -> chỉ giữ cụm bên phải nhất.
+_TEXT_GAP = 10
 
 
 def _runs(bw: np.ndarray) -> list[tuple[int, int]]:
@@ -96,7 +99,18 @@ def split(image: np.ndarray) -> list:
         return []
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if image.ndim == 3 else image
     _, bw = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    return _groups(bw)
+    return _groups(_last_text(bw))
+
+
+def _last_text(bw: np.ndarray) -> np.ndarray:
+    """Xoá mọi cột bên trái khe > _TEXT_GAP px cuối cùng (giữ cụm chữ bên phải nhất)."""
+    runs = _runs(bw)
+    for (_, prev_end), (start, _) in zip(reversed(runs[:-1]), reversed(runs[1:])):
+        if start - prev_end > _TEXT_GAP:
+            bw = bw.copy()
+            bw[:, :start] = 0
+            break
+    return bw
 
 
 def run(image: np.ndarray) -> int | None:

@@ -9,8 +9,8 @@ KEY = "my_task"   # key trong ui/tabs/event.json / settings
 # Mỗi ảnh ghi kèm điểm khớp đo được (skill template-images): đúng màn / màn khác.
 # Hai ảnh "đang chọn" / "chưa chọn" khớp chéo cao -> ngưỡng 0,95, xét "đang chọn" trước.
 # (Mẫu dùng tạm tab "Recruit More" của Gather Troops để test mẫu chạy được — đổi khi copy.)
-TAB = f"{EV}/GatherTroops/recruitMore.png"
-TAB_SELECTED = f"{EV}/GatherTroops/recruitMoreSelected.png"
+TAB = f"{EV}/GatherTroops/CultivateGenerals/recruitMore.png"
+TAB_SELECTED = f"{EV}/GatherTroops/CultivateGenerals/recruitMoreSelected.png"
 
 THRESHOLDS = {
     **EVENT_THRESHOLDS,
