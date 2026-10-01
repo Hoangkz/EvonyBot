@@ -26,7 +26,7 @@ KEY = defense_force.KEY
 SETTINGS = {KEY: {"value": 7000, "level": 6, "day": 4}}
 
 LOGIN_GIFT_ICON = (361, 148)
-LOGIN_REWARD = (122, 587)
+LOGIN_REWARD = (37, 197)       # hộp quà dưới chữ "Login Gifts" (56, 141) + (-19, 56)
 EVENT_BUTTON = (369, 281)
 
 FIRST_GO = (335, 344)          # nút Go gần tab Defense Force nhất (dòng "0 / 1,000")

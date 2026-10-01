@@ -7,6 +7,9 @@ lo việc đi từ màn hình chính tới màn event.
 
 Flow:
 1. Màn chính -> nút dưới Event Center -> danh sách event -> icon Gather Troops.
+   Đang ở sẵn màn Gather Troops thì làm luôn từ bước 2. Chưa bấm Go trong lượt này mà gặp
+   danh sách Generals / màn tướng / màn Cultivate (VD lượt trước dừng ở đó) -> Back cho tới
+   khi về lại Gather Troops (bắt buộc đi qua dòng Go để biết nhiệm vụ còn cần làm không).
 2. Màn Gather Troops: tab "Recruit More" chưa chọn thì bấm vào.
 3. Tab "Recruit More" đang chọn: đọc số đã làm ở "300 / 500" trên nút "Go" gần tab nhất
    (OCR) rồi bấm "Go" -> danh sách Generals.
@@ -66,9 +69,14 @@ def run(bot, task: dict, state: EventState):
         bot.log("Cultivate Generals: already done")
         return
     done = None   # số lần đã cultivate, đọc ở dòng có nút Go (None = chưa đọc / đọc lỗi)
+    went = False   # đã bấm Go trong lượt này (bắt buộc trước các màn sau Go)
 
     def handle(action, pos, screen):
-        nonlocal done
+        nonlocal done, went
+        if action in _AFTER_GO_ACTIONS and not went:
+            bot.log(f"Cultivate Generals: {action} before Go, back")
+            bot.back(delay=1)
+            return HANDLED
         if action == ON_QUICK_CULTIVATE:
             cancel = bot.find(CANCEL, screen=screen, region=REGIONS[CANCEL])
             if cancel is not None:
@@ -102,6 +110,7 @@ def run(bot, task: dict, state: EventState):
                 return STOP
             done = _read_done(bot, screen, go)
             bot.tap(*go, delay=3)
+            went = True
         else:
             return None   # EVENT_OPENED hoặc action dùng chung: run_task lo
         return HANDLED
@@ -121,6 +130,11 @@ _TARGETS = [
     (RECRUIT_MORE_SELECTED, ON_RECRUIT_MORE),
     (RECRUIT_MORE, OPEN_RECRUIT_MORE),
 ]
+
+
+# Màn sau khi bấm Go: cần bấm Go trong lượt này trước, xem `went` trong run().
+_AFTER_GO_ACTIONS = (ON_QUICK_CULTIVATE, OPEN_QUICK_CULTIVATE, OPEN_CULTIVATE, TICK_FAVORITE,
+                     ON_GENERALS_LIST)
 
 
 def _nearest_go(bot, screen, tab):

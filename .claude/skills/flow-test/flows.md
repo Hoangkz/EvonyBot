@@ -141,7 +141,7 @@ Hiện chỉ có nhiệm vụ Cultivate Generals (Gather Troops), đi qua dòng 
 | # | Màn hình | Action |
 | --- | --- | --- |
 | 01 | Màn hình chính còn quà đăng nhập | `tap_at(361, 148)` (icon `Event/LoginGift/icon.png`) |
-| 02 | Super Value Return, tab Login Gifts | `tap_at(122, 587)` (chữ `LoginGift/title.png` + (66, 446)), `back()` |
+| 02 | Super Value Return, tab Login Gifts | `tap_at(37, 197)` (hộp quà dưới chữ `LoginGift/title.png` + (-19, 56), không phụ thuộc ngày), `back()` |
 | 03 | Màn hình chính (`Server/listActivity.png`) | `tap_at(369, 281)` (chữ `Event/eventCenter.png` + (10, 40)) |
 | 04 | Danh sách event (Wine Festival Event) | `tap("Event/GatherTroops/icon.png")` |
 | 05 | Gather Troops, tab "Be Prepared" | `tap("Event/GatherTroops/CultivateGenerals/recruitMore.png")` |
@@ -245,3 +245,7 @@ Settings: `{"defense_force": {"value": 7000, "level": 6, "day": 4}}`. Flow chung
 - Tài khoản A (`train_*`): Rock VII → bấm vòng trái nhất (Fire Arrow VI, Rock VI, ..., Rock IV) → bấm Fire Arrow III → train cấp 3.
 - Tài khoản B (`b_*`): cấp IV khoá hết, Fire Arrow III khoá → train cấp III bằng loại khác. Bước cuối dùng `b_train_3_abatis.png` thay cho Fire Arrow III ở giữa (chưa có ảnh đúng).
 - Chưa có ảnh tài khoản khoá cả cấp III (→ `defense_force_locked`).
+
+### Quy tắc chung các nhiệm vụ Gather Troops (Cultivate Generals + 5 nhiệm vụ train)
+Mỗi nhiệm vụ phải đi qua màn Gather Troops trong lượt chạy của nó: mở từ danh sách event, hoặc đang ở sẵn màn Gather Troops thì làm luôn tại đó (lần đầu thấy màn này: kiểm tra Day khoá). Rồi tab → bấm Go (đọc số đã làm) → các màn sau Go. Gặp màn sau Go (menu công trình / màn Train / speedup / danh sách Generals / Cultivate) trước khi bấm Go → `back()` (log `"<tên>: <action> before Go, back"`) cho tới khi về lại Gather Troops. Test: `test_started_on_train_screen_goes_back_to_event`, `test_started_on_gather_troops_continues_there`, `test_started_on_gather_troops_day_locked` (Mounted Troop); `test_started_on_gather_troops_continues_there`, `test_started_mid_flow_goes_back_to_event` (Cultivate Generals).
+Sau Go: mỗi lần bấm giữa màn hình chờ thêm 2 s (`CENTER_TAP_EXTRA`) cho menu công trình hiện.

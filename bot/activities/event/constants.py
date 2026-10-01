@@ -12,9 +12,10 @@ LOGIN_GIFT_ICON = f"{EV}/LoginGift/icon.png"
 # Chữ vàng "Login Gifts" trên banner màn Super Value Return (khớp 0,96 tại (56, 141);
 # màn khác cao nhất 0,60).
 LOGIN_GIFT_TITLE = f"{EV}/LoginGift/title.png"
-# Ô quà cột "Rewards" tính từ tâm chữ "Login Gifts": (56, 141) -> quà (122, 587).
-# Đo trên ảnh Day 5 (hàng 5 của danh sách).
-LOGIN_GIFT_REWARD_OFFSET = (66, 446)
+# Hộp quà tròn ngay dưới chữ "Login Gifts" trên banner (bấm để nhận quà ngày hiện tại),
+# tính từ tâm chữ "Login Gifts": (56, 141) -> hộp quà (37, 197). Đo trên ảnh Day 5 và Day 6
+# (cùng vị trí, không phụ thuộc ngày).
+LOGIN_GIFT_REWARD_OFFSET = (-19, 56)
 
 # ---- Màn hình chính -----------------------------------------------------
 # Nút "•••" ở cột phải màn hình chính (dùng chung với get_server): khớp 0,96 trên mọi
@@ -57,6 +58,9 @@ GATHER_TROOPS_ICON = f"{EV}/GatherTroops/icon.png"
 # Nút "Claim All" ở cuối màn event: thấy là bấm trước mọi thứ khác. Khớp 1,00;
 # màn khác <= 0,66 (nút "Claimed").
 CLAIM_ALL = f"{EV}/claimAll.png"
+# Lỗi game: bấm Claim All mà nút không mất. Bấm liên tiếp quá CLAIM_ALL_MAX_TAPS lần (không
+# gặp màn nào khác xen giữa) -> Back, đếm lại từ 0, vòng lặp chạy tiếp.
+CLAIM_ALL_MAX_TAPS = 10
 # Nút "Go" của mỗi dòng nhiệm vụ (cột phải, x ~335): khớp 0,99; màn khác <= 0,60.
 GO_BUTTON = f"{EV}/goButton.png"
 GO_REGION = (70, 35, 100, 100)   # % màn hình: cột nút dưới hàng tab
@@ -85,3 +89,4 @@ CLAIM_LOGIN_GIFT = "claim_login_gift"
 OPEN_LOGIN_GIFT = "open_login_gift"
 ON_MAIN_SCREEN = "on_main_screen"
 BACK, TAP = "back", "tap"
+CLAIM = "claim_all"   # nút Claim All (đếm số lần bấm liên tiếp, xem CLAIM_ALL_MAX_TAPS)

@@ -24,6 +24,7 @@ SPEED_UP = f"{EV}/GatherTroops/Train/speedUp.png"
 GO_WAIT = 10              # giây chờ sau khi bấm Go
 CENTER = (50, 50)         # % màn hình: công trình sau khi bấm Go
 MENU_CHECK_DELAY = 1      # giây chờ menu hiện trước khi tìm icon Train
+CENTER_TAP_EXTRA = 2      # giây chờ thêm sau mỗi lần bấm giữa màn hình (menu công trình hiện chậm)
 MENU_WAIT = 3             # giây chờ sau mỗi bước của menu
 
 # ---- Màn Train (bấm icon Train trong menu công trình) --------------------------------

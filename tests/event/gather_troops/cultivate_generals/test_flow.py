@@ -23,7 +23,7 @@ SETTINGS = {KEY: {"enabled": True, "day": 1}}
 
 # Toạ độ bấm cứng (lệch so với template, xem bot/activities/event/constants.py):
 LOGIN_GIFT_ICON = (361, 148)   # icon Login Gifts ở cột phải (góc dưới trái cũng có)
-LOGIN_REWARD = (122, 587)      # chữ "Login Gifts" (56, 141) + (66, 446): ô quà Day 5
+LOGIN_REWARD = (37, 197)       # hộp quà dưới chữ "Login Gifts" (56, 141) + (-19, 56)
 EVENT_BUTTON = (369, 281)      # chữ "Event Center" (359, 241) + (10, 40)
 FIRST_GO = (335, 344)          # nút Go gần tab Recruit More nhất (dòng "500 time(s)")
 FAVORITE_FILTER = (139, 208)   # trái tim lọc yêu thích trên danh sách Generals
@@ -63,11 +63,12 @@ TO_CULTIVATE = [
     *TO_QUICK_CULTIVATE,
     *x100_loop(300),
 ]
-# Vào thẳng danh sách Generals (không qua dòng Go nên không biết số đã làm): tới tab
-# Quick Cultivate thì dừng, không bấm x100 (tránh tiêu gems khi không biết lúc nào dừng).
-FROM_GENERALS_TICKED = [
-    *TO_QUICK_CULTIVATE,
-    Step("11_quick_cultivate.png", end()),
+# Như TO_RECRUIT_MORE nhưng quà đăng nhập đã nhận (màn chính không còn icon quà).
+TO_RECRUIT_MORE_CLAIMED = [Step("03_main.png?claimed", tap_at(*EVENT_BUTTON)), *TO_RECRUIT_MORE[1:]]
+# Main -> Gather Troops -> Go đầu tiên (đọc 300) -> danh sách Generals đã tích tim lọc.
+TO_GENERALS = [
+    *TO_RECRUIT_MORE_CLAIMED,
+    Step("06_gather_recruit_more.png", tap_at(*FIRST_GO)),
 ]
 
 
@@ -84,6 +85,8 @@ VARIANTS = {
     "claimed": lambda bgr: _blank(525, 575, 0, 60)(_blank(130, 170, 330, 396)(bgr)),
     # Tab Recruit More không còn nút Go nào (mọi dòng đã xong).
     "no_go": _blank(320, 480, 290, 380),
+    # Tab Recruit More: xoá dòng "300 / 500" trên Go đầu tiên (OCR không đọc được).
+    "no_progress": _blank(294, 312, 260, 380),
     # Danh sách event không có Gather Troops.
     "no_gather_troops": _blank(330, 400, 15, 85),
 }
@@ -107,31 +110,74 @@ class EventFlow(unittest.TestCase):
     def test_claim_all_first(self):
         """Thấy "Claim All" thì bấm trước mọi thứ, rồi mới xử lý tab Recruit More."""
         flow = [
+            *TO_RECRUIT_MORE_CLAIMED[:2],
             Step("08_gather_claim_all.png", tap("Event/claimAll.png")),
             Step("06_gather_recruit_more.png", tap_at(*FIRST_GO)),
             *TO_CULTIVATE,
         ]
         run_flow(self, event.run, SCREENS, flow, SETTINGS, variants=VARIANTS)
 
+    def test_claim_all_stuck_backs_after_10_taps(self):
+        """Lỗi game: bấm Claim All mà nút không mất. Bấm 10 lần liên tiếp, lần 11 bấm Back
+        (đếm lại từ 0) rồi vòng lặp chạy tiếp như thường."""
+        flow = [
+            *TO_RECRUIT_MORE_CLAIMED[:2],
+            *[Step("08_gather_claim_all.png", tap("Event/claimAll.png")) for _ in range(10)],
+            Step("08_gather_claim_all.png", back()),
+            Step("06_gather_recruit_more.png", tap_at(*FIRST_GO)),
+            *TO_CULTIVATE,
+        ]
+        device = run_flow(self, event.run, SCREENS, flow, SETTINGS, variants=VARIANTS)
+        self.assertIn("Event: Claim All still there after 10 taps, back", device.logs)
+
     def test_progress_unknown_does_not_use_gems(self):
-        """Không qua dòng Go (không biết số đã làm): tới Quick Cultivate thì dừng, không
-        bấm Cultivate x100, không đánh dấu xong."""
-        device = run_flow(self, event.run, SCREENS, FROM_GENERALS_TICKED, SETTINGS,
-                          variants=VARIANTS)
+        """Không đọc được số đã làm ở dòng Go: tới Quick Cultivate thì dừng, không bấm
+        Cultivate x100 (tránh tiêu gems khi không biết lúc nào dừng), không đánh dấu xong."""
+        flow = [
+            *TO_RECRUIT_MORE_CLAIMED,
+            Step("06_gather_recruit_more.png?no_progress", tap_at(*FIRST_GO)),
+            *TO_QUICK_CULTIVATE,
+            Step("11_quick_cultivate.png", end()),
+        ]
+        device = run_flow(self, event.run, SCREENS, flow, SETTINGS, variants=VARIANTS)
         self.assertNotIn(KEY, device.daily_done)
 
     def test_cultivate_button_4_columns(self):
         """Tướng có hàng 4 nút (thêm Specialty): nút Cultivate nhỏ hơn, ở (152, 677)."""
         flow = [
-            FROM_GENERALS_TICKED[0],
+            *TO_GENERALS,
+            TO_QUICK_CULTIVATE[0],
             Step("12_general_detail_4_buttons.png", tap("Event/GatherTroops/CultivateGenerals/CultivateButton/2.png")),
-            *FROM_GENERALS_TICKED[2:],
+            *TO_QUICK_CULTIVATE[2:],
+            *x100_loop(300),
         ]
         run_flow(self, event.run, SCREENS, flow, SETTINGS, variants=VARIANTS)
 
     def test_favorite_already_ticked(self):
         """Tim lọc đã tích sẵn: không bấm tim, kéo xuống cuối và mở tướng luôn."""
-        run_flow(self, event.run, SCREENS, FROM_GENERALS_TICKED, SETTINGS, variants=VARIANTS)
+        flow = [*TO_GENERALS, *TO_QUICK_CULTIVATE, *x100_loop(300)]
+        run_flow(self, event.run, SCREENS, flow, SETTINGS, variants=VARIANTS)
+
+    def test_started_on_gather_troops_continues_there(self):
+        """Đang ở sẵn màn Gather Troops (tab Recruit More): không về thành, bấm Go luôn."""
+        flow = [TO_RECRUIT_MORE[-1], Step("06_gather_recruit_more.png", tap_at(*FIRST_GO)),
+                *TO_QUICK_CULTIVATE, *x100_loop(300)]
+        device = run_flow(self, event.run, SCREENS, flow, SETTINGS, variants=VARIANTS)
+        self.assertIn(KEY, device.daily_done)
+
+    def test_started_mid_flow_goes_back_to_event(self):
+        """Bắt đầu khi đang ở danh sách Generals (VD lượt trước dừng ở đó): chưa mở event /
+        chưa bấm Go trong lượt này -> Back, đi lại từ màn chính qua Gather Troops để kiểm
+        tra nhiệm vụ còn cần làm không (đọc số đã làm ở dòng Go)."""
+        flow = [
+            Step("07_generals.png", back()),
+            *TO_GENERALS,
+            *TO_QUICK_CULTIVATE,
+            *x100_loop(300),
+        ]
+        device = run_flow(self, event.run, SCREENS, flow, SETTINGS, variants=VARIANTS)
+        self.assertIn("Cultivate Generals: on_generals_list before Go, back", device.logs)
+        self.assertIn(KEY, device.daily_done)
 
     def test_no_go_marks_done(self):
         """Tab Recruit More không còn Go: đánh dấu nhiệm vụ đã xong rồi kết thúc."""

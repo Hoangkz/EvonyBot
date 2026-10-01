@@ -37,7 +37,9 @@ from ...common import click_images, delay, exit_images, find_first, go_home
 from ...ocr import read_progress
 from .constants import (
     BACK,
+    CLAIM,
     CLAIM_ALL,
+    CLAIM_ALL_MAX_TAPS,
     CLAIM_LOGIN_GIFT,
     DAY_LOCK,
     DAY_LOCK_THRESHOLD,
@@ -76,6 +78,7 @@ STOP = "stop"                   # nhiệm vụ kết thúc -> run_task() return
 class EventState:
     """Trạng thái dùng chung giữa các nhiệm vụ trong một lượt chạy Event."""
     login_done: bool = False   # mỗi lượt chỉ nhận quà 1 lần, kể cả khi bấm trượt
+    claim_all_taps: int = 0    # số lần bấm Claim All liên tiếp (xem CLAIM_ALL_MAX_TAPS)
 
 
 def run_task(bot, state: EventState, name: str, event_icon: str, handle=None, *,
@@ -92,6 +95,10 @@ def run_task(bot, state: EventState, name: str, event_icon: str, handle=None, *,
                                  + common_targets(state), regions=regions,
                                  thresholds=thresholds)
         bot.log(f"{name}: {action} at {pos}")
+        if action == CLAIM:
+            claim_all(bot, state, pos)
+            continue
+        state.claim_all_taps = 0   # gặp màn khác: đếm lại số lần bấm Claim All liên tiếp
         result = handle(action, pos, screen) if handle is not None else None
         if result == STOP:
             return
@@ -108,9 +115,21 @@ def run_task(bot, state: EventState, name: str, event_icon: str, handle=None, *,
             return
 
 
+def claim_all(bot, state: EventState, pos):
+    """Bấm Claim All. Lỗi game (nút không mất): bấm liên tiếp quá CLAIM_ALL_MAX_TAPS lần thì
+    Back và đếm lại từ 0."""
+    state.claim_all_taps += 1
+    if state.claim_all_taps > CLAIM_ALL_MAX_TAPS:
+        bot.log(f"Event: Claim All still there after {CLAIM_ALL_MAX_TAPS} taps, back")
+        state.claim_all_taps = 0
+        bot.back(delay=1)
+        return
+    bot.tap(*pos, delay=2)
+
+
 def priority_targets() -> list[tuple[str, str]]:
     """(ảnh, action) đặt TRƯỚC ảnh riêng của nhiệm vụ: thấy là bấm ngay rồi quét lại."""
-    return [(CLAIM_ALL, TAP)]
+    return [(CLAIM_ALL, CLAIM)]
 
 
 def common_targets(state: EventState) -> list[tuple[str, str]]:

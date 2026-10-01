@@ -10,6 +10,7 @@ from tests.join_monster_war.test_flow import SCREENS
 
 # (ảnh, y góc trên nút Join, tên boss, tier, lực trên thẻ); thẻ trên và thẻ dưới lệch nửa pixel.
 CARDS = [("02_war_list_join.png", 331, "Peryton", None, 6_500_000),
+         ("war_pan_ranged.png", 331, "Pan", None, 122_900_000),   # "Pan (Ranged Troop)"
          ("war_list_join_red.png", 331, "Manticore", None, 2_200_000),
          ("war_list_attacking_join.png", 562, "Yasha", None, 3_400_000),
          ("war_list_two_join.png", 331, "Minotaur", None, 9_900_000),
@@ -66,6 +67,10 @@ class BossLevelTests(unittest.TestCase):
         self.assertEqual(parse("(boss) m?n?aur"), (boss("Minotaur"), None))   # chữ chưa có mẫu
         self.assertEqual(parse("(boss) knight bayard"), (boss("Knight Bayard"), None))
         self.assertEqual(parse("(boss) ?????"), (None, None))
+        # Pan có 3 loại, tên không có "(Boss)" mà có loại quân trong ngoặc ở cuối.
+        self.assertEqual(parse("pan (panged ?roop)"), (boss("Pan"), None))
+        self.assertEqual(parse("pan (ground troop)"), (boss("Pan"), None))
+        self.assertEqual(parse("pan (mounted tr"), (boss("Pan"), None))   # ngoặc bị cắt
         self.assertEqual(parse(None), (None, None))
 
     def test_tier_gives_level_of_that_boss(self):

@@ -28,7 +28,7 @@ KEY = ranged_troop.KEY
 SETTINGS = {KEY: {"value": 20000, "level": 13, "day": 3}}
 
 LOGIN_GIFT_ICON = (361, 148)   # icon Login Gifts ở cột phải
-LOGIN_REWARD = (122, 587)      # ô quà Day 5
+LOGIN_REWARD = (37, 197)       # hộp quà dưới chữ "Login Gifts" (56, 141) + (-19, 56)
 EVENT_BUTTON = (369, 281)      # chữ "Event Center" + (10, 40)
 DAY_3_LOCK = (174, 209)        # tâm ổ khoá trên tab Day 3
 

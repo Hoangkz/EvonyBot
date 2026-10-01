@@ -29,7 +29,7 @@ KEY = mounted_troop.KEY
 SETTINGS = {KEY: {"value": 20000, "level": 13, "day": 3}}
 
 LOGIN_GIFT_ICON = (361, 148)   # icon Login Gifts ở cột phải
-LOGIN_REWARD = (122, 587)      # ô quà Day 5
+LOGIN_REWARD = (37, 197)       # hộp quà dưới chữ "Login Gifts" (56, 141) + (-19, 56)
 EVENT_BUTTON = (369, 281)      # chữ "Event Center" + (10, 40)
 # Tâm ổ khoá trên tab Day 3 (Day 4 (250, 209), Day 5 (326, 209), cách nhau 76).
 DAY_3_LOCK = (174, 209)
@@ -92,7 +92,18 @@ def _training(bgr):
     return bgr
 
 
+def _day345_locked(bgr):
+    """Biến thể ảnh: dán ổ khoá lên tab Day 3, 4, 5 (3 ổ khoá -> Day 3..5 khoá)."""
+    for x in (DAY_3_LOCK[0], DAY_3_LOCK[0] + 76, DAY_3_LOCK[0] + 152):
+        lock = cv2.imread(str(TEMPLATE_DIR / DAY_LOCK))
+        h, w = lock.shape[:2]
+        y = DAY_3_LOCK[1]
+        bgr[y - h // 2:y - h // 2 + h, x - w // 2:x - w // 2 + w] = lock
+    return bgr
+
+
 VARIANTS = {
+    "day345_locked": _day345_locked,
     "claimed": lambda bgr: _blank(525, 575, 0, 60)(_blank(130, 170, 330, 396)(bgr)),
     "day3_locked": _day3_locked,
     "no_go": _blank(320, 704, 290, 380),
@@ -253,6 +264,32 @@ class MountedTroopFlow(unittest.TestCase):
         self.assertIn("Mounted Troop: building already training, Speed Up from menu (not counted)",
                       device.logs)
         self.assertNotIn(LOCKED_KEY, device.daily_done)
+
+    def test_started_on_train_screen_goes_back_to_event(self):
+        """Bắt đầu khi đang ở màn Train (VD nhiệm vụ trước dừng ở đó): chưa mở event / chưa
+        bấm Go của Mounted Troop trong lượt này -> Back, đi lại từ màn chính qua Gather
+        Troops (kiểm tra Day khoá, đọc số đã làm) rồi mới Go -> Train."""
+        flow = [
+            Step("train_t13.png", back()),
+            *TO_EVENT,
+            *TO_FIRST_GO,
+        ]
+        device = run_flow(self, event.run, SCREENS, flow, SETTINGS, variants=VARIANTS)
+        self.assertIn("Mounted Troop: on_train_screen before Go, back", device.logs)
+        self.assertIn("Mounted Troop: done 0, remaining 20000", device.logs)
+
+    def test_started_on_gather_troops_continues_there(self):
+        """Bắt đầu khi đang ở sẵn màn Gather Troops (Day 3, nhiệm vụ trước để lại): không về
+        thành, kiểm tra Day khoá ngay trên màn đó rồi bấm Go luôn."""
+        flow = [*TO_FIRST_GO[1:]]
+        device = run_flow(self, event.run, SCREENS, flow, SETTINGS, variants=VARIANTS)
+        self.assertIn("Mounted Troop: done 0, remaining 20000", device.logs)
+
+    def test_started_on_gather_troops_day_locked(self):
+        """Đang ở sẵn màn Gather Troops mà Day 3 khoá: lưu LOCKED_KEY ngay, không về thành."""
+        flow = [Step("08_day3_mounted_troop.png?day345_locked", end())]
+        device = run_flow(self, event.run, SCREENS, flow, SETTINGS, variants=VARIANTS)
+        self.assertIn(LOCKED_KEY, device.daily_done)
 
     def test_no_go_marks_done(self):
         """Tab Mounted Troop không còn Go: đánh dấu xong."""

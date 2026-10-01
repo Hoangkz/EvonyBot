@@ -8,6 +8,9 @@ Phần đi từ màn chính tới màn event nằm trong run_task() (xem event/c
 Flow:
 1. Màn chính -> nút dưới Event Center -> danh sách event -> icon Gather Troops
    (run_task, giống hệt Cultivate Generals).
+   Đang ở sẵn màn Gather Troops thì làm luôn từ bước 2. Chưa bấm Go trong lượt này mà gặp
+   menu công trình / màn Train / màn speedup (VD nhiệm vụ trước dừng ở đó) -> Back cho tới
+   khi về lại Gather Troops (bắt buộc đi qua dòng Go để biết nhiệm vụ còn cần làm không).
 2. Màn Gather Troops vừa mở: đếm ổ khoá trên hàng tab Day. Tab Day của nhiệm vụ còn khoá
    -> lưu "chưa thể thực hiện" (locked_key, tới lần reset server) và dừng.
 3. Tab "Day N" chưa chọn -> bấm.
@@ -54,6 +57,7 @@ from ..troop_tier import TIER_ROW_REGION, TIER_THRESHOLD, choose_tier
 from .constants import (
     BUTTON_WAIT,
     CENTER,
+    CENTER_TAP_EXTRA,
     CHECKBOX_OFF,
     CONFIRM,
     CONFIRM_POS,
@@ -131,14 +135,33 @@ def run(bot, task: dict, state: EventState, troop: TroopTask):
     plan = _Plan()
     targets_by_tier = tier_targets(key)
 
+    # Bắt buộc đi qua màn Gather Troops trong lượt chạy này: kiểm tra Day khoá (lần đầu thấy
+    # màn Gather Troops — vừa mở từ danh sách event, hoặc đang ở sẵn đó) -> tab Day / tab
+    # phụ -> bấm Go của chính nhiệm vụ (đọc số đã làm), rồi mới xử lý menu công trình / màn
+    # Train / màn speedup. Gặp các màn đó trước khi bấm Go (VD nhiệm vụ trước dừng ở màn
+    # Train của nó) thì Back cho tới khi về lại Gather Troops (qua màn chính nếu cần).
+    progress = {"entered": False, "went": False}
+
+    def enter(screen):
+        """Lần đầu ở màn Gather Troops trong lượt này: Day khoá -> lưu, STOP."""
+        progress["entered"] = True
+        if day_locked(bot, screen, day):
+            bot.log(f"{name}: Day {day} locked, cannot do this task yet")
+            bot.mark_daily_done(locked_key)
+            return STOP
+        return None
+
     def handle(action, pos, screen):
         nonlocal done
         if action == EVENT_OPENED:
-            if day_locked(bot, bot.screenshot(), day):
-                bot.log(f"{name}: Day {day} locked, cannot do this task yet")
-                bot.mark_daily_done(locked_key)
+            return enter(bot.screenshot())   # Day đã mở: quét tiếp
+        if action in _EVENT_ACTIONS and not progress["entered"]:
+            if enter(screen) == STOP:
                 return STOP
-            return None   # Day đã mở: quét tiếp
+        if action in _AFTER_GO_ACTIONS and not progress["went"]:
+            bot.log(f"{name}: {action} before Go, back")
+            bot.back(delay=1)
+            return HANDLED
         if action in (OPEN_DAY, OPEN_TAB):
             bot.tap(*pos, delay=2)
         elif action == ON_TAB:
@@ -153,6 +176,7 @@ def run(bot, task: dict, state: EventState, troop: TroopTask):
             else:
                 bot.log(f"{name}: done {done}, remaining {max(0, target - done)}")
             bot.tap(*go, delay=GO_WAIT)
+            progress["went"] = True
             _open_building_menu(bot, name, troop.menu_icon)
         elif action == ON_SPEED_UP_MENU:
             # Công trình đang train (không phải của nhiệm vụ): Finish All ở màn speedup rồi
@@ -207,11 +231,19 @@ def run(bot, task: dict, state: EventState, troop: TroopTask):
              targets=_targets(troop), regions=_regions(troop), thresholds=_thresholds(troop))
 
 
+# Màn Gather Troops (lần đầu thấy thì kiểm tra Day khoá) / màn sau khi bấm Go (cần bấm Go
+# của chính nhiệm vụ trước), xem `progress` trong run().
+_EVENT_ACTIONS = (OPEN_DAY, OPEN_TAB, ON_TAB)
+_AFTER_GO_ACTIONS = (ON_SPEED_UP_MENU, ON_TRAIN_MENU, ON_TRAIN_SCREEN, ON_FINISH_ALL_DIALOG,
+                     ON_SPEEDUP)
+
+
 def _open_building_menu(bot, name: str, menu_icon: str = TRAIN):
-    """Sau khi bấm Go (công trình ở giữa màn hình): bấm giữa màn hình; thấy icon Train thì
+    """Sau khi bấm Go (công trình ở giữa màn hình): bấm giữa màn hình (mỗi lần bấm giữa chờ
+    thêm CENTER_TAP_EXTRA giây cho menu hiện); thấy icon Train thì
     chờ MENU_WAIT giây, không thấy thì chờ MENU_WAIT giây, bấm thêm 1 lần rồi chờ
     MENU_WAIT giây. Vòng lặp kế tiếp tự nhận ra menu (ON_TRAIN_MENU)."""
-    bot.tap_percent(*CENTER, delay=MENU_CHECK_DELAY)
+    bot.tap_percent(*CENTER, delay=MENU_CHECK_DELAY + CENTER_TAP_EXTRA)
     screen = bot.screenshot()
     if (bot.find(SPEED_UP, threshold=TRAIN_THRESHOLD, screen=screen) is not None
             or bot.find(menu_icon, threshold=TRAIN_THRESHOLD, screen=screen) is not None):
@@ -219,7 +251,7 @@ def _open_building_menu(bot, name: str, menu_icon: str = TRAIN):
         return
     bot.log(f"{name}: Train menu not shown, tapping center again")
     bot.sleep(MENU_WAIT)
-    bot.tap_percent(*CENTER, delay=MENU_WAIT)
+    bot.tap_percent(*CENTER, delay=MENU_WAIT + CENTER_TAP_EXTRA)
 
 
 @dataclass

@@ -78,7 +78,10 @@ def parse(text: str | None) -> tuple[Boss | None, str | None]:
     """(boss, tier word or None) from the OCR text of the name label."""
     if not text:
         return None, None
-    text = (text.split(")", 1)[1] if ")" in text else text).strip()   # drop "(boss)"
+    text = re.sub(r"^\s*\([^)]*\)", "", text)        # bỏ "(Boss)" ở đầu
+    # Bỏ loại quân trong ngoặc ở cuối, VD Pan có 3 loại: "Pan (Ranged Troop)" (OCR đọc
+    # "pan (panged ?roop)"); ngoặc có thể bị cắt mất ở mép vùng đọc.
+    text = re.sub(r"\([^)]*\)?\s*$", "", text).strip()
     bosses, tiers = catalog()["bosses"], catalog()["tiers"]
     words = text.split()
     if len(words) >= 2:
