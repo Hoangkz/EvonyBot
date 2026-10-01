@@ -17,3 +17,7 @@ class TimedOut(BotInterrupted):
 
 class BossAvailable(BotInterrupted):
     """Yield a secondary activity to a new boss on the same server."""
+
+
+class BubbleDue(BotInterrupted):
+    """Bubble sắp hết: dừng activity đang chạy (kể cả Join Boss) để gia hạn trước."""
