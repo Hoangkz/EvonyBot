@@ -30,7 +30,12 @@ CARDS = [("02_war_list_join.png", 331, "Peryton", None, 6_500_000),
          # Hai thẻ đã "Joined" (vị trí nút như Join): tier Epic + lực đơn vị B; tên dài
          # xuống 2 dòng "(Boss) Skeleton" / "Dragon" + lực đơn vị K.
          ("war_epic_cerberus_skeleton.png", 331, "Cerberus", "epic", 1_500_000_000),
-         ("war_epic_cerberus_skeleton.png", 562, "Skeleton Dragon", None, 787_200)]
+         ("war_epic_cerberus_skeleton.png", 562, "Skeleton Dragon", None, 787_200),
+         # Tier Legendary (chữ "L" hoa). Thẻ trên đang Attacking, không có nút Join nhưng bố
+         # cục thẻ như mọi thẻ trên. Thẻ dưới "Legendary Bayar" / "Knight": chân g/y của dòng
+         # trên chạm K/h của dòng dưới, không có hàng trống giữa hai dòng.
+         ("war_legendary_cerberus_bayar.png", 331, "Cerberus", "legendary", 694_900_000),
+         ("war_legendary_cerberus_bayar.png", 562, "Knight Bayard", "legendary", 668_100_000)]
 X = 319   # x góc trên nút Join trên mọi ảnh
 
 

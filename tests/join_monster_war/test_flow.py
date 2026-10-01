@@ -39,6 +39,7 @@ MINOTAUR = (623, 935)    # war_list_two_join.png, war_list_more_below.png
 BAYARD = (768, 975)      # war_list_long_name.png: Junior Knight Bayard (cấp 1), ô War đã bỏ tích (ảnh thật)
 BAYARD_JUNIOR = (621, 919)   # war_senior_junior_bayard.png (thẻ dưới), war_joined_and_join.png
 BAYARD_SENIOR = (592, 915)   # war_senior_junior_bayard.png (thẻ trên): "Senior Bayar Knight", cấp 2
+BAYARD_LEGENDARY = (417, 585)   # war_legendary_cerberus_bayar.png (thẻ dưới): "Legendary Bayar Knight", cấp 4
 GOLEM = (655, 875)           # war_scrolled_*.png: không có tier, lực 12.4M -> cấp 1
 
 
@@ -210,6 +211,11 @@ JOIN_TIER_BOSS = [
 ]
 SKIP_TIER_NOT_TICKED = [
     Step("war_list_long_name.png", end(IDLE)),
+]
+# Ảnh thật, ô War đã bỏ tích: thẻ trên Legendary Cerberus đang Attacking (không có Join),
+# thẻ dưới Legendary Bayar Knight (tên xuống 2 dòng) -> Knight Bayard cấp 4.
+JOIN_LEGENDARY_BOSS = [
+    Step("war_legendary_cerberus_bayar.png", tap(JOIN)),
 ]
 
 
@@ -435,6 +441,11 @@ class JoinMonsterWarFlow(unittest.TestCase):
         self.assertEqual(device.reported, [BAYARD])
         self.assertNotIn("Bỏ tích ô War (chỉ giữ rally đánh boss)", device.logs)
         self.assertIn("Boss (768, 975): 'junior knight bayard' -> Knight Bayard lv 1: join", device.logs)
+
+    def test_join_legendary_two_line_name(self):
+        device = run_join(self, JOIN_LEGENDARY_BOSS, with_bayard([4]))
+        self.assertEqual(device.reported, [BAYARD_LEGENDARY])
+        self.assertIn("Boss (417, 585): 'legendary bayar knight' -> Knight Bayard lv 4: join", device.logs)
 
     def test_senior_ticked_junior_not(self):
         device = run_join(self, SENIOR_ONLY, with_bayard([2]))
