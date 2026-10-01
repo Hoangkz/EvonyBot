@@ -1,9 +1,9 @@
 """
 run.py — flow nhiệm vụ Cultivate Generals (Gather Troops).
 
-Cùng cấu trúc vòng lặp với mọi nhiệm vụ Event (xem event/common.py): ảnh ưu tiên,
-ảnh riêng của nhiệm vụ, rồi common_targets(); action không phải của nhiệm vụ thì
-handle_common() lo việc đi từ màn hình chính tới nút event.
+Chạy trong vòng lặp chung run_task() (xem event/common.py): ảnh ưu tiên, ảnh riêng
+của nhiệm vụ, rồi common_targets(); action không phải của nhiệm vụ thì handle_common()
+lo việc đi từ màn hình chính tới màn event.
 
 Flow:
 1. Màn chính -> nút dưới Event Center -> danh sách event -> icon Gather Troops.
@@ -21,16 +21,9 @@ Flow:
      thì đánh dấu xong và dừng. Không đọc được số đã làm ở bước 3 thì không bấm (tránh
      tiêu gems khi không biết lúc nào dừng).
 """
-from .....common import find_first, wait_gone
+from .....common import wait_gone
 from .....ocr import read_progress
-from ...common import (
-    EVENT_OPENED,
-    EventState,
-    common_targets,
-    handle_common,
-    open_event,
-    priority_targets,
-)
+from ...common import HANDLED, STOP, EventState, run_task
 from ...constants import GATHER_TROOPS_ICON, GO_BUTTON, GO_REGION, PROGRESS_FROM_GO
 from .constants import (
     CANCEL,
@@ -73,33 +66,29 @@ def run(bot, task: dict, state: EventState):
         bot.log("Cultivate Generals: already done")
         return
     done = None   # số lần đã cultivate, đọc ở dòng có nút Go (None = chưa đọc / đọc lỗi)
-    while True:
-        screen = bot.screenshot()
-        action, pos = find_first(bot, screen, _targets(state), regions=REGIONS,
-                                 thresholds=THRESHOLDS)
-        bot.log(f"Cultivate Generals: {action} at {pos}")
+
+    def handle(action, pos, screen):
+        nonlocal done
         if action == ON_QUICK_CULTIVATE:
             cancel = bot.find(CANCEL, screen=screen, region=REGIONS[CANCEL])
             if cancel is not None:
                 bot.tap(*cancel, delay=1)
-                continue
+                return HANDLED
             x100 = bot.find(CULTIVATE_X100, screen=screen, region=REGIONS[CULTIVATE_X100])
             if x100 is None:
-                continue   # chưa hiện nút nào: quét lại
+                return HANDLED   # chưa hiện nút nào: quét lại
             if done is None:
                 bot.log("Cultivate Generals: progress unknown, not using Cultivate x100")
-                return
+                return STOP
             bot.tap(*x100)
             done += CULTIVATE_X100_TIMES
             bot.log(f"Cultivate Generals: Cultivate x100 -> {done}/{TOTAL}")
             if done >= TOTAL:
                 bot.mark_daily_done(KEY)
-                return
+                return STOP
             # Chờ nút đổi thành Cancel để không bấm (và đếm) x100 hai lần.
             wait_gone(bot, [(CULTIVATE_X100, _X100)], _X100, x100, timeout=X100_WAIT)
-        elif action == OPEN_QUICK_CULTIVATE:
-            bot.tap(*pos, delay=2)
-        elif action == OPEN_CULTIVATE:
+        elif action in (OPEN_QUICK_CULTIVATE, OPEN_CULTIVATE, OPEN_RECRUIT_MORE):
             bot.tap(*pos, delay=2)
         elif action == UNTICK_FAVORITE:
             bot.tap(*pos, delay=1)
@@ -110,31 +99,28 @@ def run(bot, task: dict, state: EventState):
             if go is None:
                 bot.log("Cultivate Generals: no Go left, done")
                 bot.mark_daily_done(KEY)
-                return
+                return STOP
             done = _read_done(bot, screen, go)
             bot.tap(*go, delay=3)
-        elif action == OPEN_RECRUIT_MORE:
-            bot.tap(*pos, delay=2)
-        elif handle_common(bot, state, action, pos, screen) == EVENT_OPENED:
-            # Màn danh sách event: tìm (cuộn tối đa 4 lần) rồi bấm icon Gather Troops.
-            if not open_event(bot, GATHER_TROOPS_ICON):
-                bot.log("Cultivate Generals: Gather Troops event not found")
-                return
+        else:
+            return None   # EVENT_OPENED hoặc action dùng chung: run_task lo
+        return HANDLED
+
+    run_task(bot, state, "Cultivate Generals", GATHER_TROOPS_ICON, handle,
+             targets=_TARGETS, regions=REGIONS, thresholds=THRESHOLDS)
 
 
-def _targets(state: EventState) -> list[tuple[str, str]]:
-    """Ảnh ưu tiên (Claim All), ảnh riêng của nhiệm vụ (màn sau trước, màn trước sau),
-    rồi tới ảnh dùng chung. Tab "đang chọn" xét trước tab "chưa chọn" (hai ảnh khớp
-    chéo, xem constants)."""
-    return priority_targets() + [
-        (QUICK_CULTIVATE_SELECTED, ON_QUICK_CULTIVATE),
-        (QUICK_CULTIVATE, OPEN_QUICK_CULTIVATE),
-        *[(path, OPEN_CULTIVATE) for path in CULTIVATE_BUTTONS],
-        (FAVORITE_ON, UNTICK_FAVORITE),
-        (FAVORITE_OFF, ON_GENERALS_LIST),
-        (RECRUIT_MORE_SELECTED, ON_RECRUIT_MORE),
-        (RECRUIT_MORE, OPEN_RECRUIT_MORE),
-    ] + common_targets(state)
+# Ảnh riêng của nhiệm vụ (màn sau trước, màn trước sau). Tab "đang chọn" xét trước tab
+# "chưa chọn" (hai ảnh khớp chéo, xem constants).
+_TARGETS = [
+    (QUICK_CULTIVATE_SELECTED, ON_QUICK_CULTIVATE),
+    (QUICK_CULTIVATE, OPEN_QUICK_CULTIVATE),
+    *[(path, OPEN_CULTIVATE) for path in CULTIVATE_BUTTONS],
+    (FAVORITE_ON, UNTICK_FAVORITE),
+    (FAVORITE_OFF, ON_GENERALS_LIST),
+    (RECRUIT_MORE_SELECTED, ON_RECRUIT_MORE),
+    (RECRUIT_MORE, OPEN_RECRUIT_MORE),
+]
 
 
 def _nearest_go(bot, screen, tab):

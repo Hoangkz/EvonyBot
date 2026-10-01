@@ -6,6 +6,7 @@ event — "Event" activity.
 - constants.py:     image folders, limits and action names
 - gather_troops/:   nhiệm vụ event Gather Troops, mỗi nhiệm vụ một thư mục
                     (cultivate_generals/run.py + constants.py, ...)
+- _template/:       MẪU nhiệm vụ để copy (my_task/), xem _template/__init__.py
 """
 from .run import run
 

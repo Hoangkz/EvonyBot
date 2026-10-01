@@ -1,16 +1,39 @@
 """
 common.py — phần dùng chung cho mọi nhiệm vụ Event.
 
-Mỗi nhiệm vụ (gather_troops/..., kings_path/...) chạy cùng một cấu trúc vòng lặp:
-chụp màn hình -> find_first(priority_targets() + ảnh riêng của nhiệm vụ +
-common_targets()) -> nếu action là
-của nhiệm vụ thì tự xử lý, còn lại gọi handle_common(). handle_common lo phần đi từ màn
-hình chính tới nút event: nhận quà đăng nhập trước, thấy nút "•••" thì tìm Event Center
-(nhiều ngưỡng trên cùng ảnh, không thấy thì kéo màn hình) rồi bấm nút event ngay dưới.
+Mọi nhiệm vụ (gather_troops/..., kings_path/...) đều đi qua cùng các bước để tới màn
+event: màn chính -> nhận quà đăng nhập -> nút dưới Event Center -> danh sách event ->
+icon event. Các bước đó nằm trong run_task(); nhiệm vụ chỉ khai báo ảnh riêng của mình
+và hàm `handle` xử lý action của các ảnh đó.
+
+Ví dụ một nhiệm vụ mới (xem gather_troops/ground_troop/run.py là bản tối giản):
+
+    from ...common import EVENT_OPENED, HANDLED, STOP, run_task
+    from ...constants import GATHER_TROOPS_ICON
+    from .constants import DAY_2, OPEN_DAY_2, ON_DAY_2, ..., REGIONS, THRESHOLDS
+
+    def run(bot, task, state):
+        def handle(action, pos, screen):
+            if action == EVENT_OPENED:      # vừa mở màn event (VD 05_gather_be_prepared)
+                return None                 # None = quét tiếp; STOP = dừng nhiệm vụ
+            if action == OPEN_DAY_2:
+                bot.tap(*pos, delay=2)
+            elif action == ON_DAY_2:
+                ...
+                return STOP
+            return HANDLED                  # action riêng đã xử lý xong -> quét lại
+
+        run_task(bot, state, "Ground Troop", GATHER_TROOPS_ICON, handle,
+                 targets=[(DAY_2_SELECTED, ON_DAY_2), (DAY_2, OPEN_DAY_2)],
+                 regions=REGIONS, thresholds=THRESHOLDS)
+
+Ảnh riêng (`targets`) xét sau priority_targets() (Claim All) và trước common_targets(),
+màn sau đặt trước màn trước. `handle` trả None cho action không phải của nhiệm vụ để
+handle_common() lo (quà, Event Center, BACK, go_home...).
 """
 from dataclasses import dataclass
 
-from ...common import click_images, delay, exit_images, go_home
+from ...common import click_images, delay, exit_images, find_first, go_home
 from .constants import (
     BACK,
     CLAIM_ALL,
@@ -33,14 +56,48 @@ from .constants import (
     TAP,
 )
 
-# Kết quả của handle_common() để vòng lặp nhiệm vụ biết vừa xảy ra gì.
+# Kết quả của handle_common() để vòng lặp nhiệm vụ biết vừa xảy ra gì; run_task() cũng
+# gọi handle(EVENT_OPENED, None, None) ngay sau khi mở được icon event.
 EVENT_OPENED = "event_opened"   # vừa bấm nút event dưới Event Center
+# Giá trị `handle` của nhiệm vụ trả cho run_task().
+HANDLED = "handled"             # action riêng đã xử lý xong -> quét lại
+STOP = "stop"                   # nhiệm vụ kết thúc -> run_task() return
 
 
 @dataclass
 class EventState:
     """Trạng thái dùng chung giữa các nhiệm vụ trong một lượt chạy Event."""
     login_done: bool = False   # mỗi lượt chỉ nhận quà 1 lần, kể cả khi bấm trượt
+
+
+def run_task(bot, state: EventState, name: str, event_icon: str, handle=None, *,
+             targets=(), regions=None, thresholds=None):
+    """Vòng lặp chung của một nhiệm vụ Event: chụp màn hình -> find_first(
+    priority_targets() + `targets` + common_targets()) -> `handle(action, pos, screen)`
+    trước; handle trả None thì handle_common() xử lý. Khi handle_common vừa bấm nút
+    event: mở `event_icon` trong danh sách event (không thấy thì return), rồi gọi
+    `handle(EVENT_OPENED, None, None)`. `handle` trả STOP thì return.
+    Không có `handle`: dừng ngay khi vừa mở được event."""
+    while True:
+        screen = bot.screenshot()
+        action, pos = find_first(bot, screen, priority_targets() + list(targets)
+                                 + common_targets(state), regions=regions,
+                                 thresholds=thresholds)
+        bot.log(f"{name}: {action} at {pos}")
+        result = handle(action, pos, screen) if handle is not None else None
+        if result == STOP:
+            return
+        if result is not None:
+            continue
+        if handle_common(bot, state, action, pos, screen) != EVENT_OPENED:
+            continue
+        # Màn danh sách event: tìm (cuộn tối đa 4 lần) rồi bấm icon event.
+        if not open_event(bot, event_icon):
+            bot.log(f"{name}: event not found")
+            return
+        bot.log(f"{name}: event opened")
+        if handle is None or handle(EVENT_OPENED, None, None) == STOP:
+            return
 
 
 def priority_targets() -> list[tuple[str, str]]:

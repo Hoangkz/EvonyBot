@@ -161,3 +161,8 @@ Nhánh phụ:
 - Danh sách event không có Gather Troops: `swipe(50, 80, 50, 50)` × 4, `back()`, rồi `end()`.
 - Không qua dòng Go (không biết số đã làm): tới tab Quick Cultivate thì `end()`, không bấm x100.
 - Event Center không có test riêng (theo yêu cầu).
+
+### Ground Troop — `tests/event/gather_troops/ground_troop/`
+Settings: `{"ground_troop": {"value": 20000, "level": 13, "day": 2}}` (ô chọn 0 = tắt).
+Bước 01–04 giống hệt Cultivate Generals (ảnh chép sang `screens/`); tới `05_gather_be_prepared.png` thì `end()` — các bước sau chưa làm.
+Nhánh phụ: ô chọn 0 → `end()` ngay; danh sách event không có Gather Troops → giống Cultivate Generals.
