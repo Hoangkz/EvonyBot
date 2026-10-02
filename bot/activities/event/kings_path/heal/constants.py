@@ -36,6 +36,9 @@ SELECT_ALL = f"{KP}/Heal/selectAll.png"
 # Sau Reset: cuộn danh sách lính xuống cuối (lính cấp thấp nhất ở dòng dưới cùng).
 LIST_SWIPE = (50, 70, 50, 30)   # % màn hình, ngón tay kéo lên = cuộn xuống
 LIST_SCROLLS = 5
+LIST_SWIPE_WAIT = 3   # chờ sau mỗi lần cuộn
+# Mọi thao tác (bấm / Back / gõ số) trong nhiệm vụ Heal chờ thêm EXTRA_WAIT giây (máy chậm).
+EXTRA_WAIT = 2
 # Dòng lính cấp thấp nhất = dòng có nút "Dismiss" thấp nhất (Dismiss (323, 221 / 312 / 403 / 495)):
 # ô số "0 / 204,582" của dòng đó lệch DISMISS_TO_AMOUNT so với tâm nút (ô (285, 465)).
 DISMISS = f"{KP}/Heal/dismiss.png"

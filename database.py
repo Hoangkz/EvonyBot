@@ -8,6 +8,8 @@ Table `settings`: cài đặt chung mọi thiết bị ({key: value}), VD SERVER
 người dùng chọn ở màn Home (mặc định 14:00; DB cũ có cột devices.server_time thì chuyển sang đây rồi xoá cột).
 Daily Activities stores {task: enabled}; which tasks are done today lives
 in `daily_done` ({task: done_at}) so saving the tab never clears it.
+Table `logs`: lịch sử sự kiện của bot theo thiết bị (bắt đầu / xong / dừng nhiệm vụ...), chỉ thêm vào,
+không bao giờ sửa hay xoá.
 Nothing is reset at a new day: a task counts as done only while its done_at
 is after the latest server reset (bot.daily_reset.done_today).
 
@@ -67,6 +69,13 @@ CREATE TABLE IF NOT EXISTS settings (
     value       TEXT,
     updated_at  TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS logs (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    serial      TEXT NOT NULL,
+    created_at  TEXT NOT NULL,
+    message     TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS logs_serial ON logs (serial, id);
 """.format(json_columns=",\n    ".join(f"{c} TEXT NOT NULL DEFAULT '{{}}'" for c in _JSON_COLUMNS))
 
 
@@ -313,6 +322,24 @@ class Database:
             )
 
         self._write(job)
+
+    # ---- logs (lịch sử sự kiện) ----------------------------------------
+    def add_log(self, serial: str, message: str, created_at: str | None = None):
+        """Thêm 1 dòng lịch sử cho thiết bị (chỉ thêm, không sửa / xoá)."""
+        created_at = created_at or _now()
+        self._write(lambda conn: conn.execute(
+            "INSERT INTO logs (serial, created_at, message) VALUES (?, ?, ?)",
+            (serial, created_at, message),
+        ))
+
+    def load_logs(self, serial: str, limit: int = 500) -> list[tuple[str, str]]:
+        """`limit` dòng lịch sử gần nhất của thiết bị [(created_at, message)], cũ trước mới sau."""
+        self._flush()
+        rows = self.conn.execute(
+            "SELECT created_at, message FROM logs WHERE serial = ? ORDER BY id DESC LIMIT ?",
+            (serial, limit),
+        ).fetchall()
+        return [(row["created_at"], row["message"]) for row in reversed(rows)]
 
 
 def _save_settings(conn: sqlite3.Connection, serial: str, settings: dict, now: str):

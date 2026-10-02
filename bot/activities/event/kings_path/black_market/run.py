@@ -53,7 +53,7 @@ def _buy(bot, path, done, target):
         return None
     bot.tap(*pos)
     if bot.wait_for(TITLE, timeout=SCREEN_WAIT) is None:
-        bot.log(f"{NAME}: Black Market screen not shown")
+        bot.record(f"{NAME}: Black Market screen not shown")
         return None
     progress = done or 0
     tried = set()        # món đã thử trong bộ hàng hiện tại
@@ -63,7 +63,7 @@ def _buy(bot, path, done, target):
             return _finish(bot, path, f"bought {progress} / {target}, done")
         screen = bot.screenshot()
         if bot.find(TITLE, screen=screen) is None:
-            bot.log(f"{NAME}: not on Black Market screen, stop")
+            bot.record(f"{NAME}: not on Black Market screen, stop")
             return None
         confirm = bot.find(CONFIRM, screen=screen)
         if confirm is not None and last == "buy":
@@ -81,13 +81,13 @@ def _buy(bot, path, done, target):
             continue
         if bot.find(INSTANT_REFRESH, screen=screen) is None:
             return _finish(bot, path, "nothing to buy and no Instant Refresh, done for today")
-        bot.log(f"{NAME}: all bought, Instant Refresh ({progress} / {target})")
+        bot.record(f"{NAME}: all bought, Instant Refresh ({progress} / {target})")
         if not _refresh(bot, screen):
-            bot.log(f"{NAME}: items did not change after {REFRESH_TRIES} refreshes, stop")
+            bot.record(f"{NAME}: items did not change after {REFRESH_TRIES} refreshes, stop")
             return None
         tried.clear()
         last = None
-    bot.log(f"{NAME}: too many steps, stop")
+    bot.record(f"{NAME}: too many steps, stop")
     return None
 
 

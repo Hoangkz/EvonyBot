@@ -71,7 +71,7 @@ def run(bot, settings: dict):
                                  targets=[(TITLE, ON_EGGS)], regions={TITLE: TITLE_REGION},
                                  icon_threshold=ICON_THRESHOLD)
     if result in (TAB_NOT_FOUND, ICON_NOT_FOUND):
-        bot.log(f"Crazy Eggs: {result} even after restarting game, mark done today")
+        bot.record(f"Crazy Eggs: {result} even after restarting game, mark done today")
         bot.mark_daily_done(DONE_KEY)
 
 
@@ -95,7 +95,7 @@ def _crack(bot, state: dict) -> bool:
         if _title_dim(bot, screen, title):
             dim_taps += 1
             if dim_taps > DIM_MAX_TAPS:
-                bot.log(f"Crazy Eggs: screen still dim after {DIM_MAX_TAPS} taps, back")
+                bot.record(f"Crazy Eggs: screen still dim after {DIM_MAX_TAPS} taps, back")
                 bot.back(delay=1)
                 dim_taps = 0
                 continue
@@ -121,7 +121,7 @@ def _crack(bot, state: dict) -> bool:
             state["before_tap"] = len(hammers)
             bot.tap(*pos, delay=EGG_TAP_DELAY)
             continue
-        bot.log("Crazy Eggs: out of hammers" if hammers else "Crazy Eggs: no egg left to crack")
+        bot.record("Crazy Eggs: out of hammers" if hammers else "Crazy Eggs: no egg left to crack")
         if not _use_lucky(bot, screen, state):
             return True
 
@@ -145,7 +145,7 @@ def _use_lucky(bot, screen, state: dict) -> bool:
     if egg_2 is None:
         bot.log("Crazy Eggs: egg 2 not waiting, Lucky Hammer not used")
         return False
-    bot.log(f"Crazy Eggs: Lucky Hammer on egg 2 at {egg_2}")
+    bot.record(f"Crazy Eggs: Lucky Hammer on egg 2 at {egg_2}")
     state["lucky_tapped"] = True
     bot.tap(*egg_2, delay=2)
     return True
@@ -165,7 +165,7 @@ def _confirm_lucky(bot, screen):
     """Hộp thoại búa vàng: bấm Confirm, lưu daily_done LUCKY_KEY."""
     pos = bot.find(LUCKY_CONFIRM, screen=screen, region=LUCKY_CONFIRM_REGION)
     if pos is None:
-        bot.log("Crazy Eggs: Lucky Hammer dialog without Confirm, back")
+        bot.record("Crazy Eggs: Lucky Hammer dialog without Confirm, back")
         bot.back(delay=1)
         return
     bot.log("Crazy Eggs: confirm Lucky Hammer")

@@ -20,7 +20,7 @@ def open_menu(bot, name: str, icons: dict[str, str]):
             pos = bot.find(icon, screen=screen)
             if pos is not None:
                 return key, pos
-    bot.log(f"{name}: menu icon not found")
+    bot.record(f"{name}: menu icon not found")
     return None, None
 
 
@@ -33,5 +33,5 @@ def open_building(bot, name: str, icon: str, screen: str) -> bool:
     bot.tap(*pos)
     if bot.wait_for(screen, timeout=SCREEN_WAIT) is not None:
         return True
-    bot.log(f"{name}: screen not shown after menu icon")
+    bot.record(f"{name}: screen not shown after menu icon")
     return False

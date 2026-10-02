@@ -71,6 +71,8 @@ class MainWindow(QMainWindow):
         self.bots.daily_task_done.connect(self.db.mark_daily_task_done)
         self.bots.bubble_found.connect(self._on_bubble_found)
         self.bots.bubble_disabled.connect(self._on_bubble_disabled)
+        self.bots.log_message.connect(self._on_log_message)
+        self.bots.history.connect(self._on_history)
         # Sub-tab index kept across devices, so switching device stays on
         # the same tab instead of jumping back to Initialization.
         self._current_tab_index = 0
@@ -138,6 +140,8 @@ class MainWindow(QMainWindow):
         self.home_view.update_device(
             device_id, server=view.initialization_tab.get_settings()["server"]
         )
+        for created_at, message in self.db.load_logs(device_id):
+            view.append_history(created_at, message)
 
         self.device_views[device_id] = view
         view.set_all_running(self._all_running())
@@ -248,6 +252,21 @@ class MainWindow(QMainWindow):
         view = self.device_views.get(device_id)
         if view is not None:
             view.initialization_tab.set_settings({"bubble": False})
+
+    def _on_log_message(self, device_id: str, message: str):
+        """Dòng log của bot -> tab Logs của thiết bị đó."""
+        view = self.device_views.get(device_id)
+        if view is not None:
+            view.append_log(message)
+
+    def _on_history(self, device_id: str, message: str):
+        """Sự kiện của bot (bắt đầu / xong / dừng nhiệm vụ, lỗi...) -> lưu DB (ghi nền, không chờ)
+        và hiện ở tab Logs > History."""
+        created_at = datetime.now().isoformat(timespec="seconds")
+        self.db.add_log(device_id, message, created_at)
+        view = self.device_views.get(device_id)
+        if view is not None:
+            view.append_history(created_at, message)
 
     def _on_exit_all_requested(self):
         # TODO: wire up to the actual automation/bot backend.

@@ -86,11 +86,11 @@ def run(bot, task: dict, state: EventState):
             if x100 is None:
                 return HANDLED   # chưa hiện nút nào: quét lại
             if done is None:
-                bot.log("Cultivate Generals: progress unknown, not using Cultivate x100")
+                bot.record("Cultivate Generals: progress unknown, not using Cultivate x100")
                 return STOP
             bot.tap(*x100)
             done += CULTIVATE_X100_TIMES
-            bot.log(f"Cultivate Generals: Cultivate x100 -> {done}/{TOTAL}")
+            bot.record(f"Cultivate Generals: Cultivate x100 -> {done}/{TOTAL}")
             if done >= TOTAL:
                 bot.mark_daily_done(KEY)
                 return STOP
@@ -150,7 +150,7 @@ def _read_done(bot, screen, go) -> int | None:
     dx, dy, w, h = PROGRESS_FROM_GO
     done = read_progress(bot.crop(screen, go[0] + dx, go[1] + dy, w, h))
     if done is None:
-        bot.log("Cultivate Generals: cannot read progress")
+        bot.record("Cultivate Generals: cannot read progress")
     else:
         bot.log(f"Cultivate Generals: done {done}, remaining {max(0, TOTAL - done)}")
     return done
@@ -167,4 +167,4 @@ def _open_last_general(bot):
     patch = bot.crop(bot.screenshot(), x - half, y - half, GENERAL_PATCH, GENERAL_PATCH)
     bot.tap(x, y)
     if wait_gone(bot, [(patch, _PATCH)], _PATCH, (x, y), timeout=GENERAL_OPEN_WAIT) is None:
-        bot.log("Cultivate Generals: general screen did not open")
+        bot.record("Cultivate Generals: general screen did not open")

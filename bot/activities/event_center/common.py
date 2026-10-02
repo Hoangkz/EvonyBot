@@ -65,11 +65,11 @@ def run_task(bot, name: str, tab: str, icon: str, handle, *, targets=(), regions
             return result
         if action == ON_EVENT_CENTER:
             if not open_tab(bot, screen, tab):
-                bot.log(f"{name}: tab {tab} not found")
+                bot.record(f"{name}: tab {tab} not found")
                 bot.back(delay=1)
                 return TAB_NOT_FOUND
             if not open_event(bot, icon, icon_threshold):
-                bot.log(f"{name}: event not found")
+                bot.record(f"{name}: event not found")
                 return ICON_NOT_FOUND
         elif action == ON_MAIN_SCREEN:
             open_event_center(bot, screen)
@@ -80,7 +80,7 @@ def run_task(bot, name: str, tab: str, icon: str, handle, *, targets=(), regions
         else:
             go_home(bot, screen)
             delay(bot)
-    bot.log(f"{name}: stopped after {MAX_STEPS} steps")
+    bot.record(f"{name}: stopped after {MAX_STEPS} steps")
     return None
 
 
@@ -95,7 +95,7 @@ def run_task_with_retry(bot, name: str, *args, **kwargs):
     result = None
     for restarted, attempts in ((False, ATTEMPTS), (True, AFTER_RESTART_ATTEMPTS)):
         if restarted:
-            bot.log(f"{name}: {result} after {ATTEMPTS} tries, restarting game")
+            bot.record(f"{name}: {result} after {ATTEMPTS} tries, restarting game")
             restart_game(bot)
         for attempt in range(1, attempts + 1):
             result = run_task(bot, name, *args, **kwargs)
@@ -107,6 +107,7 @@ def run_task_with_retry(bot, name: str, *args, **kwargs):
 
 def restart_game(bot):
     """Tắt game; lần quét sau thấy launcher -> go_home mở lại game."""
+    bot.record("Tắt game để khởi động lại")
     bot.shell(f"am force-stop {GAME_PACKAGE}")
     delay(bot, RESTART_WAIT)
 
@@ -152,7 +153,7 @@ def open_event(bot, icon: str, threshold: float = DEFAULT_THRESHOLD) -> bool:
             bot.tap(*pos, delay=3)
             return True
         if scroll < LIST_MAX_SCROLLS:
-            bot.swipe_percent(*LIST_SWIPE, duration=0.5, delay=1)
-    bot.log(f"Event Center: {icon} not found after {LIST_MAX_SCROLLS} scrolls")
+            bot.swipe_percent(*LIST_SWIPE, duration=0.5, delay=2)
+    bot.record(f"Event Center: {icon} not found after {LIST_MAX_SCROLLS} scrolls")
     bot.back(delay=1)
     return False

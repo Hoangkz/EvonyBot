@@ -114,7 +114,7 @@ def run_task(bot, state: EventState, name: str, event_icon: str, handle=None, *,
             continue
         # Màn danh sách event: tìm (cuộn tối đa 4 lần) rồi bấm icon event.
         if not open_event(bot, event_icon):
-            bot.log(f"{name}: event not found")
+            bot.record(f"{name}: event not found")
             return
         bot.log(f"{name}: event opened")
         if handle is None or handle(EVENT_OPENED, None, None) == STOP:
@@ -126,7 +126,7 @@ def claim_all(bot, state: EventState, pos):
     Back và đếm lại từ 0."""
     state.claim_all_taps += 1
     if state.claim_all_taps > CLAIM_ALL_MAX_TAPS:
-        bot.log(f"Event: Claim All still there after {CLAIM_ALL_MAX_TAPS} taps, back")
+        bot.record(f"Event: Claim All still there after {CLAIM_ALL_MAX_TAPS} taps, back")
         state.claim_all_taps = 0
         bot.back(delay=1)
         return
@@ -195,8 +195,8 @@ def open_event(bot, icon: str) -> bool:
             bot.tap(*pos, delay=3)
             return True
         if scroll < EVENT_LIST_MAX_SCROLLS:
-            bot.swipe_percent(*EVENT_LIST_SWIPE, duration=0.5, delay=1)
-    bot.log(f"Event: {icon} not found after {EVENT_LIST_MAX_SCROLLS} scrolls")
+            bot.swipe_percent(*EVENT_LIST_SWIPE, duration=0.5, delay=2)
+    bot.record(f"Event: {icon} not found after {EVENT_LIST_MAX_SCROLLS} scrolls")
     bot.back(delay=1)
     return False
 

@@ -19,6 +19,8 @@ class BotManager(QObject):
     daily_task_done = pyqtSignal(str, str)    # (serial, task Daily Activities vừa xong)
     bubble_found = pyqtSignal(str, int)       # (serial, giây bubble còn lại; 0 = không có)
     bubble_disabled = pyqtSignal(str)         # (serial) không đủ kim cương -> bỏ tích Bubble
+    log_message = pyqtSignal(str, str)        # (serial, dòng log) -> tab Logs > Info
+    history = pyqtSignal(str, str)            # (serial, sự kiện) -> lưu DB + tab Logs > History
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -36,6 +38,7 @@ class BotManager(QObject):
             return False
         if not activities:
             print(f"[{serial}] No activity selected")
+            self.log_message.emit(serial, "No activity selected")
             return False
 
         worker = BotWorker(serial, activities, settings, self,
@@ -47,6 +50,8 @@ class BotManager(QObject):
         worker.daily_task_done.connect(self.daily_task_done.emit)
         worker.bubble_found.connect(self.bubble_found.emit)
         worker.bubble_disabled.connect(self.bubble_disabled.emit)
+        worker.log_message.connect(self.log_message.emit)
+        worker.history.connect(self.history.emit)
         worker.finished.connect(lambda: self._on_finished(serial))
         self._workers[serial] = worker
         worker.start()

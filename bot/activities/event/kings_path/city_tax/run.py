@@ -61,7 +61,7 @@ def _tax(bot, path, done, target):
             continue
         if not _tax_row(bot, row, count):
             return
-    bot.log(f"{NAME}: all rows taxed, done")
+    bot.record(f"{NAME}: all rows taxed, done")
     bot.mark_daily_done(path.key)
 
 
@@ -69,12 +69,12 @@ def _tax_row(bot, row: int, count: int) -> bool:
     """Dòng thứ `row` (0..3) trên màn Tax: Tax -> popup -> gõ `count` -> Tax."""
     buttons = sorted(bot.find_all(ROW_TAX), key=lambda p: p[1])
     if len(buttons) < TAX_ROWS:
-        bot.log(f"{NAME}: {len(buttons)} Tax buttons found, expected {TAX_ROWS}")
+        bot.record(f"{NAME}: {len(buttons)} Tax buttons found, expected {TAX_ROWS}")
         return False
     bot.tap(*buttons[row])
     popup = bot.wait_for(POPUP, timeout=SCREEN_WAIT)
     if popup is None:
-        bot.log(f"{NAME}: Tax popup not shown (row {row + 1})")
+        bot.record(f"{NAME}: Tax popup not shown (row {row + 1})")
         return False
     dx, dy = POPUP_INPUT_OFFSET
     bot.tap(popup[0] + dx, popup[1] + dy, delay=1)
@@ -86,12 +86,12 @@ def _tax_row(bot, row: int, count: int) -> bool:
     bot.sleep(1)
     button = bot.find(POPUP_TAX)
     if button is None:
-        bot.log(f"{NAME}: popup Tax button not found (row {row + 1})")
+        bot.record(f"{NAME}: popup Tax button not found (row {row + 1})")
         return False
     bot.log(f"{NAME}: row {row + 1} tax x{count}")
     bot.tap(*button, delay=TAX_WAIT)
     if bot.wait_for(TAX_SCREEN, timeout=SCREEN_WAIT) is None:
-        bot.log(f"{NAME}: not back on Tax screen (row {row + 1})")
+        bot.record(f"{NAME}: not back on Tax screen (row {row + 1})")
         return False
     return True
 

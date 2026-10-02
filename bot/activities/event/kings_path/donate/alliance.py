@@ -50,7 +50,7 @@ def run(bot, task: dict):
     donated = donate_times(bot, NAME, target - done,
                            on_donate=lambda i: bot.mark_daily_done(alliance_key(done + i)))
     if done + donated >= target:
-        bot.log(f"{NAME}: donated {done + donated} / {target}, done")
+        bot.record(f"{NAME}: donated {done + donated} / {target}, done")
         bot.back(delay=1)
         bot.mark_daily_done(KEY)
 
@@ -89,5 +89,5 @@ def _open_science(bot) -> bool:
         else:
             go_home(bot, screen)
             delay(bot, 2)
-    bot.log(f"{NAME}: Alliance Science not reached")
+    bot.record(f"{NAME}: Alliance Science not reached")
     return False

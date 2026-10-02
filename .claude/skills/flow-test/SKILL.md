@@ -98,10 +98,13 @@ Mỗi `Step(screen, *actions)` nghĩa là: khi thiết bị đang hiển thị `
 9. Trạng thái có hạn dùng `time.monotonic()` (VD BossMemory) phải assert trong `with device.fake_time():`. Ra ngoài đồng hồ giả, nó bị so với giờ thật và coi như đã hết hạn.
 10. Ảnh biến thể: `Step("x.png?ten_bien_the", ...)` + `run_flow(..., variants={"ten_bien_the": fn})`, trong đó `fn(ảnh BGR) -> ảnh BGR`. Đây là **ảnh tổng hợp** cho trạng thái chưa có ảnh chụp thật (VD Join Boss: `war_off` xoá dấu tích ô War). Chỉ dùng khi phần bị sửa không liên quan tới điều đang test, và thay bằng ảnh thật khi có.
 
-Không dùng pytest. Chạy toàn bộ bằng:
+Không dùng pytest. **Chỉ chạy test của activity vừa sửa**; chạy toàn bộ chỉ khi người dùng yêu cầu (xem bảng trong skill
+`test-bot`, mục "Chỉ chạy test của phần vừa sửa"):
 
 ```powershell
-.\venv\Scripts\python.exe -m unittest discover -s tests -t . -v
+.\venv\Scripts\python.exe -m unittest discover -s tests/event_center -t . -v   # một activity / một thư mục
+.\venv\Scripts\python.exe -m unittest tests.event_center.crazy_eggs.test_flow -v # một file
+.\venv\Scripts\python.exe -m unittest discover -s tests -t . -v                # toàn bộ (~3 phút) — chỉ khi được yêu cầu
 ```
 
 `-t .` để `from tests.flow import ...` import được.

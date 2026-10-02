@@ -128,7 +128,7 @@ def keep_bubble(bot, bubble_type: str, renew_before: int) -> int | None:
         if action == CONFIRMED:
             confirms += 1
             if confirms > MAX_CONFIRMS:
-                bot.log("Bubble: quá nhiều popup Confirm, dừng")
+                bot.record("Bubble: quá nhiều popup Confirm, dừng")
                 return known
             bot.tap(*pos)
             delay(bot, 2)
@@ -141,20 +141,20 @@ def keep_bubble(bot, bubble_type: str, renew_before: int) -> int | None:
                 # Đã dùng: đọc thời gian mới.
                 remaining = _read(bot, screen, pos, USE_ITEM_BAR)
                 if remaining is not None and remaining > renew_before:
-                    bot.log(f"Bubble: đã dùng {bubble_type}, còn {remaining} giây")
+                    bot.record(f"Bubble: đã dùng {bubble_type}, còn {remaining} giây")
                     _leave(bot, 2)
                     return remaining
                 reads += 1
                 if reads >= READ_RETRIES:
                     # Không đọc được thời gian mới: tính theo loại vừa dùng.
-                    bot.log(f"Bubble: đã dùng {bubble_type}, không đọc được thời gian mới")
+                    bot.record(f"Bubble: đã dùng {bubble_type}, không đọc được thời gian mới")
                     _leave(bot, 2)
                     return BUBBLE_DURATIONS[bubble_type]
                 delay(bot, 1)
             else:
                 row = bot.find(image, threshold=TYPE_THRESHOLD, screen=screen, center=False)
                 if row is None:
-                    bot.log(f"Bubble: không thấy dòng {bubble_type} ở Use Item")
+                    bot.record(f"Bubble: không thấy dòng {bubble_type} ở Use Item")
                     _leave(bot, 2)
                     return known
                 bot.tap(row[0] + offset[0], row[1] + offset[1])
@@ -162,7 +162,7 @@ def keep_bubble(bot, bubble_type: str, renew_before: int) -> int | None:
         elif action == CITY_BUFF:
             remaining = _city_buff_time(bot, screen, pos)
             if remaining is None:
-                bot.log("Bubble: không đọc được thời gian ở City Buff")
+                bot.record("Bubble: không đọc được thời gian ở City Buff")
                 _leave(bot, 1)
                 return None
             known = remaining
@@ -192,5 +192,5 @@ def keep_bubble(bot, bubble_type: str, renew_before: int) -> int | None:
             go_home(bot, screen)
             delay(bot, 0.3)
         screen = bot.screenshot()
-    bot.log("Bubble: quá số vòng, dừng")
+    bot.record("Bubble: quá số vòng, dừng")
     return known

@@ -25,6 +25,10 @@ PATROL_TITLE = f"{KP}/Patrol/title.png"
 SELECT_ALL_OFF = f"{KP}/Patrol/selectAllOff.png"
 SELECT_ALL_ON = f"{KP}/Patrol/selectAllOn.png"
 SELECT_ALL_THRESHOLD = 0.95
+# Chỉ ô tích (bên trái ảnh, tâm cách góc trên-trái ảnh ~ (12, 12)) bấm được; bấm vào chữ
+# "Select All" (tâm ảnh) không có tác dụng. Bấm SELECT_ALL_TRIES lần vẫn chưa tích -> dừng.
+SELECT_ALL_BOX = (12, 12)
+SELECT_ALL_TRIES = 3
 # Nút "Patrol" (287, 660; tích hết thì tốn kim cương, VD 300) và "Refresh" (107, 660; 1000 vàng,
 # ra bộ phần thưởng mới để patrol lượt tiếp): 1,00; màn khác <= 0,52.
 PATROL_BUTTON = f"{KP}/Patrol/patrolButton.png"

@@ -160,7 +160,7 @@ def run(bot, task: dict, state: EventState, troop: TroopTask):
         """Lần đầu ở màn Gather Troops trong lượt này: Day khoá -> lưu, STOP."""
         progress["entered"] = True
         if day_locked(bot, screen, day):
-            bot.log(f"{name}: Day {day} locked, cannot do this task yet")
+            bot.record(f"{name}: Day {day} locked, cannot do this task yet")
             bot.mark_daily_done(locked_key)
             return STOP
         return None
@@ -191,7 +191,7 @@ def run(bot, task: dict, state: EventState, troop: TroopTask):
                 return STOP
             done = read_go_progress(bot, screen, go)
             if done is None:
-                bot.log(f"{name}: cannot read progress")
+                bot.record(f"{name}: cannot read progress")
             else:
                 bot.log(f"{name}: done {done}, remaining {max(0, target - done)}")
             bot.tap(*go, delay=GO_WAIT)
@@ -219,7 +219,7 @@ def run(bot, task: dict, state: EventState, troop: TroopTask):
                 tier = (choose_first_tier(bot, troop.tiers) if troop.first_tier
                         else choose_tier(bot, troop.tiers, level, troop.lowest))
                 if tier is None:
-                    bot.log(f"{name}: tier {troop.lowest} locked, cannot do this task yet")
+                    bot.record(f"{name}: tier {troop.lowest} locked, cannot do this task yet")
                     bot.mark_daily_done(locked_key)
                     return STOP
                 goal = target if tier == level else targets_by_tier.get(tier, 0)
@@ -293,7 +293,7 @@ def _plan_batches(bot, plan: _Plan, count: int, name: str, key: str) -> bool:
         return False
     batch = read_train_count(bot.crop(bot.screenshot(), *TRAIN_COUNT_BOX))
     if not batch:
-        bot.log(f"{name}: cannot read train count")
+        bot.record(f"{name}: cannot read train count")
         return False
     plan.times = math.ceil(count / batch)
     bot.log(f"{name}: {batch} per batch -> {plan.times} batch(es)")
@@ -312,7 +312,7 @@ def _train_step(bot, plan: _Plan, name: str, key: str):
     elif train is None:
         bot.tap(*TRAIN_BUTTON_POS, delay=BUTTON_WAIT)     # không nhận ra nút: bấm chỗ nút
     elif plan.started >= plan.times:
-        bot.log(f"{name}: trained {plan.started} batch(es), done")
+        bot.record(f"{name}: trained {plan.started} batch(es), done")
         bot.mark_daily_done(key)
         return STOP
     else:

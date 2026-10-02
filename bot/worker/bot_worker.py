@@ -12,8 +12,10 @@ Thứ tự ưu tiên: Bubble > Join Boss > nhiệm vụ (scheduler.py, độ ưu
   nhiệm vụ đã xong lại tới lượt.
 - Chỉ chọn mỗi Join Boss: chạy Join Boss liên tục như trước.
 """
+import os
 import threading
 import time
+import traceback
 from datetime import datetime
 
 from PyQt5.QtCore import QThread, pyqtSignal
@@ -23,7 +25,7 @@ from ..activities.join_monster_war import IDLE as BOSS_IDLE
 from ..common import NotEnoughGems, get_server, keep_bubble
 from ..daily_reset import done_today, last_reset
 from ..context import BotContext, BotInterrupted, TimedOut
-from ..context.errors import BossAvailable, BubbleDue, YieldToBoss
+from ..context.errors import BossAvailable, BubbleDue, StopRequested, YieldToBoss
 from .scheduler import Scheduler
 from .server_clock import ServerClock
 from .tasks import build_tasks, load_priorities
@@ -45,6 +47,14 @@ def _seconds_until(iso) -> float | None:
         return None
 
 
+def _describe_error(e: Exception, activity: str | None) -> str:
+    """Dòng lịch sử cho lỗi làm bot dừng: activity đang chạy, loại lỗi, nội dung, file:dòng nơi lỗi."""
+    frames = traceback.extract_tb(e.__traceback__)
+    where = f" (tại {os.path.basename(frames[-1].filename)}:{frames[-1].lineno})" if frames else ""
+    during = f" khi chạy {activity}" if activity else ""
+    return f"Lỗi{during}: {type(e).__name__}: {e}{where} -> bot dừng"
+
+
 # Điều phối activity của một thiết bị trên QThread riêng.
 class BotWorker(QThread):
     # Gửi serial kèm dữ liệu để UI cập nhật đúng thiết bị.
@@ -55,6 +65,8 @@ class BotWorker(QThread):
     daily_task_done = pyqtSignal(str, str)    # (serial, task Daily Activities vừa xong)
     bubble_found = pyqtSignal(str, int)       # (serial, giây bubble còn lại; 0 = không có)
     bubble_disabled = pyqtSignal(str)         # (serial) không đủ kim cương -> bỏ tích Bubble
+    log_message = pyqtSignal(str, str)        # (serial, dòng log) -> tab Logs > Info
+    history = pyqtSignal(str, str)            # (serial, sự kiện) -> lưu DB + tab Logs > History
 
     def __init__(self, serial: str, activities: list[str], settings: dict, parent=None, *,
                  boss_board=None, daily_done: dict | None = None, server_clock: ServerClock | None = None):
@@ -69,6 +81,7 @@ class BotWorker(QThread):
         self.server = settings.get("Initialization", {}).get("server") or ""
         # Cờ Stop dùng chung giữa UI và BotContext.
         self._stop = threading.Event()
+        self._current = None   # activity đang chạy, để ghi vào lịch sử khi có lỗi
         # Giờ reset server chọn ở màn Home, dùng chung mọi thiết bị (BotManager giữ; thiếu thì dùng riêng).
         self.server_clock = server_clock if server_clock is not None else ServerClock()
         # {task: done_at} lấy từ DB; task chỉ tính là xong nếu done_at sau mốc reset gần nhất.
@@ -93,6 +106,7 @@ class BotWorker(QThread):
     def run(self):
         # Điểm vào khi worker.start(): báo UI đang chạy.
         self.status_changed.emit(self.serial, STATUS_RUNNING)
+        self.record(f"Bắt đầu chạy bot: {', '.join(self.activities)}")
         # Hoàn thành bình thường hoặc Stop đều có trạng thái cuối là Stopped.
         status = STATUS_STOPPED
         try:
@@ -106,6 +120,7 @@ class BotWorker(QThread):
             self.ctx.report_boss = self._report_boss
             self.ctx.is_daily_done = self._is_daily_done
             self.ctx.mark_daily_done = self._mark_daily_done
+            self.ctx.record = self.record
             self._register_boss_listener()
             self._run_tasks()
         # Ngắt có chủ đích (Stop/timeout truyền tới đây) không xem là lỗi.
@@ -114,11 +129,14 @@ class BotWorker(QThread):
         # Lỗi ngoài dự kiến: dừng lượt chạy và báo nội dung lỗi.
         except Exception as e:
             status = f"{STATUS_ERROR}: {e}"
-            print(f"[{self.serial}] {status}")
+            self.log(traceback.format_exc().rstrip())
+            self.record(_describe_error(e, self._current))
         # Luôn xóa activity đang hiển thị và báo trạng thái cuối, kể cả khi lỗi.
         finally:
             if self.boss_board is not None:
                 self.boss_board.unregister(self.serial)
+            if status == STATUS_STOPPED:
+                self.record("Bot đã dừng")
             self.activity_changed.emit(self.serial, "None")
             self.status_changed.emit(self.serial, status)
 
@@ -160,7 +178,7 @@ class BotWorker(QThread):
         result = self._run_activity(JOIN_BOSS, {**self.settings.get(JOIN_BOSS, {}), "exit_when_idle": True})
         if result == BOSS_IDLE:
             return True
-        self.log("Join Monster War stopped; continuing with the other tasks")
+        self.record("Join Monster War dừng; chạy tiếp các nhiệm vụ khác")
         return False
 
     def _run_task(self, scheduler: Scheduler, task, boss: bool) -> bool:
@@ -175,17 +193,23 @@ class BotWorker(QThread):
             self._with_bubble(None, self.ctx.check)
             self.activity_changed.emit(self.serial, task.group)
             scheduler.started(task)
+            self.record(f"Bắt đầu: {task.key}")
             self._run_activity(task.group, self.settings.get(task.group, {}))
             scheduler.finished(task)
+            self.record(f"Xong: {task.key}")
             return True
         # Bị ngắt: lượt sau gọi lại từ đầu hàm run(); worker không lưu điểm thực thi.
         except TimedOut:
+            self.record(f"Tạm dừng: {task.key} (hết {OTHERS_WINDOW} giây, quay lại Join Monster War)")
             return False    # hết OTHERS_WINDOW giây
         except YieldToBoss:
             return False    # activity vừa xong 1 nhiệm vụ con -> kiểm tra boss ngay, lượt sau làm tiếp
         except BossAvailable:
-            self.log("New boss on this server; switching to Join Monster War")
+            self.record(f"Tạm dừng: {task.key} (có boss mới, chuyển sang Join Monster War)")
             return False
+        except StopRequested:
+            self.record(f"Dừng: {task.key} (người dùng bấm Stop)")
+            raise
         # Luôn gỡ deadline, kể cả khi Stop/lỗi, để không ảnh hưởng lượt chạy boss.
         finally:
             self.ctx._boss_interrupt_enabled = False
@@ -206,6 +230,7 @@ class BotWorker(QThread):
         server = self._with_bubble("Get Server", get_server, self.ctx)
         if server:
             self.server = server
+            self.record(f"Đọc được server: {server}")
             self._register_boss_listener()
             # Gửi server cho UI xử lý/lưu; worker chỉ cập nhật self.server.
             self.server_found.emit(self.serial, server)
@@ -242,7 +267,7 @@ class BotWorker(QThread):
                 remaining = keep_bubble(ctx, self.bubble_type, BUBBLE_RENEW_BEFORE)
             except NotEnoughGems:
                 # Không mua được thì thôi giữ bubble: bỏ tích ở UI, không thử lại nữa.
-                self.log(f"Bubble: không đủ kim cương mua {self.bubble_type}, bỏ tích Bubble")
+                self.record(f"Bubble: không đủ kim cương mua {self.bubble_type}, bỏ tích Bubble")
                 self.bubble_enabled = False
                 self.settings.setdefault("Initialization", {})["bubble"] = False
                 self.bubble_disabled.emit(self.serial)
@@ -278,6 +303,7 @@ class BotWorker(QThread):
     def _mark_daily_done(self, task: str):
         self.daily_done[task] = datetime.now().isoformat(timespec="seconds")
         self.daily_task_done.emit(self.serial, task)
+        self.record(f"Hoàn thành: {task}")
 
     def _register_boss_listener(self):
         if self.boss_board is not None and JOIN_BOSS in self.activities:
@@ -288,6 +314,7 @@ class BotWorker(QThread):
             self.boss_board.publish(self.serial, self.server, coords)
 
     def _run_activity(self, activity: str, tab_settings: dict):
+        self._current = activity
         # Tra registry để lấy hàm run theo tên activity.
         run = ACTIVITIES.get(activity)
         # Tên không tồn tại: ghi log, chờ ngắn rồi bỏ qua; ctx.sleep vẫn kiểm tra Stop/timeout.
@@ -300,5 +327,11 @@ class BotWorker(QThread):
         return self._with_bubble(activity, run, self.ctx, tab_settings)
 
     def log(self, message: str):
-        # Gắn serial vào log để phân biệt các thiết bị.
+        # Gắn serial vào log để phân biệt các thiết bị; gửi thêm lên tab Logs của thiết bị.
         print(f"[{self.serial}] {message}")
+        self.log_message.emit(self.serial, message)
+
+    def record(self, message: str):
+        # Sự kiện đáng lưu (bắt đầu / xong / dừng nhiệm vụ...): vừa là log thường, vừa lưu DB (History).
+        self.log(message)
+        self.history.emit(self.serial, message)

@@ -5,10 +5,33 @@ description: Viết và chạy unit test cho EvonyBot không cần giả lập �
 
 # Test EvonyBot
 
-Chạy từ thư mục gốc (Windows):
+## Chỉ chạy test của phần vừa sửa (bắt buộc)
+
+Chạy toàn bộ (`discover -s tests`) mất khoảng 3 phút. **Sửa code phần nào thì chỉ chạy test của phần đó; chỉ chạy
+toàn bộ khi người dùng yêu cầu** (người dùng chốt), kể cả khi sửa phần dùng chung (`bot/context/`, `bot/common/`,
+`database.py`, `tests/flow.py`) — khi đó chạy test của các phần dùng nó mà mình biết, và nói rõ chưa chạy toàn bộ.
+
+| Sửa ở | Chạy |
+| --- | --- |
+| `bot/worker/` (bot_worker, scheduler, tasks, server_clock, boss_board), `bot/daily_reset.py`, `main.py` | `tests.test_scheduler tests.test_boss_notifications tests.test_bubble tests.test_server_clock` |
+| `bot/common/bubble.py` | `tests.test_bubble tests.bubble` |
+| `bot/common/wait_gone.py` | `tests.test_wait_gone` |
+| `bot/context/screen.py` | `tests.test_screen` |
+| `database.py` | `tests.test_server_clock tests.test_bubble` (phần DB / migration) |
+| `ui/home_view.py` | `tests.test_server_clock` (ô Reset Time) |
+| `bot/activities/<activity>/` | `tests.<activity>` (VD `tests.join_monster_war`, `tests.alliance_capacity`) |
+| `bot/activities/event/` | `tests.event` (hoặc hẹp hơn: `tests.event.gather_troops.<nhiệm vụ>`, `tests.event.kings_path`, `tests.event.test_claim`) |
+| `bot/activities/event_center/` | `tests.event_center` (VD `tests.event_center.crazy_eggs`) |
+
+Lệnh (từ thư mục gốc, Windows); nhiều module cách nhau bằng dấu cách:
 ```powershell
-.\venv\Scripts\python.exe -m unittest discover -s tests -t . -v
+.\venv\Scripts\python.exe -m unittest tests.test_scheduler tests.test_boss_notifications -v
+.\venv\Scripts\python.exe -m unittest discover -s tests/event_center -t . -v     # cả một thư mục
+.\venv\Scripts\python.exe -m unittest discover -s tests -t . -v                  # toàn bộ (~3 phút)
 ```
+Đẩy stdout ra file thì thêm `PYTHONIOENCODING=utf-8`, không thì log tiếng Việt lỗi `UnicodeEncodeError`.
+
+Chạy thật trên giả lập (không phải unit test): `venv\Scripts\poe test` chạy `target()` trong `tests/real_run.py`.
 
 Test flow chính của activity theo chuỗi ảnh chụp màn hình (`tests/<activity>/screens/` + `tests/flow.py`) có skill riêng: `flow-test`. Skill này chỉ nói về unit test logic (worker, BossBoard, context, OCR...).
 Dùng `unittest` chuẩn, không có pytest. File test đặt ở `tests/test_*.py`; thư mục con trong `tests/` cần `__init__.py` thì discover mới thấy.

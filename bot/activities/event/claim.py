@@ -64,7 +64,7 @@ def maybe_claim(bot, state: EventState, event: str, name: str, icon: str, keys: 
     key = claim_key(event, done_count)
     if bot.is_daily_done(key):
         return
-    bot.log(f"{name}: {done_count} task(s) done, claiming rewards")
+    bot.record(f"{name}: {done_count} task(s) done, claiming rewards")
     run(bot, state, name, icon, CHESTS.get(event, ()), TITLES.get(event))
     bot.mark_daily_done(key)
 
@@ -110,7 +110,7 @@ def _claim_dots(bot, state: EventState, name: str):
             continue
         bot.log(f"{name}: no red dots left")
         return
-    bot.log(f"{name}: claim stopped after {CLAIM_MAX_STEPS} steps")
+    bot.record(f"{name}: claim stopped after {CLAIM_MAX_STEPS} steps")
 
 
 def _claim_chests(bot, name: str, chests):
@@ -118,7 +118,7 @@ def _claim_chests(bot, name: str, chests):
     screen = bot.screenshot()
     done = read_milestone(bot.crop(screen, *MILESTONE_BOX), total=chests[-1][1])
     if done is None:
-        bot.log(f"{name}: cannot read milestone progress, chests skipped")
+        bot.record(f"{name}: cannot read milestone progress, chests skipped")
         return
     for (x, y), milestone in chests:
         if milestone > done:
@@ -126,7 +126,7 @@ def _claim_chests(bot, name: str, chests):
         area = bot.crop(screen, x - CHEST_HALF, y - CHEST_HALF, 2 * CHEST_HALF, 2 * CHEST_HALF)
         if bot.find(CHEST_TICK, threshold=CHEST_TICK_THRESHOLD, screen=area) is not None:
             continue
-        bot.log(f"{name}: claim chest {milestone} (progress {done})")
+        bot.record(f"{name}: claim chest {milestone} (progress {done})")
         bot.tap(x, y, delay=1)
         _wait_congratulations_gone(bot)
 

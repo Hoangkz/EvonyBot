@@ -36,15 +36,15 @@ NAME = "Donate"
 def _donate(bot, path, done, target):
     """Sau Go: donate (mục tiêu - số đã làm) lần ở màn Alliance Science."""
     if done is None:
-        bot.log(f"{NAME}: progress unknown, not donating")
+        bot.record(f"{NAME}: progress unknown, not donating")
         return
     if bot.wait_for(SCIENCE_TITLE, timeout=SCIENCE_WAIT) is None:
-        bot.log(f"{NAME}: Alliance Science not shown")
+        bot.record(f"{NAME}: Alliance Science not shown")
         return
     need = target - done
     donated = donate_times(bot, NAME, need)
     if donated >= need:
-        bot.log(f"{NAME}: donated {donated}, done")
+        bot.record(f"{NAME}: donated {donated}, done")
         bot.mark_daily_done(path.key)
 
 

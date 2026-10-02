@@ -56,10 +56,10 @@ def run(bot, settings: dict):
                 continue
             bot.check()
             was_done = bot.is_daily_done(key)
-            bot.log(f"Event: task {key}")
+            bot.record(f"Event: bắt đầu {key}")
             run_task(bot, task, state)
             if not was_done and bot.is_daily_done(key):
-                bot.log(f"Event: task {key} done")
+                bot.record(f"Event: xong {key}")
                 bot.yield_to_boss()
         bot.check()
         claim.maybe_claim(bot, state, event, name, icon, [key for key, _ in tasks])

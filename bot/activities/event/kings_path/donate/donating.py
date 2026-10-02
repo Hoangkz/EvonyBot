@@ -26,7 +26,7 @@ def donate_times(bot, name: str, need: int, on_donate=None) -> int:
         if action is None:
             misses += 1
             if misses > MAX_MISSES:
-                bot.log(f"{name}: screen not recognised, stop ({donated}/{need})")
+                bot.record(f"{name}: screen not recognised, stop ({donated}/{need})")
                 return donated
             bot.sleep(1)
             continue
@@ -40,10 +40,10 @@ def donate_times(bot, name: str, need: int, on_donate=None) -> int:
                 on_donate(donated)
         else:
             if gem_buys >= MAX_GEM_BUYS:
-                bot.log(f"{name}: bought donations {MAX_GEM_BUYS} times, stop ({donated}/{need})")
+                bot.record(f"{name}: bought donations {MAX_GEM_BUYS} times, stop ({donated}/{need})")
                 return donated
             gem_buys += 1
-            bot.log(f"{name}: out of donations, buy with gems ({gem_buys}/{MAX_GEM_BUYS})")
+            bot.record(f"{name}: out of donations, buy with gems ({gem_buys}/{MAX_GEM_BUYS})")
             bot.tap(*pos, delay=GEMS_WAIT)
     return donated
 

@@ -37,13 +37,13 @@ def _spin(bot, path, done, target):
         screen = bot.screenshot()
         spin_100 = bot.find(SPINS_100, screen=screen, region=SPINS_REGION)
         if spin_100 is not None:
-            bot.log(f"{NAME}: 100 Spins, back, done")
+            bot.record(f"{NAME}: 100 Spins, back, done")
             bot.tap(*spin_100, delay=SPIN_100_WAIT)
             bot.back(delay=BUTTON_WAIT)
             bot.mark_daily_done(path.key)
             return
         if bot.find(CHIPS_TITLE, screen=screen) is not None:
-            bot.log(f"{NAME}: out of chips after {spins_10} x 10 Spins, done for today")
+            bot.record(f"{NAME}: out of chips after {spins_10} x 10 Spins, done for today")
             bot.back(delay=BUTTON_WAIT)
             bot.mark_daily_done(path.key)
             return
@@ -55,10 +55,10 @@ def _spin(bot, path, done, target):
             continue
         misses += 1
         if misses > WHEEL_WAIT:
-            bot.log(f"{NAME}: Wheel of Fortune not shown")
+            bot.record(f"{NAME}: Wheel of Fortune not shown")
             return
         bot.sleep(1)
-    bot.log(f"{NAME}: too many steps ({spins_10} x 10 Spins), stop")
+    bot.record(f"{NAME}: too many steps ({spins_10} x 10 Spins), stop")
 
 
 PATH = path_task.PathTask(

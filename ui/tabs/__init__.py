@@ -5,6 +5,7 @@ from .daily_activities_tab import DailyActivitiesTab
 from .event_tab import EventTab
 from .initialization_tab import InitializationTab
 from .join_monster_war_tab import JoinMonsterWarTab
+from .logs_tab import LogsTab
 from .open_gift_box_tab import OpenGiftBoxTab
 from .tab_placeholder import BaseTab, CheckGroup, LabeledCombo, PlaceholderTab, RadioGroup
 
@@ -16,6 +17,7 @@ __all__ = [
     "EventTab",
     "InitializationTab",
     "JoinMonsterWarTab",
+    "LogsTab",
     "OpenGiftBoxTab",
     "BaseTab",
     "CheckGroup",

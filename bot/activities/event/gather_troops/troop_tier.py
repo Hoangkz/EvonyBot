@@ -119,7 +119,7 @@ def choose_tier(bot, tiers, want: int, lowest: int) -> int | None:
         screen = bot.screenshot()
         circles = visible_circles(bot, screen, tiers)
         if not circles:
-            bot.log("Train: tier row not found")
+            bot.record("Train: tier row not found")
             return None
         center = next((c for c in circles if abs(c.x - TIER_CENTER_X) <= TIER_CENTER_TOLERANCE),
                       None)
@@ -137,7 +137,7 @@ def choose_tier(bot, tiers, want: int, lowest: int) -> int | None:
             return goal
         target = _next_tap(circles, locked, goal, kinds)
         bot.tap(target.x, target.y, delay=TAP_DELAY)
-    bot.log("Train: cannot choose tier")
+    bot.record("Train: cannot choose tier")
     return None
 
 
@@ -150,7 +150,7 @@ def choose_first_tier(bot, tiers) -> int | None:
     for _ in range(MAX_STEPS):
         circles = visible_circles(bot, bot.screenshot(), tiers)
         if not circles:
-            bot.log("Train: tier row not found")
+            bot.record("Train: tier row not found")
             return None
         leftmost = circles[0]
         bot.tap(leftmost.x, leftmost.y, delay=TAP_DELAY)
@@ -160,7 +160,7 @@ def choose_first_tier(bot, tiers) -> int | None:
             bot.log(f"Train: tier {first} cannot be trained")
             return None
         return first
-    bot.log("Train: cannot choose first tier")
+    bot.record("Train: cannot choose first tier")
     return None
 
 

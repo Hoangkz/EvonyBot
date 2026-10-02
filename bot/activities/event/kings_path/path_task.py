@@ -102,7 +102,7 @@ def run(bot, task: dict, state: EventState, path: PathTask):
         """Lần đầu ở màn King's Path trong lượt này: Day khoá -> lưu, STOP."""
         progress["entered"] = True
         if day_locked(bot, screen, day):
-            bot.log(f"{name}: Day {day} locked, cannot do this task yet")
+            bot.record(f"{name}: Day {day} locked, cannot do this task yet")
             bot.mark_daily_done(path.locked_key)
             return STOP
         return None
@@ -125,21 +125,21 @@ def run(bot, task: dict, state: EventState, path: PathTask):
         elif action == ON_TAB:
             go = _find_go(bot, screen, path)
             if go is None:
-                bot.log(f"{name}: no Go left, done")
+                bot.record(f"{name}: no Go left, done")
                 bot.mark_daily_done(key)
                 return STOP
             done = read_go_progress(bot, screen, go)
             if done is None:
-                bot.log(f"{name}: cannot read progress")
+                bot.record(f"{name}: cannot read progress")
             else:
                 bot.log(f"{name}: done {done}, target {target}")
                 if done >= target:
-                    bot.log(f"{name}: target reached, done")
+                    bot.record(f"{name}: target reached, done")
                     bot.mark_daily_done(key)
                     return STOP
             bot.tap(*go, delay=GO_WAIT)
             if path.after_go is None:
-                bot.log(f"{name}: after Go not implemented yet, stop")
+                bot.record(f"{name}: after Go not implemented yet, stop")
                 return STOP
             if path.after_go(bot, path, done, target) == AGAIN:
                 progress["again"] += 1
