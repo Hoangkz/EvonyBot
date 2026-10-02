@@ -36,6 +36,18 @@ class ScreenMixin:
         return image[y:y + max(h, 0), x:x + max(w, 0)].copy()
 
     @staticmethod
+    def _region(screen: np.ndarray, region) -> tuple[np.ndarray, int, int]:
+        """(phần ảnh trong `region`, x, y góc trên-trái của phần đó trên `screen`).
+        `region` = (x0, y0, x1, y1) theo % màn hình, VD: (0, 70, 100, 100) là
+        dải dưới cùng 30 %; None = cả màn hình."""
+        if region is None:
+            return screen, 0, 0
+        h, w = screen.shape[:2]
+        x0, y0, x1, y1 = region
+        left, top = int(w * x0 / 100), int(h * y0 / 100)
+        return screen[top:int(h * y1 / 100), left:int(w * x1 / 100)], left, top
+
+    @staticmethod
     def _match(screen: np.ndarray, tpl: np.ndarray):
         """matchTemplate scores, or None if the template can't fit on screen."""
         if (tpl.size == 0 or tpl.shape[0] > screen.shape[0] or tpl.shape[1] > screen.shape[1]):
@@ -48,39 +60,61 @@ class ScreenMixin:
         return w, h
 
     def find(self, template: "str | np.ndarray", threshold: float = DEFAULT_THRESHOLD,
-             screen: np.ndarray | None = None, center: bool = True):
+             screen: np.ndarray | None = None, center: bool = True, region=None):
         """Position of `template` (path under Images/, or an image) on screen,
-        or None. Returns its center, or its top-left corner with center=False."""
+        or None. Returns its center, or its top-left corner with center=False.
+        `region` = (x0, y0, x1, y1) theo % màn hình: chỉ tìm trong vùng đó (nhanh
+        hơn, ít khớp nhầm); toạ độ trả về vẫn là toạ độ trên cả màn hình."""
         screen = self.screenshot() if screen is None else screen
+        area, ox, oy = self._region(screen, region)
         tpl = self._template(template)
-        result = self._match(screen, tpl)
+        result = self._match(area, tpl)
         if result is None:
             return None
         _, max_val, _, max_loc = cv2.minMaxLoc(result)
         if max_val < threshold:
             return None
+        x, y = max_loc[0] + ox, max_loc[1] + oy
         if not center:
-            return max_loc
+            return x, y
         h, w = tpl.shape[:2]
-        return max_loc[0] + w // 2, max_loc[1] + h // 2
+        return x + w // 2, y + h // 2
+
+    def best_match(self, template: "str | np.ndarray", screen: np.ndarray | None = None,
+                   region=None) -> tuple[float, tuple[int, int] | None]:
+        """(điểm khớp cao nhất, tâm chỗ khớp) của `template`, kể cả khi dưới mọi ngưỡng —
+        để so sánh nhiều ảnh mẫu tại cùng một chỗ. (0, None) nếu ảnh mẫu không vừa."""
+        screen = self.screenshot() if screen is None else screen
+        area, ox, oy = self._region(screen, region)
+        tpl = self._template(template)
+        result = self._match(area, tpl)
+        if result is None:
+            return 0.0, None
+        _, max_val, _, (x, y) = cv2.minMaxLoc(result)
+        h, w = tpl.shape[:2]
+        return float(max_val), (x + ox + w // 2, y + oy + h // 2)
 
     def find_all(self, template: "str | np.ndarray", threshold: float = DEFAULT_THRESHOLD,
-                 screen: np.ndarray | None = None, center: bool = True) -> list[tuple[int, int]]:
+                 screen: np.ndarray | None = None, center: bool = True,
+                 region=None) -> list[tuple[int, int]]:
         """Every match of `template` on screen (overlapping hits merged): their
-        centers, or their top-left corners with center=False."""
+        centers, or their top-left corners with center=False. `region` như find()."""
         screen = self.screenshot() if screen is None else screen
+        area, ox, oy = self._region(screen, region)
         tpl = self._template(template)
         h, w = tpl.shape[:2]
-        result = self._match(screen, tpl)
+        result = self._match(area, tpl)
         if result is None:
             return []
         ys, xs = np.where(result >= threshold)
         # Best scores first, then drop hits that overlap one already kept.
         hits = sorted(zip(xs, ys), key=lambda p: result[p[1], p[0]], reverse=True)
+        # Compared in the area's own coordinates; offset to the screen afterwards.
         kept: list[tuple[int, int]] = []
         for x, y in hits:
             if all(abs(x - kx) >= w // 2 or abs(y - ky) >= h // 2 for kx, ky in kept):
                 kept.append((int(x), int(y)))
+        kept = [(x + ox, y + oy) for x, y in kept]
         if not center:
             return kept
         return [(x + w // 2, y + h // 2) for x, y in kept]

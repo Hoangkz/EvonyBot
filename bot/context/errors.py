@@ -13,3 +13,7 @@ class StopRequested(BotInterrupted):
 
 class TimedOut(BotInterrupted):
     pass
+
+
+class BossAvailable(BotInterrupted):
+    """Yield a secondary activity to a new boss on the same server."""

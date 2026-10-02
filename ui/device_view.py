@@ -28,6 +28,8 @@ class DeviceView(QWidget):
     # onto every other device.
     apply_all_requested = pyqtSignal(str, dict)
     server_changed = pyqtSignal(str, str)   # (device_id, server)
+    # (device_id, {tab title: settings}) — một tab có `settings_changed` vừa được người dùng sửa.
+    tab_settings_changed = pyqtSignal(str, dict)
 
     def __init__(self, device_id: str, parent=None):
         super().__init__(parent)
@@ -70,6 +72,11 @@ class DeviceView(QWidget):
         self.tabs.addTab(widget, title)
         widget.setProperty("tab_title", title)
         widget.apply_all_clicked.connect(self._on_apply_all)
+        if hasattr(widget, "settings_changed"):
+            widget.settings_changed.connect(
+                lambda: self.tab_settings_changed.emit(self.device_id,
+                                                       {title: widget.get_settings()})
+            )
 
     def _on_apply_all(self):
         # Every tab's Apply ALL copies this device's whole config (all

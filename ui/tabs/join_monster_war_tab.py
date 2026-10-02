@@ -1,116 +1,265 @@
-"""
-join_monster_war_tab.py — 1:1 rebuild of tabPage2 ("Join Monster War")
-from Form3_Designer.cs.
-"""
-from .tab_placeholder import DesignerTab
+"""Compact Join Monster War settings with responsive boss groups."""
+import json
+from pathlib import Path
 
-DESIGNER_DATA = {
-    "BuyHammer": {"loc": [37, 110], "size": [142, 28], "text": "Buy Hammer", "type": "CheckBox"},
-    "ChoiceSatamina": {"children": ["radioButton9", "radioButton12", "radioButton10"],
-                        "loc": [33, 39], "size": [273, 49], "type": "Panel"},
-    "ChoiceTroop": {"children": ["radioButton5", "radioButton6", "radioButton2", "radioButton7",
-                                  "radioButton3", "radioButton8", "radioButton1", "radioButton4"],
-                     "loc": [32, 39], "size": [655, 94], "type": "Panel"},
-    "buttonJoinBossApplyAll": {"loc": [935, 16], "size": [132, 43], "text": "Apply ALL", "type": "Button"},
-    "checkBoxViking": {"loc": [59, 61], "size": [84, 28], "text": "Viking", "type": "CheckBox"},
-    "comboBoxBuyStamina": {"loc": [168, 103], "size": [84, 30], "type": "ComboBox"},
-    "comboBoxCrazyEggs": {"loc": [161, 48], "size": [53, 30], "type": "ComboBox"},
-    "groupBoss": {"children": ["checkBoxViking"], "loc": [20, 235], "size": [437, 228],
-                  "text": "Setting", "type": "GroupBox"},
-    "groupBox1": {"children": ["ChoiceTroop"], "loc": [20, 66], "size": [711, 150],
-                  "text": "Troop", "type": "GroupBox"},
-    "groupBox14": {"children": ["BuyHammer", "comboBoxCrazyEggs", "label6"], "loc": [463, 235],
-                   "size": [268, 228], "text": "Crazy Eggs", "type": "GroupBox"},
-    "groupBox3": {"children": ["panelSpeedMarching"], "loc": [737, 235], "size": [325, 228],
-                  "text": "Speed Marching", "type": "GroupBox"},
-    "groupBox4": {"children": ["label7", "comboBoxBuyStamina", "ChoiceSatamina"], "loc": [737, 66],
-                  "size": [325, 150], "text": "Use Stamina", "type": "GroupBox"},
-    "label6": {"loc": [33, 54], "size": [122, 24], "text": "Time Check: ", "type": "Label"},
-    "label7": {"loc": [29, 109], "size": [124, 24], "text": "Buy Stamina: ", "type": "Label"},
-    "panelSpeedMarching": {"children": ["radioButton19", "radioButton21", "radioButton16",
-                                         "radioButton17", "radioButton18", "radioButton15",
-                                         "radioButton11", "radioButton13", "radioButton14"],
-                            "loc": [33, 60], "size": [273, 151], "type": "Panel"},
-    "radioButton1": {"checked": True, "loc": [33, 12], "size": [97, 28], "text": "Troop 1", "type": "RadioButton"},
-    "radioButton10": {"checked": True, "loc": [96, 11], "size": [61, 28], "text": "100", "type": "RadioButton"},
-    "radioButton11": {"loc": [30, 11], "size": [50, 28], "text": "1s", "type": "RadioButton"},
-    "radioButton12": {"loc": [176, 11], "size": [56, 28], "text": "No", "type": "RadioButton"},
-    "radioButton13": {"checked": True, "loc": [182, 107], "size": [56, 28], "text": "No", "type": "RadioButton"},
-    "radioButton14": {"loc": [107, 11], "size": [50, 28], "text": "5s", "type": "RadioButton"},
-    "radioButton15": {"loc": [182, 11], "size": [60, 28], "text": "10s", "type": "RadioButton"},
-    "radioButton16": {"loc": [182, 61], "size": [60, 28], "text": "30s", "type": "RadioButton"},
-    "radioButton17": {"loc": [30, 61], "size": [60, 28], "text": "15s", "type": "RadioButton"},
-    "radioButton18": {"loc": [107, 61], "size": [60, 28], "text": "20s", "type": "RadioButton"},
-    "radioButton19": {"loc": [30, 107], "size": [60, 28], "text": "45s", "type": "RadioButton"},
-    "radioButton2": {"loc": [200, 12], "size": [97, 28], "text": "Troop 2", "type": "RadioButton"},
-    "radioButton21": {"loc": [107, 107], "size": [60, 28], "text": "60s", "type": "RadioButton"},
-    "radioButton3": {"loc": [33, 61], "size": [97, 28], "text": "Troop 5", "type": "RadioButton"},
-    "radioButton4": {"loc": [200, 61], "size": [97, 28], "text": "Troop 6", "type": "RadioButton"},
-    "radioButton5": {"loc": [520, 61], "size": [97, 28], "text": "Troop 8", "type": "RadioButton"},
-    "radioButton6": {"loc": [358, 12], "size": [97, 28], "text": "Troop 3", "type": "RadioButton"},
-    "radioButton7": {"loc": [358, 61], "size": [97, 28], "text": "Troop 7", "type": "RadioButton"},
-    "radioButton8": {"loc": [520, 12], "size": [97, 28], "text": "Troop 4", "type": "RadioButton"},
-    "radioButton9": {"loc": [16, 11], "size": [64, 28], "text": "ALL", "type": "RadioButton"},
-    "tabPage2": {"children": ["groupBox14", "groupBox3", "buttonJoinBossApplyAll", "groupBox4",
-                               "groupBoss", "groupBox1"],
-                 "loc": [4, 31], "size": [1088, 609], "text": "Join Monster War", "type": "TabPage"},
-}
-COMBO_ITEMS = {"comboBoxBuyStamina": ["10", "16", "20"], "comboBoxCrazyEggs": ["0", "1H", "2H", "3H", "4H"]}
-PAGE_SIZE = (1088, 609)
+from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import (
+    QCheckBox, QComboBox, QGridLayout, QGroupBox, QHBoxLayout, QLabel, QPushButton,
+    QScrollArea, QVBoxLayout, QWidget,
+)
+from .tab_placeholder import BaseTab
 
-TROOP_RADIOS = ["radioButton1", "radioButton2", "radioButton6", "radioButton8",
-                "radioButton3", "radioButton7", "radioButton5", "radioButton4"]
-STAMINA_RADIOS = {"radioButton9": "ALL", "radioButton10": "100", "radioButton12": "No"}
-SPEED_MARCH_RADIOS = {
-    "radioButton13": "No", "radioButton11": "1s", "radioButton14": "5s", "radioButton15": "10s",
-    "radioButton17": "15s", "radioButton18": "20s", "radioButton16": "30s",
-    "radioButton19": "45s", "radioButton21": "60s",
-}
+TROOP_RADIOS = [f"troop_{i}" for i in range(1, 9)]
+STAMINA_OPTIONS = ["ALL", "100", "No"]
+HAMMER_OPTIONS = ["No", "10", "9", "8", "7", "6","5","4","3","2","1"]
 
 
-class JoinMonsterWarTab(DesignerTab):
+class JoinMonsterWarTab(BaseTab):
     def __init__(self, parent=None):
-        super().__init__("tabPage2", DESIGNER_DATA, COMBO_ITEMS, PAGE_SIZE, parent=parent)
+        super().__init__(title="Join Monster War", show_apply_all=False, parent=parent)
+        self.controls = {}
+        self.boss_choices = []
+        self._boss_grids = []
+        self._columns = None
+        self._boss_style = "QCheckBox { spacing: 3px; padding: 0px; }"
+        self.body_layout.setContentsMargins(20, 16, 21, 16)
+        self.body_layout.setSpacing(7)
+        apply_row = QWidget()
+        apply_layout = QHBoxLayout(apply_row)
+        apply_layout.setContentsMargins(0, 0, 0, 0)
+        apply_layout.addStretch()
+        self.apply_all_button = QPushButton("Apply ALL")
+        self.apply_all_button.setFixedSize(132, 43)
+        self.apply_all_button.clicked.connect(self.on_apply_all)
+        apply_layout.addWidget(self.apply_all_button)
+        self.add_row(apply_row)
+        self.findChild(QScrollArea).setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        # Original designer geometry, relative to the header's (20, 66) origin.
+        header = QWidget()
+        header.setFixedHeight(150)
+        troop = QGroupBox("Troop", header)
+        troop.setGeometry(0, 0, 470, 150)
+        self._troop_group = troop
+        troop_panel = QWidget(troop)
+        troop_panel.setGeometry(32, 43, 410, 94)
+        for i, name in enumerate(TROOP_RADIOS):
+            button = QCheckBox(f"Troop {i + 1}", troop_panel)
+            button.setGeometry((10, 110, 210, 310)[i % 4], 0 if i < 4 else 50, 97, 28)
+            button.setChecked(i == 0)
+            self.controls[name] = button
+        stamina = QGroupBox("Setting", header)
+        stamina.setGeometry(476, 0, 566, 150)
+        self._stamina_group = stamina
+        # Chọn tướng khi hành quân; tướng phụ chỉ đi cùng khi có chọn tướng.
+        general = QCheckBox("Select General", stamina)
+        general.setGeometry(290, 39, 250, 28)
+        assistant = QCheckBox("With Assistant General", stamina)
+        assistant.setGeometry(290, 75, 250, 28)
+        assistant.setEnabled(False)
+        general.toggled.connect(assistant.setEnabled)
+        # Khi chọn tướng: bấm tab Development, chỉ chọn tướng phát triển.
+        development = QCheckBox("Development General", stamina)
+        development.setGeometry(290, 111, 250, 28)
+        development.setEnabled(False)
+        general.toggled.connect(development.setEnabled)
+        self.controls["checkBoxSelectGeneral"] = general
+        self.controls["checkBoxAssistantGeneral"] = assistant
+        self.controls["checkBoxDevelopmentGeneral"] = development
+        for y, (name, text, items, current) in zip((36, 72, 108), (
+            ("comboBoxUseStamina", "Use Stamina: ", STAMINA_OPTIONS, "100"),
+            ("comboBoxBuyStamina", "Buy Stamina: ", ["10", "16", "20"], "10"),
+            ("comboBoxBuyHammer", "Buy Hammer: ", HAMMER_OPTIONS, "No"),
+        )):
+            label = QLabel(text, stamina)
+            label.setGeometry(29, y + 3, 124, 24)
+            combo = QComboBox(stamina)
+            combo.setGeometry(168, y, 84, 30)
+            combo.addItems(items)
+            combo.setCurrentText(current)
+            self.controls[name] = combo
+        self.add_row(header)
+        self._build_boss_selector()
+
+    def _build_boss_selector(self):
+        try:
+            catalog = json.loads(Path(__file__).with_name("boss.json").read_text(encoding="utf-8-sig"))
+        except (OSError, ValueError) as exc:
+            error = QLabel(f"Cannot load boss.json: {exc}")
+            error.setWordWrap(True)
+            self.add_row(error)
+            return
+        actives = []   # (checkbox, "active" in boss.json): ticked by default
+        for category in catalog["boss_categories"]:
+            standard = category["category_key"] == "standard_bosses"
+            group = QGroupBox(category["label"])
+            group.setStyleSheet(self._boss_style)
+            grid = QGridLayout(group)
+            grid.setContentsMargins(16, 8, 16, 6)
+            grid.setHorizontalSpacing(12)
+            grid.setVerticalSpacing(4)
+            grid.setAlignment(Qt.AlignTop | Qt.AlignLeft if standard else Qt.AlignTop)
+            cards = []
+            for boss in category["list"]:
+                # "levels": [{"level", "tier"?, "power"}] (or plain level numbers). A
+                # standard boss's own "level" is its rank, not something to tick.
+                infos = {(info["level"] if isinstance(info, dict) else info):
+                         (info if isinstance(info, dict) else {}) for info in boss.get("levels", [])}
+                levels = list(infos)
+                boxed = bool(levels) or not standard
+                card = QGroupBox(boss["name"]) if boxed else QWidget()
+                row = QVBoxLayout(card)
+                row.setContentsMargins(8, 8, 8, 4) if boxed else row.setContentsMargins(0, 0, 0, 0)
+                row.setSpacing(2)
+                enabled = None
+                if not levels:
+                    enabled = QCheckBox(boss["name"] if standard else "Join")
+                    if boxed and boss["name"] == "Viking":
+                        options = QHBoxLayout()
+                        options.setContentsMargins(0, 0, 0, 0)
+                        options.setSpacing(12)
+                        options.addWidget(enabled)
+                        summon = QCheckBox("Summon")
+                        self.controls["viking_summon"] = summon
+                        options.addWidget(summon)
+                        options.addStretch()
+                        row.addLayout(options)
+                    else:
+                        row.addWidget(enabled)
+                    actives.append((enabled, bool(boss.get("active"))))
+                level_boxes = {}
+                level_grid = QGridLayout()
+                level_grid.setContentsMargins(0, 0, 0, 0)
+                level_grid.setHorizontalSpacing(5)
+                level_grid.setVerticalSpacing(2)
+                level_grid.setAlignment(Qt.AlignLeft)
+                offset = 1 if len(levels) > 1 else 0
+                for i, level in enumerate(levels, offset):
+                    box = QCheckBox(str(level))
+                    detail = ", ".join(str(infos[level][k]) for k in ("tier", "power") if infos[level].get(k))
+                    box.setToolTip(f"{boss['name']} - Level {level}" + (f" ({detail})" if detail else ""))
+                    level_boxes[level] = box
+                    actives.append((box, bool(infos[level].get("active"))))
+                    level_grid.addWidget(box, i // 4, i % 4)
+                if levels:
+                    row.addLayout(level_grid)
+                if len(levels) > 1:
+                    select_all = QCheckBox("All")
+                    select_all.clicked.connect(
+                        lambda checked, boxes=level_boxes: self._select_levels(boxes, checked)
+                    )
+                    for box in level_boxes.values():
+                        box.toggled.connect(
+                            lambda _checked, boxes=level_boxes, all_box=select_all:
+                            all_box.setChecked(all(level.isChecked() for level in boxes.values()))
+                        )
+                    level_grid.addWidget(select_all, 0, 0)
+                cards.append(card)
+                grid.addWidget(card, len(cards) - 1, 0, Qt.AlignTop)
+                self.boss_choices.append((category["category_key"], boss["name"], enabled, level_boxes))
+            if standard:
+                boss_boxes = {name: box for key, name, box, _ in self.boss_choices
+                              if key == category["category_key"] and box is not None}
+                select_all = QCheckBox("All")
+                select_all.clicked.connect(
+                    lambda checked, boxes=boss_boxes: self._select_levels(boxes, checked)
+                )
+                for box in boss_boxes.values():
+                    box.toggled.connect(
+                        lambda _checked, boxes=boss_boxes, all_box=select_all:
+                        all_box.setChecked(all(boss.isChecked() for boss in boxes.values()))
+                    )
+                cards.insert(0, select_all)
+                grid.addWidget(select_all, len(cards) - 1, 0, Qt.AlignTop)
+            self._boss_grids.append((grid, cards, standard))
+            self.add_row(group)
+        # "active" in boss.json (on a plain boss, or on each level) = ticked by
+        # default. Set after the "All" boxes are wired so they follow.
+        for box, active in actives:
+            box.setChecked(active)
+
+    @staticmethod
+    def _select_levels(boxes, checked):
+        for box in boxes.values():
+            box.setChecked(checked)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        available = max(1, self.width() - 96)
+        layout = []
+        for _, cards, _ in self._boss_grids:
+            width = max((card.sizeHint().width() for card in cards), default=120)
+            columns = max(1, min(len(cards), available // (width + 12)))
+            layout.append((width, columns))
+        if layout == self._columns:
+            return
+        self._columns = layout
+        for (grid, cards, standard), (width, columns) in zip(self._boss_grids, layout):
+            for card in cards:
+                grid.removeWidget(card)
+            for col in range(grid.columnCount()):
+                grid.setColumnMinimumWidth(col, 0)
+                grid.setColumnStretch(col, 0)
+            for i, card in enumerate(cards):
+                if standard:
+                    rows = max(1, -(-len(cards) // columns))
+                    grid.addWidget(card, i % rows, i // rows, Qt.AlignTop | Qt.AlignLeft)
+                    grid.setColumnMinimumWidth(i // rows, width)
+                else:
+                    grid.addWidget(card, i // columns, i % columns, Qt.AlignTop)
+            if not standard:
+                for col in range(columns):
+                    grid.setColumnStretch(col, 1)
 
     def get_settings(self) -> dict:
         c = self.controls
-        troop = next((c[n].text() for n in TROOP_RADIOS if c[n].isChecked()), None)
-        stamina = next((v for n, v in STAMINA_RADIOS.items() if c[n].isChecked()), None)
-        speed = next((v for n, v in SPEED_MARCH_RADIOS.items() if c[n].isChecked()), None)
         return {
-            "troop": troop,
-            "viking": c["checkBoxViking"].isChecked(),
-            "use_stamina": stamina,
+            "troop": [c[n].text() for n in TROOP_RADIOS if c[n].isChecked()],
+            "use_stamina": c["comboBoxUseStamina"].currentText(),
             "buy_stamina": c["comboBoxBuyStamina"].currentText(),
-            "crazy_eggs_time_check": c["comboBoxCrazyEggs"].currentText(),
-            "buy_hammer": c["BuyHammer"].isChecked(),
-            "speed_marching": speed,
+            "buy_hammer": c["comboBoxBuyHammer"].currentText(),
+            "select_general": c["checkBoxSelectGeneral"].isChecked(),
+            "select_assistant_general": c["checkBoxAssistantGeneral"].isChecked(),
+            "development_general": c["checkBoxDevelopmentGeneral"].isChecked(),
+            "viking_summon": c["viking_summon"].isChecked() if "viking_summon" in c else False,
+            "selected_bosses": [
+                {"category_key": category, "name": name,
+                 "levels": [level for level, box in levels.items() if box.isChecked()]}
+                for category, name, enabled, levels in self.boss_choices
+                if (enabled.isChecked() if enabled is not None else any(box.isChecked() for box in levels.values()))
+            ],
         }
 
     def set_settings(self, data: dict):
         c = self.controls
-        if "viking" in data:
-            c["checkBoxViking"].setChecked(bool(data["viking"]))
         if "buy_stamina" in data:
             c["comboBoxBuyStamina"].setCurrentText(str(data["buy_stamina"]))
-        if "crazy_eggs_time_check" in data:
-            c["comboBoxCrazyEggs"].setCurrentText(str(data["crazy_eggs_time_check"]))
-        if "buy_hammer" in data:
-            c["BuyHammer"].setChecked(bool(data["buy_hammer"]))
         if "troop" in data:
-            _set_radio(c, {n: c[n].text() for n in TROOP_RADIOS}, data["troop"])
+            troops = data["troop"] if isinstance(data["troop"], list) else [data["troop"]]
+            for n in TROOP_RADIOS:
+                c[n].setChecked(c[n].text() in troops)
         if "use_stamina" in data:
-            _set_radio(c, STAMINA_RADIOS, data["use_stamina"])
-        if "speed_marching" in data:
-            _set_radio(c, SPEED_MARCH_RADIOS, data["speed_marching"])
+            c["comboBoxUseStamina"].setCurrentText(str(data["use_stamina"]))
+        if "buy_hammer" in data:
+            c["comboBoxBuyHammer"].setCurrentText(str(data["buy_hammer"]))
+        c["checkBoxSelectGeneral"].setChecked(bool(data.get("select_general", False)))
+        c["checkBoxAssistantGeneral"].setChecked(bool(data.get("select_assistant_general", False)))
+        c["checkBoxDevelopmentGeneral"].setChecked(bool(data.get("development_general", False)))
+        if "viking_summon" in c:
+            c["viking_summon"].setChecked(bool(data.get("viking_summon", False)))
+        if "selected_bosses" in data:
+            selected = {(boss["category_key"], boss["name"]): boss.get("levels", [])
+                        for boss in data["selected_bosses"]}
+            for category, name, enabled, levels in self.boss_choices:
+                key = (category, name)
+                if enabled is not None:
+                    enabled.setChecked(key in selected)
+                for level, box in levels.items():
+                    box.setChecked(level in selected.get(key, []))
+        else:
+            # Older device settings only had a Viking checkbox.
+            for _, name, enabled, levels in self.boss_choices:
+                if enabled is not None:
+                    enabled.setChecked(name == "Viking" and bool(data.get("viking", False)))
+                for box in levels.values():
+                    box.setChecked(False)
 
-
-def _set_radio(controls, values_by_name: dict, value):
-    """Check the radio whose value matches; with no match (e.g. None) leave
-    them all unchecked, so an applied config fully replaces the old one."""
-    for n, v in values_by_name.items():
-        btn = controls[n]
-        # Auto-exclusive radios refuse to be unchecked directly.
-        btn.setAutoExclusive(False)
-        btn.setChecked(v == value)
-        btn.setAutoExclusive(True)

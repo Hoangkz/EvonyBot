@@ -62,6 +62,8 @@ class MainWindow(QMainWindow):
         )
         self.bots.running_changed.connect(self._on_bot_running_changed)
         self.bots.server_found.connect(self._on_server_found)
+        self.bots.server_time_found.connect(self.db.set_server_time)
+        self.bots.daily_task_done.connect(self.db.mark_daily_task_done)
         # Sub-tab index kept across devices, so switching device stays on
         # the same tab instead of jumping back to Initialization.
         self._current_tab_index = 0
@@ -115,6 +117,7 @@ class MainWindow(QMainWindow):
         view.start_all_requested.connect(self._on_start_all_requested)
         view.apply_all_requested.connect(self._on_apply_all_requested)
         view.server_changed.connect(self._on_server_changed)
+        view.tab_settings_changed.connect(self.db.save_settings)
         view.tabs.currentChanged.connect(self._on_tab_changed)
 
         # New device -> store its default config; known device -> restore it.
@@ -122,6 +125,9 @@ class MainWindow(QMainWindow):
             self.db.save_settings(device_id, view.get_settings())
         else:
             view.set_settings(self.db.load_settings(device_id))
+            # Ghi lại tab Event theo event.json hiện tại (thêm nhiệm vụ mới,
+            # cập nhật level / day khi file được sửa).
+            self.db.save_settings(device_id, {"Event": view.event_tab.get_settings()})
         self.home_view.update_device(
             device_id, server=view.initialization_tab.get_settings()["server"]
         )
@@ -184,10 +190,17 @@ class MainWindow(QMainWindow):
         view = self.device_views.get(device_id)
         if view is None:
             return
+        settings = view.get_settings()
+        # Đây là dữ liệu riêng của thiết bị trong DB, không phải cấu hình Apply ALL.
+        saved = self.db.load_settings(device_id)
+        settings.setdefault("Initialization", {})["server_time"] = (
+            saved.get("Initialization", {}).get("server_time") or ""
+        )
         self.bots.start(
             device_id,
             view.initialization_tab.selected_activities(),
-            view.get_settings(),
+            settings,
+            daily_done=self.db.daily_done(device_id),
         )
 
     def _on_bot_running_changed(self, device_id: str, running: bool):

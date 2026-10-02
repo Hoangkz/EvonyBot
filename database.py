@@ -1,14 +1,16 @@
 """
 database.py — SQLite persistence for devices and their configuration.
 
-Tables:
-  devices          one row per ADB serial (+ server nhập ở tab Initialization).
-  device_settings  one JSON blob per (device, tab) — every tab except
-                   Daily Activities.
-  daily_tasks      Daily Activities split into one row per task, so we
-                   know whether each task is enabled and whether it has
-                   been done today (`done` / `done_at`). Resetting `done`
-                   at the start of a new day is handled elsewhere (TODO).
+One table, `devices`: one row per ADB serial. Besides the device columns
+(server nhập ở tab Initialization, server_time, timestamps) every tab has
+its own column holding that tab's settings as JSON (see TAB_COLUMNS).
+Daily Activities stores {task: enabled}; which tasks are done today lives
+in `daily_done` ({task: done_at}) so saving the tab never clears it.
+Nothing is reset at a new day: a task counts as done only while its done_at
+is after the latest server reset (bot.daily_reset.done_today).
+
+A database in the old layout (device_settings / daily_tasks tables) is
+discarded and recreated empty.
 
 Writes never block the caller: they are queued and run on a background
 writer thread with its own connection (a commit waits on the disk, which
@@ -18,49 +20,45 @@ queued writes, so they always see the latest data.
 import json
 import os
 import queue
-import shutil
 import sqlite3
 import threading
 from datetime import datetime
 from pathlib import Path
+
+from bot.daily_reset import done_today
 
 # %LOCALAPPDATA%\EvonyBot\evonybot.db — same place whether run from source or
 # installed (the installer also puts the app in %LOCALAPPDATA%\EvonyBot and
 # never ships/overwrites the database, so it survives upgrades and uninstall).
 DATA_DIR = Path(os.environ.get("LOCALAPPDATA", Path.home())) / "EvonyBot"
 DB_PATH = DATA_DIR / "evonybot.db"
-# Where the database used to live (next to this file).
-_LEGACY_DB_PATH = Path(__file__).resolve().parent / "evonybot.db"
 
 DAILY_TAB = "Daily Activities"
 INIT_TAB = "Initialization"  # device id is not stored; server goes to devices.server
+
+# Tab title -> column of `devices` holding that tab's settings JSON.
+TAB_COLUMNS = {
+    "Initialization": "initialization",
+    "Join Monster War": "join_monster_war",
+    "Alliance Capacity": "alliance_capacity",
+    "Daily Activities": "daily_activities",
+    "Open Gift Box": "open_gift_box",
+    "Black Market": "black_market",
+    "Event": "event",
+    "Battlefield Shop": "battlefield_shop",
+}
+_JSON_COLUMNS = [*TAB_COLUMNS.values(), "daily_done"]
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS devices (
     serial      TEXT PRIMARY KEY,
     server      TEXT,
+    server_time TEXT,
+    {json_columns},
     created_at  TEXT NOT NULL,
     updated_at  TEXT NOT NULL
 );
-
-CREATE TABLE IF NOT EXISTS device_settings (
-    serial      TEXT NOT NULL REFERENCES devices(serial) ON DELETE CASCADE,
-    tab         TEXT NOT NULL,
-    settings    TEXT NOT NULL,
-    updated_at  TEXT NOT NULL,
-    PRIMARY KEY (serial, tab)
-);
-
-CREATE TABLE IF NOT EXISTS daily_tasks (
-    serial      TEXT NOT NULL REFERENCES devices(serial) ON DELETE CASCADE,
-    task        TEXT NOT NULL,
-    enabled     INTEGER NOT NULL DEFAULT 0,
-    done        INTEGER NOT NULL DEFAULT 0,
-    done_at     TEXT,
-    updated_at  TEXT NOT NULL,
-    PRIMARY KEY (serial, task)
-);
-"""
+""".format(json_columns=",\n    ".join(f"{c} TEXT NOT NULL DEFAULT '{{}}'" for c in _JSON_COLUMNS))
 
 
 def _now() -> str:
@@ -70,25 +68,27 @@ def _now() -> str:
 def _connect(path: Path) -> sqlite3.Connection:
     conn = sqlite3.connect(path)
     conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON")
     # WAL: readers don't wait for the writer thread, and commits are cheaper.
     conn.execute("PRAGMA journal_mode = WAL")
     conn.execute("PRAGMA synchronous = NORMAL")
     return conn
 
 
+def _reset_old_layout(conn: sqlite3.Connection):
+    """Drop every table of an old-layout database so _SCHEMA starts fresh."""
+    tables = {row["name"] for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
+    columns = {row["name"] for row in conn.execute("PRAGMA table_info(devices)")}
+    if tables & {"device_settings", "daily_tasks"} or (columns and not set(_JSON_COLUMNS) <= columns):
+        for table in ("device_settings", "daily_tasks", "devices"):
+            conn.execute(f"DROP TABLE IF EXISTS {table}")
+
+
 class Database:
     def __init__(self, path: Path = DB_PATH):
         path.parent.mkdir(parents=True, exist_ok=True)
-        # First run with the new location: carry over the old database.
-        if path == DB_PATH and not path.exists() and _LEGACY_DB_PATH.exists():
-            shutil.copy2(_LEGACY_DB_PATH, path)
         self.conn = _connect(path)
+        _reset_old_layout(self.conn)
         self.conn.executescript(_SCHEMA)
-        # Database cũ chưa có cột server -> thêm vào.
-        columns = {row["name"] for row in self.conn.execute("PRAGMA table_info(devices)")}
-        if "server" not in columns:
-            self.conn.execute("ALTER TABLE devices ADD COLUMN server TEXT")
         self.conn.commit()
         # Serials known to be in `devices`, including inserts still queued.
         self._known = {row["serial"] for row in self.conn.execute("SELECT serial FROM devices")}
@@ -129,6 +129,10 @@ class Database:
         """Wait for queued writes (usually none) so a read sees them."""
         self._queue.join()
 
+    def _row(self, serial: str):
+        self._flush()
+        return self.conn.execute("SELECT * FROM devices WHERE serial = ?", (serial,)).fetchone()
+
     # ---- devices -----------------------------------------------------
     def add_device(self, serial: str) -> bool:
         """Insert the device if it's new. Returns True if it was inserted."""
@@ -150,6 +154,14 @@ class Database:
             (server or None, now, serial),
         ))
 
+    def set_server_time(self, serial: str, server_time: str):
+        """Lưu thời điểm reset ISO theo giờ máy (có ngày để xử lý qua nửa đêm)."""
+        now = _now()
+        self._write(lambda conn: conn.execute(
+            "UPDATE devices SET server_time = ?, updated_at = ? WHERE serial = ?",
+            (server_time or None, now, serial),
+        ))
+
     # ---- settings ----------------------------------------------------
     def save_settings(self, serial: str, settings: dict):
         """Save a DeviceView.get_settings()-style dict (keyed by tab title)."""
@@ -168,86 +180,73 @@ class Database:
 
     def load_settings(self, serial: str) -> dict:
         """Return saved settings in the same shape DeviceView.set_settings() takes."""
-        self._flush()
-        result = {
-            row["tab"]: json.loads(row["settings"])
-            for row in self.conn.execute(
-                "SELECT tab, settings FROM device_settings WHERE serial = ?", (serial,)
-            )
-        }
-        daily = {
-            row["task"]: bool(row["enabled"])
-            for row in self.conn.execute(
-                "SELECT task, enabled FROM daily_tasks WHERE serial = ?", (serial,)
-            )
-        }
-        if daily:
-            result[DAILY_TAB] = daily
-        row = self.conn.execute("SELECT server FROM devices WHERE serial = ?", (serial,)).fetchone()
-        if row is not None:
-            result.setdefault(INIT_TAB, {})["server"] = row["server"] or ""
+        row = self._row(serial)
+        if row is None:
+            return {}
+        result = {tab: json.loads(row[column]) for tab, column in TAB_COLUMNS.items()}
+        result = {tab: data for tab, data in result.items() if data}
+        result.setdefault(INIT_TAB, {})["server"] = row["server"] or ""
+        result[INIT_TAB]["server_time"] = row["server_time"] or ""
         return result
 
     # ---- daily task progress -----------------------------------------
     def get_daily_tasks(self, serial: str) -> list[dict]:
-        self._flush()
-        rows = self.conn.execute(
-            "SELECT task, enabled, done, done_at FROM daily_tasks WHERE serial = ? ORDER BY task",
-            (serial,),
-        )
+        row = self._row(serial)
+        if row is None:
+            return []
+        enabled = json.loads(row["daily_activities"])
+        done = json.loads(row["daily_done"])
+        server_time = row["server_time"] or ""
         return [
-            {"task": r["task"], "enabled": bool(r["enabled"]),
-             "done": bool(r["done"]), "done_at": r["done_at"]}
-            for r in rows
+            {"task": task, "enabled": bool(enabled.get(task)),
+             "done": done_today(done.get(task), server_time), "done_at": done.get(task)}
+            for task in sorted(enabled.keys() | done.keys())
         ]
+
+    def daily_done(self, serial: str) -> dict:
+        """Raw {task: done_at} (có cả ngày cũ); người dùng tự so với mốc reset."""
+        row = self._row(serial)
+        return json.loads(row["daily_done"]) if row is not None else {}
 
     def pending_daily_tasks(self, serial: str) -> list[str]:
         """Enabled tasks that haven't been done yet."""
-        self._flush()
-        rows = self.conn.execute(
-            "SELECT task FROM daily_tasks WHERE serial = ? AND enabled = 1 AND done = 0 ORDER BY task",
-            (serial,),
-        )
-        return [r["task"] for r in rows]
+        return [t["task"] for t in self.get_daily_tasks(serial) if t["enabled"] and not t["done"]]
 
     def mark_daily_task_done(self, serial: str, task: str, done: bool = True):
         now = _now()
-        self._write(lambda conn: conn.execute(
-            """UPDATE daily_tasks SET done = ?, done_at = ?, updated_at = ?
-               WHERE serial = ? AND task = ?""",
-            (int(done), now if done else None, now, serial, task),
-        ))
+
+        def job(conn):
+            row = conn.execute("SELECT daily_done FROM devices WHERE serial = ?", (serial,)).fetchone()
+            if row is None:
+                return
+            progress = json.loads(row["daily_done"])
+            if done:
+                progress[task] = now
+            else:
+                progress.pop(task, None)
+            conn.execute(
+                "UPDATE devices SET daily_done = ?, updated_at = ? WHERE serial = ?",
+                (json.dumps(progress, ensure_ascii=False), now, serial),
+            )
+
+        self._write(job)
 
 
 def _save_settings(conn: sqlite3.Connection, serial: str, settings: dict, now: str):
     conn.execute("UPDATE devices SET updated_at = ? WHERE serial = ?", (now, serial))
     for tab, data in settings.items():
+        column = TAB_COLUMNS.get(tab)
+        if column is None:
+            continue
         if tab == INIT_TAB:
             # Server lưu ở cột devices.server; chỉ cập nhật khi dữ liệu có key này
             # (Apply ALL bỏ key server nên không ghi đè server của máy khác).
             if "server" in data:
                 conn.execute("UPDATE devices SET server = ? WHERE serial = ?",
                              (data["server"] or None, serial))
-            data = {k: v for k, v in data.items() if k not in ("device_id", "server")}
-        if tab == DAILY_TAB:
-            _save_daily_tasks(conn, serial, data, now)
-            continue
+            # server_time chỉ được ghi qua set_server_time, không sao chép qua Apply ALL.
+            data = {k: v for k, v in data.items() if k not in ("device_id", "server", "server_time")}
         conn.execute(
-            """INSERT INTO device_settings (serial, tab, settings, updated_at)
-               VALUES (?, ?, ?, ?)
-               ON CONFLICT (serial, tab) DO UPDATE
-               SET settings = excluded.settings, updated_at = excluded.updated_at""",
-            (serial, tab, json.dumps(data, ensure_ascii=False), now),
-        )
-
-
-def _save_daily_tasks(conn: sqlite3.Connection, serial: str, tasks: dict, now: str):
-    # Only `enabled` is updated here; `done` / `done_at` are kept.
-    for task, enabled in tasks.items():
-        conn.execute(
-            """INSERT INTO daily_tasks (serial, task, enabled, updated_at)
-               VALUES (?, ?, ?, ?)
-               ON CONFLICT (serial, task) DO UPDATE
-               SET enabled = excluded.enabled, updated_at = excluded.updated_at""",
-            (serial, task, int(bool(enabled)), now),
+            f"UPDATE devices SET {column} = ? WHERE serial = ?",
+            (json.dumps(data, ensure_ascii=False), serial),
         )

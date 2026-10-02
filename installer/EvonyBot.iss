@@ -65,6 +65,28 @@ Type: filesandordirs; Name: "{app}\__pycache__"
 Type: files; Name: "{app}\*.py"
 
 [Code]
+// Before files are replaced: wait for the closing app (it stops its bots
+// first, which can take a while), then kill whatever still runs from
+// {app}\python - notably the adb server that adbutils starts from its
+// bundled adb.exe and that outlives the app. A locked adb.exe made the
+// silent update fail with "Rolling back changes".
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+  ResultCode: Integer;
+  Script: String;
+begin
+  Script :=
+    '$d = ''' + ExpandConstant('{app}') + '\python\''; ' +
+    '$t = (Get-Date).AddSeconds(20); ' +
+    'while ((Get-Process pythonw, python -EA 0 | ? { $_.Path -like ($d + ''*'') }) -and (Get-Date) -lt $t) { Start-Sleep -Milliseconds 300 }; ' +
+    'Get-Process adb, pythonw, python -EA 0 | ? { $_.Path -like ($d + ''*'') } | Stop-Process -Force; ' +
+    'Start-Sleep -Milliseconds 500';
+  Exec(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'),
+    '-NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -Command "' + Script + '"',
+    '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  Result := '';
+end;
+
 function ShouldRelaunch: Boolean;
 var
   I: Integer;

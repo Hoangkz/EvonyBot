@@ -17,6 +17,12 @@ class BotContext(FlowMixin, InputMixin, ScreenMixin):
         self.serial = device.serial
         self._stop = stop_event
         self._deadline = deadline    # time.monotonic() value, or None for no limit
+        self._boss_event = threading.Event()
+        self._boss_interrupt_enabled = False
+        self.report_boss = lambda coords: None
+        # Daily Activities: task đã xong từ lần reset gần nhất chưa / đánh dấu xong.
+        self.is_daily_done = lambda task: False
+        self.mark_daily_done = lambda task: None
         self._log = log
         self._templates: dict[str, np.ndarray] = {}
         self._window_size: tuple[int, int] | None = None
