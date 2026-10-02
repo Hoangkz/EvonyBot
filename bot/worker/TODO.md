@@ -66,16 +66,7 @@ logic ưu tiên boss hiện tại (`_boss_priority`).
   `daily_alliance_research`, `daily_alliance_technology`, `daily_greet_champion`.
 - [ ] `daily_general_enhancing`: người dùng ghi "Cần làm thêm".
 
-## 4. Kiểm tra sau các thay đổi DB (2026-10-03)
-
-- [ ] Sao lưu `%LOCALAPPDATA%\EvonyBot\evonybot.db` trước khi mở app bản mới: migration chạy 1 lần, không quay lại được
-  (đổi 5 key Gather Troops; chuyển `devices.server_time` sang bảng `settings` rồi xoá cột).
-- [ ] Mở app (`venv\Scripts\poe dev`): cấu hình tab Event của các máy còn đủ 5 ô Gather Troops; bảng `settings` có
-  `server_time`.
-- [ ] Chạy nhiều máy cùng lúc khi chưa có giờ reset (xoá dòng `server_time` trong bảng `settings`): chỉ 1 máy hiện
-  "Get Server Time", các máy khác chạy activity luôn; lấy xong thì các máy dùng chung.
-
-## 5. Khác
+## 4. Khác
 
 - [ ] Commit các thay đổi đang chưa commit (Crazy Eggs: ngưỡng búa 0,77, FLOW / TODO; `tests/real_run.py` + `poe test`;
   `priority.json`; đổi key Gather Troops + migration; bảng `settings` + `ServerClock`).
