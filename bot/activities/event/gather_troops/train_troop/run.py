@@ -2,6 +2,8 @@
 run.py — flow chung của các nhiệm vụ train lính trong Gather Troops (Ground Troop Day 2,
 Mounted Troop Day 3, ...). Mỗi nhiệm vụ chỉ khác tab Day, tab phụ và ảnh cấp lính: khai
 báo một TroopTask rồi gọi run(bot, task, state, troop).
+King's Path Train Troop (kings_path/train_troop/) dùng lại flow này với event_icon /
+title của King's Path và first_tier=True (luôn train cấp I, troop_tier.choose_first_tier).
 
 Phần đi từ màn chính tới màn event nằm trong run_task() (xem event/common.py).
 
@@ -41,6 +43,7 @@ TODO: `done` đọc ở dòng Go đầu tiên (tier 7); khi train cấp khác c�
 import math
 from dataclasses import dataclass, field
 
+from .....context.templates import TEMPLATE_DIR
 from .....ocr import read_train_count
 from ...common import (
     EVENT_OPENED,
@@ -53,7 +56,7 @@ from ...common import (
     run_task,
 )
 from ...constants import GATHER_TROOPS_ICON, THRESHOLDS as EVENT_THRESHOLDS
-from ..troop_tier import TIER_ROW_REGION, TIER_THRESHOLD, choose_tier
+from ..troop_tier import TIER_ROW_REGION, TIER_THRESHOLD, choose_first_tier, choose_tier
 from .constants import (
     BUTTON_WAIT,
     CENTER,
@@ -111,6 +114,14 @@ class TroopTask:
     lowest: int = LOWEST_TIER     # cấp thấp nhất nhiệm vụ tính ("tier 7 and above")
     menu_icon: str = TRAIN        # icon mở màn Train trong menu công trình (bẫy: "Build")
     speedup_title: str = SPEEDUP_TITLE   # tiêu đề màn speedup (bẫy: "Trap Building Speedup")
+    event_icon: str = GATHER_TROOPS_ICON  # icon event trong danh sách (King's Path: KINGS_PATH_ICON)
+    # Tiêu đề màn event, phải thấy mới bấm tab Day / tab phụ / Go (King's Path: hàng tab Day
+    # giống hệt Gather Troops). None = không kiểm tra.
+    title: str | None = None
+    title_region: tuple | None = None
+    # True: luôn train cấp thấp nhất (vòng đầu tiên, troop_tier.choose_first_tier) thay vì
+    # cấp người dùng chọn (King's Path: "Train N Troop(s)" tính mọi cấp).
+    first_tier: bool = False
 
     @property
     def locked_key(self) -> str:
@@ -122,6 +133,9 @@ class TroopTask:
 def run(bot, task: dict, state: EventState, troop: TroopTask):
     """`task` là settings của nhiệm vụ: {"value": int, "level": int, "day": int}."""
     name, key, locked_key = troop.name, troop.key, troop.locked_key
+    if not (TEMPLATE_DIR / troop.event_icon).exists():
+        bot.log(f"{name}: no event icon image yet ({troop.event_icon}), skipped")
+        return
     if bot.is_daily_done(key):
         bot.log(f"{name}: already done")
         return
@@ -155,6 +169,11 @@ def run(bot, task: dict, state: EventState, troop: TroopTask):
         nonlocal done
         if action == EVENT_OPENED:
             return enter(bot.screenshot())   # Day đã mở: quét tiếp
+        if (action in _EVENT_ACTIONS and troop.title is not None
+                and bot.find(troop.title, screen=screen, region=troop.title_region) is None):
+            bot.log(f"{name}: event tabs but not this event, back")
+            bot.back(delay=1)
+            return HANDLED
         if action in _EVENT_ACTIONS and not progress["entered"]:
             if enter(screen) == STOP:
                 return STOP
@@ -197,7 +216,8 @@ def run(bot, task: dict, state: EventState, troop: TroopTask):
                     bot.log(f"{name}: troops already training, finishing them first (not counted)")
                     bot.tap(*speedup, delay=BUTTON_WAIT)
                     return HANDLED
-                tier = choose_tier(bot, troop.tiers, level, troop.lowest)
+                tier = (choose_first_tier(bot, troop.tiers) if troop.first_tier
+                        else choose_tier(bot, troop.tiers, level, troop.lowest))
                 if tier is None:
                     bot.log(f"{name}: tier {troop.lowest} locked, cannot do this task yet")
                     bot.mark_daily_done(locked_key)
@@ -227,7 +247,7 @@ def run(bot, task: dict, state: EventState, troop: TroopTask):
             return None
         return HANDLED
 
-    run_task(bot, state, name, GATHER_TROOPS_ICON, handle,
+    run_task(bot, state, name, troop.event_icon, handle,
              targets=_targets(troop), regions=_regions(troop), thresholds=_thresholds(troop))
 
 

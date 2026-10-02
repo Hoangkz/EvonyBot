@@ -12,3 +12,34 @@ DAY = 1   # ngày mở nhiệm vụ (dùng khi settings thiếu "day")
 TAB = None
 TAB_SELECTED = f"{KP}/Tab/cityTaxSelected.png"
 TAB_INDEX = 0
+
+# ---- Sau khi bấm Go -----------------------------------------------------------------
+# Go -> về thành, Chợ (Market) ở giữa màn hình. Chờ thêm GO_EXTRA_WAIT giây (cùng GO_WAIT
+# của path_task là 10 s) -> bấm giữa màn hình -> chờ MENU_WAIT giây -> menu công trình.
+GO_EXTRA_WAIT = 5
+CENTER = (50, 50)   # % màn hình
+MENU_WAIT = 5
+MENU_TRIES = 2      # không thấy icon Tax thì bấm giữa thêm lần nữa
+# Icon "Tax" trong menu Chợ (221, 193): 0,97 (ảnh của Daily Activities / Resource Tax).
+TAX_MENU = "DailyActivites/ActivitiesTaxResource/Tax.png"
+
+# ---- Màn Tax ------------------------------------------------------------------------
+# Dòng chữ "Please select a type of resources to tax on..." (181, 211): 1,00; khi popup che
+# 0,68 -> dấu hiệu đang ở màn Tax (ảnh của Daily Activities).
+TAX_SCREEN = "DailyActivites/ActivitiesTaxResource/TaxRevenue.png"
+# Nút "Tax" xanh của 4 dòng tài nguyên (Food / Wood / Stone / Iron), x 308, y 284 / 383 / 482
+# / 581: 1,00; màn khác <= 0,64. Cũng khớp 0,99 nút Tax to trong popup -> xét popup trước.
+ROW_TAX = f"{KP}/Tax/rowTax.png"
+TAX_ROWS = 4
+
+# ---- Popup Tax (chọn số lần) ---------------------------------------------------------
+# Chữ "Cost" trong popup (192, 381): 0,99 (ảnh của Daily Activities). Ô số và nút Tax tính
+# lệch từ chữ này: ô số (198, 300), nút Tax (198, 438). Số lần vượt lượt miễn phí thì tiêu
+# kim cương (người chơi cho phép).
+POPUP = "DailyActivites/ActivitiesTaxResource/TapTax1.png"
+POPUP_INPUT_OFFSET = (6, -81)
+# Nút "Tax" to trong popup (198, 438): 1,00; màn khác <= 0,61.
+POPUP_TAX = f"{KP}/Tax/popupTax.png"
+INPUT_DELETES = 5   # xoá số cũ trong ô (tối đa 5 chữ số) trước khi gõ số mới
+SCREEN_WAIT = 10    # chờ màn Tax / popup hiện (giây)
+TAX_WAIT = 3        # sau khi bấm Tax trong popup: chờ về màn Tax

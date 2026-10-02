@@ -4,7 +4,7 @@
 > Train Troop, Offer, Heal, Wheel — [kings_path/](kings_path/) (flow chung: [path_task.py](kings_path/path_task.py),
 > test: `tests/event/kings_path/`). Còn thiếu: ảnh icon King's Path trong danh sách event
 > (`Images/Event/KingsPath/icon.png`; chưa có thì nhiệm vụ tự bỏ qua), phần sau Go của từng nhiệm vụ,
-> Black Market (Day 5). Phần dưới là bản nháp ban đầu.
+> Black Market (Day 5). Phần dưới là bản nháp ban đầu. Việc còn lại: [kings_path/TODO.md](kings_path/TODO.md).
 
 ## 0. Màn hình thật (ảnh `tests/event/kings_path/screens/`)
 

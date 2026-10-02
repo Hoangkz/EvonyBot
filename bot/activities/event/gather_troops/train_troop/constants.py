@@ -74,7 +74,9 @@ def tier_targets(key: str) -> dict[int, int]:
     for group in data["groups"]:
         for combo in group.get("combos", []):
             if combo["key"] == key:
-                return {v["level"]: v["value"] for v in combo["values"] if v.get("level")}
+                # Giá trị số trơn (King's Path: không gắn cấp) -> không có mục tiêu theo cấp.
+                return {v["level"]: v["value"] for v in combo["values"]
+                        if isinstance(v, dict) and v.get("level")}
     return {}
 
 
