@@ -91,7 +91,7 @@ Settings (cột `event` trong DB, cũng là `settings` mà `run(bot, settings)` 
 ```json
 {
   "gather_troops_cultivate_generals": {"enabled": true, "day": 1},
-  "ground_troop": {"value": 20000, "level": 13, "day": 2},
+  "gather_troops_ground_troop": {"value": 20000, "level": 13, "day": 2},
   "kings_path_patrol": {"value": 200, "day": 2}
 }
 ```

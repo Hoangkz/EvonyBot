@@ -100,7 +100,7 @@ from .constants import (
 @dataclass(frozen=True)
 class TroopTask:
     """Phần riêng của một nhiệm vụ train lính."""
-    key: str                      # key trong settings / event.json (VD "ground_troop")
+    key: str                      # key trong settings / event.json (VD "gather_troops_ground_troop")
     name: str                     # tên trong log (VD "Ground Troop")
     day: int                      # ngày mở nhiệm vụ (dùng khi settings thiếu "day")
     day_tab: str                  # ảnh tab "Day N" khi CHƯA chọn

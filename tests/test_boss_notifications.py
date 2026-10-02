@@ -6,6 +6,7 @@ from bot.context import BotContext
 from bot.context.errors import BossAvailable, StopRequested, YieldToBoss
 from bot.worker.boss_board import BossBoard
 from bot.worker.bot_worker import BOSS_IDLE, JOIN_BOSS, BotWorker
+from bot.worker.server_clock import ServerClock
 
 
 class BossNotificationTests(unittest.TestCase):
@@ -45,8 +46,8 @@ class BossNotificationTests(unittest.TestCase):
     def test_notification_returns_to_boss_and_retries_pending_activity(self):
         board = BossBoard()
         worker = BotWorker("b", [JOIN_BOSS, "secondary"], {
-            "Initialization": {"server": "1", "server_time": "known"}
-        }, boss_board=board)
+            "Initialization": {"server": "1"}
+        }, boss_board=board, server_clock=ServerClock("known"))
         worker.ctx = BotContext(SimpleNamespace(serial="b"), worker._stop, None, worker.log)
         worker._register_boss_listener()
         calls = []
@@ -80,8 +81,8 @@ class BossNotificationTests(unittest.TestCase):
         """Activity phụ xong 1 nhiệm vụ (yield_to_boss) -> worker kiểm tra boss ngay, rồi gọi lại
         activity đó (chưa bỏ khỏi danh sách chờ)."""
         worker = BotWorker("b", [JOIN_BOSS, "secondary"], {
-            "Initialization": {"server": "1", "server_time": "known"}
-        })
+            "Initialization": {"server": "1"}
+        }, server_clock=ServerClock("known"))
         worker.ctx = BotContext(SimpleNamespace(serial="b"), worker._stop, None, worker.log)
         calls = []
 

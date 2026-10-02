@@ -7,7 +7,7 @@ from ..siege_machine.constants import DAY_4, THRESHOLDS as SIEGE_THRESHOLDS
 from ..troop_tier import kind_images
 
 # Ô chọn ở group Gather Troops (Day 4): {"value": số bẫy, "level": cấp bẫy, "day": 4}.
-KEY = "defense_force"
+KEY = "gather_troops_defense_force"
 DAY = 4   # ngày mở nhiệm vụ (dùng khi settings thiếu "day")
 LOCKED_KEY = f"{KEY}_locked"   # giống TroopTask.locked_key
 LOWEST_LEVEL = 3   # nhiệm vụ chỉ tính "level 3 and above Trap(s)"

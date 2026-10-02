@@ -14,6 +14,7 @@ from ..common import NotEnoughGems, get_server, get_server_time, keep_bubble
 from ..daily_reset import done_today, last_reset
 from ..context import BotContext, BotInterrupted, TimedOut
 from ..context.errors import BossAvailable, BubbleDue, YieldToBoss
+from .server_clock import ServerClock
 from .status import STATUS_ERROR, STATUS_RUNNING, STATUS_STOPPED
 
 JOIN_BOSS = "Join Monster War"
@@ -46,7 +47,7 @@ class BotWorker(QThread):
     bubble_disabled = pyqtSignal(str)         # (serial) không đủ kim cương -> bỏ tích Bubble
 
     def __init__(self, serial: str, activities: list[str], settings: dict, parent=None, *,
-                 boss_board=None, daily_done: dict | None = None):
+                 boss_board=None, daily_done: dict | None = None, server_clock: ServerClock | None = None):
         super().__init__(parent)
         # Lưu thiết bị và sao chép danh sách activity cho lượt chạy.
         self.serial = serial
@@ -58,7 +59,8 @@ class BotWorker(QThread):
         self.server = settings.get("Initialization", {}).get("server") or ""
         # Cờ Stop dùng chung giữa UI và BotContext.
         self._stop = threading.Event()
-        self.server_time = settings.get("Initialization", {}).get("server_time") or ""
+        # Giờ reset server dùng chung mọi thiết bị (BotManager giữ; thiếu thì dùng riêng).
+        self.server_clock = server_clock if server_clock is not None else ServerClock()
         # {task: done_at} lấy từ DB; task chỉ tính là xong nếu done_at sau mốc reset gần nhất.
         self.daily_done = dict(daily_done or {})
         self._daily_ran_for = None   # mốc reset của lần chạy Daily Activities gần nhất
@@ -195,15 +197,24 @@ class BotWorker(QThread):
                 self.ctx._boss_interrupt_enabled = False
                 self.ctx._deadline = None
 
+    @property
+    def server_time(self) -> str:
+        """Thời điểm reset server (ISO, giờ máy) dùng chung mọi thiết bị; "" nếu chưa biết."""
+        return self.server_clock.value
+
     def _ensure_server_time(self):
-        """Chỉ đọc khi chưa có thời điểm reset; không đọc được thì lần sau thử lại."""
-        if self.server_time:
+        """Chưa có thời điểm reset (chung mọi thiết bị): thiết bị đầu tiên cần tới thì đi đọc, các
+        thiết bị khác chạy bình thường (mốc reset tạm là 0h giờ máy). Không đọc được thì lần sau
+        (thiết bị này hoặc thiết bị khác) thử lại."""
+        if not self.server_clock.claim():
             return
-        self.activity_changed.emit(self.serial, "Get Server Time")
-        server_time = self._with_bubble("Get Server Time", get_server_time, self.ctx)
+        server_time = None
+        try:
+            self.activity_changed.emit(self.serial, "Get Server Time")
+            server_time = self._with_bubble("Get Server Time", get_server_time, self.ctx)
+        finally:
+            self.server_clock.release(server_time)
         if server_time:
-            self.server_time = server_time
-            self.settings.setdefault("Initialization", {})["server_time"] = server_time
             self.server_time_found.emit(self.serial, server_time)
 
     def _ensure_server(self):

@@ -63,7 +63,9 @@ class MainWindow(QMainWindow):
         )
         self.bots.running_changed.connect(self._on_bot_running_changed)
         self.bots.server_found.connect(self._on_server_found)
-        self.bots.server_time_found.connect(self.db.set_server_time)
+        # Giờ reset server chung mọi thiết bị (bảng settings): nạp lúc mở app, lưu khi có máy đọc được.
+        self.bots.server_clock.set(self.db.server_time())
+        self.bots.server_time_found.connect(lambda serial, server_time: self.db.set_server_time(server_time))
         self.bots.daily_task_done.connect(self.db.mark_daily_task_done)
         self.bots.bubble_found.connect(self._on_bubble_found)
         self.bots.bubble_disabled.connect(self._on_bubble_disabled)
@@ -197,7 +199,6 @@ class MainWindow(QMainWindow):
         # Đây là dữ liệu riêng của thiết bị trong DB, không phải cấu hình Apply ALL.
         saved = self.db.load_settings(device_id)
         init = settings.setdefault("Initialization", {})
-        init["server_time"] = saved.get("Initialization", {}).get("server_time") or ""
         # Bubble còn hạn trong DB thì bot không cần vào game kiểm tra lại.
         init["bubble_until"] = saved.get("Initialization", {}).get("bubble_until") or ""
         self.bots.start(

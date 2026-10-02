@@ -7,7 +7,7 @@
             ],
             "combos": [
                 {
-                    "key": "ground_troop", "label": "Ground Troop:", "day": 2, "default": 20000,
+                    "key": "gather_troops_ground_troop", "label": "Ground Troop:", "day": 2, "default": 20000,
                     "values": [
                         { "value": 0, "level": null },
                         { "value": 500, "level": 7 },
@@ -20,7 +20,7 @@
                     ]
                 },
                 {
-                    "key": "mounted_troop", "label": "Mounted Troop:", "day": 3, "default": 20000,
+                    "key": "gather_troops_mounted_troop", "label": "Mounted Troop:", "day": 3, "default": 20000,
                     "values": [
                         { "value": 0, "level": null },
                         { "value": 500, "level": 7 },
@@ -33,7 +33,7 @@
                     ]
                 },
                 {
-                    "key": "ranged_troop", "label": "Ranged Troop:", "day": 3, "default": 20000,
+                    "key": "gather_troops_ranged_troop", "label": "Ranged Troop:", "day": 3, "default": 20000,
                     "values": [
                         { "value": 0, "level": null },
                         { "value": 500, "level": 7 },
@@ -46,7 +46,7 @@
                     ]
                 },
                 {
-                    "key": "siege_machine", "label": "Siege Machine:", "day": 4, "default": 20000,
+                    "key": "gather_troops_siege_machine", "label": "Siege Machine:", "day": 4, "default": 20000,
                     "values": [
                         { "value": 0, "level": null },
                         { "value": 500, "level": 7 },
@@ -59,7 +59,7 @@
                     ]
                 },
                 {
-                    "key": "defense_force", "label": "Defense Force:", "day": 4, "default": 7000,
+                    "key": "gather_troops_defense_force", "label": "Defense Force:", "day": 4, "default": 7000,
                     "values": [
                         { "value": 0, "level": null },
                         { "value": 1000, "level": 3 },

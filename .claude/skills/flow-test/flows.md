@@ -163,9 +163,9 @@ Nhánh phụ:
 - Event Center không có test riêng (theo yêu cầu).
 
 ### Ground Troop — `tests/event/gather_troops/ground_troop/`
-Settings: `{"ground_troop": {"value": 20000, "level": 13, "day": 2}}` (ô chọn 0 = tắt).
+Settings: `{"gather_troops_ground_troop": {"value": 20000, "level": 13, "day": 2}}` (ô chọn 0 = tắt).
 Bước 01–04 giống hệt Cultivate Generals (ảnh chép sang `screens/`); tới màn Gather Troops thì đếm ổ khoá `Event/dayLock.png` trên hàng tab Day:
-- 4 ổ khoá (Day 2..5 khoá): lưu `ground_troop_locked` vào daily_done (bỏ qua tới lần reset) rồi `end()`.
+- 4 ổ khoá (Day 2..5 khoá): lưu `gather_troops_ground_troop_locked` vào daily_done (bỏ qua tới lần reset) rồi `end()`.
 - Ít hơn (VD `07_gather_day1.png` không khoá, `06_day_locked_tmp.png` chỉ Day 4–5 khoá): đi tiếp.
 
 | # | Màn hình | Action |
@@ -181,15 +181,15 @@ Bước 01–04 giống hệt Cultivate Generals (ảnh chép sang `screens/`); 
 | speedup_settings(_ticked) | Hộp Finish All | Ô góc dưới trái chưa tích thì `tap(".../Train/checkboxOff.png")`, rồi `tap(".../Train/confirm.png")` |
 | train_t13 (sau Finish All) | Nút Train hiện lại, đã bấm đủ số lần | `end()`, đánh dấu `ground_troop` đã xong |
 
-Biến thể màn Train: `locked_12` (dán ổ khoá lên XII, XIII của `train_t11`) → train cấp 11, mục tiêu 10000 theo event.json; ảnh thật `locked_1407xx.png` (tài khoản chỉ mở cấp I, cấp II+ khoá): mở ở VII → lưu `ground_troop_locked`; mở ở XII → bấm cấp trái nhất (X, VIII) tới khi thấy VII khoá → lưu `ground_troop_locked`.
+Biến thể màn Train: `locked_12` (dán ổ khoá lên XII, XIII của `train_t11`) → train cấp 11, mục tiêu 10000 theo event.json; ảnh thật `locked_1407xx.png` (tài khoản chỉ mở cấp I, cấp II+ khoá): mở ở VII → lưu `gather_troops_ground_troop_locked`; mở ở XII → bấm cấp trái nhất (X, VIII) tới khi thấy VII khoá → lưu `gather_troops_ground_troop_locked`.
 
 Tab Ground Troop hết Go (biến thể `no_go`): `end()`, đánh dấu `ground_troop` đã xong.
 
 TODO: `06_day_locked_tmp.png` là ảnh tạm (màn King's Path); biến thể `day2_locked` dán thêm ổ khoá lên Day 2, Day 3. Thay bằng ảnh Gather Troops thật khi có.
-Nhánh phụ: đã lưu `ground_troop_locked` / ô chọn 0 → `end()` ngay; danh sách event không có Gather Troops → giống Cultivate Generals.
+Nhánh phụ: đã lưu `gather_troops_ground_troop_locked` / ô chọn 0 → `end()` ngay; danh sách event không có Gather Troops → giống Cultivate Generals.
 
 ### Mounted Troop — `tests/event/gather_troops/mounted_troop/`
-Settings: `{"mounted_troop": {"value": 20000, "level": 13, "day": 3}}`. Flow chung với Ground Troop (`gather_troops/train_troop/`, mỗi nhiệm vụ khai báo một `TroopTask`), chỉ khác:
+Settings: `{"gather_troops_mounted_troop": {"value": 20000, "level": 13, "day": 3}}`. Flow chung với Ground Troop (`gather_troops/train_troop/`, mỗi nhiệm vụ khai báo một `TroopTask`), chỉ khác:
 
 | # | Màn hình | Action |
 | --- | --- | --- |
@@ -199,13 +199,13 @@ Settings: `{"mounted_troop": {"value": 20000, "level": 13, "day": 3}}`. Flow chu
 | 10 / 11 | Thành, chuồng ngựa (Stables) ở giữa / menu Stables | giống Ground Troop |
 | train_tNN | Màn Train lính kỵ (ảnh cấp `MountedTroop/Tier/<cấp>.png`, I..XV) | giống Ground Troop; `train_t13` OCR 40785 / lần |
 
-- 3 ổ khoá (Day 3..5 khoá, biến thể `day3_locked` trên ảnh tạm `06_day_locked_tmp.png`): lưu `mounted_troop_locked`.
-- Ảnh thật `locked_1754xx.png` (chỉ mở cấp I): mở ở I → lưu `mounted_troop_locked`; `locked_175511` (X..XIII khoá) → bấm X, IX → thấy VI..IX khoá → lưu `mounted_troop_locked`.
+- 3 ổ khoá (Day 3..5 khoá, biến thể `day3_locked` trên ảnh tạm `06_day_locked_tmp.png`): lưu `gather_troops_mounted_troop_locked`.
+- Ảnh thật `locked_1754xx.png` (chỉ mở cấp I): mở ở I → lưu `gather_troops_mounted_troop_locked`; `locked_175511` (X..XIII khoá) → bấm X, IX → thấy VI..IX khoá → lưu `gather_troops_mounted_troop_locked`.
 - Màn Training Speedup / hộp Finish All dùng chung ảnh với Ground Troop (chép `speedup*.png`).
 - `train_training.png` (ảnh thật, Mounted / Ranged / Siege mỗi loại một ảnh): vừa vào màn Train đã đang train → `tap(".../Train/trainingSpeedup.png")`, Finish All trước rồi mới chọn cấp (không lưu `*_locked` dù cấp ở giữa không có nút "+").
 
 ### Ranged Troop — `tests/event/gather_troops/ranged_troop/`
-Settings: `{"ranged_troop": {"value": 20000, "level": 13, "day": 3}}`. Giống Mounted Troop (cùng Day 3, cùng ảnh `MountedTroop/day3.png`), nhưng tab phụ bên phải:
+Settings: `{"gather_troops_ranged_troop": {"value": 20000, "level": 13, "day": 3}}`. Giống Mounted Troop (cùng Day 3, cùng ảnh `MountedTroop/day3.png`), nhưng tab phụ bên phải:
 
 | # | Màn hình | Action |
 | --- | --- | --- |
@@ -213,11 +213,11 @@ Settings: `{"ranged_troop": {"value": 20000, "level": 13, "day": 3}}`. Giống M
 | 09 | Day 3, tab Ranged Troop (`rangedTroopSelected.png`) | OCR "0 / 500", `tap_at(335, 344)` |
 | train_tNN | Màn Train lính cung (`RangedTroop/Tier/<cấp>.png`, I..XVI) | giống Ground Troop; `train_t13` OCR 28266 / lần |
 
-- `locked_180037` (I..IV) → bấm IV → `locked_180045` (V, VI khoá) → lưu `ranged_troop_locked`; `locked_180117` (XII..XVI khoá) → bấm XII, X, VIII → `locked_180100` → lưu `ranged_troop_locked`.
+- `locked_180037` (I..IV) → bấm IV → `locked_180045` (V, VI khoá) → lưu `gather_troops_ranged_troop_locked`; `locked_180117` (XII..XVI khoá) → bấm XII, X, VIII → `locked_180100` → lưu `gather_troops_ranged_troop_locked`.
 - `10_after_go.png` / `11_train_menu.png`: trại cung (Archer Camp); icon Train trên menu này chỉ khớp 0,86 (ngưỡng 0,8).
 
 ### Siege Machine — `tests/event/gather_troops/siege_machine/`
-Settings: `{"siege_machine": {"value": 20000, "level": 13, "day": 4}}`. Giống Mounted Troop nhưng Day 4:
+Settings: `{"gather_troops_siege_machine": {"value": 20000, "level": 13, "day": 4}}`. Giống Mounted Troop nhưng Day 4:
 
 | # | Màn hình | Action |
 | --- | --- | --- |
@@ -226,13 +226,13 @@ Settings: `{"siege_machine": {"value": 20000, "level": 13, "day": 4}}`. Giống 
 | 09 | Day 4, tab Defense Force đang chọn | `tap("Event/GatherTroops/SiegeMachine/siegeMachine.png")` |
 | train_tNN | Màn Train xe công thành (`SiegeMachine/Tier/<cấp>.png`, I..XV) | giống Ground Troop; `train_t13` OCR 20812 / lần |
 
-- `06_day_locked_tmp.png` (Day 4, 5 khoá) dùng thẳng, không cần biến thể: lưu `siege_machine_locked`.
-- `locked_201311` (I..IV) → bấm IV → `locked_201315` (V, VI khoá) → lưu `siege_machine_locked`; `locked_201352` (XII..XVI khoá) → bấm XII, X, VIII → `locked_201328` → lưu `siege_machine_locked`.
+- `06_day_locked_tmp.png` (Day 4, 5 khoá) dùng thẳng, không cần biến thể: lưu `gather_troops_siege_machine_locked`.
+- `locked_201311` (I..IV) → bấm IV → `locked_201315` (V, VI khoá) → lưu `gather_troops_siege_machine_locked`; `locked_201352` (XII..XVI khoá) → bấm XII, X, VIII → `locked_201328` → lưu `gather_troops_siege_machine_locked`.
 - `10_after_go.png` / `11_train_menu.png`: xưởng (Workshop) thật.
 - Xưởng đang có mẻ train (áp dụng cho mọi loại lính, flow chung): bấm giữa sau Go → `11_speed_up_menu.png` (menu có Speed Up / Instant Finish / Cancel / View, không có Train; icon View khớp nhầm `train.png` 0,92) → `tap(".../Train/speedUp.png")` → `speedup_workshop.png` (Speedup Settings → Confirm → Finish All) → `12_after_finish_all.png` (về thành) → `tap_at(198, 352)` lần nữa → `11_train_menu.png` → Train như thường.
 
 ### Defense Force — `tests/event/gather_troops/defense_force/`
-Settings: `{"defense_force": {"value": 7000, "level": 6, "day": 4}}`. Flow chung `train_troop` (TroopTask có `lowest=3`, `menu_icon=build.png`, `speedup_title` riêng), khác lính ở:
+Settings: `{"gather_troops_defense_force": {"value": 7000, "level": 6, "day": 4}}`. Flow chung `train_troop` (TroopTask có `lowest=3`, `menu_icon=build.png`, `speedup_title` riêng), khác lính ở:
 
 | # | Màn hình | Action |
 | --- | --- | --- |
@@ -244,7 +244,7 @@ Settings: `{"defense_force": {"value": 7000, "level": 6, "day": 4}}`. Flow chung
 
 - Tài khoản A (`train_*`): Rock VII → bấm vòng trái nhất (Fire Arrow VI, Rock VI, ..., Rock IV) → bấm Fire Arrow III → train cấp 3.
 - Tài khoản B (`b_*`): cấp IV khoá hết, Fire Arrow III khoá → train cấp III bằng loại khác. Bước cuối dùng `b_train_3_abatis.png` thay cho Fire Arrow III ở giữa (chưa có ảnh đúng).
-- Chưa có ảnh tài khoản khoá cả cấp III (→ `defense_force_locked`).
+- Chưa có ảnh tài khoản khoá cả cấp III (→ `gather_troops_defense_force_locked`).
 
 ### Quy tắc chung các nhiệm vụ Gather Troops (Cultivate Generals + 5 nhiệm vụ train)
 Mỗi nhiệm vụ phải đi qua màn Gather Troops trong lượt chạy của nó: mở từ danh sách event, hoặc đang ở sẵn màn Gather Troops thì làm luôn tại đó (lần đầu thấy màn này: kiểm tra Day khoá). Rồi tab → bấm Go (đọc số đã làm) → các màn sau Go. Gặp màn sau Go (menu công trình / màn Train / speedup / danh sách Generals / Cultivate) trước khi bấm Go → `back()` (log `"<tên>: <action> before Go, back"`) cho tới khi về lại Gather Troops. Test: `test_started_on_train_screen_goes_back_to_event`, `test_started_on_gather_troops_continues_there`, `test_started_on_gather_troops_day_locked` (Mounted Troop); `test_started_on_gather_troops_continues_there`, `test_started_mid_flow_goes_back_to_event` (Cultivate Generals).

@@ -13,14 +13,15 @@ from bot.context import BotContext
 from bot.context.errors import BossAvailable, BubbleDue, StopRequested
 from bot.worker import bot_worker
 from bot.worker.bot_worker import BUBBLE_RENEW_BEFORE, BUBBLE_RETRY, BotWorker
+from bot.worker.server_clock import ServerClock
 
 
 def make_worker(bubble=True, bubble_type="3d", activities=("secondary",), bubble_until=""):
     worker = BotWorker("b", list(activities), {
-        "Initialization": {"server": "1", "server_time": "known",
+        "Initialization": {"server": "1",
                            "bubble": bubble, "bubble_type": bubble_type,
                            "bubble_until": bubble_until},
-    })
+    }, server_clock=ServerClock("known"))
     worker.ctx = BotContext(SimpleNamespace(serial="b"), worker._stop, None, worker.log)
     worker.found = []
     worker.bubble_found.connect(lambda serial, seconds: worker.found.append(seconds))

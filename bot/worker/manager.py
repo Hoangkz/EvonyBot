@@ -6,6 +6,7 @@ from PyQt5.QtCore import QObject, pyqtSignal
 
 from .bot_worker import BotWorker
 from .boss_board import BossBoard
+from .server_clock import ServerClock
 from .status import STATUS_STOPPING
 
 
@@ -24,6 +25,8 @@ class BotManager(QObject):
         super().__init__(parent)
         self._workers: dict[str, BotWorker] = {}
         self.boss_board = BossBoard()
+        # Giờ reset server chung mọi thiết bị: main gán giá trị đã lưu trong DB lúc mở app.
+        self.server_clock = ServerClock()
 
     def is_running(self, serial: str) -> bool:
         return serial in self._workers
@@ -37,7 +40,8 @@ class BotManager(QObject):
             return False
 
         worker = BotWorker(serial, activities, settings, self,
-                           boss_board=self.boss_board, daily_done=daily_done)
+                           boss_board=self.boss_board, daily_done=daily_done,
+                           server_clock=self.server_clock)
         worker.activity_changed.connect(self.activity_changed.emit)
         worker.status_changed.connect(self.status_changed.emit)
         worker.server_found.connect(self.server_found.emit)

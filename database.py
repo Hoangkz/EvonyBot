@@ -1,9 +1,11 @@
 """
 database.py — SQLite persistence for devices and their configuration.
 
-One table, `devices`: one row per ADB serial. Besides the device columns
-(server nhập ở tab Initialization, server_time, bubble_until, timestamps) every tab has
+Table `devices`: one row per ADB serial. Besides the device columns
+(server nhập ở tab Initialization, bubble_until, timestamps) every tab has
 its own column holding that tab's settings as JSON (see TAB_COLUMNS).
+Table `settings`: cài đặt chung mọi thiết bị ({key: value}), VD SERVER_TIME — giờ reset server
+(một giá trị cho mọi thiết bị; DB cũ có cột devices.server_time thì chuyển sang đây rồi xoá cột).
 Daily Activities stores {task: enabled}; which tasks are done today lives
 in `daily_done` ({task: done_at}) so saving the tab never clears it.
 Nothing is reset at a new day: a task counts as done only while its done_at
@@ -35,6 +37,8 @@ DB_PATH = DATA_DIR / "evonybot.db"
 
 DAILY_TAB = "Daily Activities"
 INIT_TAB = "Initialization"  # device id is not stored; server goes to devices.server
+# Key trong bảng `settings`: thời điểm reset server (ISO, giờ máy), dùng chung mọi thiết bị.
+SERVER_TIME = "server_time"
 
 # Tab title -> column of `devices` holding that tab's settings JSON.
 TAB_COLUMNS = {
@@ -53,10 +57,14 @@ _SCHEMA = """
 CREATE TABLE IF NOT EXISTS devices (
     serial      TEXT PRIMARY KEY,
     server      TEXT,
-    server_time TEXT,
     bubble_until TEXT,
     {json_columns},
     created_at  TEXT NOT NULL,
+    updated_at  TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS settings (
+    key         TEXT PRIMARY KEY,
+    value       TEXT,
     updated_at  TEXT NOT NULL
 );
 """.format(json_columns=",\n    ".join(f"{c} TEXT NOT NULL DEFAULT '{{}}'" for c in _JSON_COLUMNS))
@@ -84,6 +92,45 @@ def _reset_old_layout(conn: sqlite3.Connection):
             conn.execute(f"DROP TABLE IF EXISTS {table}")
 
 
+# Key nhiệm vụ đã đổi tên (bot/worker/priority.json): key cũ -> key mới. Đổi trong cột `event`
+# (cấu hình tab Event) và `daily_done` (kể cả "<key>_locked") của DB cũ, để không mất cấu hình / tiến độ.
+KEY_RENAMES = {old: f"gather_troops_{old}" for old in
+               ("ground_troop", "mounted_troop", "ranged_troop", "siege_machine", "defense_force")}
+
+
+def _rename_keys(conn: sqlite3.Connection):
+    """Đổi key cũ (KEY_RENAMES) sang key mới trong cột `event` và `daily_done`."""
+    def renamed(data: dict) -> dict:
+        out = {}
+        for key, value in data.items():
+            base, suffix = (key[:-len("_locked")], "_locked") if key.endswith("_locked") else (key, "")
+            new = KEY_RENAMES.get(base)
+            out[new + suffix if new and (new + suffix) not in data else key] = value
+        return out
+
+    for row in conn.execute("SELECT serial, event, daily_done FROM devices").fetchall():
+        event, done = json.loads(row["event"]), json.loads(row["daily_done"])
+        new_event, new_done = renamed(event), renamed(done)
+        if new_event != event or new_done != done:
+            conn.execute("UPDATE devices SET event = ?, daily_done = ? WHERE serial = ?",
+                         (json.dumps(new_event, ensure_ascii=False),
+                          json.dumps(new_done, ensure_ascii=False), row["serial"]))
+
+
+def _move_server_time(conn: sqlite3.Connection):
+    """DB cũ có cột devices.server_time: lấy giá trị đầu tiên khác rỗng làm SERVER_TIME chung (nếu
+    bảng settings chưa có) rồi xoá cột."""
+    columns = {row["name"] for row in conn.execute("PRAGMA table_info(devices)")}
+    if "server_time" not in columns:
+        return
+    row = conn.execute("SELECT server_time FROM devices WHERE server_time IS NOT NULL AND server_time != '' "
+                       "ORDER BY updated_at DESC LIMIT 1").fetchone()
+    if row is not None:
+        conn.execute("INSERT OR IGNORE INTO settings (key, value, updated_at) VALUES (?, ?, ?)",
+                     (SERVER_TIME, row["server_time"], _now()))
+    conn.execute("ALTER TABLE devices DROP COLUMN server_time")
+
+
 def _add_missing_columns(conn: sqlite3.Connection):
     """Thêm cột mới vào DB cũ mà không xoá dữ liệu."""
     columns = {row["name"] for row in conn.execute("PRAGMA table_info(devices)")}
@@ -98,6 +145,8 @@ class Database:
         _reset_old_layout(self.conn)
         self.conn.executescript(_SCHEMA)
         _add_missing_columns(self.conn)
+        _move_server_time(self.conn)
+        _rename_keys(self.conn)
         self.conn.commit()
         # Serials known to be in `devices`, including inserts still queued.
         self._known = {row["serial"] for row in self.conn.execute("SELECT serial FROM devices")}
@@ -163,13 +212,29 @@ class Database:
             (server or None, now, serial),
         ))
 
-    def set_server_time(self, serial: str, server_time: str):
-        """Lưu thời điểm reset ISO theo giờ máy (có ngày để xử lý qua nửa đêm)."""
+    # ---- settings chung -----------------------------------------------
+    def get_setting(self, key: str, default: str = "") -> str:
+        """Giá trị cài đặt chung `key` (bảng settings), hoặc `default` nếu chưa có."""
+        self._flush()
+        row = self.conn.execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
+        return row["value"] if row is not None and row["value"] is not None else default
+
+    def set_setting(self, key: str, value: str):
+        """Lưu cài đặt chung `key` (rỗng -> NULL)."""
         now = _now()
         self._write(lambda conn: conn.execute(
-            "UPDATE devices SET server_time = ?, updated_at = ? WHERE serial = ?",
-            (server_time or None, now, serial),
+            "INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?) "
+            "ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at",
+            (key, value or None, now),
         ))
+
+    def server_time(self) -> str:
+        """Thời điểm reset server (ISO, giờ máy) dùng chung mọi thiết bị; rỗng nếu chưa biết."""
+        return self.get_setting(SERVER_TIME)
+
+    def set_server_time(self, server_time: str):
+        """Lưu thời điểm reset ISO theo giờ máy (có ngày để xử lý qua nửa đêm), chung mọi thiết bị."""
+        self.set_setting(SERVER_TIME, server_time)
 
     def set_bubble_until(self, serial: str, bubble_until: str):
         """Lưu thời điểm bubble hết (ISO theo giờ máy; rỗng -> NULL = chưa biết)."""
@@ -203,7 +268,6 @@ class Database:
         result = {tab: json.loads(row[column]) for tab, column in TAB_COLUMNS.items()}
         result = {tab: data for tab, data in result.items() if data}
         result.setdefault(INIT_TAB, {})["server"] = row["server"] or ""
-        result[INIT_TAB]["server_time"] = row["server_time"] or ""
         result[INIT_TAB]["bubble_until"] = row["bubble_until"] or ""
         return result
 
@@ -214,7 +278,7 @@ class Database:
             return []
         enabled = json.loads(row["daily_activities"])
         done = json.loads(row["daily_done"])
-        server_time = row["server_time"] or ""
+        server_time = self.server_time()
         return [
             {"task": task, "enabled": bool(enabled.get(task)),
              "done": done_today(done.get(task), server_time), "done_at": done.get(task)}
@@ -262,7 +326,7 @@ def _save_settings(conn: sqlite3.Connection, serial: str, settings: dict, now: s
             if "server" in data:
                 conn.execute("UPDATE devices SET server = ? WHERE serial = ?",
                              (data["server"] or None, serial))
-            # server_time / bubble_until chỉ được ghi qua set_*, không sao chép qua Apply ALL.
+            # bubble_until chỉ được ghi qua set_*, không sao chép qua Apply ALL.
             data = {k: v for k, v in data.items()
                     if k not in ("device_id", "server", "server_time", "bubble_until")}
         conn.execute(
