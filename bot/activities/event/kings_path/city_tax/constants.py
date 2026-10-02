@@ -8,8 +8,8 @@ KEY = "kings_path_city_tax"
 DAY = 1   # ngày mở nhiệm vụ (dùng khi settings thiếu "day")
 
 # Tab phụ "City Tax" (thứ 1, bên trái), dòng nhiệm vụ "Tax on resources for N time(s)".
-# Chưa có ảnh tab chưa chọn: bấm theo vị trí (TAB_INDEX) khi Day 1 đang chọn.
-TAB = None
+# Chưa chọn (day1_hoarding.png) / đang chọn khớp chéo 0,90 -> ngưỡng 0,95.
+TAB = f"{KP}/Tab/cityTax.png"
 TAB_SELECTED = f"{KP}/Tab/cityTaxSelected.png"
 TAB_INDEX = 0
 
@@ -33,8 +33,12 @@ TAX_ROWS = 4
 # kim cương (người chơi cho phép).
 POPUP = "DailyActivites/ActivitiesTaxResource/TapTax1.png"
 POPUP_INPUT_OFFSET = (6, -81)
+# Bấm ô số -> thanh nhập ở đáy màn (đang chứa số cũ, tax_input.png): xoá hết, gõ số mới, rồi bấm
+# vào màn hình (không bấm OK) cho thanh nhập mất: chỗ trống trong popup bên trái ô số (62, 300),
+# lệch POPUP_BLANK_OFFSET so với chữ "Cost" — nền trơn, không trúng nút.
+POPUP_BLANK_OFFSET = (-130, -81)
 # Nút "Tax" to trong popup (198, 438): 1,00; màn khác <= 0,61.
 POPUP_TAX = f"{KP}/Tax/popupTax.png"
-INPUT_DELETES = 5   # xoá số cũ trong ô (tối đa 5 chữ số) trước khi gõ số mới
+INPUT_DELETES = 5   # xoá số cũ trong ô (VD "8"; tối đa 5 chữ số) trước khi gõ số mới
 SCREEN_WAIT = 10    # chờ popup Tax hiện (giây)
 TAX_WAIT = 3        # sau khi bấm Tax trong popup: chờ về màn Tax

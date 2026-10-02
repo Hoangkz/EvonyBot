@@ -6,6 +6,10 @@ các nhiệm vụ được bật ở tab Event, xong hết thì nhận thưởng
 (claim.py — chỉ khi event có nhiệm vụ đã xong hôm nay, mỗi khi số nhiệm vụ xong tăng lên),
 rồi mới sang event kế tiếp.
 
+Nhiệm vụ nào vừa xong trong lượt này (daily_done chuyển sang có) thì bot.yield_to_boss(): đang
+chạy theo lịch ưu tiên boss thì nhường ngay cho worker kiểm tra boss; lượt sau Event chạy lại từ
+đầu, nhiệm vụ đã xong tự bỏ qua.
+
 Mỗi nhiệm vụ là một file riêng (gather_troops/..., kings_path/...) với hàm
 `run(bot, task, state)`; phần đi từ màn hình chính tới nút event dùng chung ở common.py.
 `state` giữ qua các nhiệm vụ để quà đăng nhập chỉ nhận 1 lần mỗi lượt.
@@ -14,7 +18,7 @@ from . import claim
 from .common import EventState
 from .constants import GATHER_TROOPS_ICON, KINGS_PATH_ICON
 from .gather_troops import cultivate_generals, ground_troop, mounted_troop, ranged_troop, siege_machine, defense_force
-from .kings_path import city_tax, donate, heal, patrol, train_troop, wheel
+from .kings_path import black_market, city_tax, donate, heal, patrol, train_troop, wheel
 
 # (key event, tên log, icon trong danh sách event, [(key nhiệm vụ trong settings / event.json,
 # hàm chạy nhiệm vụ)] theo thứ tự chạy).
@@ -34,6 +38,7 @@ EVENTS = [
         (train_troop.KEY, train_troop.run),
         (heal.KEY, heal.run),
         (wheel.KEY, wheel.run),
+        (black_market.KEY, black_market.run),
     ]),
 ]
 # Mọi nhiệm vụ theo thứ tự chạy.
@@ -50,8 +55,12 @@ def run(bot, settings: dict):
             if not _enabled(task):
                 continue
             bot.check()
+            was_done = bot.is_daily_done(key)
             bot.log(f"Event: task {key}")
             run_task(bot, task, state)
+            if not was_done and bot.is_daily_done(key):
+                bot.log(f"Event: task {key} done")
+                bot.yield_to_boss()
         bot.check()
         claim.maybe_claim(bot, state, event, name, icon, [key for key, _ in tasks])
 

@@ -18,10 +18,15 @@ Flow:
 4. Tab phụ của nhiệm vụ chưa chọn -> bấm (theo ảnh; chưa có ảnh thì bấm theo vị trí khi
    Day đang chọn).
 5. Tab phụ đang chọn: tìm nút Go của nhiệm vụ — dòng Go trên cùng, hoặc dòng có tiêu đề
-   `row_title` (cuộn xuống tối đa ROW_MAX_SCROLLS lần nếu chưa thấy). Không còn Go nào ->
+   `row_title` (không cuộn: Teamwork làm Patrol trước Donate, sau Claim All chỉ còn ~3 dòng Go
+   nằm gọn trên màn — 2 dòng Patrol rồi dòng Donate). Không còn Go nào ->
    đánh dấu xong. Đọc số đã làm ở "a / b" trên nút (OCR): đã đạt mục tiêu (`value` trong
    settings) -> đánh dấu xong. Còn lại -> bấm Go.
 6. Sau Go: `after_go(bot, path, done, target)` của nhiệm vụ. Chưa có -> dừng (TODO).
+   after_go trả AGAIN (VD Heal vừa Speed Up xong lượt chữa dở) -> không dừng: vòng lặp đi lại từ
+   màn chính -> Event Center -> King's Path -> Day -> tab -> OCR lại số đã làm -> Go lần nữa
+   (không giới hạn số lần: lặp tới khi đủ mục tiêu; hết 120 s / có boss thì bị ngắt như thường,
+   lượt sau làm tiếp).
 """
 from dataclasses import dataclass, field
 from typing import Callable
@@ -41,8 +46,6 @@ from .constants import (
     OPEN_TAB,
     ROW_GO_DY,
     ROW_GO_TOLERANCE,
-    ROW_MAX_SCROLLS,
-    ROW_SWIPE,
     ROW_TITLE_THRESHOLD,
     ROWS_REGION,
     SUB_TAB_X,
@@ -52,6 +55,10 @@ from .constants import (
     TITLE,
     TITLE_REGION,
 )
+
+
+# after_go trả AGAIN: đi lại từ đầu (đọc lại tiến độ ở dòng Go rồi bấm Go lần nữa).
+AGAIN = "again"
 
 
 @dataclass(frozen=True)
@@ -66,7 +73,7 @@ class PathTask:
     # Ảnh tiêu đề dòng khi tab phụ có nhiều loại nhiệm vụ (VD Teamwork: Patrol / Donate);
     # None = mọi dòng của tab phụ là của nhiệm vụ -> lấy dòng Go trên cùng.
     row_title: str | None = None
-    # Làm nhiệm vụ sau khi bấm Go: (bot, path, done, target) -> None. None = chưa làm.
+    # Làm nhiệm vụ sau khi bấm Go: (bot, path, done, target) -> None / AGAIN. None = chưa làm.
     after_go: Callable | None = field(default=None, compare=False)
 
     @property
@@ -89,7 +96,7 @@ def run(bot, task: dict, state: EventState, path: PathTask):
         return
     day = int(task.get("day") or path.day)
     target = int(task.get("value") or 0)
-    progress = {"entered": False, "scrolls": 0}
+    progress = {"entered": False, "again": 0}   # again: số lần after_go trả AGAIN (để log)
 
     def enter(screen):
         """Lần đầu ở màn King's Path trong lượt này: Day khoá -> lưu, STOP."""
@@ -118,11 +125,6 @@ def run(bot, task: dict, state: EventState, path: PathTask):
         elif action == ON_TAB:
             go = _find_go(bot, screen, path)
             if go is None:
-                if path.row_title is not None and progress["scrolls"] < ROW_MAX_SCROLLS:
-                    progress["scrolls"] += 1
-                    bot.log(f"{name}: row not seen, scrolling ({progress['scrolls']})")
-                    bot.swipe_percent(*ROW_SWIPE, duration=0.5, delay=1)
-                    return HANDLED
                 bot.log(f"{name}: no Go left, done")
                 bot.mark_daily_done(key)
                 return STOP
@@ -139,7 +141,10 @@ def run(bot, task: dict, state: EventState, path: PathTask):
             if path.after_go is None:
                 bot.log(f"{name}: after Go not implemented yet, stop")
                 return STOP
-            path.after_go(bot, path, done, target)
+            if path.after_go(bot, path, done, target) == AGAIN:
+                progress["again"] += 1
+                bot.log(f"{name}: again from the start (re-read progress, round {progress['again']})")
+                return HANDLED
             return STOP
         return HANDLED
 

@@ -80,10 +80,10 @@
                 { "key": "kings_path_city_tax", "label": "City Tax:", "day": 1, "values": [ 0, 3, 10, 20, 40, 70, 110 ], "default": 110 },
                 { "key": "kings_path_patrol", "label": "Patrol:", "day": 2, "values": [ 0, 50, 100, 150, 200 ], "default": 200 },
                 { "key": "kings_path_donate", "label": "Donate:", "day": 2, "values": [ 0, 10, 20, 40, 60 ], "default": 60 },
-                { "key": "kings_path_train_troop", "label": "Train Troop:", "day": 3, "values": [ 2000, 5000, 10000, 20000, 50000, 100000, 200000 ], "default": 200000 },
-                { "key": "kings_path_heal", "label": "Heal:", "day": 3, "values": [ 1000, 2000, 5000, 8000, 12000, 30000, 50000 ], "default": 50000 },
-                { "key": "kings_path_wheel", "label": "Wheel:", "day": 4, "values": [ 5, 10, 30, 60, 100 ], "default": 100 },
-                { "key": "kings_path_black_market", "label": "Black Market:", "day": 5, "values": [ 1, 5, 10, 20, 50, 100 ], "default": 100 }
+                { "key": "kings_path_train_troop", "label": "Train Troop:", "day": 3, "values": [ 0, 2000, 5000, 10000, 20000, 50000, 100000, 200000 ], "default": 200000 },
+                { "key": "kings_path_heal", "label": "Heal:", "day": 3, "values": [ 0, 1000, 2000, 5000, 8000, 12000, 30000, 50000 ], "default": 50000 },
+                { "key": "kings_path_wheel", "label": "Wheel:", "day": 4, "values": [ 0, 5, 10, 30, 60, 100 ], "default": 100 },
+                { "key": "kings_path_black_market", "label": "Black Market:", "day": 5, "values": [ 0, 1, 5, 10, 20, 50, 100 ], "default": 100 }
             ]
         }
     ]

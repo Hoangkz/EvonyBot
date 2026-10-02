@@ -15,9 +15,10 @@ TITLE = KINGS_PATH_TITLE
 TITLE_REGION = EVENT_TITLE_REGION
 
 # Chữ "Day N" trên hàng tab (y ~209; tâm x: Day 1 45, Day 2 120, Day 3 196, Day 4 271).
-# Chưa chọn / đang chọn khớp chéo 0,90 -> ngưỡng 0,95. Day 5 chưa có ảnh (đang khoá).
-DAY_TABS = {d: f"{KP}/Day/day{d}.png" for d in (1, 2, 3, 4)}
-DAY_TABS_SELECTED = {d: f"{KP}/Day/day{d}Selected.png" for d in (1, 2, 3, 4)}
+# Chưa chọn / đang chọn khớp chéo 0,90 -> ngưỡng 0,95. Day 5 (x 347): chưa chọn / đang chọn chéo
+# 0,91; chữ "Day 5" lúc khoá giống lúc mở (0,94) — không sao: Day khoá thì dừng trước khi bấm.
+DAY_TABS = {d: f"{KP}/Day/day{d}.png" for d in (1, 2, 3, 4, 5)}
+DAY_TABS_SELECTED = {d: f"{KP}/Day/day{d}Selected.png" for d in (1, 2, 3, 4, 5)}
 DAY_THRESHOLD = 0.95
 
 # Tab phụ trong một Day (3 tab, y ~252; tâm x 71 / 198 / 324). Ảnh tab chưa chọn thiếu thì
@@ -40,9 +41,6 @@ ROW_GO_DY = 43
 ROW_GO_TOLERANCE = 8
 ROW_TITLE_THRESHOLD = 0.75   # đúng dòng 0,81 .. 1,00 (nền có vệt sáng); màn khác <= 0,67
 ROWS_REGION = (0, 35, 100, 100)   # % màn hình: danh sách dòng dưới hàng tab phụ
-# Dòng của nhiệm vụ chưa thấy trên màn: cuộn danh sách xuống tối đa ROW_MAX_SCROLLS lần.
-ROW_SWIPE = (50, 85, 50, 55)   # % màn hình, ngón tay kéo lên = cuộn xuống
-ROW_MAX_SCROLLS = 3
 
 # Bấm Go -> game chuyển màn (thành / bản đồ / màn chức năng): chờ.
 GO_WAIT = 5

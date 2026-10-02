@@ -86,11 +86,12 @@ flowchart TD
     I --> J{Còn pending?}
     J -->|Có| H
     J -->|Không| K[Tắt ngắt boss; gỡ deadline]
-    H -->|BossAvailable hoặc TimedOut| K
+    H -->|BossAvailable, TimedOut hoặc YieldToBoss| K
     K --> A
 ```
 
 - 120 giây là ngân sách chung cho cả nhóm activity phụ trong một lượt, không phải cho từng activity.
+- Activity phụ vừa xong một nhiệm vụ gọi `bot.yield_to_boss()` (hiện: Event, sau mỗi nhiệm vụ vừa xong) → ném `YieldToBoss`: worker kiểm tra boss ngay, không chờ hết 120 giây; activity vẫn ở `pending`, lượt sau gọi lại từ đầu (nhiệm vụ đã xong tự bỏ qua). Ngoài lịch ưu tiên boss thì `yield_to_boss()` không làm gì.
 - Khi timeout hoặc có thông báo boss, activity đang dở vẫn nằm đầu pending.
 - Lượt sau gọi lại từ đầu hàm activity; worker không lưu dòng đang chạy hoặc tiến độ nội bộ.
 - Activity trả về bình thường được xem là hoàn thành và bị loại khỏi pending.

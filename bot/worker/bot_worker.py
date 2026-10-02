@@ -13,7 +13,7 @@ from ..activities.join_monster_war import IDLE as BOSS_IDLE
 from ..common import NotEnoughGems, get_server, get_server_time, keep_bubble
 from ..daily_reset import done_today, last_reset
 from ..context import BotContext, BotInterrupted, TimedOut
-from ..context.errors import BossAvailable, BubbleDue
+from ..context.errors import BossAvailable, BubbleDue, YieldToBoss
 from .status import STATUS_ERROR, STATUS_RUNNING, STATUS_STOPPED
 
 JOIN_BOSS = "Join Monster War"
@@ -184,6 +184,8 @@ class BotWorker(QThread):
             # Lượt sau gọi lại từ đầu hàm run(); worker không lưu điểm thực thi.
             except TimedOut:
                 pass    # hết 2 phút -> pending[0] là activity đang dở, lượt sau làm tiếp
+            except YieldToBoss:
+                pass    # activity vừa xong 1 nhiệm vụ -> kiểm tra boss ngay, lượt sau làm tiếp
             except BossAvailable:
                 self.log("New boss on this server; switching to Join Monster War")
             except BubbleDue:

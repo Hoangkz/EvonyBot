@@ -3,7 +3,7 @@ flow.py — flow control: stop / time-out checks, interruptible sleep, log.
 """
 import time
 
-from .errors import BossAvailable, BubbleDue, StopRequested, TimedOut
+from .errors import BossAvailable, BubbleDue, StopRequested, TimedOut, YieldToBoss
 
 
 class FlowMixin:
@@ -17,6 +17,14 @@ class FlowMixin:
             raise BossAvailable()
         if self._deadline is not None and time.monotonic() >= self._deadline:
             raise TimedOut()
+
+    def yield_to_boss(self):
+        """Gọi khi activity phụ vừa xong một nhiệm vụ: đang chạy theo lịch ưu tiên boss (worker
+        bật _boss_interrupt_enabled) thì nhường ngay để kiểm tra boss; không thì không làm gì."""
+        self.check()
+        if self._boss_interrupt_enabled:
+            self.log("Task done: yielding to boss check")
+            raise YieldToBoss()
 
     def sleep(self, seconds: float):
         """Like time.sleep, but wakes up immediately on Stop / time-out."""

@@ -8,7 +8,8 @@ Sau Go:
    có icon "Tax" -> bấm. Không thấy icon thì bấm giữa thêm 1 lần.
 2. Màn Tax: chia (mục tiêu - số đã làm) cho 4 dòng, làm tròn lên cho nhanh, 4 dòng bằng nhau
    (VD đã làm 20, mục tiêu 110 -> còn 90 -> 90 / 4 = 22,5 -> mỗi dòng 23; dư vài lần không sao).
-3. Mỗi dòng: bấm "Tax" -> popup -> gõ số lần vào ô số -> bấm "Tax" (quá lượt miễn phí thì
+3. Mỗi dòng: bấm "Tax" -> popup -> bấm ô số -> xoá số cũ, gõ số lần -> bấm chỗ trống trong popup
+   (thanh nhập mất) -> bấm "Tax" (quá lượt miễn phí thì
    tiêu kim cương) -> về màn Tax.
 4. Thu đủ 4 dòng -> đánh dấu xong.
 Không đọc được số đã làm ở dòng Go thì không thu (không biết số lần, tránh tiêu kim cương).
@@ -24,6 +25,7 @@ from .constants import (
     INPUT_DELETES,
     KEY,
     POPUP,
+    POPUP_BLANK_OFFSET,
     POPUP_INPUT_OFFSET,
     POPUP_TAX,
     ROW_TAX,
@@ -79,7 +81,8 @@ def _tax_row(bot, row: int, count: int) -> bool:
     for _ in range(INPUT_DELETES):
         bot.shell("input keyevent KEYCODE_DEL")
     bot.shell(f"input text {count}")
-    bot.shell("input keyevent KEYCODE_ENTER")
+    bx, by = POPUP_BLANK_OFFSET
+    bot.tap(popup[0] + bx, popup[1] + by)   # bấm vào màn hình cho thanh nhập mất (không bấm OK)
     bot.sleep(1)
     button = bot.find(POPUP_TAX)
     if button is None:

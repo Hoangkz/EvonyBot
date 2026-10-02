@@ -38,3 +38,19 @@ SCIENCE_WAIT = 10   # sau Go: chờ màn Alliance Science (giây)
 DONATE_WAIT = 1     # sau mỗi lần bấm Donate
 GEMS_WAIT = 2       # sau khi bấm nút kim cương / Okay
 MAX_MISSES = 5      # số lần chụp liên tiếp không nhận ra màn nào -> bỏ, lượt sau làm tiếp
+
+# ---- Không làm Patrol: donate qua Liên minh (alliance.py) --------------------------------
+# Ô Patrol ở tab Event = 0 (không tích) -> Donate không vào King's Path: màn chính -> Liên minh
+# -> cuộn xuống -> Alliance Science -> donate thẻ khoa học đầu tiên (như activity Alliance
+# Capacity, dùng lại ảnh của nó). Không có dòng Go để đọc tiến độ -> tự lưu số lần đã donate hôm
+# nay vào daily_done `<KEY>_alliance_<n>` (n = 1, 2, ...): bị ngắt thì lượt sau donate tiếp phần
+# còn thiếu.
+PATROL_KEY = "kings_path_patrol"   # ô Patrol trong settings tab Event
+EVENT_TAB = "Event"                # tên tab trong bot.settings
+# Đo trên tests/event/kings_path/screens/alliance_*.png:
+ALLIANCE_BUTTON = "JoinBoss/lienminh.png"         # nút Liên minh ở màn chính (361, 558): 0,93
+ALLIANCE_SCROLL = "JoinBoss/chientranh.png"       # dòng Alliance War (42, 396): 0,97 -> cuộn xuống
+ALLIANCE_SCIENCE = "Science/scienceclick.png"     # dòng Alliance Science: 0,99 sau khi cuộn (49, 498);
+                                                  # bị che ở đáy trước khi cuộn: 0,86 (không bấm)
+OUT_ALLIANCE = "JoinBoss/outLM.png"               # popup ngoài liên minh (bấm lệch +40, +40 rồi Back)
+NAV_MAX_STEPS = 30

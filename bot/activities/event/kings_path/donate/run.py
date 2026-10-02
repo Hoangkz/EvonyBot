@@ -9,19 +9,18 @@ Sau Go (màn Alliance Science):
 - Hết lượt (nút kim cương) -> bấm để mua lại lượt, tối đa MAX_GEM_BUYS (5) lần; quá thì dừng.
 Không đọc được số đã làm ở dòng Go thì không donate (không biết lúc nào dừng, tránh tiêu
 kim cương). Bị ngắt giữa chừng: lượt sau đọc lại số đã làm ở dòng Go rồi làm tiếp.
+
+Ô Patrol ở tab Event = 0 (không làm Patrol): không vào King's Path mà donate qua Liên minh ->
+Alliance Science (alliance.py). Vòng donate dùng chung: donating.py.
 """
 from ...common import EventState
 from .. import path_task
+from . import alliance
 from .constants import (
     DAY,
-    DONATE_BUTTON,
-    DONATE_WAIT,
-    GEMS_BUTTON,
-    GEMS_WAIT,
+    EVENT_TAB,
     KEY,
-    MAX_GEM_BUYS,
-    MAX_MISSES,
-    OKAY,
+    PATROL_KEY,
     ROW_TITLE,
     SCIENCE_TITLE,
     SCIENCE_WAIT,
@@ -29,6 +28,7 @@ from .constants import (
     TAB_INDEX,
     TAB_SELECTED,
 )
+from .donating import donate_times
 
 NAME = "Donate"
 
@@ -38,50 +38,26 @@ def _donate(bot, path, done, target):
     if done is None:
         bot.log(f"{NAME}: progress unknown, not donating")
         return
-    need = target - done
     if bot.wait_for(SCIENCE_TITLE, timeout=SCIENCE_WAIT) is None:
         bot.log(f"{NAME}: Alliance Science not shown")
         return
-    donated = gem_buys = misses = 0
-    while donated < need:
-        action, pos = _read_screen(bot, bot.screenshot())
-        if action is None:
-            misses += 1
-            if misses > MAX_MISSES:
-                bot.log(f"{NAME}: screen not recognised, stop ({donated}/{need})")
-                return
-            bot.sleep(1)
-            continue
-        misses = 0
-        if action == "okay":
-            bot.tap(*pos, delay=GEMS_WAIT)
-        elif action == "donate":
-            bot.tap(*pos, delay=DONATE_WAIT)
-            donated += 1
-        else:
-            if gem_buys >= MAX_GEM_BUYS:
-                bot.log(f"{NAME}: bought donations {MAX_GEM_BUYS} times, stop ({donated}/{need})")
-                return
-            gem_buys += 1
-            bot.log(f"{NAME}: out of donations, buy with gems ({gem_buys}/{MAX_GEM_BUYS})")
-            bot.tap(*pos, delay=GEMS_WAIT)
-    bot.log(f"{NAME}: donated {donated}, done")
-    bot.mark_daily_done(path.key)
+    need = target - done
+    donated = donate_times(bot, NAME, need)
+    if donated >= need:
+        bot.log(f"{NAME}: donated {donated}, done")
+        bot.mark_daily_done(path.key)
 
 
-def _read_screen(bot, screen):
-    """(action, vị trí) trên màn Alliance Science: "okay" (hộp xác nhận), "donate" /
-    "gems" (nút của thẻ khoa học trên cùng); (None, None) nếu không phải màn đó."""
-    if bot.find(SCIENCE_TITLE, screen=screen) is None:
-        return None, None
-    okay = bot.find(OKAY, screen=screen)
-    if okay is not None:
-        return "okay", okay
-    for action, template in (("donate", DONATE_BUTTON), ("gems", GEMS_BUTTON)):
-        points = bot.find_all(template, screen=screen)
-        if points:
-            return action, min(points, key=lambda p: p[1])
-    return None, None
+def _patrol_enabled(bot) -> bool:
+    """Ô Patrol ở tab Event có bật (giá trị khác 0) không. Không có cấu hình tab Event (VD test
+    chỉ truyền settings của nhiệm vụ) -> coi như bật."""
+    event = (getattr(bot, "settings", None) or {}).get(EVENT_TAB)
+    if not event:
+        return True
+    patrol = event.get(PATROL_KEY)
+    if not isinstance(patrol, dict):
+        return False
+    return str(patrol.get("value", 0)) not in ("", "0")
 
 
 PATH = path_task.PathTask(
@@ -92,5 +68,9 @@ PATH = path_task.PathTask(
 
 
 def run(bot, task: dict, state: EventState):
-    """`task` là settings của nhiệm vụ: {"value": int, "day": int}."""
+    """`task` là settings của nhiệm vụ: {"value": int, "day": int}. Không làm Patrol -> donate qua
+    Liên minh (alliance.py), không vào King's Path."""
+    if not _patrol_enabled(bot):
+        alliance.run(bot, task)
+        return
     path_task.run(bot, task, state, PATH)
