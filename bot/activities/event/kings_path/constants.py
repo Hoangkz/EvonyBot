@@ -4,15 +4,15 @@ constants.py — ảnh, ngưỡng và action dùng chung cho các nhiệm vụ K
 
 Ảnh cắt từ tests/event/kings_path/screens/ (màn 396x704).
 """
-from ..constants import EV
+from ..constants import EV, EVENT_TITLE_REGION, KINGS_PATH_TITLE
 
 KP = f"{EV}/KingsPath"
 
 # ---- Màn King's Path ---------------------------------------------------------------
 # Chữ "King's Path" trên thanh tiêu đề, tâm (198, 23). Hàng tab Day giống hệt Gather Troops
 # (khớp chéo 1,00) nên phải thấy tiêu đề này mới coi là đang ở màn King's Path.
-TITLE = f"{KP}/title.png"
-TITLE_REGION = (20, 0, 80, 8)   # % màn hình: thanh tiêu đề
+TITLE = KINGS_PATH_TITLE
+TITLE_REGION = EVENT_TITLE_REGION
 
 # Chữ "Day N" trên hàng tab (y ~209; tâm x: Day 1 45, Day 2 120, Day 3 196, Day 4 271).
 # Chưa chọn / đang chọn khớp chéo 0,90 -> ngưỡng 0,95. Day 5 chưa có ảnh (đang khoá).

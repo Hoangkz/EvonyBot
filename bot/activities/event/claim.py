@@ -6,7 +6,10 @@ Chỉ chạy khi event có ít nhất 1 nhiệm vụ đã xong hôm nay (daily_d
 vụ xong tăng lên (lưu daily_done `<event>_claimed_<số nhiệm vụ xong>`): bị ngắt giữa chừng
 thì lượt sau nhận lại.
 
-Flow (sau khi mở event bằng run_task, giống nhiệm vụ):
+Đang ở sẵn bảng event đó (thấy tiêu đề, VD nhiệm vụ cuối vừa xong ngay trên bảng) thì nhận luôn
+tại chỗ; không thì mở event bằng run_task (màn chính -> Event Center -> danh sách -> icon).
+
+Flow (trên bảng event):
 1. Claim All -> bấm (run_task tự lo, xem common.priority_targets).
 2. Chấm đỏ trên hàng tab phụ (tab chưa bấm trong Day đang mở) -> bấm tab đó.
 3. Hết chấm ở tab phụ: chấm đỏ trên hàng tab Day (Day chưa bấm) -> bấm Day đó.
@@ -33,12 +36,18 @@ from .constants import (
     DOT_ROW_HALF,
     DOT_TAB_Y,
     DOT_TAP_OFFSET,
+    EVENT_TITLE_REGION,
     GATHER_CHESTS,
+    GATHER_TROOPS_TITLE,
+    KINGS_PATH_TITLE,
     MILESTONE_BOX,
 )
 
 # Rương mốc theo event: [((x, y) tâm icon, mốc)].
 CHESTS = {"gather_troops": GATHER_CHESTS}
+# Tiêu đề bảng event: thấy là đang ở sẵn bảng đó -> nhận luôn, không mở lại từ màn chính.
+TITLES = {"gather_troops": GATHER_TROOPS_TITLE, "kings_path": KINGS_PATH_TITLE}
+ON_EVENT = "on_event"   # action: đang ở bảng event (thấy tiêu đề)
 
 
 def claim_key(event: str, done_count: int) -> str:
@@ -56,22 +65,24 @@ def maybe_claim(bot, state: EventState, event: str, name: str, icon: str, keys: 
     if bot.is_daily_done(key):
         return
     bot.log(f"{name}: {done_count} task(s) done, claiming rewards")
-    run(bot, state, name, icon, CHESTS.get(event, ()))
+    run(bot, state, name, icon, CHESTS.get(event, ()), TITLES.get(event))
     bot.mark_daily_done(key)
 
 
-def run(bot, state: EventState, name: str, icon: str, chests=()):
-    """Mở event `icon`, bấm lần lượt các tab có chấm đỏ (mỗi tab Claim All), rồi nhận rương
-    mốc `chests` đã tới mốc."""
+def run(bot, state: EventState, name: str, icon: str, chests=(), title: str | None = None):
+    """Vào bảng event (đang ở sẵn — thấy `title` — thì dùng luôn, không thì mở `icon` từ màn
+    chính), bấm lần lượt các tab có chấm đỏ (mỗi tab Claim All), rồi nhận rương mốc `chests`."""
     def handle(action, pos, screen):
-        if action != EVENT_OPENED:
+        if action not in (EVENT_OPENED, ON_EVENT):
             return None
         _claim_dots(bot, state, name)
         if chests:
             _claim_chests(bot, name, chests)
         return STOP
 
-    run_task(bot, state, f"{name} claim", icon, handle)
+    targets = [(title, ON_EVENT)] if title else []
+    run_task(bot, state, f"{name} claim", icon, handle, targets=targets,
+             regions={title: EVENT_TITLE_REGION} if title else None)
 
 
 def _claim_dots(bot, state: EventState, name: str):

@@ -128,6 +128,17 @@ class ClaimFlow(unittest.TestCase):
         self.assertIn("Gather Troops: claim chest 10 (progress 12)", device.logs)
         self.assertIn(claim_key("gather_troops", 1), device.daily_done)
 
+    def test_claim_on_event_screen(self):
+        """Đang ở sẵn bảng King's Path (nhiệm vụ cuối vừa xong trên bảng): nhận luôn tại chỗ, không
+        Back về màn chính rồi mở lại event."""
+        flow = [
+            Step("day1_city_tax.png", tap(CLAIM_ALL)),
+            Step("day1_city_tax.png?no_dots", end()),
+        ]
+        device = _run(self, flow, DONE)
+        self.assertIn(claim_key("kings_path", 1), device.daily_done)
+        self.assertNotIn("King's Path claim: event opened", device.logs)
+
     def test_already_claimed(self):
         """Đã nhận ứng với 1 nhiệm vụ xong: không mở lại event."""
         flow = [Step("03_main.png", end())]

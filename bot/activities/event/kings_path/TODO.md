@@ -48,11 +48,7 @@ Cần ảnh cho mỗi nhiệm vụ: thành sau Go, menu sau khi bấm giữa (c�
 - [ ] Train Troop, Heal, Wheel, Black Market **không có giá trị 0** → không tắt được nhiệm vụ.
 - [ ] `kings_path_black_market` có trong tab nhưng chưa có nhiệm vụ → bị bỏ qua im lặng.
 
-## 6. Chưa làm
-
-- [ ] Rương **King's Path** (rương đếm số ở đầu màn, Progress x / 99). Cần ảnh lúc nhận được + sau khi bấm.
-
-## 7. Phạm vi (đã chốt 2026-10-02)
+## 6. Phạm vi (đã chốt 2026-10-02)
 
 Chỉ làm các nhiệm vụ có trong group King's Path của `ui/tabs/event.json`: City Tax, Patrol, Donate,
 Train Troop, Heal, Wheel, Black Market. **Không làm** các tab phụ khác: Hoarding, Mining (Day 1);
@@ -60,10 +56,11 @@ Unstoppable — đánh boss, Try Your Best (Day 2); God's Blessing — Offer (Da
 Accumulation, Sharp Weapons (Day 4).
 
 City Tax: tiêu kim cương khi hết lượt miễn phí, **không cần mức trần** — chỉ cần tax 4 dòng đủ mục tiêu.
+King's Path: nhận thưởng chỉ cần Claim All theo chấm đỏ, **không** đọc thanh tiến độ / nhận rương đầu màn.
 Mốc rương Gather Troops (5/10/30/50/70) cố định; game đổi mốc thì sửa ở `bot/activities/event/milestones.py`.
 Donate: giá mua lại lượt cao nhất 448 kim cương, giảm dần theo thời gian → **không cần mức trần**. Mua tối đa 5 lần
 (lần đầu không còn lượt miễn phí: 5 × 13 = 65 ≥ 60); donate đủ (mục tiêu − số đã làm, OCR dòng Go) là dừng.
 
-## 8. Khác
+## 7. Khác
 
 - [ ] Toàn bộ thay đổi King's Path **chưa commit**.

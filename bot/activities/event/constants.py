@@ -59,6 +59,13 @@ GATHER_TROOPS_ICON = f"{EV}/GatherTroops/icon.png"
 # khớp 1,00 tại (45, 512) (tests/event/kings_path/screens/04_event_list.png); màn khác <= 0,47.
 KINGS_PATH_ICON = f"{EV}/KingsPath/icon.png"
 
+# Tiêu đề màn event (đầu màn, tâm (199, 23)): thấy là đang ở sẵn bảng event đó.
+# "Gather Troops": 1,00 trên 20 màn Gather Troops trong tests; màn khác (cả King's Path) <= 0,50.
+GATHER_TROOPS_TITLE = f"{EV}/GatherTroops/title.png"
+# "King's Path": 1,00 trên mọi màn King's Path; màn khác <= 0,74 (xem kings_path/constants.py).
+KINGS_PATH_TITLE = f"{EV}/KingsPath/title.png"
+EVENT_TITLE_REGION = (20, 0, 80, 8)   # % màn hình: thanh tiêu đề
+
 # ---- Màn một event (Gather Troops, King's Path, ...) -------------------
 # Nút "Claim All" ở cuối màn event: thấy là bấm trước mọi thứ khác. Khớp 1,00;
 # màn khác <= 0,66 (nút "Claimed").
