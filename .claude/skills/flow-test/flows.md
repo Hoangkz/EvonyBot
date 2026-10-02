@@ -255,3 +255,23 @@ Settings: `{"kings_path_patrol": {"value": 200, "day": 2}}` (mỗi nhiệm vụ 
 Chưa có ảnh icon King's Path trong danh sách event: test bắt đầu ngay ở màn King's Path và tạm patch `path_task.KINGS_PATH_ICON` sang icon Gather Troops.
 Flow chung (path_task.py): Day khoá? -> tab Day -> tab phụ -> nút Go của nhiệm vụ (dòng trên cùng, hoặc dòng có tiêu đề `row_title`) -> OCR "a / b" -> đạt mục tiêu thì xong, chưa thì bấm Go (phần sau Go: TODO).
 Biến thể ảnh: `claimed` (xoá nút Claim All), `not_kp` (xoá tiêu đề "King's Path" -> bot phải Back).
+
+## Event Center / Crazy Eggs — `tests/event_center/crazy_eggs/test_flow.py`
+`bot/activities/event_center/` KHÔNG phải activity (không có trong ACTIVITIES): chứa nhiệm vụ Event Center, nơi cần thì gọi `event_center.crazy_eggs.run(bot, settings)`.
+Quả đập được = có icon búa (`EventCenter/CrazyEggs/hammer.png`) trong nhãn "Scout Cost:"; số quả theo vị trí búa (cột 1: x < 50 %, hàng 1: y < 70 % màn); bấm thẳng vào tâm búa. Kết thúc khi hết quả có búa hoặc hết búa (hộp thoại "You don't have enough Hammers" → Cancel; dự phòng: bấm mà số quả có búa không giảm).
+
+| # | Màn hình | Action |
+| --- | --- | --- |
+| 01 | Màn chính | `tap_at(359, 216)` — bấm chính icon cúp Event Center (tâm chữ + (0, -25)) |
+| 02 | Event Center, tab Limited (nhận bằng `EventCenter/competitionTab.png`) | `tap("EventCenter/activitiesTab.png")` |
+| 03 | Tab Activities, đầu danh sách (không thấy icon) | `swipe()` |
+| 03_activities_crazy_eggs | Tab Activities đã cuộn tới Crazy Eggs (ảnh thật) | `tap("EventCenter/CrazyEggs/icon.png")` |
+| 04 | Crazy Eggs, 4 quả có búa | `tap_at(297, 393)` (búa quả 2) |
+| 06 | Popup "Congratulations!" (ảnh thật của một lần đập khác) | `back()` |
+| ?cracked_2 → ?cracked_23 → ?cracked_231 | Crazy Eggs, bớt dần quả có búa (nhãn lấy từ ảnh 05) | bấm quả 3, 1, 4 |
+| 05 | Crazy Eggs, 4 quả "Waiting:" | búa vàng: `tap_at(250, 391)` (nhãn "Waiting:" quả 2) |
+| 07 | Hộp thoại "Use the Lucky Hammer ... Confirm use?" | `tap("EventCenter/CrazyEggs/confirm.png")`, lưu `crazy_eggs_lucky_hammer` |
+| 06 | Popup "Congratulations!" sau khi Confirm (giống đập thường) | `back()` |
+| 05 | Crazy Eggs, 4 quả "Waiting:" | `end()` |
+
+Nhánh phụ: bấm quả 2 mà ảnh không đổi → hết búa, quả 2 không chờ nên không dùng búa vàng, return; mọi quả "Waiting" + búa vàng đã dùng hôm nay → return ngay; bấm quả 2 dùng búa vàng mà không hiện hộp thoại → lưu đã dùng, return; quả 1 "Activated" (`08_egg_1_activated.png`, búa vàng đã dùng) → chỉ đập quả 3 → animation trứng vỡ (`10_egg_breaking.png`, màn tối) → `tap_pct(50, 95)` → popup trứng vỡ "Congratulations on activating the egg!" (`09_egg_activated_rewards.png`) → `back()` → return; số búa vàng trên màn là "0" (`12_all_activated.png`, 4 quả đã vỡ) → lưu đã dùng, return; bấm quả 3 khi hết búa → hộp thoại `11_not_enough_hammers.png` → `tap("EventCenter/CrazyEggs/cancel.png")` → return; màn Event Center không có tab Activities (`02?no_activities_tab`) → 3 lần (01 → 02 → `back()`), `shell("am force-stop")`, thêm 2 lần → lưu `crazy_eggs_done`, return; đã có `crazy_eggs_done` → return ngay; tab Activities không có icon (`03_activities.png` thật) → 3 lần (01 → 02 → 03 cuộn 8 lần → `back()`), `shell("am force-stop")`, thêm 2 lần → lưu `crazy_eggs_done`, return.
