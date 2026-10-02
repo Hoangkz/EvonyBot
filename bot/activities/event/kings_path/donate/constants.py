@@ -21,8 +21,9 @@ ROW_TITLE = f"{KP}/Title/donate.png"
 # "Okay" -> có lại 13 lượt. Ảnh cắt từ tests/event/kings_path/screens/donate_*.png.
 # Tiêu đề "Alliance Science" (198, 23): 1,00 (0,99 khi có hộp xác nhận); màn khác <= 0,64.
 SCIENCE_TITLE = f"{KP}/Donate/title.png"
-# Chữ "Donate" trên nút xanh của thẻ khoa học trên cùng (317, 361): 1,00; màn khác <= 0,64.
-DONATE_BUTTON = f"{KP}/Donate/donate.png"
+# Chữ "Donate" trên nút xanh của thẻ khoa học (317, 361 / 530): 1,00; màn khác <= 0,64. Dùng chung
+# với activity Alliance Capacity (ảnh cũ của nó chỉ khớp 0,84 ở thẻ đầu -> donate nhầm thẻ 2).
+DONATE_BUTTON = "Science/donate.png"
 # Mép trái nút kim cương + icon (không lấy số vì giá đổi theo lần mua) (294, 361): 1,00;
 # khi hộp xác nhận che 0,72. Màn khác tới 0,91 (nút kim cương ở màn Bubble) -> chỉ xét khi
 # thấy SCIENCE_TITLE.
