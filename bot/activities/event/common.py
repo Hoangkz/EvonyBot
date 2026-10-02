@@ -138,13 +138,17 @@ def priority_targets() -> list[tuple[str, str]]:
 def common_targets(state: EventState) -> list[tuple[str, str]]:
     """(ảnh, action) dùng chung, đặt SAU ảnh riêng của nhiệm vụ. Màn quà (chữ "Login
     Gifts") xét trước icon vì tab trong màn đó cũng giống icon; hết quà thì bỏ cả hai.
+    Ảnh exit/click (popup) xét trước ảnh của màn chính (icon quà, MAIN_SCREEN): popup đè
+    lên thành thì vẫn thấy ảnh màn chính nhưng bấm không được, phải đóng popup trước.
     Icon quà xét trước nút "•••" để ở màn chính luôn nhận quà trước khi tìm Event Center."""
     targets = []
     if not state.login_done:
-        targets += [(LOGIN_GIFT_TITLE, CLAIM_LOGIN_GIFT), (LOGIN_GIFT_ICON, OPEN_LOGIN_GIFT)]
-    targets.append((MAIN_SCREEN, ON_MAIN_SCREEN))
+        targets.append((LOGIN_GIFT_TITLE, CLAIM_LOGIN_GIFT))
     targets += [(path, BACK) for path in exit_images()]
     targets += [(path, TAP) for path in click_images()]
+    if not state.login_done:
+        targets.append((LOGIN_GIFT_ICON, OPEN_LOGIN_GIFT))
+    targets.append((MAIN_SCREEN, ON_MAIN_SCREEN))
     return targets
 
 
