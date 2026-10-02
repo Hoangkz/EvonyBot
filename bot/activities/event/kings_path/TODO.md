@@ -55,9 +55,28 @@ Hiện các nhiệm vụ này bấm Go rồi dừng, **không bao giờ đánh d
 - [ ] Train Troop, Offer, Heal, Wheel, Black Market **không có giá trị 0** → không tắt được nhiệm vụ.
 - [ ] `kings_path_black_market` có trong tab nhưng chưa có nhiệm vụ → bị bỏ qua im lặng.
 
-## 6. Ngoài phạm vi hiện tại (ghi lại để quyết định sau)
+## 6. Phạm vi
 
-- [ ] Các tab phụ chưa làm: Hoarding, Mining (Day 1); Unstoppable — đánh boss, Try Your Best (Day 2);
+Chỉ làm các nhiệm vụ có trong group King's Path của `ui/tabs/event.json`: City Tax, Patrol, Donate,
+Train Troop, Offer, Heal, Wheel, Black Market. **Không làm** (đã chốt 2026-10-02):
+
+- Các tab phụ khác: Hoarding, Mining (Day 1); Unstoppable — đánh boss, Try Your Best (Day 2);
   Accumulation, Sharp Weapons (Day 4).
-- [ ] Rương mốc tiến độ ở đầu màn (Progress x / 99): chưa nhận tự động (Claim All chỉ nhận dòng nhiệm vụ?).
+
+## 7. Nhận thưởng theo chấm đỏ (event/claim.py)
+
+- [x] Xong hết nhiệm vụ của một event (Gather Troops, King's Path — mỗi event riêng) mà có ≥ 1 nhiệm vụ
+  xong hôm nay → mở event, bấm các tab phụ / tab Day có chấm đỏ, mỗi tab Claim All (2026-10-02).
+  Nhận lại mỗi khi số nhiệm vụ xong tăng lên.
+- [ ] Thử thật trên giả lập (cả Gather Troops và King's Path).
+- [x] Rương mốc **Gather Troops** (5/10/30/50/70): OCR "Progress:x / 70" (font mới `Images/OCR/Milestone`),
+  bấm rương có mốc ≤ x mà chưa có dấu tích; chạy sau khi hết chấm đỏ (2026-10-02).
+- [ ] OCR `Milestone` mới có mẫu chữ số **0, 1, 2, 6, 7** — thiếu **3, 4, 5, 8, 9**: tiến độ chứa các số này đọc lỗi
+  → bot bỏ qua rương. Gửi ảnh màn Gather Troops có tiến độ chứa các số đó để thêm mẫu.
+- [ ] Bấm rương xong có popup phần thưởng không? Chưa có ảnh — nếu có popup che, cần thêm bước đóng.
+- [ ] Mốc rương đang cố định 5/10/30/50/70 (theo ảnh). Event lần sau đổi mốc thì phải sửa `GATHER_CHESTS`.
+- [ ] Rương **King's Path** (rương đếm số ở đầu màn, Progress x / 99): chưa làm. Cần ảnh lúc nhận được + sau khi bấm.
+
+## 8. Khác
+
 - [ ] Toàn bộ thay đổi King's Path **chưa commit**.

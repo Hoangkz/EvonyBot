@@ -22,6 +22,7 @@ from bot.activities.event.kings_path.city_tax.run import split_counts
 from bot.activities.event.kings_path.donate.constants import DONATE_BUTTON, GEMS_BUTTON, OKAY
 from bot.activities.event.kings_path.wheel.constants import SPINS_10, SPINS_100
 from tests.flow import Step, back, end, run_flow, tap, tap_at, tap_pct
+from tests.event import setUpModule, tearDownModule  # noqa: F401 (tắt lượt nhận thưởng)
 
 SCREENS = Path(__file__).parent / "screens"
 KP = "Event/KingsPath"

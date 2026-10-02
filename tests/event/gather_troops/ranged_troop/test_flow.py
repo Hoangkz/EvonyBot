@@ -22,6 +22,7 @@ from bot.activities.event.gather_troops import ranged_troop
 from bot.activities.event.gather_troops.ranged_troop.constants import LOCKED_KEY
 from bot.context import TEMPLATE_DIR
 from tests.flow import Step, back, end, run_flow, tap, tap_at
+from tests.event import setUpModule, tearDownModule  # noqa: F401 (tắt lượt nhận thưởng)
 
 SCREENS = Path(__file__).parent / "screens"
 KEY = ranged_troop.KEY

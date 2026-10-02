@@ -30,6 +30,11 @@ The bubble timer font ("Timer", read_bubble_time.py) is split by colour too;
 ":" is recognised by shape (not saved). Example for "06:55:22":
 
     python -m bot.ocr.add_sample Timer timer.png "0|6|:|5|5|:|2|2"
+
+The milestone progress font ("Milestone", read_milestone.py) is split the same way, from
+the whole line "Progress:12 / 70" (everything left of ":" is dropped). Example:
+
+    python -m bot.ocr.add_sample Milestone line.png "1|2|/|7|0"
 """
 import sys
 from pathlib import Path
@@ -42,6 +47,8 @@ from .read_boss_name import FONT as NAME_FONT
 from .read_bubble_time import FONT as TIMER_FONT
 from .read_bubble_time import split as split_timer
 from .read_boss_name import split as split_name
+from .read_milestone import FONT as MILESTONE_FONT
+from .read_milestone import split as split_milestone
 from .read_power import FONT as POWER_FONT
 from .read_power import split as split_power
 from .read_progress import FONT as PROGRESS_FONT
@@ -49,7 +56,7 @@ from .read_progress import split as split_progress
 
 # Fonts split into pieces by their own splitter (see _pieces.py / read_progress.py).
 PIECE_FONTS = {NAME_FONT: split_name, POWER_FONT: split_power, PROGRESS_FONT: split_progress,
-               TIMER_FONT: split_timer}
+               TIMER_FONT: split_timer, MILESTONE_FONT: split_milestone}
 
 
 def add_sample(font: str, image_path: str, text: str) -> list[Path]:

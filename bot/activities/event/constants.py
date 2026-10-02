@@ -81,6 +81,31 @@ DAY_LOCK_THRESHOLD = 0.7
 DAY_TABS_REGION = (0, 26, 100, 33)   # % màn hình: hàng tab Day
 DAY_TABS = 5
 
+# ---- Nhận thưởng theo chấm đỏ (claim.py) -----------------------------------------
+# Chấm đỏ ở góc trên phải tab Day / tab phụ = còn thưởng chưa nhận. Nhận theo MÀU (template
+# trượt trên hàng tab phụ vì nền sau chấm khác nhau): điểm ảnh R > 150, G < 70, B < 60, khối
+# liền DOT_AREA px. Đo trên 10 màn King's Path + màn Gather Troops: tâm chấm hàng Day y 191
+# (x 77 / 153 / 228 ...), hàng tab phụ y 234..235 (x 128 / 253 / 379), diện tích 16..21 px.
+# Màn khác có nhiều khối đỏ -> chỉ quét 2 hàng này khi đang ở màn event.
+DOT_DAY_Y = 191
+DOT_TAB_Y = 235
+DOT_ROW_HALF = 8           # quét y +- mức này quanh mỗi hàng
+DOT_AREA = (12, 30)        # diện tích khối đỏ (px) được coi là chấm
+# Bấm vào tab có chấm: lệch từ tâm chấm vào trong tab (chấm ở góc trên phải tab).
+DOT_TAP_OFFSET = (-25, 14)
+CLAIM_MAX_STEPS = 30       # số bước tối đa của một lượt nhận thưởng
+
+# Rương mốc trên đầu màn Gather Troops: (tâm icon, mốc ghi dưới icon) — 5 / 10 / 30 / 50 / 70.
+# Rương nhận được = mốc <= số đã làm ở dòng "Progress:12 / 70" (OCR bot.ocr.read_milestone,
+# vùng cắt MILESTONE_BOX) và chưa có dấu tích. Nhận xong rương có dấu tích.
+GATHER_CHESTS = [((70, 83), 5), ((122, 83), 10), ((173, 83), 30), ((224, 83), 50), ((275, 83), 70)]
+MILESTONE_BOX = (100, 121, 160, 14)   # (x, y, w, h) cả dòng "Progress:12 / 70"
+# Dấu tích xanh trên rương đã nhận (tâm lệch (+1, -1) so với tâm icon): 1,00; rương chưa nhận
+# <= 0,56 (tests/event/claim_screens/gather_chest_10.png + 4 màn Gather Troops) -> 0,8.
+CHEST_TICK = f"{EV}/chestTick.png"
+CHEST_TICK_THRESHOLD = 0.8
+CHEST_HALF = 18   # tìm dấu tích trong ô 36x36 quanh tâm icon
+
 # Ngưỡng riêng của ảnh dùng chung; nhiệm vụ ghép thêm ngưỡng của mình
 # ({**THRESHOLDS, ...} trong constants.py của nhiệm vụ).
 THRESHOLDS = {

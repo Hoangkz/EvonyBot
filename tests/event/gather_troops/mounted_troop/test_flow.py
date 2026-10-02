@@ -23,6 +23,7 @@ from bot.activities.event.gather_troops import mounted_troop
 from bot.activities.event.gather_troops.mounted_troop.constants import LOCKED_KEY
 from bot.context import TEMPLATE_DIR
 from tests.flow import Step, back, end, run_flow, tap, tap_at
+from tests.event import setUpModule, tearDownModule  # noqa: F401 (tắt lượt nhận thưởng)
 
 SCREENS = Path(__file__).parent / "screens"
 KEY = mounted_troop.KEY

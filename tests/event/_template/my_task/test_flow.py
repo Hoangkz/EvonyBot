@@ -14,6 +14,7 @@ from pathlib import Path
 from bot.activities.event._template import my_task
 from bot.activities.event.common import EventState
 from tests.flow import Step, back, end, run_flow, swipe, tap, tap_at
+from tests.event import setUpModule, tearDownModule  # noqa: F401 (tắt lượt nhận thưởng)
 
 SCREENS = Path(__file__).parents[2] / "gather_troops" / "cultivate_generals" / "screens"
 KEY = my_task.KEY

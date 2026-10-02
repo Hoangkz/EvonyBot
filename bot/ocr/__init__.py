@@ -10,12 +10,14 @@ per reader, each exposing `run(image)`:
 - read_boss_name: "(Boss) Peryton" trên thẻ rally -> "(boss) peryton"
 - read_power: lực boss "6.5M" trên thẻ rally -> 6500000
 - read_progress: tiến độ nhiệm vụ event "300 / 500" -> 300 (số đã làm)
+- read_milestone: tiến độ rương mốc "Progress:12 / 70" (Gather Troops) -> 12
 - read_bubble_time: thời gian bubble còn lại "06:55:22" -> số giây
 - read_train_count: số lính tối đa một lần train (ô bên phải nút "+") -> 20812
 """
 from .read_boss_name import run as read_boss_name
 from .read_bubble_time import run as read_bubble_time
 from .read_coords import run as read_coords
+from .read_milestone import run as read_milestone
 from .read_number import run as read_number
 from .read_power import run as read_power
 from .read_progress import run as read_progress
@@ -23,5 +25,5 @@ from .read_server import run as read_server
 from .read_server_time import run as read_server_time
 from .read_train_count import run as read_train_count
 
-__all__ = ["read_boss_name", "read_bubble_time", "read_coords", "read_number", "read_power", "read_progress",
+__all__ = ["read_boss_name", "read_bubble_time", "read_coords", "read_milestone", "read_number", "read_power", "read_progress",
            "read_server", "read_server_time", "read_train_count"]
