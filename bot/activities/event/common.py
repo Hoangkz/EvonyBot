@@ -2,8 +2,8 @@
 common.py — phần dùng chung cho mọi nhiệm vụ Event.
 
 Mọi nhiệm vụ (gather_troops/..., kings_path/...) đều đi qua cùng các bước để tới màn
-event: màn chính -> nhận quà đăng nhập -> nút dưới Event Center -> danh sách event ->
-icon event. Các bước đó nằm trong run_task(); nhiệm vụ chỉ khai báo ảnh riêng của mình
+event: màn chính -> nhận quà đăng nhập -> nút event (nút có ruy băng đếm ngược, xem
+find_event_button) -> danh sách event -> icon event. Các bước đó nằm trong run_task(); nhiệm vụ chỉ khai báo ảnh riêng của mình
 và hàm `handle` xử lý action của các ảnh đó.
 
 Ví dụ một nhiệm vụ mới (xem gather_troops/ground_troop/run.py là bản tối giản):
@@ -63,6 +63,9 @@ from .constants import (
     PROGRESS_FROM_GO,
     PROGRESS_LINE1_FROM_GO,
     PROGRESS_LINE2_FROM_GO,
+    RIBBON_BUTTON_OFFSET,
+    RIBBON_SEARCH,
+    RIBBON_TAIL,
     SWIPE_RIGHT,
     SWIPE_TIMES,
     SWIPE_UP,
@@ -71,7 +74,7 @@ from .constants import (
 
 # Kết quả của handle_common() để vòng lặp nhiệm vụ biết vừa xảy ra gì; run_task() cũng
 # gọi handle(EVENT_OPENED, None, None) ngay sau khi mở được icon event.
-EVENT_OPENED = "event_opened"   # vừa bấm nút event dưới Event Center
+EVENT_OPENED = "event_opened"   # vừa bấm nút event
 # Giá trị `handle` của nhiệm vụ trả cho run_task().
 HANDLED = "handled"             # action riêng đã xử lý xong -> quét lại
 STOP = "stop"                   # nhiệm vụ kết thúc -> run_task() return
@@ -165,13 +168,13 @@ def handle_common(bot, state: EventState, action, pos, screen):
         bot.log("Event: open Login Gifts")
         bot.tap(*pos, delay=2)
     elif action == ON_MAIN_SCREEN:
-        event_center = find_event_center(bot, screen)
-        if event_center is None:
-            bot.log("Event: Event Center not found, swiping")
+        button = find_event_button(bot, screen)
+        if button is None:
+            bot.log("Event: event button not found, swiping")
             swipe_around(bot)
             return None
-        dx, dy = EVENT_BUTTON_OFFSET
-        bot.tap(event_center[0] + dx, event_center[1] + dy, delay=5)
+        bot.log(f"Event: tap event button {button}")
+        bot.tap(*button, delay=5)
         return EVENT_OPENED
     elif action == BACK:
         bot.back(delay=1)
@@ -227,6 +230,33 @@ def read_go_progress(bot, screen, go) -> int | None:
     if done is None:
         done = read_progress_two_lines(crop(PROGRESS_LINE1_FROM_GO), crop(PROGRESS_LINE2_FROM_GO))
     return done
+
+
+def find_event_button(bot, screen):
+    """Điểm bấm nút event (MỘT kết quả duy nhất), hoặc None. `screen` là chính ảnh chụp vừa
+    nhận ra màn chính (nút "•••"), không chụp lại.
+    Nút event = nút có ruy băng đỏ đếm ngược, vị trí đổi theo số nút khác (có khi ngay dưới
+    Event Center, có khi lên hàng trên cùng). Tìm đuôi ruy băng trong cả 2 vùng RIBBON_SEARCH:
+    vùng nào trả về toạ độ thì vùng đó đúng. Ngưỡng thứ nhất trước, không vùng nào đạt thì lần
+    lượt thử các ngưỡng thấp hơn; cả 2 vùng cùng đạt thì lấy chỗ khớp cao hơn. Ngưỡng thấp nhất
+    cũng không đạt: bấm ngay dưới chữ "Event Center" như trước (không thấy cả Event Center ->
+    None)."""
+    matches = [(*bot.best_match(RIBBON_TAIL, screen=screen, region=region), thresholds)
+               for region, thresholds in RIBBON_SEARCH]
+    dx, dy = RIBBON_BUTTON_OFFSET
+    for level in range(len(RIBBON_SEARCH[0][1])):
+        passed = [(score, tail) for score, tail, thresholds in matches
+                  if tail is not None and score >= thresholds[level]]
+        if passed:
+            score, (x, y) = max(passed)
+            bot.log(f"Event: ribbon at {(x, y)} score {score:.3f} (level {level})")
+            return x + dx, y + dy
+    event_center = find_event_center(bot, screen)
+    if event_center is None:
+        return None
+    bot.log("Event: no ribbon, using button below Event Center")
+    ox, oy = EVENT_BUTTON_OFFSET
+    return event_center[0] + ox, event_center[1] + oy
 
 
 def find_event_center(bot, screen):

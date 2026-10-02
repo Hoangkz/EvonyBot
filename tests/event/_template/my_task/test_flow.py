@@ -23,7 +23,7 @@ SETTINGS = {KEY: {"enabled": True, "day": 1}}
 # Toạ độ bấm cứng (lệch so với template, xem bot/activities/event/constants.py):
 LOGIN_GIFT_ICON = (361, 148)   # icon Login Gifts ở cột phải (góc dưới trái cũng có)
 LOGIN_REWARD = (37, 197)       # hộp quà dưới chữ "Login Gifts" (56, 141) + (-19, 56)
-EVENT_BUTTON = (369, 281)      # chữ "Event Center" (359, 241) + (10, 40)
+EVENT_BUTTON = (361, 280)   # nút event: đuôi ruy băng cột phải (331, 308) + (30, -28)
 
 # Màn chính -> event vừa mở: giống mọi nhiệm vụ Event.
 TO_EVENT = [

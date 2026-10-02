@@ -68,6 +68,8 @@ Màn có 4 quả trứng: hàng trên có quả 1 (trái) và 2 (phải), hàng 
 
 Mỗi quả chứa nhiều vật phẩm. Nhận hết vật phẩm thì trứng vỡ: nhãn thành **"Activated"** (không có búa, không có "Waiting") và quả đó không đập được nữa. Đập thường tự bỏ qua quả này vì nó không có búa. Nếu cả 4 quả đã vỡ thì không còn búa nào, và bot kết thúc.
 
+Vỡ đủ 4 quả thì phần thưởng cuối ("Activate all the 4 Eggs to earn the ultimate rewards!") **game tự nhận**, bot không cần bấm nhận; màn hiện ra bỏ qua bằng cách bấm (50 %, 95 %), giống animation trứng vỡ (người dùng xác nhận).
+
 Lúc trứng vỡ có **animation**: cả màn tối đi, tiêu đề "Crazy Eggs" mờ hẳn. Bot bấm vào (50 %, 95 %) để bỏ qua animation. Sau đó hiện popup thưởng thêm **"Congratulations on activating the egg!"**. Popup này cao hơn popup thường và che gần hết màn hình; bot cũng đóng nó bằng BACK.
 
 ```mermaid
@@ -82,7 +84,7 @@ flowchart TD
     DM -->|Có: animation trứng vỡ| DT[Bấm 50 %, 95 %; quá 10 lần liên tiếp thì BACK] --> A
     DM -->|Không| P{Có popup Congratulations?}
     P -->|Có: Congratulations! / ... activating the egg!| Q[BACK đóng popup] --> A
-    P -->|Không| C[find_all búa trên cả màn, ngưỡng 0,8; số quả theo vị trí búa: x < 50 %, y < 70 %]
+    P -->|Không| C[find_all búa trên cả màn, ngưỡng 0,77; số quả theo vị trí búa: x < 50 %, y < 70 %]
     C --> D{Còn búa và chưa hết búa?}
     D -->|Có| F[before_tap = số búa; bấm thẳng vào búa đầu tiên; chờ 3 s] --> A
     D -->|Hết búa, lần đầu thấy| W[Chờ thêm 3 s: animation trứng vỡ có thể chưa xong] --> A
@@ -134,7 +136,7 @@ flowchart TD
 | `title.png` | 1,00 | 0,52 | 0,9 (mặc định) |
 | `competitionTab.png` | 1,00 (khi đang ở tab Limited lẫn Activities) | 0,55 | 0,9 (mặc định) |
 | `activitiesTab.png` / `activitiesTabOn.png` | 1,00 (chéo nhau 0,91) | 0,48 | 0,85 |
-| `hammer.png` | 0,84..0,95 (4 quả) | 0,61 (màn trứng đang chờ); không khớp nhầm chỗ nào trên 13 ảnh khi tìm cả màn | 0,8 |
+| `hammer.png` (7.png) | 0,950 / 0,913 / 0,881 / 0,840 (quả 1 / 2 / 3 / 4), cố định qua 60 khung hình trên máy thật (vùng búa không hoạt ảnh) | màn Crazy Eggs / Event Center không có búa 0,699; màn khác (train xe công thành) 0,767 | 0,77 |
 | `waiting.png` | 0,87..1,00 (4 quả) | 0,71 | 0,8 |
 | `Event/congratulations.png` | 0,999 (popup sau khi đập); 0,939 (popup trứng vỡ) | 0,45 | 0,9 (mặc định) |
 | `activatedRewards.png` | 1,00 (popup trứng vỡ, phần "activating the egg!") | 0,45 | 0,9 (mặc định) |
@@ -160,6 +162,8 @@ flowchart TD
 - `test_icon_not_found_restarts_then_marks_done`: tab Activities không có icon (ảnh 03 thật) → mỗi lần cuộn 8 lần rồi BACK; sau 3 lần thì force-stop game, thử thêm 2 lần → lưu `crazy_eggs_done`, return.
 - `test_done_today_skips`: đã có `crazy_eggs_done` → return ngay, không thao tác gì.
 - `test_lucky_hammer_no_dialog`: bấm quả 2 để dùng búa vàng mà không hiện hộp thoại → lưu đã dùng, return.
+
+**Chạy thật** trên máy 127.0.0.1:21923 (dùng búa thật): [tests/real_run.py](../../../../tests/real_run.py), `target()` đang gọi `crazy_eggs.run`. Lệnh: `venv\Scripts\poe test` (thêm `--shots` để lưu ảnh). Không dùng búa vàng: thêm `"crazy_eggs_lucky_hammer"` vào `DAILY_DONE` trong file.
 
 Ảnh tổng hợp đang dùng tạm, thay khi có ảnh thật:
 

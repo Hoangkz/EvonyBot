@@ -27,8 +27,8 @@ MAIN_SCREEN = "Server/listActivity.png"
 # ---- Event Center ------------------------------------------------------
 # Chữ "Event Center" ở cột phải màn hình chính; nút event nằm ngay dưới. Icon cúp có
 # hiệu ứng lấp lánh nên chỉ lấy phần chữ, và ảnh là TRUNG VỊ của 60 khung hình chụp
-# trong 1 phút (tests/event/screens/event_center, vùng x 336-383, y 228-254) để không
-# lệch theo một khung hiệu ứng nào.
+# trong 1 phút (vùng x 336-383, y 228-254) để không lệch theo một khung hiệu ứng nào.
+# tests/event/screens/event_center giữ 10 khung khác nhau nhất trong 60 khung đó.
 EVENT_CENTER = f"{EV}/eventCenter.png"
 # Vị trí không cố định (bị đẩy lên/xuống theo số nút phía trên) nhưng luôn ở góc trên
 # bên phải: chỉ tìm trong vùng này (% màn hình). Đã gặp: y 161 / 229 / ~310 trên 704.
@@ -39,8 +39,36 @@ EVENT_CENTER_REGION = (60, 0, 100, 50)
 #   0,85 / 0,80 -> thấy 80/80 (thấp nhất 0,883), không khớp nhầm màn nào.
 #   0,75 .. 0,65: dự phòng nền hay hiệu ứng lạ; màn khác cao nhất 0,436.
 EVENT_CENTER_THRESHOLDS = (0.85, 0.80, 0.75, 0.70, 0.65)
-# Nút event ngay dưới chữ "Event Center": bấm lệch so với tâm chữ (x, y).
+# Nút event ngay dưới chữ "Event Center": lệch so với tâm chữ (x, y). Chỉ bấm vào đây khi không
+# tìm thấy ruy băng nào (xem RIBBON_SEARCH).
 EVENT_BUTTON_OFFSET = (10, 40)
+
+# ---- Nút event (nút có ruy băng đỏ đếm ngược "3d 14:00") -------------------
+# Đuôi trái ruy băng 7x7 (toàn phần đỏ, không dính nền lẫn chữ số); icon nút đổi theo mùa
+# (ly rượu, ly bia...) và chữ trên ruy băng chạy liên tục nên chỉ đuôi là cố định. Đuôi phải
+# hay bị mép màn hình cắt nên không dùng. Cắt từ x 250-256, y 170-176 (tâm (253, 173)) ảnh
+# Screenshot_20261003-005902. Đo 2 máy x 60 khung trong 1 phút (tests/event/screens/ribbon:
+# giữ 10 khung khác nhau nhất mỗi máy, 01-10 máy 21913, 11-20 máy 21923) + 129 ảnh màn chính trong tests: ruy băng
+# thật 0,982..1,00 (vùng đuôi không đổi giữa các khung); ruy băng vương miện "2d 22:39" (không
+# phải nút event) không khớp.
+RIBBON_TAIL = f"{EV}/ribbonTail.png"
+# Trên chính ảnh chụp vừa thấy nút "•••", tìm đuôi ở 2 vùng cố định (% màn hình): vùng nào trả về
+# toạ độ thì vùng đó đúng -> MỘT nút duy nhất (cả 2 cùng thấy thì lấy chỗ khớp cao hơn; trên các
+# ảnh đo chỉ 1 vùng có ruy băng). Mỗi vùng một dãy ngưỡng giảm dần: lần đầu ngưỡng đầu, không vùng
+# nào đạt thì thử tiếp 3 ngưỡng thấp hơn; vẫn không thấy thì bấm Event Center + EVENT_BUTTON_OFFSET
+# như trước.
+# KHÔNG tìm nút trên cùng bên phải (đuôi (331, 105) = (83.6%, 14.9%), có trên mọi màn chính):
+# không phải nút event.
+#   Cột trái  x 60-70 %, y 12-40 % (x 237-277, y 84-281): đuôi (253, 105) / (253, 173);
+#             chỗ khác cao nhất 0,794 -> sàn 0,80.
+#   Cột phải  x 80-100 %, y 30-50 % (x 316-396, y 211-352): đuôi (331, 240) / (331, 308);
+#             chỗ khác cao nhất 0,834 (ruy băng vương miện, (368, 309)) -> sàn 0,845.
+RIBBON_SEARCH = [
+    ((60, 12, 70, 40), (0.86, 0.84, 0.82, 0.80)),
+    ((80, 30, 100, 50), (0.86, 0.855, 0.85, 0.845)),
+]
+# Bấm vào icon nút: lệch so với tâm đuôi ruy băng (đuôi (253, 173) -> icon (283, 145)).
+RIBBON_BUTTON_OFFSET = (30, -28)
 # Không thấy Event Center trên màn chính: kéo màn hình rồi quét lại. Toạ độ % màn hình
 # (x1, y1, x2, y2) của một lần vuốt; mỗi chiều vuốt 3 lần.
 SWIPE_RIGHT = (30, 50, 70, 50)   # ngón tay kéo từ trái sang phải

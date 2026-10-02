@@ -25,11 +25,14 @@ TITLE_REGION = (20, 0, 80, 8)
 TITLE_DIM_MEAN = 35
 SKIP_ANIMATION_TAP = (50, 95)   # % màn hình
 DIM_MAX_TAPS = 10
-# Icon búa trong nhãn "Scout Cost:" dưới quả trứng: có = quả đó đập được (quả đang "Waiting:"
-# không có). Trên 4 quả sẵn sàng khớp 0,84..0,95; màn trứng đang chờ <= 0,61 -> 0,8 (chỉ tìm
-# khi đang ở màn Crazy Eggs).
+# Icon búa (7.png) trong nhãn "Scout Cost:" dưới quả trứng: có = quả đó đập được (quả đang "Waiting:"
+# không có). Đo 60 khung hình trong 1 phút trên máy thật (127.0.0.1:21923, 2026-10-03; ảnh đã xoá):
+# vùng búa KHÔNG có hoạt ảnh (độ lệch điểm ảnh 0), điểm cố định theo quả vì nền sau
+# nhãn khác màu: quả 1 / 2 / 3 / 4 = 0,950 / 0,913 / 0,881 / 0,840. Không có búa: màn Crazy Eggs /
+# Event Center <= 0,699 (chỉ tìm khi đang ở màn Crazy Eggs); màn khác (train xe công thành) <= 0,767.
+# -> 0,77: giữa 0,699 và 0,840 (dư ~0,07 mỗi bên).
 HAMMER = f"{FOLDER}/hammer.png"
-HAMMER_THRESHOLD = 0.8
+HAMMER_THRESHOLD = 0.77
 # Đập: bấm thẳng vào vị trí icon búa tìm được (bấm chỗ nào của quả cũng đập được, người dùng xác nhận).
 EGG_TAP_DELAY = 3   # chờ sau khi bấm trứng; cũng là nhịp chờ thêm trước khi kết luận hết búa
 # Đập xong hiện popup "Congratulations!" (danh sách phần thưởng, khác nhau theo quả) che hàng

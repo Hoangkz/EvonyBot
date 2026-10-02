@@ -31,7 +31,7 @@ SETTINGS = {KEY: {"value": 20000, "level": 13, "day": 3}}
 
 LOGIN_GIFT_ICON = (361, 148)   # icon Login Gifts ở cột phải
 LOGIN_REWARD = (37, 197)       # hộp quà dưới chữ "Login Gifts" (56, 141) + (-19, 56)
-EVENT_BUTTON = (369, 281)      # chữ "Event Center" + (10, 40)
+EVENT_BUTTON = (361, 280)   # nút event: đuôi ruy băng cột phải (331, 308) + (30, -28)
 # Tâm ổ khoá trên tab Day 3 (Day 4 (250, 209), Day 5 (326, 209), cách nhau 76).
 DAY_3_LOCK = (174, 209)
 

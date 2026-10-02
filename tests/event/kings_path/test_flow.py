@@ -44,7 +44,7 @@ from tests.event import setUpModule, tearDownModule  # noqa: F401 (tắt lượt
 
 SCREENS = Path(__file__).parent / "screens"
 KP = "Event/KingsPath"
-EVENT_BUTTON = (369, 281)   # chữ "Event Center" (359, 241) + (10, 40), xem test Gather Troops
+EVENT_BUTTON = (361, 280)   # nút event: đuôi ruy băng cột phải (331, 308) + (30, -28)
 
 
 def _blank(y0, y1, x0, x1):
