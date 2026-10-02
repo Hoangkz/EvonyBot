@@ -1,5 +1,8 @@
 {
-    "_doc": "Độ ưu tiên của từng nhiệm vụ cho bộ chọn nhiệm vụ của worker (chưa dùng). Nhóm = activity (nút Select Activity / tab UI). key = key nhiệm vụ trong settings / daily_done. Ưu tiên cao hơn làm trước; cùng ưu tiên thì xoay vòng. Mặc định 1. Riêng join_monster_war chỉ để cho đủ danh sách: priority bị bỏ qua, Join Boss vẫn chạy theo logic ưu tiên boss hiện tại (BotWorker._boss_priority).",
+    "_doc": "Độ ưu tiên của từng nhiệm vụ cho bộ chọn nhiệm vụ của worker (chưa dùng). Nhóm = activity (nút Select Activity / tab UI). key = key nhiệm vụ trong settings / daily_done. Ưu tiên cao hơn làm trước; cùng ưu tiên thì xoay vòng. Mặc định 1. Bubble và Join Boss cũng là nhiệm vụ nhưng có luật riêng (bot/worker/TODO.md mục 1): bubble luôn cao nhất, Join Boss chạy giữa mỗi 2 nhiệm vụ thường.",
+    "Bubble": [
+        { "key": "bubble", "label": "Bubble (giữ khiên)", "priority": 99999, "note": "Luật riêng: luôn cao nhất, tới hạn khi còn <= 1 giờ, ngắt được mọi nhiệm vụ kể cả Join Boss" }
+    ],
     "Join Monster War": [
         { "key": "join_monster_war", "label": "Join Monster War", "priority": 9999 }
     ],
