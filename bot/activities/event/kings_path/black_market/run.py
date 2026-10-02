@@ -28,7 +28,7 @@ from .constants import (
     INSTANT_REFRESH,
     ITEM_BOX,
     KEY,
-    MAX_STEPS,
+    MAX_IDLE_STEPS,
     MENU_BLACK_MARKET,
     REFRESH_CHECKS,
     REFRESH_FIRST_CHECK,
@@ -58,7 +58,9 @@ def _buy(bot, path, done, target):
     progress = done or 0
     tried = set()        # món đã thử trong bộ hàng hiện tại
     last = None          # "buy" (vừa bấm một món) / "refresh" (vừa bấm Instant Refresh) / None
-    for _ in range(MAX_STEPS):
+    idle = 0             # số bước liên tiếp chưa mua được món nào
+    while idle < MAX_IDLE_STEPS:
+        idle += 1
         if progress >= target:
             return _finish(bot, path, f"bought {progress} / {target}, done")
         screen = bot.screenshot()
@@ -68,6 +70,7 @@ def _buy(bot, path, done, target):
         confirm = bot.find(CONFIRM, screen=screen)
         if confirm is not None and last == "buy":
             progress += 1
+            idle = 0
             bot.log(f"{NAME}: buy confirmed ({progress} / {target})")
             bot.tap(*confirm, delay=BUY_WAIT)
             last = None
@@ -87,7 +90,7 @@ def _buy(bot, path, done, target):
             return None
         tried.clear()
         last = None
-    bot.record(f"{NAME}: too many steps, stop")
+    bot.record(f"{NAME}: nothing bought in {MAX_IDLE_STEPS} steps ({progress} / {target}), stop")
     return None
 
 

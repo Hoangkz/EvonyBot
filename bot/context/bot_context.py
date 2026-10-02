@@ -25,6 +25,8 @@ class BotContext(FlowMixin, InputMixin, ScreenMixin):
         # Daily Activities: task đã xong từ lần reset gần nhất chưa / đánh dấu xong.
         self.is_daily_done = lambda task: False
         self.mark_daily_done = lambda task: None
+        # Giờ (ISO) lưu `task` trong daily_done, kể cả ngày cũ; None nếu chưa có.
+        self.done_at = lambda task: None
         self._log = log
         # Sự kiện đáng lưu lịch sử (DB + tab Logs > History); worker gán BotWorker.record,
         # mặc định (test / chạy tay) chỉ là log thường.

@@ -332,12 +332,13 @@ class Database:
             (serial, created_at, message),
         ))
 
-    def load_logs(self, serial: str, limit: int = 500) -> list[tuple[str, str]]:
-        """`limit` dòng lịch sử gần nhất của thiết bị [(created_at, message)], cũ trước mới sau."""
+    def load_logs(self, serial: str, since: str = "", limit: int = 500) -> list[tuple[str, str]]:
+        """Tối đa `limit` dòng lịch sử gần nhất của thiết bị có created_at >= `since` (ISO; rỗng = mọi
+        lúc) [(created_at, message)], cũ trước mới sau."""
         self._flush()
         rows = self.conn.execute(
-            "SELECT created_at, message FROM logs WHERE serial = ? ORDER BY id DESC LIMIT ?",
-            (serial, limit),
+            "SELECT created_at, message FROM logs WHERE serial = ? AND created_at >= ? ORDER BY id DESC LIMIT ?",
+            (serial, since, limit),
         ).fetchall()
         return [(row["created_at"], row["message"]) for row in reversed(rows)]
 

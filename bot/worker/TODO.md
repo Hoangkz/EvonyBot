@@ -67,6 +67,10 @@ tab cấu hình). Bộ chọn lấy thẳng nhiệm vụ: ưu tiên cao làm tr�
 
 ## 4. Khác
 
+- [ ] **Dọn dẹp event khi hết hạn**: hàm xoá key của event (kể cả `<nhiệm vụ>_complete` — hiện có
+  `kings_path_heal_complete`, không tự hết hạn) trong `daily_done` khi event kết thúc, để vòng mới làm lại.
+  Người dùng tự làm sau.
+
 - [x] Đã xoá `bot/common/get_server_time.py`, `bot/ocr/read_server_time.py`, `Images/Server/serverTime.png` (2026-10-03).
 
 - [ ] Commit các thay đổi đang chưa commit: bước 1 (`tasks.py`, `scheduler.py`, `_run_tasks`, `tests/test_scheduler.py`),

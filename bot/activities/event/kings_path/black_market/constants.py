@@ -46,4 +46,6 @@ REFRESH_FIRST_CHECK = 2
 REFRESH_CHECKS = 10
 REFRESH_TRIES = 3
 BUY_WAIT = 2
-MAX_STEPS = 300   # mục tiêu tới 100 lần mua: mỗi lần mua 2 bước + refresh
+# Dừng khi MAX_IDLE_STEPS bước liên tiếp không mua được món nào (kẹt / hàng toàn trả kim cương).
+# Không giới hạn tổng số bước: mục tiêu 100 lần mua cần ~300 bước (mua 2 bước + refresh).
+MAX_IDLE_STEPS = 30

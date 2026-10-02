@@ -11,6 +11,7 @@ Có **2 loại log**, cả hai hiện ở tab **Logs** của từng thiết bị
 | --- | --- | --- |
 | Hiện ở | Logs > **Info** (giờ `HH:MM:SS`) | Logs > **History** (ngày giờ) **và** Info |
 | Lưu DB | Không — mất khi tắt app, tab giữ 2000 dòng gần nhất | Có — bảng `logs`, chỉ thêm, **không bao giờ sửa / xoá** |
+| Hiện trên tab | Chỉ 1 giờ gần nhất (`SHOW_SECONDS`) | Chỉ 1 giờ gần nhất; DB vẫn giữ đủ |
 | Dùng cho | Từng bước, toạ độ, điểm khớp, "đang vuốt tìm", "bấm lại" | Sự kiện người dùng cần biết sau này |
 
 Trong test / chạy tay (`BotContext(..., log=print)`), `bot.record` mặc định = `log`, nên không cần DB.
@@ -51,7 +52,9 @@ activity: bot.record(msg)                    # ctx.record = BotWorker.record (g�
 
 - **Bot không chờ DB**: `Database._write` chỉ `queue.put`; signal Qt giữa thread là queued. Đừng đổi sang
   ghi đồng bộ trong worker.
-- Mở app: `_register_device` nạp `db.load_logs(serial)` (500 dòng gần nhất) vào History.
+- Mở app: `_register_device` nạp `db.load_logs(serial, since)` (trong 1 giờ gần nhất, tối đa 500 dòng) vào History.
+- Tab Logs chỉ hiện log trong `SHOW_SECONDS` (3600) gần nhất: `LogsTab` có QTimer mỗi phút ẩn các dòng cũ hơn
+  khỏi màn hình (chỉ ẩn trên UI, không đụng DB). Đổi thời gian: sửa `SHOW_SECONDS` trong `ui/tabs/logs_tab.py`.
 - `bot.log` đi theo signal `log_message` -> `_on_log_message` -> `LogsTab.append` (không đụng DB).
 
 ## Thêm sự kiện mới

@@ -6,6 +6,8 @@ from ..constants import KP
 # Ô chọn ở group King's Path: {"value": mục tiêu, "day": 3}.
 KEY = "kings_path_heal"
 DAY = 3   # ngày mở nhiệm vụ (dùng khi settings thiếu "day")
+# Đạt mục tiêu -> lưu "kings_path_heal_complete", bỏ qua luôn tới khi hàm dọn dẹp event xoá.
+# Không đủ lính bị thương -> chỉ lưu "kings_path_heal" (xong hôm nay, mai kiểm tra tiếp).
 
 # Tab phụ "Healing Heart" (thứ 3, bên phải), dòng nhiệm vụ "Heal N troops".
 TAB = f"{KP}/Tab/healingHeart.png"
@@ -43,6 +45,9 @@ EXTRA_WAIT = 2
 # ô số "0 / 204,582" của dòng đó lệch DISMISS_TO_AMOUNT so với tâm nút (ô (285, 465)).
 DISMISS = f"{KP}/Heal/dismiss.png"
 DISMISS_TO_AMOUNT = (-38, -31)
+# Dòng có Dismiss cao hơn MIN_DISMISS_Y: ô số của nó bị thanh "Wounded Troops" che (danh sách cuộn
+# dở) -> bỏ qua. Dòng trên cùng khi chưa cuộn: Dismiss y = 221.
+MIN_DISMISS_Y = 200
 INPUT_DELETES = 7   # xoá số cũ trong ô (tối đa 7 chữ số) trước khi gõ số mới
 # Nút "Heal" góc dưới phải (319, 666): 1,00 khi chưa chọn lính (xám) / 0,86 khi đã chọn.
 HEAL_BUTTON = f"{KP}/Heal/healButton.png"
@@ -53,7 +58,8 @@ HEAL_WAIT = 3   # sau khi bấm Heal
 # Nút "OK" của thanh nhập (344, 668): 1,00; màn khác <= 0,60. Gõ số tối đa cần heal, nhỏ hơn
 # lính có thì game tự hạ về số lính có.
 INPUT_OK = f"{KP}/Heal/inputOk.png"
-INPUT_WAIT = 5
+INPUT_WAIT = 10
+INPUT_TRIES = 2   # không thấy thanh nhập thì bấm lại ô số (lần bấm đầu có thể bị nuốt)
 
 # ---- Sau khi bấm Heal: màn Hospital đang chữa (heal_healing.png) -------------------------
 # Nút "Speed Up" góc dưới phải (319, 674): 1,00; màn khác <= 0,71.

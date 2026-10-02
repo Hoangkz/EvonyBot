@@ -20,6 +20,7 @@ from bot.worker import BotManager
 from database import Database
 from ui import DeviceView, HomeView, Sidebar
 from ui import theme
+from ui.tabs.logs_tab import SHOW_SECONDS
 
 
 class MainWindow(QMainWindow):
@@ -140,7 +141,9 @@ class MainWindow(QMainWindow):
         self.home_view.update_device(
             device_id, server=view.initialization_tab.get_settings()["server"]
         )
-        for created_at, message in self.db.load_logs(device_id):
+        # Tab Logs chỉ hiện log trong SHOW_SECONDS gần nhất; DB vẫn giữ đủ.
+        since = (datetime.now() - timedelta(seconds=SHOW_SECONDS)).isoformat(timespec="seconds")
+        for created_at, message in self.db.load_logs(device_id, since):
             view.append_history(created_at, message)
 
         self.device_views[device_id] = view

@@ -120,6 +120,7 @@ class BotWorker(QThread):
             self.ctx.report_boss = self._report_boss
             self.ctx.is_daily_done = self._is_daily_done
             self.ctx.mark_daily_done = self._mark_daily_done
+            self.ctx.done_at = self.daily_done.get
             self.ctx.record = self.record
             self._register_boss_listener()
             self._run_tasks()
