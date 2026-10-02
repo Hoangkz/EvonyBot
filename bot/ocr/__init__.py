@@ -22,8 +22,7 @@ from .read_number import run as read_number
 from .read_power import run as read_power
 from .read_progress import run as read_progress
 from .read_server import run as read_server
-from .read_server_time import run as read_server_time
 from .read_train_count import run as read_train_count
 
 __all__ = ["read_boss_name", "read_bubble_time", "read_coords", "read_milestone", "read_number", "read_power", "read_progress",
-           "read_server", "read_server_time", "read_train_count"]
+           "read_server", "read_train_count"]

@@ -57,13 +57,16 @@ class BossNotificationTests(unittest.TestCase):
             if activity == JOIN_BOSS:
                 self.assertFalse(worker.ctx._boss_interrupt_enabled)
                 self.assertIsNone(worker.ctx._deadline)
+                if calls.count(JOIN_BOSS) == 3:
+                    worker._stop.set()   # đủ kịch bản: vòng lặp (sống tới khi Stop) dừng
                 return BOSS_IDLE
             if calls.count("secondary") == 1:
                 board.publish("a", "1", (10, 20))
                 worker.ctx.check()
 
         worker._run_activity = run_activity
-        worker._boss_priority(["secondary"])
+        with self.assertRaises(StopRequested):
+            worker._run_tasks()
         self.assertEqual(calls, [JOIN_BOSS, "secondary", JOIN_BOSS, "secondary", JOIN_BOSS])
         self.assertFalse(worker.ctx._boss_interrupt_enabled)
         self.assertIsNone(worker.ctx._deadline)
@@ -89,12 +92,15 @@ class BossNotificationTests(unittest.TestCase):
         def run_activity(activity, settings):
             calls.append(activity)
             if activity == JOIN_BOSS:
+                if calls.count(JOIN_BOSS) == 3:
+                    worker._stop.set()
                 return BOSS_IDLE
             if calls.count("secondary") == 1:
                 worker.ctx.yield_to_boss()
 
         worker._run_activity = run_activity
-        worker._boss_priority(["secondary"])
+        with self.assertRaises(StopRequested):
+            worker._run_tasks()
         self.assertEqual(calls, [JOIN_BOSS, "secondary", JOIN_BOSS, "secondary", JOIN_BOSS])
         self.assertFalse(worker.ctx._boss_interrupt_enabled)
 

@@ -43,7 +43,7 @@ Activity chạy vòng `while True` → dừng test bằng `deadline` (`time.mono
 ## Các mẫu test đã có (xem `git show HEAD:tests/test_boss_notifications.py`)
 - **BossBoard**: `BossBoard(clock=lambda: now[0])` để điều khiển thời gian; kiểm tra lọc server, không báo lại worker nguồn, chống trùng 120 s / 10 s khi không có toạ độ, `unregister`.
 - **Ngắt**: `ctx._boss_event.set()` chỉ ném `BossAvailable` khi `ctx._boss_interrupt_enabled = True`; Stop luôn ưu tiên trước.
-- **Lịch ưu tiên boss**: tạo `BotWorker(serial, [JOIN_BOSS, "x"], {"Initialization": {"server": "1"}}, boss_board=board, server_clock=ServerClock("known"))`, gán `worker.ctx`, thay `worker._run_activity` bằng hàm ghi lại lời gọi và trả `BOSS_IDLE`, rồi gọi thẳng `worker._boss_priority([...])` (không `start()` QThread). Assert thứ tự `calls` và `ctx._deadline is None`, `_boss_interrupt_enabled is False` sau cùng.
+- **Lịch ưu tiên boss**: tạo `BotWorker(serial, [JOIN_BOSS, "x"], {"Initialization": {"server": "1"}}, boss_board=board, server_clock=ServerClock("known"))`, gán `worker.ctx`, thay `worker._run_activity` bằng hàm ghi lại lời gọi và trả `BOSS_IDLE`, rồi gọi thẳng `worker._run_tasks()` (không `start()` QThread). Vòng lặp sống tới khi Stop: trong hàm giả, đủ kịch bản thì `worker._stop.set()` và bắt `StopRequested` (hoặc vòng lặp thoát ở `while`). Độ ưu tiên: patch `bot_worker.load_priorities`. Assert thứ tự `calls` (mỗi vòng 1 lượt Join Boss + 1 nhiệm vụ) và `ctx._deadline is None`, `_boss_interrupt_enabled is False` sau cùng. Mẫu: tests/test_scheduler.py, tests/test_boss_notifications.py.
 - **daily_reset**: truyền `now=` cố định vào `last_reset` / `done_today`.
 
 ## Lưu ý

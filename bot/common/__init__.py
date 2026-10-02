@@ -20,10 +20,9 @@ from .delay import delay
 from .exit_images import exit_images
 from .find_first import find_first
 from .get_server import get_server
-from .get_server_time import get_server_time
 from .go_home import GAME_PACKAGE, go_home
 from .images_in import images_in
 from .wait_gone import wait_gone
 
 __all__ = ["BUBBLE_DURATIONS", "GAME_PACKAGE", "NotEnoughGems", "keep_bubble", "click_images", "current_focus", "delay", "exit_images",
-           "find_first", "get_server", "get_server_time", "go_home", "images_in", "wait_gone"]
+           "find_first", "get_server", "go_home", "images_in", "wait_gone"]

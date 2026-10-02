@@ -3,7 +3,7 @@ home_view.py — landing screen: scans ADB ports and lists devices.
 """
 from pathlib import Path
 
-from PyQt5.QtCore import QThread, Qt, pyqtSignal
+from PyQt5.QtCore import QThread, Qt, QTime, pyqtSignal
 from PyQt5.QtWidgets import (
     QAbstractItemView,
     QComboBox,
@@ -15,6 +15,7 @@ from PyQt5.QtWidgets import (
     QPushButton,
     QTableWidget,
     QTableWidgetItem,
+    QTimeEdit,
     QVBoxLayout,
     QWidget,
 )
@@ -32,6 +33,7 @@ class HomeView(QWidget):
     start_all_requested = pyqtSignal()
     exit_all_requested = pyqtSignal()
     close_all_requested = pyqtSignal()
+    reset_time_changed = pyqtSignal(str)   # giờ reset server "HH:MM" người dùng vừa chọn
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -76,6 +78,16 @@ class HomeView(QWidget):
         self.timeout_combo.setFixedWidth(75)
         toolbar.addWidget(self.timeout_combo)
         toolbar.addWidget(QLabel("Minutes"))
+        toolbar.addSpacing(12)
+
+        # Giờ reset server (giờ máy), dùng chung mọi thiết bị: nhiệm vụ đã xong làm lại sau mốc này.
+        toolbar.addWidget(QLabel("Reset Time"))
+        self.reset_time_edit = QTimeEdit(QTime(14, 0))
+        self.reset_time_edit.setDisplayFormat("HH:mm")
+        self.reset_time_edit.setFixedWidth(75)
+        self.reset_time_edit.timeChanged.connect(
+            lambda value: self.reset_time_changed.emit(value.toString("HH:mm")))
+        toolbar.addWidget(self.reset_time_edit)
         toolbar.addSpacing(12)
 
         exit_all = QPushButton("Exit All")
@@ -241,6 +253,14 @@ class HomeView(QWidget):
                 if status is not None:
                     self.table.item(row, 3).setText(status)
                 return
+
+    def set_reset_time(self, server_time: str):
+        """Hiện giờ reset "HH:MM" đã lưu (không phát reset_time_changed)."""
+        value = QTime.fromString(server_time, "HH:mm")
+        if value.isValid():
+            self.reset_time_edit.blockSignals(True)
+            self.reset_time_edit.setTime(value)
+            self.reset_time_edit.blockSignals(False)
 
     @property
     def auto_timeout_minutes(self) -> int:

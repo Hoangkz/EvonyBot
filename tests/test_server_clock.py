@@ -1,67 +1,54 @@
 """
-Giờ reset server dùng chung mọi thiết bị: ServerClock (worker đầu tiên đi lấy, worker khác chạy bình
-thường) và bảng `settings` của DB (chuyển cột devices.server_time cũ sang, xoá cột).
+Giờ reset server: người dùng chọn ở màn Home ("HH:MM", mặc định 14:00), lưu bảng `settings` của DB, dùng
+chung mọi thiết bị (ServerClock); bot không vào game đọc giờ reset nữa.
 """
 import json
+import os
 import sqlite3
 import tempfile
 import unittest
+from datetime import datetime
 from pathlib import Path
-from types import SimpleNamespace
-from unittest import mock
 
 import database
-from bot.worker import bot_worker
+from bot.daily_reset import DEFAULT_RESET_TIME, done_today, last_reset, reset_clock
 from bot.worker.bot_worker import BotWorker
 from bot.worker.server_clock import ServerClock
 
 
-def make_worker(clock):
-    worker = BotWorker("b", ["secondary"], {"Initialization": {"server": "1"}}, server_clock=clock)
-    worker.ctx = SimpleNamespace()
-    worker.found = []
-    worker.server_time_found.connect(lambda serial, value: worker.found.append(value))
-    return worker
+class ResetTimeTests(unittest.TestCase):
+    def test_last_reset_today_or_yesterday(self):
+        self.assertEqual(last_reset("14:00", datetime(2026, 10, 3, 15, 30)), datetime(2026, 10, 3, 14, 0))
+        self.assertEqual(last_reset("14:00", datetime(2026, 10, 3, 14, 0)), datetime(2026, 10, 3, 14, 0))
+        self.assertEqual(last_reset("14:00", datetime(2026, 10, 3, 9, 0)), datetime(2026, 10, 2, 14, 0))
 
+    def test_default_and_old_iso(self):
+        self.assertEqual(DEFAULT_RESET_TIME, "14:00")
+        for value in ("", None, "known", "25:99"):
+            self.assertEqual(reset_clock(value), "14:00")
+        self.assertEqual(last_reset("", datetime(2026, 10, 3, 15)), datetime(2026, 10, 3, 14, 0))
+        # Giá trị cũ dạng ISO (một lần reset bất kỳ) vẫn đọc được: lấy giờ của nó.
+        self.assertEqual(reset_clock("2026-09-01T09:30:12"), "09:30")
+        self.assertEqual(last_reset("2026-09-01T09:30:12", datetime(2026, 10, 3, 10)), datetime(2026, 10, 3, 9, 30))
 
-class ServerClockTests(unittest.TestCase):
-    def test_first_worker_fetches_others_skip(self):
-        """Worker A đang đi lấy (đã claim): worker B không lấy, chạy tiếp; A lấy xong thì B dùng chung."""
+    def test_done_today(self):
+        now = datetime(2026, 10, 3, 15)
+        self.assertTrue(done_today("2026-10-03T14:05:00", "14:00", now))
+        self.assertFalse(done_today("2026-10-03T13:55:00", "14:00", now))
+        self.assertFalse(done_today(None, "14:00", now))
+
+    def test_server_clock(self):
         clock = ServerClock()
-        self.assertTrue(clock.claim())          # A nhận việc
-        b = make_worker(clock)
-        with mock.patch.object(bot_worker, "get_server_time") as fetch:
-            b._ensure_server_time()
-        fetch.assert_not_called()
-        self.assertEqual(b.server_time, "")
-        clock.release("2026-10-03T09:00:00")    # A lấy xong
-        self.assertEqual(b.server_time, "2026-10-03T09:00:00")
+        self.assertEqual(clock.value, "14:00")
+        clock.set("08:15")
+        self.assertEqual(clock.value, "08:15")
+        clock.set("")
+        self.assertEqual(clock.value, "14:00")
 
-    def test_fetch_once_then_shared(self):
-        clock = ServerClock()
-        a, b = make_worker(clock), make_worker(clock)
-        with mock.patch.object(bot_worker, "get_server_time", return_value="2026-10-03T09:00:00") as fetch:
-            a._ensure_server_time()
-            b._ensure_server_time()
-        fetch.assert_called_once()
-        self.assertEqual((a.server_time, b.server_time), ("2026-10-03T09:00:00",) * 2)
-        self.assertEqual(a.found, ["2026-10-03T09:00:00"])
-        self.assertEqual(b.found, [])
-
-    def test_failed_fetch_lets_next_try(self):
-        clock = ServerClock()
-        a, b = make_worker(clock), make_worker(clock)
-        with mock.patch.object(bot_worker, "get_server_time", side_effect=[None, "2026-10-03T09:00:00"]):
-            a._ensure_server_time()             # đọc lỗi -> nhả việc
-            self.assertEqual(a.server_time, "")
-            b._ensure_server_time()             # máy khác thử lại được
-        self.assertEqual(b.server_time, "2026-10-03T09:00:00")
-
-    def test_known_value_never_fetches(self):
-        worker = make_worker(ServerClock("known"))
-        with mock.patch.object(bot_worker, "get_server_time") as fetch:
-            worker._ensure_server_time()
-        fetch.assert_not_called()
+    def test_worker_never_reads_server_time_in_game(self):
+        worker = BotWorker("b", ["x"], {"Initialization": {"server": "1"}}, server_clock=ServerClock("09:00"))
+        self.assertFalse(hasattr(worker, "_ensure_server_time"))
+        self.assertEqual(worker.server_time, "09:00")
 
 
 class SettingsTableTests(unittest.TestCase):
@@ -86,21 +73,43 @@ class SettingsTableTests(unittest.TestCase):
         try:
             columns = {row["name"] for row in db.conn.execute("PRAGMA table_info(devices)")}
             self.assertNotIn("server_time", columns)
-            self.assertEqual(db.server_time(), "2026-10-01T09:00:00")
+            self.assertEqual(db.server_time(), "09:00")
             self.assertEqual(db.load_settings("a")["Event"], {"kings_path_patrol": {"value": 200}})
         finally:
             db.close()
 
-    def test_set_server_time_is_shared(self):
+    def test_default_and_set(self):
         db = database.Database(self.path)
         try:
-            self.assertEqual(db.server_time(), "")
-            db.set_server_time("2026-10-03T09:00:00")
-            self.assertEqual(db.server_time(), "2026-10-03T09:00:00")
-            db.set_server_time("2026-10-04T09:00:00")
-            self.assertEqual(db.server_time(), "2026-10-04T09:00:00")
+            self.assertEqual(db.server_time(), "14:00")
+            db.set_server_time("08:30")
+            self.assertEqual(db.server_time(), "08:30")
+            self.assertEqual(db.get_setting(database.SERVER_TIME), "08:30")
         finally:
             db.close()
+
+
+class HomeResetTimeTests(unittest.TestCase):
+    """Ô "Reset Time" ở màn Home: mặc định 14:00, đổi thì phát reset_time_changed("HH:MM")."""
+
+    @classmethod
+    def setUpClass(cls):
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        from PyQt5.QtWidgets import QApplication
+        cls.app = QApplication.instance() or QApplication([])
+
+    def test_picker(self):
+        from PyQt5.QtCore import QTime
+        from ui.home_view import HomeView
+        view = HomeView()
+        self.assertEqual(view.reset_time_edit.time().toString("HH:mm"), "14:00")
+        changed = []
+        view.reset_time_changed.connect(changed.append)
+        view.set_reset_time("09:45")          # nạp giá trị đã lưu: không phát tín hiệu
+        self.assertEqual(view.reset_time_edit.time().toString("HH:mm"), "09:45")
+        self.assertEqual(changed, [])
+        view.reset_time_edit.setTime(QTime(16, 30))   # người dùng đổi
+        self.assertEqual(changed, ["16:30"])
 
 
 if __name__ == "__main__":

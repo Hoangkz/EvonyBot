@@ -63,9 +63,11 @@ class MainWindow(QMainWindow):
         )
         self.bots.running_changed.connect(self._on_bot_running_changed)
         self.bots.server_found.connect(self._on_server_found)
-        # Giờ reset server chung mọi thiết bị (bảng settings): nạp lúc mở app, lưu khi có máy đọc được.
+        # Giờ reset server chung mọi thiết bị (bảng settings, mặc định 14:00): người dùng chọn ở màn
+        # Home; đổi là lưu DB và các worker đang chạy dùng giá trị mới ngay.
         self.bots.server_clock.set(self.db.server_time())
-        self.bots.server_time_found.connect(lambda serial, server_time: self.db.set_server_time(server_time))
+        self.home_view.set_reset_time(self.bots.server_clock.value)
+        self.home_view.reset_time_changed.connect(self._on_reset_time_changed)
         self.bots.daily_task_done.connect(self.db.mark_daily_task_done)
         self.bots.bubble_found.connect(self._on_bubble_found)
         self.bots.bubble_disabled.connect(self._on_bubble_disabled)
@@ -185,6 +187,10 @@ class MainWindow(QMainWindow):
         for device_id in self.device_views:
             if not self.bots.is_running(device_id):
                 self._start_bot(device_id)
+
+    def _on_reset_time_changed(self, server_time: str):
+        self.db.set_server_time(server_time)
+        self.bots.server_clock.set(server_time)
 
     def _all_running(self) -> bool:
         return bool(self.device_views) and all(

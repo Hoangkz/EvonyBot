@@ -37,66 +37,59 @@ Các giả lập chạy đồng thời. Trong mỗi worker, các activity chạy
 4. `worker.start()` khởi động luồng và gọi `BotWorker.run()`.
 5. Worker báo trạng thái Running, lấy thiết bị ADB và tạo BotContext.
 6. Worker gắn settings, callback `report_boss` và đăng ký nhận thông báo nếu đã chọn Join Monster War.
-7. Worker chọn chế độ điều phối dựa trên danh sách activity.
+7. Worker chạy vòng lặp nhiệm vụ `_run_tasks()` (mục 3).
 
 Server ban đầu lấy từ `settings["Initialization"]["server"]`. Nếu chưa có, `_ensure_server()` thử đọc trong game và cập nhật đăng ký với BossBoard khi đọc được. Server đã có sẽ không được đọc lại trong lượt chạy.
 
-## 3. Chọn chế độ điều phối
+## 3. Vòng lặp nhiệm vụ: `_run_tasks()`
+
+Worker chạy theo **nhiệm vụ** (bot/worker/TODO.md). Bước 1: mỗi activity đã chọn (trừ Join Boss) là 1 nhiệm vụ chạy
+nguyên khối ([tasks.py](tasks.py)); độ ưu tiên = cao nhất trong các nhiệm vụ của nhóm đó trong
+[priority.json](priority.json) (số lớn hơn làm trước). Bộ chọn [scheduler.py](scheduler.py) lấy nhiệm vụ tới lượt có ưu
+tiên cao nhất; cùng ưu tiên thì xoay vòng (nhiệm vụ lâu chưa được bắt đầu nhất đi trước).
+
+**Giờ reset server** (mốc làm lại nhiệm vụ đã xong): người dùng chọn ở màn Home (ô "Reset Time", "HH:MM", mặc định 14:00), lưu bảng `settings` của DB, dùng chung mọi thiết bị qua `ServerClock`; đổi là các worker đang chạy dùng ngay. Bot không vào game đọc giờ reset nữa (đã xoá `get_server_time` / OCR `read_server_time`).
+
+Thứ tự ưu tiên: **Bubble > Join Boss > nhiệm vụ**. Bubble và Join Boss có luật riêng trong code (mục 3b, các ý dưới).
 
 ```mermaid
 flowchart TD
-    A[BotWorker.run] --> B{Có Join Boss và activity phụ?}
-    B -->|Không| C[_run_once: chạy theo thứ tự danh sách]
-    B -->|Có| D[_boss_priority: ưu tiên Join Boss]
-    C --> E[Kết thúc hoặc Stop hoặc lỗi]
-    D --> E
-    E --> F[Hủy đăng ký BossBoard và cập nhật UI]
+    A[_run_tasks] --> O{Chỉ chọn mỗi Join Boss?}
+    O -->|Có| P[_run_once: Join Boss chạy liên tục như trước] --> Z[Kết thúc khi Join Boss trả về / Stop]
+    O -->|Không| L{Stop?}
+    L -->|Có| Z
+    L -->|Không| C[Đảm bảo server]
+    C --> B{Có Join Boss và chưa dừng hẳn?}
+    B -->|Có| D[_check_boss: Join Boss với exit_when_idle=True]
+    D -->|Khác IDLE: dừng hẳn| X[Bỏ Join Boss, vẫn chạy nhiệm vụ]
+    D -->|IDLE| T
+    X --> T
+    B -->|Không| T{Có nhiệm vụ bị ngắt còn tới lượt?}
+    T -->|Có| R[Lấy nhiệm vụ đó]
+    T -->|Không| S[scheduler.pick]
+    S -->|None| W[Nghỉ IDLE_WAIT giây, vẫn lo bubble] --> L
+    S -->|Nhiệm vụ| R
+    R --> G[_run_task: có Join Boss thì deadline 120 s + bật ngắt bởi boss mới]
+    G -->|Trả về bình thường| H[scheduler.finished: xong tới mốc reset kế tiếp] --> L
+    G -->|TimedOut / BossAvailable / YieldToBoss| I[Giữ làm nhiệm vụ bị ngắt] --> L
 ```
 
-### Chạy tuần tự: `_run_once()`
-
-Áp dụng khi chỉ chọn Join Boss hoặc không chọn Join Boss:
-
-1. Kiểm tra Stop trước mỗi activity.
-2. Đảm bảo đã thử lấy giờ reset và server, theo thứ tự này. Nếu đã có thì bỏ qua việc đọc.
-3. Báo activity hiện tại cho UI.
-4. `_run_activity()` lấy hàm từ ACTIVITIES và gọi `run(ctx, tab_settings)`.
-5. Hàm trả về thì chuyển sang activity tiếp theo.
-
-Mỗi activity được gọi một lần, nhưng có thể tự lặp bên trong. Chỉ chọn Join Boss thì activity này thường tiếp tục kiểm tra boss cho tới khi tự dừng hoặc người dùng Stop.
-
-Tên activity không tồn tại sẽ được ghi log, chờ 1 giây qua `ctx.sleep()` rồi bỏ qua.
-
-### Ưu tiên boss: `_boss_priority()`
-
-`pending` là danh sách activity phụ chưa hoàn thành, giữ nguyên thứ tự ban đầu.
-
-```mermaid
-flowchart TD
-    A{Còn pending?} -->|Không| B[Chạy Join Boss với settings gốc]
-    B --> Z[Kết thúc khi Join Boss trả về]
-    A -->|Có| C[Đảm bảo giờ reset và server]
-    C --> D[Xóa cờ boss cũ; chạy Join Boss với exit_when_idle=True]
-    D --> E{Trả về IDLE?}
-    E -->|Không| F[Chạy nốt pending bằng _run_once]
-    F --> Z
-    E -->|Có| G[Đặt deadline 120 giây; bật ngắt bởi thông báo boss]
-    G --> H[Kiểm tra ngắt rồi chạy pending đầu tiên]
-    H -->|Trả về bình thường| I[Xóa activity khỏi pending]
-    I --> J{Còn pending?}
-    J -->|Có| H
-    J -->|Không| K[Tắt ngắt boss; gỡ deadline]
-    H -->|BossAvailable, TimedOut hoặc YieldToBoss| K
-    K --> A
-```
-
-- 120 giây là ngân sách chung cho cả nhóm activity phụ trong một lượt, không phải cho từng activity.
-- Activity phụ vừa xong một nhiệm vụ gọi `bot.yield_to_boss()` (hiện: Event, sau mỗi nhiệm vụ vừa xong) → ném `YieldToBoss`: worker kiểm tra boss ngay, không chờ hết 120 giây; activity vẫn ở `pending`, lượt sau gọi lại từ đầu (nhiệm vụ đã xong tự bỏ qua). Ngoài lịch ưu tiên boss thì `yield_to_boss()` không làm gì.
-- Khi timeout hoặc có thông báo boss, activity đang dở vẫn nằm đầu pending.
-- Lượt sau gọi lại từ đầu hàm activity; worker không lưu dòng đang chạy hoặc tiến độ nội bộ.
-- Activity trả về bình thường được xem là hoàn thành và bị loại khỏi pending.
-- Nếu Join Boss trả về khác IDLE, worker chạy nốt pending bằng `_run_once()` rồi kết thúc. Trong nhánh này không còn deadline 120 giây hoặc ngắt để quay lại boss.
-- Khi pending hết, Join Boss chạy với settings gốc; cơ chế nhường activity phụ kết thúc.
+- **Mỗi vòng có Join Boss: 1 lượt Join Boss rồi đúng 1 nhiệm vụ**, tối đa `OTHERS_WINDOW` = 120 giây cho **từng** nhiệm vụ
+  (không còn ngân sách chung cả nhóm). Xong nhiệm vụ là quay lại Join Boss ngay. Mỗi nhiệm vụ đi kèm một lượt kiểm tra
+  boss: Join Boss rảnh vẫn cuộn danh sách War 6 lần rồi mới nhường.
+- Nhiệm vụ bị ngắt (hết 120 giây, có boss mới, `yield_to_boss`) được làm lại **đầu tiên** ở vòng sau, gọi lại từ đầu
+  hàm activity; worker không lưu tiến độ nội bộ (activity tự bỏ qua phần đã `mark_daily_done`).
+- **Nhiệm vụ xong** thì không tới lượt nữa cho tới mốc reset server kế tiếp (tính theo mốc lúc bắt đầu lượt làm xong);
+  qua mốc thì tự tới lượt lại (trước đây chỉ Daily Activities được thêm lại).
+- **Không còn nhiệm vụ tới lượt**: nghỉ `IDLE_WAIT` = 5 giây (qua `_with_bubble`) rồi xét lại; có Join Boss thì mỗi vòng
+  vẫn kiểm tra boss. **Thread vẫn sống tới khi Stop**, kể cả khi không chọn Join Boss.
+- **Không chọn Join Boss: không có luật 120 giây** (không deadline, không ngắt bởi boss mới).
+- **Không tích Bubble: không có luật Bubble** (`_ensure_bubble` không làm gì, không hẹn `BubbleDue`).
+- Join Boss trả về khác IDLE (dừng hẳn, VD hết thể lực và không cho dùng vật phẩm): không gọi lại Join Boss, vẫn chạy
+  các nhiệm vụ.
+- Trước mỗi nhiệm vụ: `_with_bubble(None, ctx.check)` — lo bubble trước (không có Join Boss thì không có bước nào khác
+  lo), rồi xét Stop / boss mới.
+- Tên activity không tồn tại trong ACTIVITIES: ghi log, chờ 1 giây qua `ctx.sleep()`, coi như xong.
 
 ## 3b. Bubble (khiên): ưu tiên hơn mọi activity
 
@@ -110,7 +103,7 @@ Bật khi tích **Bubble** ở tab Initialization (`settings["Initialization"]["
 
 ```mermaid
 flowchart TD
-    A[Trước mỗi activity / Get Server / Get Server Time] --> B{Tích Bubble và tới lượt kiểm tra?}
+    A[Trước mỗi activity / Get Server] --> B{Tích Bubble và tới lượt kiểm tra?}
     B -->|Không| R[Chạy activity]
     B -->|Có| C[Tắt tạm deadline 120s và ngắt boss]
     C --> D[Đọc thời gian bubble còn lại]
@@ -201,7 +194,7 @@ Nếu một thông báo đến trong lúc worker đang Join Boss, nó không ng�
 2. Đang cho phép ngắt boss và event đã bật → ném `BossAvailable`.
 3. Đã hết deadline → ném `TimedOut`.
 
-Ngắt boss chỉ được bật trong cửa sổ chạy activity phụ của `_boss_priority()`. Nó không ngắt chính Join Boss.
+Ngắt boss chỉ được bật trong lúc chạy một nhiệm vụ của `_run_task()` (khi có Join Boss). Nó không ngắt chính Join Boss.
 
 Worker phản hồi tại lần check kế tiếp. `ctx.sleep()` kiểm tra tối đa mỗi khoảng 0,2 giây trong vòng chờ; lời gọi ADB hoặc thao tác chặn đang chạy phải kết thúc trước khi worker có thể check tiếp. Không có cơ chế cưỡng chế dừng thread.
 

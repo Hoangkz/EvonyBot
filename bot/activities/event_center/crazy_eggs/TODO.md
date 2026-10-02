@@ -39,7 +39,7 @@ tối lạ giữ cách bấm (50 %, 95 %) tối đa 10 lần rồi BACK.)
 ## 4. Tích hợp (để sau, khi người dùng yêu cầu)
 
 - [ ] Chạy kèm các activity khác: cứ mỗi 2 giờ đưa Crazy Eggs lên đầu danh sách activity phụ; Join Monster War vẫn
-  ưu tiên số 1. Một lần chạy kết thúc khi đập hết trứng hoặc hết búa. Phần điều phối nằm ở `BotWorker._boss_priority`.
+  ưu tiên số 1. Một lần chạy kết thúc khi đập hết trứng hoặc hết búa. Phần điều phối: bộ chọn nhiệm vụ (`bot/worker/scheduler.py`, xem `bot/worker/TODO.md` bước 2).
 - [ ] Búa vàng chỉ được lưu vào DB khi chạy trong worker (`mark_daily_done` → cột `daily_done`). Khi nối vào, kiểm tra
   `crazy_eggs_lucky_hammer` có xuất hiện trong DB không.
 - [ ] Bị cắt giữa chừng (hết khung 120 s / có boss mới) thì lần gọi lại chạy từ đầu và mất `state` (`before_tap`,

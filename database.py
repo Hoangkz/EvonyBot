@@ -4,8 +4,8 @@ database.py — SQLite persistence for devices and their configuration.
 Table `devices`: one row per ADB serial. Besides the device columns
 (server nhập ở tab Initialization, bubble_until, timestamps) every tab has
 its own column holding that tab's settings as JSON (see TAB_COLUMNS).
-Table `settings`: cài đặt chung mọi thiết bị ({key: value}), VD SERVER_TIME — giờ reset server
-(một giá trị cho mọi thiết bị; DB cũ có cột devices.server_time thì chuyển sang đây rồi xoá cột).
+Table `settings`: cài đặt chung mọi thiết bị ({key: value}), VD SERVER_TIME — giờ reset server "HH:MM"
+người dùng chọn ở màn Home (mặc định 14:00; DB cũ có cột devices.server_time thì chuyển sang đây rồi xoá cột).
 Daily Activities stores {task: enabled}; which tasks are done today lives
 in `daily_done` ({task: done_at}) so saving the tab never clears it.
 Nothing is reset at a new day: a task counts as done only while its done_at
@@ -27,7 +27,7 @@ import threading
 from datetime import datetime
 from pathlib import Path
 
-from bot.daily_reset import done_today
+from bot.daily_reset import done_today, reset_clock
 
 # %LOCALAPPDATA%\EvonyBot\evonybot.db — same place whether run from source or
 # installed (the installer also puts the app in %LOCALAPPDATA%\EvonyBot and
@@ -37,7 +37,7 @@ DB_PATH = DATA_DIR / "evonybot.db"
 
 DAILY_TAB = "Daily Activities"
 INIT_TAB = "Initialization"  # device id is not stored; server goes to devices.server
-# Key trong bảng `settings`: thời điểm reset server (ISO, giờ máy), dùng chung mọi thiết bị.
+# Key trong bảng `settings`: giờ reset server "HH:MM" (chọn ở màn Home), dùng chung mọi thiết bị.
 SERVER_TIME = "server_time"
 
 # Tab title -> column of `devices` holding that tab's settings JSON.
@@ -229,12 +229,13 @@ class Database:
         ))
 
     def server_time(self) -> str:
-        """Thời điểm reset server (ISO, giờ máy) dùng chung mọi thiết bị; rỗng nếu chưa biết."""
-        return self.get_setting(SERVER_TIME)
+        """Giờ reset server "HH:MM" (chọn ở màn Home) dùng chung mọi thiết bị; chưa có / giá trị ISO cũ
+        -> đổi qua bot.daily_reset.reset_clock (mặc định 14:00)."""
+        return reset_clock(self.get_setting(SERVER_TIME))
 
     def set_server_time(self, server_time: str):
-        """Lưu thời điểm reset ISO theo giờ máy (có ngày để xử lý qua nửa đêm), chung mọi thiết bị."""
-        self.set_setting(SERVER_TIME, server_time)
+        """Lưu giờ reset server "HH:MM", chung mọi thiết bị."""
+        self.set_setting(SERVER_TIME, reset_clock(server_time))
 
     def set_bubble_until(self, serial: str, bubble_until: str):
         """Lưu thời điểm bubble hết (ISO theo giờ máy; rỗng -> NULL = chưa biết)."""

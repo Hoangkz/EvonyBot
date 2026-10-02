@@ -1,6 +1,16 @@
 """
-bot_worker.py — BotWorker: runs the device's selected activities once each
-on its own QThread (Join Boss keeps going until it stops by itself or Stop).
+bot_worker.py — BotWorker: chạy các nhiệm vụ của một thiết bị trên QThread riêng, tới khi Stop.
+
+Thứ tự ưu tiên: Bubble > Join Boss > nhiệm vụ (scheduler.py, độ ưu tiên trong priority.json).
+- Bubble: lo trước mọi lần chạy (_with_bubble); tới hạn thì ngắt mọi thứ đang chạy (BubbleDue).
+- Có chọn Join Boss: mỗi vòng chạy Join Boss (rảnh thì nhường), rồi 1 nhiệm vụ tối đa OTHERS_WINDOW
+  giây; xong nhiệm vụ là quay lại Join Boss ngay. Hết giờ / có boss mới -> quay lại, nhiệm vụ đang dở
+  làm lại đầu tiên ở vòng sau. Join Boss dừng hẳn (không phải rảnh) -> vẫn chạy tiếp các nhiệm vụ.
+- Không chọn Join Boss: không có giới hạn 120 giây, các nhiệm vụ chạy lần lượt tới khi xong.
+- Không tích Bubble: không có luật Bubble (không lo bubble, không bị ngắt vì bubble).
+- Không còn nhiệm vụ tới lượt: nghỉ ngắn rồi xét lại (thread vẫn sống); qua mốc reset server thì các
+  nhiệm vụ đã xong lại tới lượt.
+- Chỉ chọn mỗi Join Boss: chạy Join Boss liên tục như trước.
 """
 import threading
 import time
@@ -10,17 +20,18 @@ from PyQt5.QtCore import QThread, pyqtSignal
 
 from ..activities import ACTIVITIES
 from ..activities.join_monster_war import IDLE as BOSS_IDLE
-from ..common import NotEnoughGems, get_server, get_server_time, keep_bubble
+from ..common import NotEnoughGems, get_server, keep_bubble
 from ..daily_reset import done_today, last_reset
 from ..context import BotContext, BotInterrupted, TimedOut
 from ..context.errors import BossAvailable, BubbleDue, YieldToBoss
+from .scheduler import Scheduler
 from .server_clock import ServerClock
+from .tasks import build_tasks, load_priorities
 from .status import STATUS_ERROR, STATUS_RUNNING, STATUS_STOPPED
 
 JOIN_BOSS = "Join Monster War"
-DAILY = "Daily Activities"
-OTHERS_WINDOW = 120   # giây tối đa làm activity khác trước khi quay lại kiểm tra boss
-IDLE_WAIT = 5         # giây nghỉ khi boss rảnh mà không còn activity khác để làm
+OTHERS_WINDOW = 120   # giây tối đa cho 1 nhiệm vụ khi có Join Boss (không có Join Boss: không giới hạn)
+IDLE_WAIT = 5         # giây nghỉ khi không còn nhiệm vụ nào tới lượt
 BUBBLE = "Bubble"
 BUBBLE_RENEW_BEFORE = 3600   # bubble còn <= 1 tiếng -> dùng bubble mới
 BUBBLE_RETRY = 300           # đọc / dùng bubble không được -> 5 phút sau thử lại
@@ -41,7 +52,6 @@ class BotWorker(QThread):
     status_changed = pyqtSignal(str, str)     # (serial, status)
     server_found = pyqtSignal(str, str)       # (serial, server)
 
-    server_time_found = pyqtSignal(str, str)  # (serial, thời điểm reset giờ máy)
     daily_task_done = pyqtSignal(str, str)    # (serial, task Daily Activities vừa xong)
     bubble_found = pyqtSignal(str, int)       # (serial, giây bubble còn lại; 0 = không có)
     bubble_disabled = pyqtSignal(str)         # (serial) không đủ kim cương -> bỏ tích Bubble
@@ -59,11 +69,10 @@ class BotWorker(QThread):
         self.server = settings.get("Initialization", {}).get("server") or ""
         # Cờ Stop dùng chung giữa UI và BotContext.
         self._stop = threading.Event()
-        # Giờ reset server dùng chung mọi thiết bị (BotManager giữ; thiếu thì dùng riêng).
+        # Giờ reset server chọn ở màn Home, dùng chung mọi thiết bị (BotManager giữ; thiếu thì dùng riêng).
         self.server_clock = server_clock if server_clock is not None else ServerClock()
         # {task: done_at} lấy từ DB; task chỉ tính là xong nếu done_at sau mốc reset gần nhất.
         self.daily_done = dict(daily_done or {})
-        self._daily_ran_for = None   # mốc reset của lần chạy Daily Activities gần nhất
         # Bubble: tích ở tab Initialization -> luôn giữ bubble, ưu tiên hơn mọi activity.
         init = settings.get("Initialization", {})
         self.bubble_enabled = bool(init.get("bubble"))
@@ -98,13 +107,7 @@ class BotWorker(QThread):
             self.ctx.is_daily_done = self._is_daily_done
             self.ctx.mark_daily_done = self._mark_daily_done
             self._register_boss_listener()
-            # Tách activity phụ để chọn chế độ điều phối.
-            others = [a for a in self.activities if a != JOIN_BOSS]
-            # Có cả boss và activity phụ thì ưu tiên boss; còn lại chạy theo danh sách.
-            if JOIN_BOSS in self.activities and others:
-                self._boss_priority(others)
-            else:
-                self._run_once(self.activities)
+            self._run_tasks()
         # Ngắt có chủ đích (Stop/timeout truyền tới đây) không xem là lỗi.
         except BotInterrupted:
             pass
@@ -120,102 +123,78 @@ class BotWorker(QThread):
             self.status_changed.emit(self.serial, status)
 
     def _run_once(self, activities: list[str]):
-        """Chạy tuần tự mỗi activity 1 lần (nhiệm vụ xong là xong)."""
-        # Gọi từng activity theo thứ tự; vòng lặp bên trong do activity tự quản lý.
+        """Chạy tuần tự mỗi activity 1 lần (chỉ còn dùng cho trường hợp chỉ chọn mỗi Join Boss)."""
         for activity in activities:
-            # Kiểm tra Stop trước khi bắt đầu activity tiếp theo.
             if self._stop.is_set():
                 break
-            # Thử lấy server nếu chưa biết, sau đó báo activity hiện tại cho UI.
-            # Lấy giờ reset trước: menu này cũng nằm trên đường lấy server.
-            self._ensure_server_time()
             self._ensure_server()
             self.activity_changed.emit(self.serial, activity)
-            # Truyền cấu hình riêng theo tên; nếu thiếu thì dùng dict rỗng.
             self._run_activity(activity, self.settings.get(activity, {}))
 
-    def _boss_priority(self, others: list[str]):
-        """Ưu tiên Join Boss; boss rảnh -> làm activity khác tối đa OTHERS_WINDOW giây
-        rồi quay lại kiểm tra boss. Activity bị cắt giữa chừng được làm tiếp đầu
-        tiên ở lượt sau; activity chạy tới cuối là hoàn thành, bỏ khỏi danh sách.
-        - Join Boss dừng hẳn (không phải rảnh) -> chạy nốt các activity chưa xong.
-        - Các activity khác đã hoàn thành hết -> chỉ còn Join Boss."""
-        # Danh sách chờ; activity bị timeout vẫn giữ ở đầu để được gọi lại trước.
-        pending = list(others)   # activity chưa hoàn thành, pending[0] là cái đang dở
-        # Lặp lịch ưu tiên boss cho đến khi Stop hoặc có nhánh return.
+    def _run_tasks(self):
+        """Vòng lặp chính (xem docstring đầu file) cho tới khi Stop."""
+        boss = JOIN_BOSS in self.activities
+        tasks = build_tasks(self.activities, {JOIN_BOSS}, load_priorities())
+        if boss and not tasks:
+            self._run_once([JOIN_BOSS])   # chỉ Join Boss: chạy liên tục như trước
+            return
+        scheduler = Scheduler(tasks, lambda: last_reset(self.server_time))
+        resume = None   # nhiệm vụ bị ngắt giữa chừng: làm lại đầu tiên ở vòng sau
         while not self._stop.is_set():
-            # Qua mốc reset server -> Daily Activities được làm lại trong ngày mới.
-            if DAILY in others and DAILY not in pending and self._daily_reset_passed():
-                pending.append(DAILY)
-            # Hết activity phụ: chạy boss với cấu hình gốc rồi kết thúc điều phối.
-            # Có Daily Activities thì vẫn giữ vòng lặp để chờ ngày mới.
-            if not pending and DAILY not in others:
-                self._run_once([JOIN_BOSS])
-                return
-
-            # Lấy giờ reset trước: menu này cũng nằm trên đường lấy server.
-            self._ensure_server_time()
             self._ensure_server()
-            self.activity_changed.emit(self.serial, JOIN_BOSS)
-            self.ctx._boss_event.clear()
-            # Tạo cấu hình tạm: boss trả về IDLE khi rảnh để nhường activity phụ; không sửa settings gốc.
-            result = self._run_activity(JOIN_BOSS, {**self.settings.get(JOIN_BOSS, {}), "exit_when_idle": True})
-            # Boss trả về khác IDLE: chạy nốt danh sách chờ rồi kết thúc.
-            if result != BOSS_IDLE:
-                self._run_once(pending)   # bắt đầu từ activity đang dở
-                return
-
-            # Boss rảnh: cấp chung 120 giây cho cả nhóm activity phụ, không phải từng activity.
-            # Dùng monotonic để không bị ảnh hưởng bởi chỉnh giờ hệ thống.
-            # Timeout chỉ phát hiện khi BotContext kiểm tra; không ngắt cưỡng chế.
-            if not pending:
-                # Chỉ còn chờ ngày mới cho Daily Activities: nghỉ ngắn rồi kiểm tra boss lại.
+            if boss:
+                boss = self._check_boss()
+            task = resume if resume is not None and scheduler.is_due(resume) else scheduler.pick()
+            resume = None
+            if task is None:
                 self._with_bubble(None, self.ctx.sleep, IDLE_WAIT)
                 continue
+            if not self._run_task(scheduler, task, boss):
+                resume = task
+
+    def _check_boss(self) -> bool:
+        """Một lượt Join Boss, rảnh thì nhường (exit_when_idle). False nếu Join Boss dừng hẳn."""
+        self.activity_changed.emit(self.serial, JOIN_BOSS)
+        self.ctx._boss_event.clear()
+        # Cấu hình tạm: boss trả về IDLE khi rảnh để nhường nhiệm vụ; không sửa settings gốc.
+        result = self._run_activity(JOIN_BOSS, {**self.settings.get(JOIN_BOSS, {}), "exit_when_idle": True})
+        if result == BOSS_IDLE:
+            return True
+        self.log("Join Monster War stopped; continuing with the other tasks")
+        return False
+
+    def _run_task(self, scheduler: Scheduler, task, boss: bool) -> bool:
+        """Chạy 1 nhiệm vụ. Có Join Boss: tối đa OTHERS_WINDOW giây, boss mới cũng ngắt; không có Join
+        Boss: không giới hạn thời gian. True nếu chạy tới cuối (xong), False nếu bị ngắt (làm lại ở vòng sau)."""
+        if boss:
+            # Timeout chỉ phát hiện khi BotContext kiểm tra; không ngắt cưỡng chế.
             self.ctx._deadline = time.monotonic() + OTHERS_WINDOW
             self.ctx._boss_interrupt_enabled = True
-            try:
-                # Chạy lần lượt các activity còn chờ trong khoảng thời gian được cấp.
-                while pending:
-                    self.ctx.check()
-                    self.activity_changed.emit(self.serial, pending[0])
-                    self._run_activity(pending[0], self.settings.get(pending[0], {}))
-                    # Chỉ xóa khi activity trả về bình thường; nếu timeout thì vẫn giữ trong pending.
-                    pending.pop(0)
-            # Hết thời gian: giữ activity đang dở và quay lại kiểm tra boss.
-            # Lượt sau gọi lại từ đầu hàm run(); worker không lưu điểm thực thi.
-            except TimedOut:
-                pass    # hết 2 phút -> pending[0] là activity đang dở, lượt sau làm tiếp
-            except YieldToBoss:
-                pass    # activity vừa xong 1 nhiệm vụ -> kiểm tra boss ngay, lượt sau làm tiếp
-            except BossAvailable:
-                self.log("New boss on this server; switching to Join Monster War")
-            except BubbleDue:
-                pass    # bubble tới hạn giữa 2 activity -> lượt sau xử lý bubble trước
-            # Luôn gỡ deadline, kể cả khi Stop/lỗi, để không ảnh hưởng lượt chạy boss.
-            finally:
-                self.ctx._boss_interrupt_enabled = False
-                self.ctx._deadline = None
+        try:
+            # Lo bubble trước (không có Join Boss thì không có bước nào khác lo), rồi xét Stop / boss mới.
+            self._with_bubble(None, self.ctx.check)
+            self.activity_changed.emit(self.serial, task.group)
+            scheduler.started(task)
+            self._run_activity(task.group, self.settings.get(task.group, {}))
+            scheduler.finished(task)
+            return True
+        # Bị ngắt: lượt sau gọi lại từ đầu hàm run(); worker không lưu điểm thực thi.
+        except TimedOut:
+            return False    # hết OTHERS_WINDOW giây
+        except YieldToBoss:
+            return False    # activity vừa xong 1 nhiệm vụ con -> kiểm tra boss ngay, lượt sau làm tiếp
+        except BossAvailable:
+            self.log("New boss on this server; switching to Join Monster War")
+            return False
+        # Luôn gỡ deadline, kể cả khi Stop/lỗi, để không ảnh hưởng lượt chạy boss.
+        finally:
+            self.ctx._boss_interrupt_enabled = False
+            self.ctx._deadline = None
 
     @property
     def server_time(self) -> str:
-        """Thời điểm reset server (ISO, giờ máy) dùng chung mọi thiết bị; "" nếu chưa biết."""
+        """Giờ reset server "HH:MM" người dùng chọn ở màn Home, dùng chung mọi thiết bị."""
         return self.server_clock.value
-
-    def _ensure_server_time(self):
-        """Chưa có thời điểm reset (chung mọi thiết bị): thiết bị đầu tiên cần tới thì đi đọc, các
-        thiết bị khác chạy bình thường (mốc reset tạm là 0h giờ máy). Không đọc được thì lần sau
-        (thiết bị này hoặc thiết bị khác) thử lại."""
-        if not self.server_clock.claim():
-            return
-        server_time = None
-        try:
-            self.activity_changed.emit(self.serial, "Get Server Time")
-            server_time = self._with_bubble("Get Server Time", get_server_time, self.ctx)
-        finally:
-            self.server_clock.release(server_time)
-        if server_time:
-            self.server_time_found.emit(self.serial, server_time)
 
     def _ensure_server(self):
         """Chưa có server -> đọc server trong game rồi báo ra UI để lưu lại."""
@@ -293,9 +272,6 @@ class BotWorker(QThread):
         self._bubble_expiry = time.monotonic() + seconds
         self.bubble_found.emit(self.serial, int(seconds))
 
-    def _daily_reset_passed(self) -> bool:
-        return self._daily_ran_for is not None and last_reset(self.server_time) > self._daily_ran_for
-
     def _is_daily_done(self, task: str) -> bool:
         return done_today(self.daily_done.get(task), self.server_time)
 
@@ -319,8 +295,6 @@ class BotWorker(QThread):
             self.log(f"Unknown activity: {activity}")
             self.ctx.sleep(1.0)
             return None
-        if activity == DAILY:
-            self._daily_ran_for = last_reset(self.server_time)
         # Trả nguyên kết quả; để exception truyền lên cấp điều phối xử lý.
         # Bubble được lo trước; tới hạn giữa chừng thì activity làm lại từ đầu.
         return self._with_bubble(activity, run, self.ctx, tab_settings)

@@ -16,7 +16,6 @@ class BotManager(QObject):
     running_changed = pyqtSignal(str, bool)   # (serial, running)
     server_found = pyqtSignal(str, str)       # (serial, server)
 
-    server_time_found = pyqtSignal(str, str)  # (serial, thời điểm reset giờ máy)
     daily_task_done = pyqtSignal(str, str)    # (serial, task Daily Activities vừa xong)
     bubble_found = pyqtSignal(str, int)       # (serial, giây bubble còn lại; 0 = không có)
     bubble_disabled = pyqtSignal(str)         # (serial) không đủ kim cương -> bỏ tích Bubble
@@ -25,7 +24,7 @@ class BotManager(QObject):
         super().__init__(parent)
         self._workers: dict[str, BotWorker] = {}
         self.boss_board = BossBoard()
-        # Giờ reset server chung mọi thiết bị: main gán giá trị đã lưu trong DB lúc mở app.
+        # Giờ reset server chung mọi thiết bị: main gán giá trị đã lưu trong DB / chọn ở màn Home.
         self.server_clock = ServerClock()
 
     def is_running(self, serial: str) -> bool:
@@ -45,7 +44,6 @@ class BotManager(QObject):
         worker.activity_changed.connect(self.activity_changed.emit)
         worker.status_changed.connect(self.status_changed.emit)
         worker.server_found.connect(self.server_found.emit)
-        worker.server_time_found.connect(self.server_time_found.emit)
         worker.daily_task_done.connect(self.daily_task_done.emit)
         worker.bubble_found.connect(self.bubble_found.emit)
         worker.bubble_disabled.connect(self.bubble_disabled.emit)
