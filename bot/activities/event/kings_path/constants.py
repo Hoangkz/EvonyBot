@@ -47,6 +47,16 @@ ROW_MAX_SCROLLS = 3
 # Bấm Go -> game chuyển màn (thành / bản đồ / màn chức năng): chờ.
 GO_WAIT = 5
 
+# ---- Sau Go: công trình trong thành (building.py) ----------------------------------
+# Go -> về thành, công trình của nhiệm vụ ở giữa màn hình. Chờ thêm GO_EXTRA_WAIT giây (cùng
+# GO_WAIT là 10 s) -> bấm giữa màn hình -> chờ MENU_WAIT giây -> menu công trình; không thấy
+# icon thì bấm giữa thêm lần nữa (MENU_TRIES lần). Rồi chờ màn chức năng tối đa SCREEN_WAIT giây.
+GO_EXTRA_WAIT = 5
+BUILDING_CENTER = (50, 50)   # % màn hình
+MENU_WAIT = 5
+MENU_TRIES = 2
+SCREEN_WAIT = 10
+
 # ---- Actions --------------------------------------------------------------------
 OPEN_DAY = "kp_open_day"   # tab Day của nhiệm vụ chưa chọn -> bấm
 ON_DAY = "kp_on_day"       # Day đang chọn nhưng tab phụ khác -> bấm tab phụ theo vị trí

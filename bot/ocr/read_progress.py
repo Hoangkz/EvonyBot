@@ -126,3 +126,31 @@ def run(image: np.ndarray) -> int | None:
     text = read_chars(left, FONT)
     digits = re.sub(r"\D", "", text or "")
     return int(digits) if digits else None
+
+
+def run_two_lines(first: np.ndarray, second: np.ndarray) -> int | None:
+    """Tiến độ số lớn bị xuống dòng: `first` = dòng 1 "23,530 /", `second` = dòng 2 "50,000"
+    (tests/event/kings_path/screens/day3_strong_troops_go.png). Trả số đã làm ở dòng 1, chỉ khi
+    dòng 2 cũng đọc ra số và >= số đã làm; ngược lại None.
+    Dấu "/" cuối dòng 1 rộng hơn bình thường (không qua _is_slash) -> bỏ mảnh cuối, mọi mảnh
+    còn lại phải là chữ số / ","."""
+    chars = split(first)
+    if len(chars) < 2:
+        return None
+    done = _all_digits(chars[:-1])
+    total = _all_digits(split(second))
+    if done is None or total is None or total < done:
+        return None
+    return done
+
+
+def _all_digits(chars) -> int | None:
+    """Số từ các mảnh chữ số (bỏ ","), None nếu có mảnh "/" hoặc mảnh đọc lỗi."""
+    while chars and isinstance(chars[0], str) and chars[0] == ",":
+        chars = chars[1:]
+    pieces = [c for c in chars if not (isinstance(c, str) and c == ",")]
+    if not pieces or any(isinstance(c, str) for c in pieces):
+        return None
+    text = read_chars(pieces, FONT) or ""
+    digits = re.sub(r"\D", "", text)
+    return int(digits) if len(digits) == len(pieces) else None

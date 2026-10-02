@@ -12,7 +12,7 @@ import cv2
 from bot.activities import event
 from bot.activities.event import claim
 from bot.activities.event.claim import claim_key, red_dots
-from bot.activities.event.constants import CLAIM_ALL, DOT_DAY_Y, DOT_TAB_Y, KINGS_PATH_ICON
+from bot.activities.event.constants import CLAIM_ALL, DOT_DAY_Y, DOT_TAB_Y, GATHER_CHESTS, KINGS_PATH_ICON
 from bot.activities.event.gather_troops import cultivate_generals
 from bot.activities.event.kings_path import wheel
 from bot.ocr import read_milestone
@@ -69,9 +69,26 @@ class RedDots(unittest.TestCase):
 class Milestone(unittest.TestCase):
     def test_read_progress(self):
         """OCR dòng "Progress:12 / 70" / "Progress:6 / 70" (MILESTONE_BOX)."""
-        for name, done in (("gather_chest_10.png", 12), ("07_gather_day1.png", 6)):
+        cases = [("gather_chest_10.png", 12), ("07_gather_day1.png", 6),
+                 ("gather_chest_claimed.png", 12)]   # chữ tối hơn (băng Congratulations)
+        cases += [(f"gather_progress_{n}.png", n) for n in range(13, 20)]   # đủ chữ số 0..9
+        for name, done in cases:
             screen = cv2.imread(str(CLAIM_SCREENS / name))
-            self.assertEqual(read_milestone(screen[121:135, 100:260]), done, name)
+            self.assertEqual(read_milestone(screen[121:135, 100:260], total=70), done, name)
+            self.assertIsNone(read_milestone(screen[121:135, 100:260], total=99), name)
+
+
+class Chests(unittest.TestCase):
+    def test_claim_reached_chests(self):
+        """Progress 15 / 70, rương 5 và 10 chưa nhận (chưa có dấu tích): bấm rương 5 rồi 10,
+        không bấm rương 30."""
+        flow = [
+            Step("gather_progress_15.png", tap_at(70, 83)),
+            Step("gather_progress_15.png", tap_at(122, 83), end()),
+        ]
+        device = run_flow(self, lambda bot, _: claim._claim_chests(bot, "Gather Troops", GATHER_CHESTS),
+                          CLAIM_SCREENS, flow, {})
+        self.assertIn("Gather Troops: claim chest 10 (progress 15)", device.logs)
 
 
 class ClaimFlow(unittest.TestCase):
@@ -100,7 +117,8 @@ class ClaimFlow(unittest.TestCase):
             Step("03_main.png?main_claimed", tap_at(*EVENT_BUTTON)),
             Step("04_event_list.png", tap("Event/GatherTroops/icon.png")),
             Step("gather_chest_10.png", tap_at(122, 83)),
-            Step("07_gather_day1.png", end()),
+            # Băng "Congratulations!" (rương 10 đã tích) -> chờ mất rồi mới xét tiếp.
+            Step("gather_chest_claimed.png", end()),
         ]
         with mock.patch.object(claim, "maybe_claim", MAYBE_CLAIM):
             device = run_flow(self, event.run, CLAIM_SCREENS, flow,

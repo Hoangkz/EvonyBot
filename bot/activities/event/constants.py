@@ -1,6 +1,8 @@
 """
 constants.py — Event image folders, limits and action names.
 """
+from . import milestones
+
 EV = "Event"
 
 # ---- Quà đăng nhập (Login Gifts) ---------------------------------------
@@ -71,6 +73,10 @@ GO_REGION = (70, 35, 100, 100)   # % màn hình: cột nút dưới hàng tab
 # tính từ tâm nút Go (đo: tâm Go (335, 344) -> chữ x 315-374, y 297-309). Đọc bằng
 # bot.ocr.read_progress (font Images/OCR/Progress).
 PROGRESS_FROM_GO = (-70, -48, 111, 14)
+# Số lớn bị xuống dòng (chỉ gặp ở nhiệm vụ train lính, VD "23,530 /" + "50,000"): dòng 1 cao hơn
+# ~5 px, dòng 2 ngay dưới. Đọc bằng read_progress.run_two_lines khi đọc 1 dòng lỗi.
+PROGRESS_LINE1_FROM_GO = (-70, -53, 111, 13)
+PROGRESS_LINE2_FROM_GO = (-70, -41, 111, 13)
 
 # Ổ khoá trên tab "Day N" chưa mở (hàng tab Day 1..Day 5, y ~209). Ngày khoá luôn là các
 # ngày cuối: đếm được N ổ khoá thì DAY_TABS - N + 1 .. DAY_TABS đang khoá (VD 4 -> Day 2..5).
@@ -95,16 +101,22 @@ DOT_AREA = (12, 30)        # diện tích khối đỏ (px) được coi là ch�
 DOT_TAP_OFFSET = (-25, 14)
 CLAIM_MAX_STEPS = 30       # số bước tối đa của một lượt nhận thưởng
 
-# Rương mốc trên đầu màn Gather Troops: (tâm icon, mốc ghi dưới icon) — 5 / 10 / 30 / 50 / 70.
+# Rương mốc trên đầu màn Gather Troops: (tâm icon, mốc ghi dưới icon). Con số MỐC để riêng ở
+# milestones.py (sửa ở đó khi game đổi mốc); ở đây chỉ là vị trí 5 rương trái -> phải.
 # Rương nhận được = mốc <= số đã làm ở dòng "Progress:12 / 70" (OCR bot.ocr.read_milestone,
 # vùng cắt MILESTONE_BOX) và chưa có dấu tích. Nhận xong rương có dấu tích.
-GATHER_CHESTS = [((70, 83), 5), ((122, 83), 10), ((173, 83), 30), ((224, 83), 50), ((275, 83), 70)]
+GATHER_CHEST_POSITIONS = [(70, 83), (122, 83), (173, 83), (224, 83), (275, 83)]
+GATHER_CHESTS = list(zip(GATHER_CHEST_POSITIONS, milestones.GATHER_TROOPS, strict=True))
 MILESTONE_BOX = (100, 121, 160, 14)   # (x, y, w, h) cả dòng "Progress:12 / 70"
-# Dấu tích xanh trên rương đã nhận (tâm lệch (+1, -1) so với tâm icon): 1,00; rương chưa nhận
-# <= 0,56 (tests/event/claim_screens/gather_chest_10.png + 4 màn Gather Troops) -> 0,8.
+# Dấu tích xanh trên rương đã nhận (tâm lệch (+1, -1) so với tâm icon): rương 5 1,00, rương 10
+# vừa nhận 0,86 (gather_chest_claimed.png); rương chưa nhận <= 0,57 -> 0,8.
 CHEST_TICK = f"{EV}/chestTick.png"
 CHEST_TICK_THRESHOLD = 0.8
 CHEST_HALF = 18   # tìm dấu tích trong ô 36x36 quanh tâm icon
+# Bấm rương -> băng "Congratulations!" giữa màn (199, 319) che các dòng nhiệm vụ (cả nút Go):
+# chờ băng mất (tối đa CONGRATS_WAIT giây) rồi mới bấm tiếp. 1,00; màn khác <= 0,45.
+CONGRATULATIONS = f"{EV}/congratulations.png"
+CONGRATS_WAIT = 5
 
 # Ngưỡng riêng của ảnh dùng chung; nhiệm vụ ghép thêm ngưỡng của mình
 # ({**THRESHOLDS, ...} trong constants.py của nhiệm vụ).

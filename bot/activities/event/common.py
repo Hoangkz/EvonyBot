@@ -35,6 +35,7 @@ from dataclasses import dataclass
 
 from ...common import click_images, delay, exit_images, find_first, go_home
 from ...ocr import read_progress
+from ...ocr.read_progress import run_two_lines as read_progress_two_lines
 from .constants import (
     BACK,
     CLAIM,
@@ -60,6 +61,8 @@ from .constants import (
     ON_MAIN_SCREEN,
     OPEN_LOGIN_GIFT,
     PROGRESS_FROM_GO,
+    PROGRESS_LINE1_FROM_GO,
+    PROGRESS_LINE2_FROM_GO,
     SWIPE_RIGHT,
     SWIPE_TIMES,
     SWIPE_UP,
@@ -210,9 +213,16 @@ def nearest_go(bot, screen, tab):
 
 
 def read_go_progress(bot, screen, go) -> int | None:
-    """Số đã làm ở "300 / 500" ngay trên nút `go` (OCR), hoặc None nếu đọc lỗi."""
-    dx, dy, w, h = PROGRESS_FROM_GO
-    return read_progress(bot.crop(screen, go[0] + dx, go[1] + dy, w, h))
+    """Số đã làm ở "300 / 500" ngay trên nút `go` (OCR), hoặc None nếu đọc lỗi. Đọc 1 dòng
+    lỗi thì thử kiểu số lớn bị xuống 2 dòng ("23,530 /" + "50,000")."""
+    def crop(box):
+        dx, dy, w, h = box
+        return bot.crop(screen, go[0] + dx, go[1] + dy, w, h)
+
+    done = read_progress(crop(PROGRESS_FROM_GO))
+    if done is None:
+        done = read_progress_two_lines(crop(PROGRESS_LINE1_FROM_GO), crop(PROGRESS_LINE2_FROM_GO))
+    return done
 
 
 def find_event_center(bot, screen):

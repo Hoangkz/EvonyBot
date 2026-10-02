@@ -14,7 +14,7 @@ from . import claim
 from .common import EventState
 from .constants import GATHER_TROOPS_ICON, KINGS_PATH_ICON
 from .gather_troops import cultivate_generals, ground_troop, mounted_troop, ranged_troop, siege_machine, defense_force
-from .kings_path import city_tax, donate, heal, offer, patrol, train_troop, wheel
+from .kings_path import city_tax, donate, heal, patrol, train_troop, wheel
 
 # (key event, tên log, icon trong danh sách event, [(key nhiệm vụ trong settings / event.json,
 # hàm chạy nhiệm vụ)] theo thứ tự chạy).
@@ -32,7 +32,6 @@ EVENTS = [
         (patrol.KEY, patrol.run),
         (donate.KEY, donate.run),
         (train_troop.KEY, train_troop.run),
-        (offer.KEY, offer.run),
         (heal.KEY, heal.run),
         (wheel.KEY, wheel.run),
     ]),

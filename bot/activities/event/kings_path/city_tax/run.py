@@ -6,24 +6,23 @@ Flow chung tới Go: xem ../path_task.py.
 Sau Go:
 1. Chờ 10 s (về thành, Chợ ở giữa màn hình) -> bấm giữa màn hình -> chờ 5 s -> menu Chợ
    có icon "Tax" -> bấm. Không thấy icon thì bấm giữa thêm 1 lần.
-2. Màn Tax: chia (mục tiêu - số đã làm) cho 4 dòng, dư dồn vào các dòng đầu
-   (VD 110 -> 28, 28, 27, 27).
+2. Màn Tax: chia (mục tiêu - số đã làm) cho 4 dòng, làm tròn lên cho nhanh, 4 dòng bằng nhau
+   (VD đã làm 20, mục tiêu 110 -> còn 90 -> 90 / 4 = 22,5 -> mỗi dòng 23; dư vài lần không sao).
 3. Mỗi dòng: bấm "Tax" -> popup -> gõ số lần vào ô số -> bấm "Tax" (quá lượt miễn phí thì
    tiêu kim cương) -> về màn Tax.
 4. Thu đủ 4 dòng -> đánh dấu xong.
 Không đọc được số đã làm ở dòng Go thì không thu (không biết số lần, tránh tiêu kim cương).
 Bị ngắt giữa chừng: lượt sau đọc lại số đã làm ở dòng Go rồi chia lại phần còn thiếu.
 """
+import math
+
 from ...common import EventState
 from .. import path_task
+from ..building import open_building
 from .constants import (
-    CENTER,
     DAY,
-    GO_EXTRA_WAIT,
     INPUT_DELETES,
     KEY,
-    MENU_TRIES,
-    MENU_WAIT,
     POPUP,
     POPUP_INPUT_OFFSET,
     POPUP_TAX,
@@ -42,9 +41,8 @@ NAME = "City Tax"
 
 
 def split_counts(total: int, parts: int = TAX_ROWS) -> list[int]:
-    """Chia `total` thành `parts` phần gần bằng nhau, dư dồn vào các phần đầu."""
-    base, extra = divmod(max(0, total), parts)
-    return [base + (1 if i < extra else 0) for i in range(parts)]
+    """Chia `total` thành `parts` phần bằng nhau, làm tròn lên (tổng có thể dư < `parts`)."""
+    return [math.ceil(max(0, total) / parts)] * parts
 
 
 def _tax(bot, path, done, target):
@@ -54,8 +52,7 @@ def _tax(bot, path, done, target):
         return
     counts = split_counts(target - done)
     bot.log(f"{NAME}: done {done}, target {target}, tax {counts}")
-    bot.sleep(GO_EXTRA_WAIT)
-    if not _open_tax(bot):
+    if not open_building(bot, NAME, TAX_MENU, TAX_SCREEN):
         return
     for row, count in enumerate(counts):
         if count == 0:
@@ -64,21 +61,6 @@ def _tax(bot, path, done, target):
             return
     bot.log(f"{NAME}: all rows taxed, done")
     bot.mark_daily_done(path.key)
-
-
-def _open_tax(bot) -> bool:
-    """Thành (Chợ ở giữa) -> bấm giữa màn hình -> icon Tax -> màn Tax."""
-    for _ in range(MENU_TRIES):
-        bot.tap_percent(*CENTER, delay=MENU_WAIT)
-        icon = bot.find(TAX_MENU)
-        if icon is not None:
-            bot.tap(*icon)
-            if bot.wait_for(TAX_SCREEN, timeout=SCREEN_WAIT) is not None:
-                return True
-            bot.log(f"{NAME}: Tax screen not shown")
-            return False
-    bot.log(f"{NAME}: Tax icon not found")
-    return False
 
 
 def _tax_row(bot, row: int, count: int) -> bool:

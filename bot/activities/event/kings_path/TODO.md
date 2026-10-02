@@ -1,11 +1,9 @@
 # King's Path — việc còn lại
 
-Cập nhật: 2026-10-02. Tích `[x]` khi xong. Kịch bản tổng: [../KINGS_PATH.md](../KINGS_PATH.md).
+Cập nhật: 2026-10-02. Xong mục nào thì xoá mục đó. Kịch bản tổng: [../KINGS_PATH.md](../KINGS_PATH.md).
 
-## 1. Chặn chạy thật (làm trước)
+## 1. Chạy thật
 
-- [x] **Ảnh icon King's Path trong danh sách event** → `Images/Event/KingsPath/icon.png` (2026-10-02).
-- [x] Test đi từ màn chính → Event Center → danh sách event → King's Path (`test_open_from_main`).
 - [ ] Chạy thử cả group King's Path trên giả lập (lần đầu chạy thật).
 
 ## 2. Nhiệm vụ chưa có phần sau Go
@@ -13,69 +11,58 @@ Cập nhật: 2026-10-02. Tích `[x]` khi xong. Kịch bản tổng: [../KINGS_P
 Hiện các nhiệm vụ này bấm Go rồi dừng, **không bao giờ đánh dấu xong**, nên mỗi lượt bot lại vào King's Path và bấm Go
 (mất thời gian trong 120 s dành cho activity phụ). Cần ảnh màn mở ra sau khi bấm Go và các bước tiếp theo.
 
-- [ ] **Patrol** (Day 2, Teamwork): ảnh sau Go + cách patrol.
-- [ ] **Offer** (Day 3, God's Blessing): ảnh sau Go + cách offer.
 - [ ] **Heal** (Day 3, Healing Heart): ảnh sau Go + cách heal (cần có lính bị thương).
+
+Heal sau Go giống City Tax / Patrol (chờ 10 s → bấm giữa màn hình → icon trong menu công trình → màn chức năng).
+**Yêu cầu: lưu được tiến độ** — đọc số đã làm ở dòng Go (OCR) mỗi lượt trước khi bấm Go, chỉ làm phần còn thiếu
+(mục tiêu − đã làm); bị ngắt (120 s / boss) thì lượt sau đọc lại số mới từ game rồi làm tiếp; đủ mục tiêu → xong.
+Cần ảnh cho mỗi nhiệm vụ: thành sau Go, menu sau khi bấm giữa (có icon), màn sau khi bấm icon, popup sau khi thực hiện.
 - [ ] **Black Market** (Day 5): chưa có code. Cần ảnh Day 5 khi đã mở (tab Day 5, các tab phụ, dòng nhiệm vụ, màn sau Go).
 - [ ] Ảnh tab **Day 5** (chưa chọn / đang chọn): hiện chỉ có Day 1–4 nên nhiệm vụ Day 5 không bấm được tab.
 - [ ] Quyết định: trong lúc chờ ảnh, có nên **bỏ qua** các nhiệm vụ chưa có phần sau Go (thay vì bấm Go rồi dừng) không?
 
 ## 3. Đã code nhưng chưa thử trên giả lập
 
-- [x] **Wheel** — có 100 Spins: bấm → Back → xong. Chỉ có 10 Spins: bấm liên tục tới khi game mở Purchase Chips → Back → xong hôm nay (2026-10-02).
-- [ ] **Wheel** — thử thật trên giả lập (nhất là nhịp bấm 10 Spins 1 s/lần khi bảng kết quả đang hiện).
-- [ ] **City Tax** — gõ số vào popup Tax (bấm ô số → xoá 5 lần → `input text` → Enter): kiểm tra ô số đổi đúng 28 / 27.
-- [ ] **City Tax** — "tap giữ màn hình" đang hiểu là **bấm 1 lần** giữa màn hình; nếu là nhấn giữ thì sửa.
-- [ ] **City Tax** — test dùng ảnh ghép (màn Day 1 trong ảnh toàn dòng Claim). Chụp màn City Tax còn dòng Go để thay.
-- [ ] **Train Troop** — test dùng ảnh ghép dòng Go (tab Strong Troops trong ảnh toàn dòng Claim). Chụp màn còn dòng Go.
+- [ ] **Wheel** — thử thật (nhất là nhịp bấm 10 Spins 1 s/lần khi bảng kết quả đang hiện).
+- [ ] **City Tax** — gõ số vào popup Tax (bấm ô số → xoá 5 lần → `input text` → Enter): kiểm tra ô số đổi đúng
+  (VD mỗi dòng 23 khi đã làm 20 / 110).
 - [ ] **Train Troop** — doanh trại mở ở cấp cao (không thấy cấp I): bot bấm vòng trái nhất để lùi dần, **chưa có ảnh test**.
   Chụp màn Train đang ở cấp cao (VD XIII) với tài khoản có nhiều cấp mở.
 - [ ] **Patrol / Donate** — cuộn danh sách tìm dòng (tối đa 3 lần) chưa thử với dòng nằm dưới màn.
 - [ ] **Donate** — thử thật: popup / hiệu ứng sau mỗi lần Donate có che nút không (đang chờ 1 s mỗi lần).
+- [ ] **Patrol** — thử thật (người dùng đang test). Hết lượt = nút Refresh xám (đã có ảnh, nhận theo màu).
+  "Đã patrol" = >= 6 dấu tích lớn (khối xanh lá >= 20 px); lượt chỉ tính khi màn chuyển sang "đã patrol".
+- [ ] **Đi giữa các nhiệm vụ** (King's Path và Gather Troops như nhau): xong một nhiệm vụ ở màn chức năng, nhiệm vụ sau
+  bấm Back từng lần (`go_home`) rồi xét lại màn. Kiểm trong log: Back về thẳng event thì làm tiếp ngay; về thành thì
+  thấy `... event opened` (mở lại từ Event Center, ~15–30 s mỗi nhiệm vụ — do game, không tránh được).
+- [ ] **Nhận thưởng theo chấm đỏ + rương mốc Gather Troops** (event/claim.py) — thử thật cả Gather Troops và King's Path.
 
 ## 4. Rủi ro logic cần xem lại
 
-- [ ] **OCR tiến độ hỏng ở 2 trường hợp:**
-  - dòng Go trên cùng bị hàng tab phụ che chữ "a / b" (nút Go ở y < ~318) → đọc ra None;
-  - số lớn bị xuống 2 dòng (VD "10,000 / 10,000" ở Strong Troops, Healing Heart) → đọc ra None.
-
-  Hậu quả: City Tax / Donate **không làm gì và lặp lại mỗi lượt** (vì không dám tiêu kim cương khi không biết số);
-  Train Troop train **đủ cả mục tiêu** (có thể dư). Cần chụp dòng có số 2 dòng để sửa vùng cắt OCR.
-- [ ] **"Không còn Go → xong"**: với nhiệm vụ không tìm dòng theo tiêu đề (City Tax, Train, Offer, Heal, Wheel),
-  không thấy nút Go trên màn là coi như xong. Đúng nếu sau Claim All các dòng đã nhận dồn xuống dưới — **chưa xác nhận**.
-  Nếu dòng Go nằm dưới màn hình thì bot đánh dấu xong nhầm.
-- [x] **Donate** — mua lại lượt tối đa **4 lần** / lượt chạy (13 miễn phí + 4 × 13 = 65 ≥ 60).
-- [ ] **Donate** — không kiểm tra giá kim cương mỗi lần mua (lần đầu 448, có thể tăng). Có cần mức trần không?
-- [ ] **City Tax** — vượt lượt miễn phí thì tiêu kim cương, không có mức trần.
-- [ ] Mỗi nhiệm vụ King's Path tự mở lại event từ màn chính (Event Center → danh sách → icon) → chậm khi bật nhiều nhiệm vụ.
+- [ ] **OCR tiến độ**: dòng Go trên cùng bị hàng tab phụ che chữ "a / b" (nút Go ở y < ~318) → đọc ra None →
+  City Tax / Donate không làm gì lượt đó. (Số lớn xuống 2 dòng ở Train Troop đã đọc được.)
 
 ## 5. Cấu hình `ui/tabs/event.json` (group King's Path)
 
 - [ ] Train Troop: dãy `..., 50000, 10000, 200000` — có lẽ `10000` gõ nhầm của `100000`.
-- [ ] Train Troop, Offer, Heal, Wheel, Black Market **không có giá trị 0** → không tắt được nhiệm vụ.
+- [ ] Train Troop, Heal, Wheel, Black Market **không có giá trị 0** → không tắt được nhiệm vụ.
 - [ ] `kings_path_black_market` có trong tab nhưng chưa có nhiệm vụ → bị bỏ qua im lặng.
 
-## 6. Phạm vi
+## 6. Chưa làm
+
+- [ ] Rương **King's Path** (rương đếm số ở đầu màn, Progress x / 99). Cần ảnh lúc nhận được + sau khi bấm.
+
+## 7. Phạm vi (đã chốt 2026-10-02)
 
 Chỉ làm các nhiệm vụ có trong group King's Path của `ui/tabs/event.json`: City Tax, Patrol, Donate,
-Train Troop, Offer, Heal, Wheel, Black Market. **Không làm** (đã chốt 2026-10-02):
+Train Troop, Heal, Wheel, Black Market. **Không làm** các tab phụ khác: Hoarding, Mining (Day 1);
+Unstoppable — đánh boss, Try Your Best (Day 2); God's Blessing — Offer (Day 3, bỏ 2026-10-02);
+Accumulation, Sharp Weapons (Day 4).
 
-- Các tab phụ khác: Hoarding, Mining (Day 1); Unstoppable — đánh boss, Try Your Best (Day 2);
-  Accumulation, Sharp Weapons (Day 4).
-
-## 7. Nhận thưởng theo chấm đỏ (event/claim.py)
-
-- [x] Xong hết nhiệm vụ của một event (Gather Troops, King's Path — mỗi event riêng) mà có ≥ 1 nhiệm vụ
-  xong hôm nay → mở event, bấm các tab phụ / tab Day có chấm đỏ, mỗi tab Claim All (2026-10-02).
-  Nhận lại mỗi khi số nhiệm vụ xong tăng lên.
-- [ ] Thử thật trên giả lập (cả Gather Troops và King's Path).
-- [x] Rương mốc **Gather Troops** (5/10/30/50/70): OCR "Progress:x / 70" (font mới `Images/OCR/Milestone`),
-  bấm rương có mốc ≤ x mà chưa có dấu tích; chạy sau khi hết chấm đỏ (2026-10-02).
-- [ ] OCR `Milestone` mới có mẫu chữ số **0, 1, 2, 6, 7** — thiếu **3, 4, 5, 8, 9**: tiến độ chứa các số này đọc lỗi
-  → bot bỏ qua rương. Gửi ảnh màn Gather Troops có tiến độ chứa các số đó để thêm mẫu.
-- [ ] Bấm rương xong có popup phần thưởng không? Chưa có ảnh — nếu có popup che, cần thêm bước đóng.
-- [ ] Mốc rương đang cố định 5/10/30/50/70 (theo ảnh). Event lần sau đổi mốc thì phải sửa `GATHER_CHESTS`.
-- [ ] Rương **King's Path** (rương đếm số ở đầu màn, Progress x / 99): chưa làm. Cần ảnh lúc nhận được + sau khi bấm.
+City Tax: tiêu kim cương khi hết lượt miễn phí, **không cần mức trần** — chỉ cần tax 4 dòng đủ mục tiêu.
+Mốc rương Gather Troops (5/10/30/50/70) cố định; game đổi mốc thì sửa ở `bot/activities/event/milestones.py`.
+Donate: giá mua lại lượt cao nhất 448 kim cương, giảm dần theo thời gian → **không cần mức trần**. Mua tối đa 5 lần
+(lần đầu không còn lượt miễn phí: 5 × 13 = 65 ≥ 60); donate đủ (mục tiêu − số đã làm, OCR dòng Go) là dừng.
 
 ## 8. Khác
 

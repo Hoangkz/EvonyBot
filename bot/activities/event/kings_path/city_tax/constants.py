@@ -14,12 +14,7 @@ TAB_SELECTED = f"{KP}/Tab/cityTaxSelected.png"
 TAB_INDEX = 0
 
 # ---- Sau khi bấm Go -----------------------------------------------------------------
-# Go -> về thành, Chợ (Market) ở giữa màn hình. Chờ thêm GO_EXTRA_WAIT giây (cùng GO_WAIT
-# của path_task là 10 s) -> bấm giữa màn hình -> chờ MENU_WAIT giây -> menu công trình.
-GO_EXTRA_WAIT = 5
-CENTER = (50, 50)   # % màn hình
-MENU_WAIT = 5
-MENU_TRIES = 2      # không thấy icon Tax thì bấm giữa thêm lần nữa
+# Go -> về thành, Chợ (Market) ở giữa màn hình -> bấm giữa -> menu Chợ (../building.py).
 # Icon "Tax" trong menu Chợ (221, 193): 0,97 (ảnh của Daily Activities / Resource Tax).
 TAX_MENU = "DailyActivites/ActivitiesTaxResource/Tax.png"
 
@@ -41,5 +36,5 @@ POPUP_INPUT_OFFSET = (6, -81)
 # Nút "Tax" to trong popup (198, 438): 1,00; màn khác <= 0,61.
 POPUP_TAX = f"{KP}/Tax/popupTax.png"
 INPUT_DELETES = 5   # xoá số cũ trong ô (tối đa 5 chữ số) trước khi gõ số mới
-SCREEN_WAIT = 10    # chờ màn Tax / popup hiện (giây)
+SCREEN_WAIT = 10    # chờ popup Tax hiện (giây)
 TAX_WAIT = 3        # sau khi bấm Tax trong popup: chờ về màn Tax

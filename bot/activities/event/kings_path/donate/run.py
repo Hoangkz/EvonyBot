@@ -6,7 +6,7 @@ Flow chung tới Go: xem ../path_task.py.
 Sau Go (màn Alliance Science):
 - Hộp "Spend N Gems on clearing the Cooldown?" -> Okay.
 - Nút "Donate" -> bấm, đếm 1 lần. Đủ (mục tiêu - số đã làm) lần -> đánh dấu xong.
-- Hết lượt (nút kim cương) -> bấm để mua lại lượt, tối đa MAX_GEM_BUYS (4) lần; quá thì dừng.
+- Hết lượt (nút kim cương) -> bấm để mua lại lượt, tối đa MAX_GEM_BUYS (5) lần; quá thì dừng.
 Không đọc được số đã làm ở dòng Go thì không donate (không biết lúc nào dừng, tránh tiêu
 kim cương). Bị ngắt giữa chừng: lượt sau đọc lại số đã làm ở dòng Go rồi làm tiếp.
 """

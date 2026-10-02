@@ -6,7 +6,6 @@ kings_path — nhiệm vụ của event "King's Path". Mỗi nhiệm vụ một 
 - patrol/:      Patrol (`kings_path_patrol`, Day 2, tab "Teamwork", dòng "Patrol for")
 - donate/:      Donate (`kings_path_donate`, Day 2, tab "Teamwork", dòng "Donate to the Alliance")
 - train_troop/: Train Troop (`kings_path_train_troop`, Day 3, tab "Strong Troops")
-- offer/:       Offer (`kings_path_offer`, Day 3, tab "God's Blessing")
 - heal/:        Heal (`kings_path_heal`, Day 3, tab "Healing Heart")
 - wheel/:       Wheel (`kings_path_wheel`, Day 4, tab "Fortune Wheel")
 - path_task.py: flow chung tới nút Go (PathTask)

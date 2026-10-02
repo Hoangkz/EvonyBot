@@ -14,12 +14,16 @@ from unittest import mock
 
 import cv2
 
+
 from bot.activities import event
 from bot.activities.event.constants import CLAIM_ALL, KINGS_PATH_ICON
 from bot.activities.event.kings_path import city_tax, donate, heal, patrol, path_task, train_troop, wheel
 from bot.activities.event.kings_path.city_tax.constants import POPUP_TAX, TAX_MENU
 from bot.activities.event.kings_path.city_tax.run import split_counts
 from bot.activities.event.kings_path.donate.constants import DONATE_BUTTON, GEMS_BUTTON, OKAY
+from bot.activities.event.kings_path.patrol.constants import (
+    MENU_PATROL, PATROL_BUTTON, REFRESH_BUTTON as PATROL_REFRESH, SELECT_ALL_OFF as PATROL_SELECT_ALL_OFF)
+from bot.activities.event.kings_path.patrol.run import round_key as patrol_round_key
 from bot.activities.event.kings_path.wheel.constants import SPINS_10, SPINS_100
 from tests.flow import Step, back, end, run_flow, tap, tap_at, tap_pct
 from tests.event import setUpModule, tearDownModule  # noqa: F401 (tắt lượt nhận thưởng)
@@ -37,19 +41,9 @@ def _blank(y0, y1, x0, x1):
     return fn
 
 
-def _paste_go_row(bgr):
-    """Dán dòng "0 / 1,000" + nút Go (dòng đầu, y 290..375) của ảnh Day 3 vào ảnh City Tax
-    (dòng nào cũng đang Claim) và xoá Claim All -> tab còn dòng Go, đã làm 0."""
-    src = cv2.imread(str(SCREENS / "day3_healing_heart.png"))
-    bgr[290:375, 260:385] = src[290:375, 260:385]
-    return _blank(655, 695, 140, 256)(bgr)
-
-
 VARIANTS = {
     # Màn chính đã nhận quà: không còn icon Login Gifts (cột phải + góc dưới trái).
     "main_claimed": lambda bgr: _blank(525, 575, 0, 60)(_blank(130, 170, 330, 396)(bgr)),
-    # Dòng đầu có nút Go "0 / ..." (ảnh tổng hợp, xem _paste_go_row): City Tax, Strong Troops.
-    "go": _paste_go_row,
     # Đã bấm Claim All: xoá nút Claim All ở đáy màn.
     "claimed": _blank(655, 695, 140, 256),
     # Màn event cùng khung nhưng không phải King's Path (VD Gather Troops): xoá tiêu đề.
@@ -79,10 +73,93 @@ class KingsPathFlow(unittest.TestCase):
         flow = [
             Step("day2_unstoppable.png", tap(CLAIM_ALL)),
             Step("day2_unstoppable.png?claimed", tap(f"{KP}/Tab/teamwork.png")),
-            Step("day2_teamwork.png", tap_at(335, 344), end()),
+            Step("day2_teamwork.png", tap_at(335, 344)),   # sau Go: harness dừng bot
         ]
         device = _run(self, flow, {patrol.KEY: {"value": 200, "day": 2}})
         self.assertIn("Patrol: done 140, target 200", device.logs)
+
+    def test_patrol_rounds(self):
+        """Patrol (đã làm 140, mục tiêu 160): Go -> bấm giữa thành -> icon Patrol -> Select All ->
+        Patrol (+10) -> đã patrol -> Refresh -> Select All -> Patrol (+10 = 160) -> đủ, Back, xong."""
+        rounds = [
+            Step("patrol_screen.png", tap(PATROL_SELECT_ALL_OFF)),
+            Step("patrol_selected.png", tap(PATROL_BUTTON)),
+        ]
+        flow = [
+            Step("day2_teamwork.png", tap_at(335, 344)),
+            Step("patrol_city.png", tap_pct(50, 50)),
+            Step("patrol_menu.png", tap(MENU_PATROL)),
+            *rounds,
+            Step("patrol_done.png", tap(PATROL_REFRESH)),
+            *rounds,
+            Step("patrol_done.png", back(), end()),
+        ]
+        device = _run(self, flow, {patrol.KEY: {"value": 160, "day": 2}})
+        self.assertIn("Patrol: progress 160 / 160, done", device.logs)
+        self.assertIn(patrol.KEY, device.daily_done)
+        self.assertIn(patrol_round_key(2), device.daily_done)
+
+    def test_patrol_daily_limit(self):
+        """Hôm nay đã patrol 9 lượt (lưu daily_done): patrol thêm 1 lượt -> đủ 10 -> Back, xong hôm
+        nay (mục tiêu 200 chưa đủ, mai làm tiếp)."""
+        flow = [
+            Step("day2_teamwork.png", tap_at(335, 344)),
+            Step("patrol_city.png", tap_pct(50, 50)),
+            Step("patrol_menu.png", tap(MENU_PATROL)),
+            Step("patrol_screen.png", tap(PATROL_SELECT_ALL_OFF)),
+            Step("patrol_selected.png", tap(PATROL_BUTTON)),
+            Step("patrol_done.png", back(), end()),
+        ]
+        done = {patrol_round_key(n): "2026-10-02T08:00:00" for n in range(1, 10)}
+        device = _run(self, flow, {patrol.KEY: {"value": 200, "day": 2}}, daily_done=done)
+        self.assertIn("Patrol: 10 rounds today, done for today", device.logs)
+        self.assertIn(patrol.KEY, device.daily_done)
+
+    def test_patrol_out_of_refreshes(self):
+        """Refresh mà phần thưởng vẫn là bộ đã patrol (hết lượt Refresh): Back, xong hôm nay."""
+        flow = [
+            Step("day2_teamwork.png", tap_at(335, 344)),
+            Step("patrol_city.png", tap_pct(50, 50)),
+            Step("patrol_menu.png", tap(MENU_PATROL)),
+            Step("patrol_done.png", tap(PATROL_REFRESH)),
+            Step("patrol_done.png", back(), end()),
+        ]
+        device = _run(self, flow, {patrol.KEY: {"value": 200, "day": 2}})
+        self.assertIn(patrol.KEY, device.daily_done)
+
+    def test_patrol_not_confirmed(self):
+        """Bấm Patrol mà màn không chuyển sang "đã patrol" (game chậm / popup): không tính lượt,
+        không cộng tiến độ, dừng (không đánh dấu xong)."""
+        flow = [
+            Step("day2_teamwork.png", tap_at(335, 344)),
+            Step("patrol_city.png", tap_pct(50, 50)),
+            Step("patrol_menu.png", tap(MENU_PATROL)),
+            Step("patrol_selected.png", tap(PATROL_BUTTON)),
+            Step("patrol_selected.png", end()),
+        ]
+        device = _run(self, flow, {patrol.KEY: {"value": 200, "day": 2}})
+        self.assertNotIn(patrol_round_key(1), device.daily_done)
+        self.assertNotIn(patrol.KEY, device.daily_done)
+
+    def test_patrol_claimed_detection(self):
+        """Đếm dấu tích lớn: chưa tích / chỉ tích ô nhỏ -> chưa patrol; sau patrol / hết lượt -> đã."""
+        claimed = sys.modules["bot.activities.event.kings_path.patrol.run"]._claimed
+        for name, expected in (("patrol_screen.png", False), ("patrol_selected.png", False),
+                               ("patrol_done.png", True), ("patrol_no_refresh.png", True)):
+            self.assertEqual(claimed(cv2.imread(str(SCREENS / name))), expected, name)
+
+    def test_patrol_refresh_disabled(self):
+        """Đã patrol lượt hiện tại, nút Refresh xám (Refreshes Today 10/10, ảnh thật): Back, xong
+        hôm nay — không bấm Refresh."""
+        flow = [
+            Step("day2_teamwork.png", tap_at(335, 344)),
+            Step("patrol_city.png", tap_pct(50, 50)),
+            Step("patrol_menu.png", tap(MENU_PATROL)),
+            Step("patrol_no_refresh.png", back(), end()),
+        ]
+        device = _run(self, flow, {patrol.KEY: {"value": 200, "day": 2}})
+        self.assertIn("Patrol: Refresh disabled (out of refreshes), done for today", device.logs)
+        self.assertIn(patrol.KEY, device.daily_done)
 
     def test_donate(self):
         """Tab Teamwork: dòng "Donate to the Alliance" (0 / 10) -> Go -> Alliance Science:
@@ -111,11 +188,12 @@ class KingsPathFlow(unittest.TestCase):
         self.assertNotIn(donate.KEY, device.daily_done)
 
     def test_city_tax(self):
-        """Day 1 City Tax: đọc 0 / ... -> Go -> bấm giữa thành -> icon Tax -> màn Tax: chia
-        110 thành 28, 28, 27, 27 -> mỗi dòng Tax -> popup gõ số -> Tax -> xong."""
+        """Day 1 City Tax (ảnh thật): dòng Go trên cùng 93 / 110, các dòng Claimed dồn xuống dưới
+        -> Go -> bấm giữa thành -> icon Tax -> màn Tax: còn 17 / 4 = 4,25 -> mỗi dòng 5 -> mỗi
+        dòng Tax -> popup gõ số -> Tax -> xong."""
         rows = [284, 383, 482, 581]
         flow = [
-            Step("day1_city_tax.png?go", tap_at(335, 344)),
+            Step("day1_city_tax_go.png", tap_at(335, 344)),
             Step("tax_city.png", tap_pct(50, 50)),
             Step("tax_menu.png", tap(TAX_MENU)),
         ]
@@ -127,26 +205,30 @@ class KingsPathFlow(unittest.TestCase):
         flow.append(Step("tax_screen.png", end()))
         device = _run(self, flow, {city_tax.KEY: {"value": 110, "day": 1}})
         texts = [c for c in device.shells if c.startswith("input text")]
-        self.assertEqual(texts, ["input text 28", "input text 28", "input text 27", "input text 27"])
+        self.assertIn("City Tax: done 93, target 110, tax [5, 5, 5, 5]", device.logs)
+        self.assertEqual(texts, ["input text 5"] * 4)
         self.assertIn(city_tax.KEY, device.daily_done)
 
     def test_train_troop(self):
-        """Day 3 -> tab Strong Troops -> Go (0 / ...) -> doanh trại -> menu Train -> màn Train:
-        bấm vòng cấp I (sát mép trái) -> 2000 lính / 1580 mỗi mẻ = 2 mẻ -> Train."""
+        """Day 3 -> tab Strong Troops (ảnh thật, tiến độ xuống 2 dòng "23,530 / 50,000") -> Go ->
+        doanh trại -> menu Train -> màn Train: bấm vòng cấp I (sát mép trái) -> Train."""
         flow = [
             Step("day3_healing_heart.png", tap(f"{KP}/Tab/strongTroops.png")),
-            Step("day3_strong_troops.png?go", tap_at(335, 344)),
+            Step("day3_strong_troops_go.png", tap_at(335, 344)),
             Step("train_after_go.png", tap_at(198, 352)),
             Step("train_menu.png", tap("Event/GatherTroops/Train/train.png")),
             Step("train_t01.png", tap("Event/GatherTroops/GroundTroop/Tier/1.png")),
             Step("train_t01.png", tap("Event/GatherTroops/Train/trainButton.png")),
         ]
-        device = _run(self, flow, {train_troop.KEY: {"value": 2000, "day": 3}})
-        self.assertIn("Train Troop: 1580 per batch -> 2 batch(es)", device.logs)
+        device = _run(self, flow, {train_troop.KEY: {"value": 50000, "day": 3}})
+        # Tiến độ xuống 2 dòng "23,530 /" + "50,000" -> đã làm 23530, còn 26470 / 1580 = 17 mẻ.
+        self.assertIn("Train Troop: done 23530, remaining 26470", device.logs)
+        self.assertIn("Train Troop: 1580 per batch -> 17 batch(es)", device.logs)
 
     def test_split_counts(self):
-        self.assertEqual(split_counts(110), [28, 28, 27, 27])
-        self.assertEqual(split_counts(3), [1, 1, 1, 0])
+        self.assertEqual(split_counts(110), [28] * 4)
+        self.assertEqual(split_counts(90), [23] * 4)   # đã làm 20 / 110
+        self.assertEqual(split_counts(3), [1] * 4)
         self.assertEqual(split_counts(0), [0, 0, 0, 0])
 
     def test_target_reached(self):

@@ -1,7 +1,7 @@
 # Kịch bản King's Path
 
 > **Trạng thái (2026-10-01):** đã code phần từ màn chính tới bấm Go cho City Tax, Patrol, Donate,
-> Train Troop, Offer, Heal, Wheel — [kings_path/](kings_path/) (flow chung: [path_task.py](kings_path/path_task.py),
+> Train Troop, Heal, Wheel — [kings_path/](kings_path/) (flow chung: [path_task.py](kings_path/path_task.py),
 > test: `tests/event/kings_path/`). Còn thiếu: ảnh icon King's Path trong danh sách event
 > (`Images/Event/KingsPath/icon.png`; chưa có thì nhiệm vụ tự bỏ qua), phần sau Go của từng nhiệm vụ,
 > Black Market (Day 5). Phần dưới là bản nháp ban đầu. Việc còn lại: [kings_path/TODO.md](kings_path/TODO.md).
@@ -12,7 +12,7 @@
 | --- | --- | --- |
 | 1 | City Tax · Hoarding · Mining | City Tax: "Tax on resources for N time(s)" (3/10/20/40/...) |
 | 2 | Unstoppable · Try Your Best · Teamwork | Teamwork: "Patrol for N time(s)" + "Donate to the Alliance N time(s)" (cùng tab, tìm dòng theo tiêu đề) |
-| 3 | Strong Troops · God's Blessing · Healing Heart | "Train N Troop(s)", "Offer N time(s)", "Heal N troops" |
+| 3 | Strong Troops · God's Blessing · Healing Heart | "Train N Troop(s)", "Heal N troops" (Offer — God's Blessing: không làm) |
 | 4 | Accumulation · Fortune Wheel · Sharp Weapons | "Spin the Wheel of Fortune N time(s)" |
 | 5 | (khoá) | Black Market? — chưa có ảnh |
 

@@ -30,9 +30,10 @@ GEMS_BUTTON = f"{KP}/Donate/gems.png"
 # Chữ "Okay" trong hộp xác nhận tiêu kim cương (199, 387): 1,00; màn khác <= 0,50.
 OKAY = f"{KP}/Donate/okay.png"
 
-# Mua lại lượt tối đa 4 lần mỗi lượt chạy: 13 lượt miễn phí đầu + 4 x 13 = 65 >= 60 (mốc cao
-# nhất "Donate to the Alliance 60 time(s)").
-MAX_GEM_BUYS = 4
+# Mua lại lượt tối đa 5 lần mỗi lượt chạy: lần vào đầu đã hết lượt miễn phí -> 5 x 13 = 65 >= 60
+# (mốc cao nhất "Donate to the Alliance 60 time(s)"). Còn lượt miễn phí thì donate đủ (mục tiêu -
+# số đã làm, OCR ở dòng Go) là dừng nên chỉ mua đúng số lần cần (VD 13 miễn phí + 4 lần mua).
+MAX_GEM_BUYS = 5
 SCIENCE_WAIT = 10   # sau Go: chờ màn Alliance Science (giây)
 DONATE_WAIT = 1     # sau mỗi lần bấm Donate
 GEMS_WAIT = 2       # sau khi bấm nút kim cương / Okay

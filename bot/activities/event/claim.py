@@ -11,7 +11,8 @@ Flow (sau khi mở event bằng run_task, giống nhiệm vụ):
 2. Chấm đỏ trên hàng tab phụ (tab chưa bấm trong Day đang mở) -> bấm tab đó.
 3. Hết chấm ở tab phụ: chấm đỏ trên hàng tab Day (Day chưa bấm) -> bấm Day đó.
 4. Hết chấm -> rương mốc (chỉ Gather Troops, CHESTS): đọc số đã làm ở "Progress:12 / 70"
-   (OCR), bấm mọi rương có mốc <= số đó mà chưa có dấu tích (VD 12 -> rương 5, 10).
+   (OCR, số bên phải phải đúng mốc cuối), bấm mọi rương có mốc <= số đó mà chưa có dấu tích
+   (VD 12 -> rương 5, 10); mỗi lần bấm chờ băng "Congratulations!" mất.
 Mỗi tab chỉ bấm 1 lần mỗi lượt (chấm không mất cũng không kẹt).
 """
 import cv2
@@ -25,6 +26,8 @@ from .constants import (
     CHEST_TICK_THRESHOLD,
     CLAIM_ALL,
     CLAIM_MAX_STEPS,
+    CONGRATS_WAIT,
+    CONGRATULATIONS,
     DOT_AREA,
     DOT_DAY_Y,
     DOT_ROW_HALF,
@@ -102,7 +105,7 @@ def _claim_dots(bot, state: EventState, name: str):
 def _claim_chests(bot, name: str, chests):
     """Bấm các rương có mốc <= số đã làm (OCR "Progress:x / y") mà chưa có dấu tích."""
     screen = bot.screenshot()
-    done = read_milestone(bot.crop(screen, *MILESTONE_BOX))
+    done = read_milestone(bot.crop(screen, *MILESTONE_BOX), total=chests[-1][1])
     if done is None:
         bot.log(f"{name}: cannot read milestone progress, chests skipped")
         return
@@ -113,7 +116,16 @@ def _claim_chests(bot, name: str, chests):
         if bot.find(CHEST_TICK, threshold=CHEST_TICK_THRESHOLD, screen=area) is not None:
             continue
         bot.log(f"{name}: claim chest {milestone} (progress {done})")
-        bot.tap(x, y, delay=2)
+        bot.tap(x, y, delay=1)
+        _wait_congratulations_gone(bot)
+
+
+def _wait_congratulations_gone(bot):
+    """Chờ băng "Congratulations!" (hiện sau khi nhận rương) mất, tối đa CONGRATS_WAIT giây."""
+    for _ in range(CONGRATS_WAIT * 2):
+        if bot.find(CONGRATULATIONS) is None:
+            return
+        bot.sleep(0.5)
 
 
 def red_dots(screen, row_y: int) -> list[int]:
