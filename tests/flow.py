@@ -18,7 +18,7 @@ import cv2
 import numpy as np
 from PIL import Image
 
-from bot.activities.event import city_building
+from bot.activities.event import city_building, constants as event_constants
 from bot.context import TEMPLATE_DIR, BotContext, StopRequested, TimedOut
 
 TAP_THRESHOLD = 0.8     # điểm khớp tối thiểu để coi template có trên ảnh
@@ -326,10 +326,11 @@ def run_flow(testcase, run, screens_dir: Path, flow: list[Step], settings: dict,
     device.logs = logs
     device.ctx = ctx
 
-    # Ảnh công trình tự học (city_building) ghi vào thư mục tạm của từng lần chạy, không
-    # vào %LOCALAPPDATA% thật; test cần ảnh học sẵn thì chép vào trong `setup`.
+    # Ảnh công trình / tiêu đề bot tự học ghi vào thư mục tạm của từng lần chạy, không vào
+    # %LOCALAPPDATA% thật; test cần ảnh học sẵn thì chép vào trong `setup`.
     with tempfile.TemporaryDirectory() as learned, \
             mock.patch.object(city_building, "LEARNED_DIR", Path(learned)), \
+            mock.patch.object(event_constants, "LEARNED_TITLES_DIR", Path(learned) / "titles"), \
             mock.patch.object(time, "monotonic", clock):
         device.learned_dir = Path(learned)
         if setup is not None:

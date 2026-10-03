@@ -33,6 +33,7 @@ handle_common() lo (quà, Event Center, BACK, go_home...).
 """
 import time
 from dataclasses import dataclass
+from pathlib import Path
 
 import cv2
 import numpy as np
@@ -41,6 +42,7 @@ from ...common import click_images, delay, exit_images, find_first, go_home, ima
 from ...context.templates import TEMPLATE_DIR
 from ...ocr import read_progress
 from ...ocr.read_progress import run_two_lines as read_progress_two_lines
+from . import constants
 from .constants import (
     BACK,
     CLAIM,
@@ -354,7 +356,7 @@ def open_event(bot, icon: str) -> str:
         score, pos = bot.best_match(icon, screen=screen)
         if pos is not None and score >= EVENT_ICON_THRESHOLD:
             if not list_seen and icon in REFRESH_TITLE_ICONS:
-                add_title(bot, screen, event_list_titles(), EVENT_LIST_TITLES_DIR,
+                add_title(bot, screen, event_list_titles(), constants.LEARNED_TITLES_DIR,
                           EVENT_LIST_TITLE_BOX)
             bot.tap(*pos, delay=3)
             return OPENED
@@ -437,8 +439,11 @@ def _back_to_event_list(bot):
 
 
 def event_list_titles() -> list[str]:
-    """Mọi ảnh tiêu đề danh sách event: title.png gốc và các ảnh bot đã thêm (EVENT_LIST_TITLES_DIR)."""
-    return [EVENT_LIST_TITLE, *images_in(EVENT_LIST_TITLES_DIR)]
+    """Mọi ảnh tiêu đề danh sách event: title.png gốc, ảnh thêm tay (EVENT_LIST_TITLES_DIR, đường
+    dẫn dưới Images/) và ảnh bot tự thêm (LEARNED_TITLES_DIR, đường dẫn tuyệt đối)."""
+    learned = constants.LEARNED_TITLES_DIR
+    added = sorted(learned.glob("*.png")) if learned.is_dir() else []
+    return [EVENT_LIST_TITLE, *images_in(EVENT_LIST_TITLES_DIR), *(str(p) for p in added)]
 
 
 def find_event_list_title(bot, screen=None):
@@ -462,9 +467,10 @@ def wait_event_list_title(bot, timeout: float) -> bool:
         bot.sleep(0.5)
 
 
-def add_title(bot, screen, titles: list[str], folder: str, box) -> bool:
-    """Cắt ô `box` (x, y, w, h) của `screen`; khác MỌI ảnh trong `titles` (điểm < TITLE_SAME) thì
-    lưu thành ảnh mới <n>.png trong `folder` (không ghi đè ảnh nào). True nếu đã lưu."""
+def add_title(bot, screen, titles: list[str], folder, box) -> bool:
+    """Cắt ô `box` (x, y, w, h) của `screen`; khác MỌI ảnh trong `titles` (đường dẫn dưới Images/ hoặc
+    tuyệt đối, điểm < TITLE_SAME) thì lưu thành ảnh mới <n>.png trong thư mục `folder` (không ghi đè
+    ảnh nào). True nếu đã lưu."""
     crop = bot.crop(screen, *box)
     if crop.size == 0 or float(crop.std()) < TITLE_MIN_STD:
         bot.log("Event: title area is blank, not saving")
@@ -475,12 +481,12 @@ def add_title(bot, screen, titles: list[str], folder: str, box) -> bool:
         if old is not None and old.shape == crop.shape \
                 and float(cv2.matchTemplate(crop, old, cv2.TM_CCOEFF_NORMED).max()) >= TITLE_SAME:
             return False
-    directory = TEMPLATE_DIR / folder
+    directory = Path(folder)
     directory.mkdir(parents=True, exist_ok=True)
     number = 1 + max((int(p.stem) for p in directory.glob("*.png") if p.stem.isdigit()), default=0)
     path = directory / f"{number}.png"
     cv2.imencode(".png", crop)[1].tofile(str(path))
-    bot.record(f"Event: new title image {folder}/{path.name}")
+    bot.record(f"Event: new title image {path}")
     return True
 
 

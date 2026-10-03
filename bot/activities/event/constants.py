@@ -1,6 +1,9 @@
 """
 constants.py — Event image folders, limits and action names.
 """
+import os
+from pathlib import Path
+
 from . import milestones
 
 EV = "Event"
@@ -91,9 +94,13 @@ EVENT_OPEN_RETRIES = 2
 # ô. Khớp 1,00 trên 7 ảnh 04_event_list.png; 315 màn khác <= 0,49. Bấm nút event xong chờ tối đa
 # EVENT_LIST_WAIT giây; không thấy (đổi đợt lễ hội / chưa tải) vẫn cuộn tìm icon (open_event).
 EVENT_LIST_TITLE = f"{EV}/EventList/title.png"
-# Tiêu đề danh sách event của các đợt lễ hội khác (bot tự thêm, không ghi đè title.png): <n>.png.
-# Kiểm tra màn danh sách event = so với title.png và mọi ảnh trong thư mục này (event_list_titles).
+# Tiêu đề danh sách event của các đợt lễ hội khác: <n>.png.
+# - EVENT_LIST_TITLES_DIR (trong Images/, có trong bản build): ảnh thêm tay.
+# - LEARNED_TITLES_DIR (%LOCALAPPDATA%, riêng từng máy, giữ qua các lần cập nhật app — Images/ bị
+#   thay mỗi lần cập nhật): ảnh bot tự thêm (add_title). Test đổi biến này sang thư mục tạm.
+# Kiểm tra màn danh sách event = so với title.png và mọi ảnh trong hai thư mục (event_list_titles).
 EVENT_LIST_TITLES_DIR = f"{EV}/EventList/Title"
+LEARNED_TITLES_DIR = Path(os.environ.get("LOCALAPPDATA", Path.home())) / "EvonyBot" / "titles" / "event_list"
 # ---- Rương Login Rewards ở đầu danh sách event (claim_login_reward trong common.py) ----------
 # Mỗi ngày kiểm 1 lần (daily_done LOGIN_REWARD_KEY, tới lần reset server): tìm đầu thanh tiến độ
 # màu cam dưới hàng rương (progressTip.png, (122, 306) trên event_list_reward.png: 1,00; (68, 306)
@@ -165,7 +172,7 @@ EVENT_TITLE_REGION = (20, 0, 80, 8)   # % màn hình: thanh tiêu đề
 # khi bấm nút event: vẫn cuộn tìm icon như thường, chỉ nhớ là không thấy (biến tạm, không lưu DB);
 # gặp icon King's Path / Gather Troops = đúng là danh sách event -> chụp màn, cắt ô tiêu đề
 # EVENT_LIST_TITLE_BOX (x, y, w, h — đúng chỗ đã cắt ảnh mẫu) lưu thành ảnh MỚI trong
-# EVENT_LIST_TITLES_DIR (không ghi đè ảnh cũ: đợt lễ hội cũ quay lại vẫn nhận ra). Chỉ lưu khi ảnh
+# LEARNED_TITLES_DIR (không ghi đè ảnh cũ: đợt lễ hội cũ quay lại vẫn nhận ra). Chỉ lưu khi ảnh
 # cắt khác mọi ảnh tiêu đề đã có (điểm < TITLE_SAME) và không phải vùng trơn (độ lệch chuẩn >=
 # TITLE_MIN_STD, VD màn đen lúc đang tải).
 EVENT_LIST_TITLE_BOX = (60, 8, 276, 30)

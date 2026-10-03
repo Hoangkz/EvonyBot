@@ -60,12 +60,17 @@ flowchart TD
 | Khi cập nhật app | Bị thay bằng bản mới | Giữ nguyên |
 | Bot có ghi vào không | Không | Có (tối đa `MAX_SAMPLES` = 3 ảnh / công trình, đầy thì xoá ảnh cũ nhất) |
 
-Bot đọc **cả hai** (ảnh có sẵn trước). Hiện có đủ 7 nền văn minh × 16 công trình ảnh có sẵn.
+Bot đọc **cả hai** (ảnh có sẵn trước). Hiện có đủ 7 nền văn minh × 15 công trình ảnh có sẵn.
 
 Một công trình có thể có nhiều ảnh (`1.png`, `2.png` hoặc `01.png` ... `10.png`); khớp ảnh nào cũng được.
-Bệnh viện dùng nhiều ảnh nhất (5 – 10) vì dấu "+" bay lên ở vị trí khác nhau.
+Bệnh viện dùng nhiều ảnh nhất (2 – 10 tuỳ civ) vì dấu "+" bay lên ở vị trí khác nhau.
 
 Nâng cấp làm công trình đổi hình: **tự cập nhật** ảnh có sẵn (chụp lại), bot không tự học lại khi vẫn còn khớp.
+
+Cùng nguyên tắc cho ảnh **tiêu đề danh sách event** (đổi theo đợt lễ hội): ảnh có sẵn ở
+`Images/Event/EventList/title.png` + `Images/Event/EventList/Title/`, ảnh bot tự thêm ở
+`%LOCALAPPDATA%\EvonyBot\titles\event_list\<n>.png` (`LEARNED_TITLES_DIR`, [constants.py](constants.py)) —
+không ghi vào `Images/` vì thư mục này bị thay mỗi lần cập nhật app.
 
 ## 4. Nền văn minh của thiết bị
 
@@ -96,7 +101,7 @@ các khung (xoá hiệu ứng thoáng qua): `stable_window` → `stable_crop`.
   - **ngang**: trên thân công trình, không lấn ra nền đất / hàng rào.
 - Khi tự học lúc chạy: `LEARN_FRAMES` = 5 khung, cách nhau 1 s, sau khi camera đứng yên.
 
-Kết quả đo (7 civ × 16 công trình, 403+ ảnh tests): khớp đúng ≥ 0,92 (thấp nhất: Academy civ 1 lúc đang nghiên
+Kết quả đo (7 civ × 15 công trình, ảnh `tests/event/city_building/screens` + các màn khác trong tests): khớp đúng ≥ 0,92 (thấp nhất: Academy civ 1 lúc đang nghiên
 cứu, mẫu chụp lúc rảnh), khớp nhầm công trình / civ khác ≤ 0,61 → `BUILDING_THRESHOLD` = 0,77.
 
 ## 6. Thêm / cập nhật ảnh có sẵn (chụp tay)
@@ -131,8 +136,9 @@ cứu, mẫu chụp lúc rảnh), khớp nhầm công trình / civ khác ≤ 0,6
 
 ## 8. Test
 
-- Flow test ([tests/flow.py](../../../tests/flow.py)) ghi ảnh tự học vào thư mục tạm (`LEARNED_DIR` được patch),
-  không đụng `%LOCALAPPDATA%`; `device.learned_dir` để chép ảnh học sẵn trong `setup`.
+- Flow test ([tests/flow.py](../../../tests/flow.py)) ghi ảnh tự học vào thư mục tạm (`LEARNED_DIR` và
+  `LEARNED_TITLES_DIR` được patch), không đụng `%LOCALAPPDATA%`; `device.learned_dir` để chép ảnh học sẵn
+  trong `setup`.
 - Ảnh test theo nền văn minh: `tests/event/city_building/screens/civ1..7/<building>/`.
 - Chưa có test riêng cho `city_building` (TODO).
 
