@@ -37,11 +37,25 @@ $EmbedZip = Join-Path $Build "python-$PyVersion-embed-amd64.zip"
 $HostPy = Join-Path $Root "venv\Scripts\python.exe"
 
 # ---- Inno Setup compiler --------------------------------------------
-$Iscc = @(
+$IsccCandidates = @(
     "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
     "$env:ProgramFiles\Inno Setup 6\ISCC.exe",
     "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe"
-) | Where-Object { Test-Path $_ } | Select-Object -First 1
+)
+
+# Inno Setup can be installed into a custom folder. Read its registered
+# InstallLocation as well as checking the standard locations above.
+$InnoUninstallKeys = @(
+    "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*",
+    "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*",
+    "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*"
+)
+$InnoInstallDirs = Get-ItemProperty $InnoUninstallKeys -ErrorAction SilentlyContinue |
+    Where-Object { $_.DisplayName -like "Inno Setup version 6*" } |
+    ForEach-Object { $_.InstallLocation } |
+    Where-Object { $_ }
+$IsccCandidates += $InnoInstallDirs | ForEach-Object { Join-Path $_ "ISCC.exe" }
+$Iscc = $IsccCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
 if (-not $Iscc) {
     $cmd = Get-Command iscc -ErrorAction SilentlyContinue
     if ($cmd) { $Iscc = $cmd.Source }

@@ -17,6 +17,7 @@ Thứ tự ưu tiên: Bubble > Auto Times Out > Join Boss > nhiệm vụ (schedu
 - Chỉ chọn mỗi Join Boss: chạy Join Boss liên tục như trước.
 """
 import os
+import sys
 import threading
 import time
 import traceback
@@ -43,6 +44,24 @@ BUBBLE_RENEW_BEFORE = 7200   # bubble còn <= 2 tiếng -> dùng bubble mới
 BUBBLE_RETRY = 300           # đọc / dùng bubble không được -> 5 phút sau thử lại
 AUTO_RESTART = "Auto Times Out"
 RESTART_WAIT = 3             # giây chờ sau khi đóng game
+
+
+def _print_safe(message: str):
+    """Ghi console mà không bao giờ làm worker chết vì code page Windows.
+
+    Khi chạy từ PowerShell/cmd cũ, stdout thường là CP1252 và không mã hóa được tiếng Việt.
+    UI/History vẫn nhận nguyên văn Unicode; chỉ bản console mới thay ký tự không hỗ trợ.
+    """
+    stream = sys.stdout
+    if stream is None:       # pythonw.exe không có console
+        return
+    encoding = getattr(stream, "encoding", None) or "utf-8"
+    safe = message.encode(encoding, errors="replace").decode(encoding, errors="replace")
+    try:
+        print(safe, file=stream)
+    except (OSError, ValueError):
+        # Console đã đóng / stream không còn hợp lệ: log UI vẫn tiếp tục hoạt động.
+        pass
 
 
 def _seconds_until(iso) -> float | None:
@@ -387,7 +406,7 @@ class BotWorker(QThread):
 
     def log(self, message: str):
         # Gắn serial vào log để phân biệt các thiết bị; gửi thêm lên tab Logs của thiết bị.
-        print(f"[{self.serial}] {message}")
+        _print_safe(f"[{self.serial}] {message}")
         self.log_message.emit(self.serial, message)
 
     def record(self, message: str):

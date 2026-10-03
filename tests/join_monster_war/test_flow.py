@@ -10,13 +10,14 @@ import threading
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
+from unittest import mock
 
 import cv2
 import numpy as np
 
 from bot.activities import join_monster_war
 from bot.activities.join_monster_war.boss_memory import JOINED, SKIPPED, BossMemory
-from bot.activities.join_monster_war.constants import (CHOOSE_DEVELOPMENT, FAVORITE_OFF, IDLE, JOIN, LISTBOSS, MARCH,
+from bot.activities.join_monster_war.constants import (CHOOSE_DEVELOPMENT, FAVORITE_OFF, IDLE, JOIN, JOINED_BUTTON, LISTBOSS, MARCH,
                                                      NOT_ENOUGH_STAMINA, PRESET_DX, PRESET_X0, PRESET_Y,
                                                      REGIONS, SELECT_GENERAL, STAMINA_SLIDER_END,
                                                      STAMINA_USE, WAR_TICKED)
@@ -170,18 +171,19 @@ SCROLL_LIMIT = [
     Step(W("war_list_more_below.png"), end(IDLE)),
 ]
 
-# Sau 2 lần cuộn thấy Yasha (boss mới, không được tích) -> đếm lại từ đầu, nên cần
-# thêm 6 lần cuộn nữa (tổng 8) mới rảnh; chu kỳ xuống/lên vẫn chạy tiếp.
-NEW_BOSS_RESETS_SCROLLS = [
+# Boss không được tích không kéo dài vòng quét vô hạn: vẫn hoàn thành chu kỳ 3 xuống / 3 lên.
+UNWANTED_BOSS_DOES_NOT_RESET_SCROLLS = [
     Step(W("war_list_more_below.png"), DOWN),
     Step(W("war_list_more_below.png"), DOWN),
-    Step(W("war_list_attacking_join.png"), DOWN),   # Yasha mới -> đếm lại: lần 1 (xuống thứ 3)
-    Step(W("war_list_attacking_join.png"), UP),     # lần 2
-    Step(W("war_list_attacking_join.png"), UP),     # lần 3
-    Step(W("war_list_attacking_join.png"), UP),     # lần 4 (về đầu danh sách)
-    Step(W("war_list_attacking_join.png"), DOWN),   # lần 5 (danh sách chưa hiện hết -> cuộn tiếp)
-    Step(W("war_list_attacking_join.png"), DOWN),   # lần 6
+    Step(W("war_list_attacking_join.png"), DOWN),
+    Step(W("war_list_attacking_join.png"), UP),
+    Step(W("war_list_attacking_join.png"), UP),
+    Step(W("war_list_attacking_join.png"), UP),
     Step(W("war_list_attacking_join.png"), end(IDLE)),
+]
+
+LEGACY_SKIPPED_RECHECK = [
+    Step(W("02_war_list_join.png"), tap(JOIN)),
 ]
 
 
@@ -264,7 +266,7 @@ JOIN_AND_MARCH = [
     Step(W("02_war_list_join.png"), tap(JOIN)),
     Step(MARCH_SCREEN, preset(1)),
     Step(MARCH_SCREEN, tap(MARCH)),
-    Step(W("02_war_list_join.png"), end(IDLE)),
+    Step(W("war_after_march_joined.png"), end(IDLE)),
 ]
 # Người dùng chỉ chọn đội 3, 4 nhưng các ô đó đang khoá -> không đội nào dùng được -> Back.
 MARCH_ONLY_LOCKED = [
@@ -436,6 +438,47 @@ JOIN_CUT_AT_BOTTOM = [
 
 
 class JoinMonsterWarFlow(unittest.TestCase):
+    def test_four_rallies_two_unwanted_still_joins_wanted(self):
+        """Hai boss không chọn ở đầu danh sách không được chặn boss hợp lệ phía dưới."""
+        points = [(319, 300), (319, 380), (319, 460), (319, 540)]
+
+        class FakeBot:
+            def __init__(self):
+                self.boss_memory = BossMemory()
+                self.reported = []
+                self.taps = []
+
+            def template_size(self, _):
+                return 20, 14
+
+            def find_all(self, template, **_):
+                return list(points) if template == JOIN else []
+
+            def crop(self, image, *_):
+                return image
+
+            def find(self, *_args, **_kwargs):
+                return None
+
+            def report_boss(self, coords):
+                self.reported.append(coords)
+
+            def tap(self, x, y):
+                self.taps.append((x, y))
+
+            def log(self, _):
+                pass
+
+        bot = FakeBot()
+        boss = _Boss(bot, SETTINGS)
+        boss._boss_is_wanted = mock.Mock(side_effect=[False, False, True])
+        boss._join_text_is_red = mock.Mock(return_value=False)
+
+        self.assertTrue(boss._join(np.zeros((704, 396, 3), dtype=np.uint8)))
+        self.assertEqual(boss.screen_blacklist, points[:2])
+        self.assertEqual(bot.taps, [(329, 467)])
+        self.assertEqual(bot.reported, [None])
+
     def test_join_boss_by_tier_level(self):
         device = run_join(self, JOIN_TIER_BOSS, with_bayard([1]))
         self.assertEqual(device.reported, [BAYARD])
@@ -451,7 +494,7 @@ class JoinMonsterWarFlow(unittest.TestCase):
         device = run_join(self, SENIOR_ONLY, with_bayard([2]))
         self.assertEqual(device.reported, [BAYARD_SENIOR])
         with device.fake_time():
-            self.assertEqual(device.ctx.boss_memory.status(BAYARD_JUNIOR), SKIPPED)
+            self.assertIsNone(device.ctx.boss_memory.status(BAYARD_JUNIOR))
 
     def test_joined_button_is_not_tapped(self):
         device = run_join(self, JOINED_AND_JOIN, with_bayard([1]))
@@ -475,7 +518,7 @@ class JoinMonsterWarFlow(unittest.TestCase):
 
     def test_march_only_locked_troops_backs_out(self):
         device = run_join(self, MARCH_ONLY_LOCKED, {**IDLE_SETTINGS, "troop": ["Troop 3", "Troop 4"]})
-        self.assertIn("Đội quân đã chọn [3, 4] đều đang khoá (6 ô khoá)", device.logs)
+        self.assertIn("Join Monster War: đội quân đã chọn [3, 4] đều đang khoá (6 ô khoá)", device.logs)
 
     def test_choose_assistant_general(self):
         device = run_join(self, CHOOSE_ASSISTANT, WITH_GENERALS)
@@ -531,21 +574,21 @@ class JoinMonsterWarFlow(unittest.TestCase):
 
     def test_refill_stamina_100_then_march_again(self):
         device = run_join(self, REFILL_100, {**ALL_TROOPS, "use_stamina": "100"})
-        self.assertIn("Dùng vật phẩm thể lực (100)", device.logs)
+        self.assertIn("Join Monster War: dùng vật phẩm thể lực (100)", device.logs)
         with device.fake_time():
             self.assertEqual(device.ctx.boss_memory.status(PERYTON), JOINED)
 
     def test_refill_stamina_all_then_march_again(self):
         device = run_join(self, REFILL_ALL, {**ALL_TROOPS, "use_stamina": "ALL"})
-        self.assertIn("Dùng vật phẩm thể lực (ALL)", device.logs)
+        self.assertIn("Join Monster War: dùng vật phẩm thể lực (ALL)", device.logs)
         with device.fake_time():
             self.assertEqual(device.ctx.boss_memory.status(PERYTON), JOINED)
 
-    def test_out_of_stamina_items_marks_joined_and_idles(self):
+    def test_out_of_stamina_items_does_not_mark_joined(self):
         device = run_join(self, OUT_OF_STAMINA_ITEMS, {**ALL_TROOPS, "use_stamina": "ALL"})
-        self.assertIn("Hết vật phẩm thể lực", device.logs)
+        self.assertIn("Join Monster War: hết vật phẩm thể lực", device.logs)
         with device.fake_time():
-            self.assertEqual(device.ctx.boss_memory.status(PERYTON), JOINED)
+            self.assertIsNone(device.ctx.boss_memory.status(PERYTON))
 
     def test_green_select_buttons_only(self):
         image = cv2.imread(str(SCREENS / "select_assistant_main_disabled.png"))
@@ -584,7 +627,7 @@ class JoinMonsterWarFlow(unittest.TestCase):
         device = run_join(self, SKIP_TIER_NOT_TICKED, {**with_bayard([2, 3]), "exit_when_idle": True})
         self.assertEqual(device.reported, [])
         with device.fake_time():
-            self.assertEqual(device.ctx.boss_memory.status(BAYARD), SKIPPED)
+            self.assertIsNone(device.ctx.boss_memory.status(BAYARD))
 
     def test_war_ticked_template_on_real_crops(self):
         # Ảnh chụp thật ô "War": còn tích -> khớp; đã bỏ tích -> không khớp (ngưỡng 0.9).
@@ -699,7 +742,7 @@ class JoinMonsterWarFlow(unittest.TestCase):
                           {**settings, "exit_when_idle": True})
         self.assertEqual(device.reported, [])
         with device.fake_time():
-            self.assertEqual(device.ctx.boss_memory.status(PERYTON), SKIPPED)
+            self.assertIsNone(device.ctx.boss_memory.status(PERYTON))
 
     def test_ticked_boss_name_is_read(self):
         device = run_join(self, JOIN_BELOW_ATTACKING, SETTINGS)
@@ -711,10 +754,10 @@ class JoinMonsterWarFlow(unittest.TestCase):
                           setup=remember(PERYTON, JOINED))
         self.assertEqual(device.reported, [])
 
-    def test_skipped_boss_is_not_checked_again(self):
-        device = run_join(self, ALREADY_KNOWN_PERYTON, IDLE_SETTINGS,
+    def test_legacy_skipped_memory_does_not_block_selected_boss(self):
+        device = run_join(self, LEGACY_SKIPPED_RECHECK, IDLE_SETTINGS,
                           setup=remember(PERYTON, SKIPPED))
-        self.assertEqual(device.reported, [])
+        self.assertEqual(device.reported, [PERYTON])
 
     def test_joined_boss_skips_every_rally_on_it(self):
         # Hai rally cùng toạ độ Minotaur: đã tham gia một thì bỏ qua cả hai.
@@ -727,14 +770,14 @@ class JoinMonsterWarFlow(unittest.TestCase):
                           setup=remember(MINOTAUR, JOINED))
         self.assertEqual(device.reported, [])
 
-    def test_new_boss_resets_scroll_count(self):
+    def test_unwanted_boss_does_not_reset_scroll_count(self):
         settings = {**IDLE_SETTINGS, "selected_bosses": [
             b for b in SETTINGS["selected_bosses"] if b["name"] != "Yasha"]}
-        device = run_join(self, NEW_BOSS_RESETS_SCROLLS, settings,
+        device = run_join(self, UNWANTED_BOSS_DOES_NOT_RESET_SCROLLS, settings,
                           setup=remember(MINOTAUR, JOINED))
         self.assertEqual(device.reported, [])
         with device.fake_time():
-            self.assertEqual(device.ctx.boss_memory.status(YASHA), SKIPPED)
+            self.assertIsNone(device.ctx.boss_memory.status(YASHA))
 
     def test_all_known_but_list_continues_scrolls(self):
         device = run_join(self, ALREADY_KNOWN_MORE_BELOW, SETTINGS,

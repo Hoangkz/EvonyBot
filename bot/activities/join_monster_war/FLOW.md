@@ -18,7 +18,7 @@ Khi module được import, code kiểm tra template một lần:
 - `CAN_READ_COORDS`: có ảnh LOCATION thì mới thử OCR tọa độ.
 - `CAN_SELECT_GENERAL`: phải có đủ bốn ảnh chọn tướng thì mới chạy bước chọn tướng.
 
-Mỗi lần gọi activity sẽ khởi tạo lại `screen_blacklist`, bộ đếm cuộn và trạng thái nhận diện trước đó. `BossMemory` (toạ độ boss đã tham gia / bỏ qua, mục 5) gắn với BotContext nên **không** bị reset: nó còn qua các lần worker gọi lại Join Boss và chỉ mất khi bấm Stop. Dữ liệu BossBoard dùng chung nằm ngoài cả hai.
+Mỗi lần gọi activity sẽ khởi tạo lại `screen_blacklist`, bộ đếm cuộn và trạng thái nhận diện trước đó. `BossMemory` chỉ chặn dài hạn các tọa độ đã xác nhận `JOINED`; boss không được chọn chỉ bị blacklist trên màn hình hiện tại. BossMemory gắn với BotContext nên còn qua các lần worker gọi lại Join Boss và mất khi bấm Stop. Dữ liệu BossBoard dùng chung nằm ngoài cả hai.
 
 ## 2. Vòng lặp chính
 
@@ -99,10 +99,10 @@ flowchart TD
     C -->|Không| D[_scroll: cuộn hoặc rảnh; xóa screen_blacklist; return False]
     C -->|Có| E[Lấy nút tiếp theo và crop thẻ boss]
     E --> F[Thử OCR tọa độ nếu được hỗ trợ]
-    F --> G{Tọa độ còn trong BossMemory?}
+    F --> G{Tọa độ có trạng thái JOINED?}
     G -->|Có| H[Thêm vị trí nút vào screen_blacklist]
     G -->|Không| I{OCR tên: boss không được tích, hoặc chữ Join đỏ?}
-    I -->|Có| J[BossMemory: SKIPPED; thêm vị trí nút vào screen_blacklist]
+    I -->|Có| J[Chỉ thêm vị trí nút vào screen_blacklist]
     I -->|Không| K[report_boss: báo boss cho worker cùng server]
     K --> L[Tap Join; pending = tọa độ; reset idle_scrolls]
     L --> M[Dừng duyệt nút trong lượt này]
@@ -126,19 +126,21 @@ Chi tiết bộ lọc:
 - Nhận diện chữ đỏ bằng dòng chữ thời gian bên trong nút Join (vùng `x - 6`, `y + chiều cao chữ Join`, rộng 46, cao 12): có hơn 5 pixel thỏa `R > 160`, `G < 110`, `B < 110` thì **bỏ qua lần này** (không lưu vào BossMemory, lần quét sau kiểm tra lại; không reset bộ đếm cuộn), log `Boss (…): thời gian đỏ, bỏ qua lần này`. Vùng cũ (rộng 60, cao 20) chạm viền đỏ của thẻ bên dưới khi nút ở vị trí lệch sau khi cuộn, nên nhận nhầm thời gian trắng là đỏ.
 - Nút Join vừa bấm **không** đưa vào `screen_blacklist`. Bấm mà không vào được màn March (VD thông báo "You cannot send more troops.", bot không đọc thông báo này) thì lượt sau xét lại chính nút đó: thời gian đỏ thì bỏ qua, không đỏ thì bấm Join lại. Sau mỗi lần bấm Join bot chờ cố định `JOIN_TAP_WAIT = 5` giây rồi chụp lại, **không** gọi `wait_gone` (nút Join còn nguyên khi Join không được nên `wait_gone` sẽ chờ hết 10 giây).
 
-Mỗi lần `_join()` chỉ tap tối đa một nút Join. Nếu các nút đều bị bỏ qua, hàm trở về vòng quét; lần sau các nút đã ghi nhớ sẽ bị lọc.
+Mỗi lần `_join()` chỉ tap tối đa một nút Join. Nếu các nút đều bị bỏ qua, hàm trở về vòng quét; các nút bị loại chỉ bị lọc trong màn hình hiện tại. Sau khi cuộn hoặc mở lại flow, chúng được OCR và xét lại.
 
-### BossMemory — boss đã tham gia / bỏ qua
+### BossMemory — boss đã xác nhận tham gia
 
 [boss_memory.py](boss_memory.py) lưu `tọa độ -> (trạng thái, hết hạn)` riêng cho từng giả lập, trong bộ nhớ:
 
 | Trạng thái | Khi nào được ghi |
 | --- | --- |
-| `SKIPPED` | Boss không được tích ở tab (hoặc không nhận ra tên), hoặc nút Join chữ đỏ. |
-| `JOINED` | Trong `_march()`, khi màn hình March đóng lại sau khi tap hành quân. Tap Join chỉ đặt `pending`; mọi nhánh Back của `_march()` (không phải boss, không chọn được quân, March không đóng) bỏ `pending`, nên boss đó được thử lại. |
+| `SKIPPED` | Chỉ giữ để tương thích code/test cũ; flow hiện tại không dùng trạng thái này để chặn boss. |
+| `JOINED` | Trong `_march()`, chỉ sau khi quay về danh sách War và xác nhận có thêm nút `Joined`, hoặc tìm thấy đúng tọa độ boss trên thẻ `Joined`. Tap Join chỉ đặt `pending`; nút March biến mất nhưng chưa thấy bằng chứng `Joined` thì không ghi nhớ. |
 
 - Mỗi tọa độ hết hạn sau 6 phút (`TTL`), sau đó boss ở tọa độ đó được xét lại như mới.
-- Thấy lại tọa độ còn hạn: không OCR tên, không kiểm tra chữ đỏ, không Join, chỉ thêm vị trí nút vào `screen_blacklist`.
+- Chỉ tọa độ có trạng thái `JOINED` còn hạn mới được bỏ qua trước khi OCR tên.
+- Boss không được tích, không nhận ra tên/cấp hoặc có thời gian đỏ chỉ bị blacklist trong màn hình hiện tại. Sau khi cuộn/mở lại flow, bot kiểm tra lại để một lần OCR sai không khóa nhầm boss hợp lệ trong 6 phút.
+- Bộ nhớ tự dọn bản ghi hết hạn và giới hạn tối đa 256 tọa độ.
 - Khóa là tọa độ boss, nên hai rally trên cùng một con boss được tính là một: join một rally thì rally còn lại bị bỏ qua.
 - Không đọc được tọa độ (OCR `None`) thì không lưu được; nút chỉ bị lọc bằng `screen_blacklist` trong màn hình hiện tại.
 
@@ -197,10 +199,10 @@ Chi tiết triển khai nằm ở [boss_board.py](../../worker/boss_board.py) v�
 5. Tìm lại MARCH; tap vị trí mới nếu có, nếu không dùng vị trí MARCH đã nhận diện ở vòng chính.
 6. Tối đa 5 lần, mỗi lần chờ 0,8 giây và kiểm tra:
    - Popup **không đủ thể lực** ("Get more now?", nút Confirm `hettheluc.png`): trả màn này cho vòng lặp chính (giữ tọa độ boss). Vòng lặp chính gặp `OUT_OF_STAMINA`: `use_stamina = No` thì **dừng hẳn Join Boss**; `ALL` / `100` thì bấm Confirm rồi `_use_stamina()`. Popup đè lên màn March nhưng nút March mờ vẫn khớp ảnh mẫu (0,99), nên phải kiểm tra popup trước.
-   - Nút MARCH biến mất (màn March đã đóng): ghi tọa độ boss vừa Join vào BossMemory là `JOINED` rồi trả về.
+   - Nút MARCH biến mất: chờ danh sách War xác nhận có hàng `Joined`. Xác nhận bằng đúng tọa độ đọc lại trên hàng Joined, hoặc số hàng Joined tăng so với trước khi tap Join; lúc đó mới ghi `JOINED`.
 7. Nếu nút MARCH vẫn còn sau các lần chờ, Back.
 
-Việc nút MARCH biến mất được dùng làm dấu hiệu thoát màn hình March; code không đọc kết quả từ server game để xác nhận rally đã tham gia thành công. (Trước đây dùng `checkLocam.png`, nhưng ảnh này không có trên màn March thật, khớp 0,77.)
+Nếu màn March đã đóng nhưng chưa tìm được xác nhận Joined, bot ghi log `chưa xác nhận được Joined` và không lưu tọa độ. Ảnh hiện tại được trả cho vòng chính tự nhận diện, tránh coi popup/lag/chuyển màn tạm là đã tham gia.
 
 ### Chọn tướng: `_select_general()`
 
@@ -218,11 +220,11 @@ Hàm không trả cờ thành công/thất bại. Khi nó trả về, `_march()`
 
 Được gọi khi vòng lặp chính gặp popup không đủ thể lực (`OUT_OF_STAMINA`) mà `use_stamina` là `ALL` / `100`: bấm Confirm rồi:
 
-1. Màn **Use Item**: tìm các nút "Use ( N )" (`staminaItemUse.png`, chỉ trong cột nút bên phải), bấm nút **trên cùng** (vật phẩm đầu tiên). Không có nút nào (hết vật phẩm thể lực): log "Hết vật phẩm thể lực", **Back 2 lần** (thoát màn Use Item, rồi màn March). **Không dừng** Join Boss (thể lực tự hồi theo thời gian): nhớ boss vừa Join là `JOINED` (6 phút không thử lại) và **đánh dấu rảnh**. Còn activity khác thì trả `IDLE`; chỉ chạy Join Boss thì chờ 5 giây rồi quét lại.
+1. Màn **Use Item**: tìm các nút "Use ( N )" (`staminaItemUse.png`, chỉ trong cột nút bên phải), bấm nút **trên cùng** (vật phẩm đầu tiên). Không có nút nào: log "hết vật phẩm thể lực", **Back 2 lần**, không ghi `JOINED`, rồi đánh dấu rảnh. Lượt Join Boss sau có thể thử lại khi thể lực đã hồi.
 2. **Popup số lượng** (nút Use lớn `staminaUse.png`):
    - `100`: bấm Use luôn (số lượng mặc định);
    - `ALL`: bấm gần cuối thanh trượt (`STAMINA_SLIDER_END`, dùng hết), rồi bấm Use.
-3. Chờ 5 giây (`STAMINA_REFILL_WAIT`), Back về màn March, rồi **bấm March lại** (`_press_march`, giữ nguyên đội đã chọn). Màn March đóng thì boss được nhớ là đã tham gia.
+3. Chờ 5 giây (`STAMINA_REFILL_WAIT`), Back về màn March, rồi **bấm March lại** (`_press_march`, giữ nguyên đội đã chọn). Chỉ khi danh sách War xác nhận Joined thì boss mới được nhớ là đã tham gia.
 
 `use_stamina = No` (hoặc đã hết vật phẩm): gặp popup không đủ thể lực thì Join Boss dừng hẳn (trả `None`).
 
@@ -249,7 +251,7 @@ Sau mỗi lần vuốt, `swipe = (swipe + 1) % 6` (`SCROLLS_EACH_WAY = 3`: 3 l�
 - `exit_when_idle=True`: trả True để vòng chính trả về chuỗi `IDLE`.
 - `exit_when_idle=False`: chờ 5 giây rồi trả False để tiếp tục quét.
 
-`idle_scrolls` được reset về 0 khi thấy một **boss mới** (đọc được tọa độ và tọa độ chưa có trong BossMemory, dù sau đó Join hay không tham gia) và khi tap Join. Thẻ không đọc được tọa độ không reset, để một thẻ OCR lỗi không làm bot cuộn mãi. Chu kỳ xuống / lên (`swipe`) không bị reset, vẫn chạy tiếp.
+`idle_scrolls` được reset về 0 khi bot thực sự tap Join. Boss không được chọn không reset bộ đếm; nếu không, cùng một boss bị bỏ qua xuất hiện lại sau mỗi lần cuộn có thể giữ bot quét vô hạn. Chu kỳ xuống/lên (`swipe`) không bị reset.
 
 ## 10. Kết thúc và quan hệ với worker
 
