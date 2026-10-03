@@ -229,16 +229,20 @@ def stable_crop(frames: list) -> np.ndarray:
 
 def _find_known(bot, candidates):
     """Chụp liên tục tới khi thấy một ảnh học (tối đa BUILDING_TIMEOUT giây). Trả (ảnh màn hình,
-    nền văn minh của ảnh khớp), hoặc (None, None)."""
+    nền văn minh của ảnh khớp, tâm chỗ khớp), hoặc (None, None, None). Nhiều ảnh cùng khớp thì lấy
+    chỗ khớp cao nhất."""
     elapsed = 0.0
     while True:
         screen = bot.screenshot()
+        best = None
         for owner, image in candidates:
-            if bot.find(image, threshold=BUILDING_THRESHOLD, screen=screen,
-                        region=BUILDING_REGION) is not None:
-                return screen, owner
+            score, pos = bot.best_match(image, screen=screen, region=BUILDING_REGION)
+            if pos is not None and score >= BUILDING_THRESHOLD and (best is None or score > best[0]):
+                best = (score, owner, pos)
+        if best is not None:
+            return screen, best[1], best[2]
         if elapsed >= BUILDING_TIMEOUT:
-            return None, None
+            return None, None, None
         bot.sleep(BUILDING_INTERVAL)
         elapsed += BUILDING_INTERVAL
 
@@ -265,25 +269,25 @@ def _settled_frames(bot) -> list:
 
 # ---- API --------------------------------------------------------------------------------
 def tap_building(bot, name: str, building: str, delay: float, also=()) -> BuildingTap:
-    """Sau Go: tìm ảnh học của `building` (và các công trình `also`); thấy hay không cũng bấm
-    giữa màn hình rồi chờ `delay` giây. Trả BuildingTap để người gọi kiểm tra menu xong thì
-    gọi remember_building."""
+    """Sau Go: tìm ảnh học của `building` (và các công trình `also`). Thấy -> bấm vào chỗ khớp
+    (công trình có thể không nằm giữa, VD camera bị lướt lệch); không thấy -> bấm giữa màn hình
+    để thử. Chờ `delay` giây. Trả BuildingTap để người gọi kiểm tra menu xong thì gọi
+    remember_building."""
     candidates = _candidates(bot, (building, *also))
-    screen, owner = _find_known(bot, candidates) if candidates else (None, None)
+    screen, owner, pos = _find_known(bot, candidates) if candidates else (None, None, None)
     if screen is not None:
-        bot.log(f"{name}: building recognized, tapping center")
+        bot.log(f"{name}: building recognized at {pos}, tapping it")
         if owner is not None and not getattr(bot, "civilization", None):
             _assign(bot, name, owner)
-        known = True
+        bot.tap(*pos, delay=delay)
+        return BuildingTap(building, [screen], True)
+    if candidates:
+        bot.log(f"{name}: learned building not found, tapping center to check")
     else:
-        if candidates:
-            bot.log(f"{name}: learned building not found, tapping center to check")
-        else:
-            bot.log(f"{name}: building not learned yet, tapping center to check")
-        frames = _settled_frames(bot)
-        known = False
+        bot.log(f"{name}: building not learned yet, tapping center to check")
+    frames = _settled_frames(bot)
     bot.tap_percent(*CENTER, delay=delay)
-    return BuildingTap(building, [screen] if known else frames, known)
+    return BuildingTap(building, frames, False)
 
 
 def remember_building(bot, name: str, tap: BuildingTap | None):
