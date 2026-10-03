@@ -2,6 +2,7 @@
 run.py — nhiệm vụ Ground Troop (Gather Troops, Day 2): Day 2 -> tab phụ "Ground Troop"
 -> Go -> doanh trại (Barracks) -> Train lính bộ. Flow chung: xem ../train_troop/run.py.
 """
+from ...city_building import BARRACKS
 from ...common import EventState
 from .. import train_troop
 from .constants import DAY, DAY_2, GROUND_TROOP, GROUND_TROOP_SELECTED, KEY, THRESHOLDS, TIERS
@@ -11,7 +12,7 @@ NAME = "Ground Troop"
 TROOP = train_troop.TroopTask(
     key=KEY, name=NAME, day=DAY, day_tab=DAY_2,
     tab=GROUND_TROOP, tab_selected=GROUND_TROOP_SELECTED,
-    tiers=TIERS, thresholds=THRESHOLDS,
+    tiers=TIERS, building=BARRACKS, thresholds=THRESHOLDS,
 )
 
 

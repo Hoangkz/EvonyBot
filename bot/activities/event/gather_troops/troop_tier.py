@@ -1,54 +1,74 @@
 """
 troop_tier.py — chọn cấp lính trên màn Train (doanh trại / chuồng ngựa / xưởng bẫy ...),
-dùng chung cho các nhiệm vụ train của Gather Troops.
+dùng chung cho các nhiệm vụ train của Gather Troops (và King's Path Train Troop).
 
-Màn Train có hàng vòng tròn (y ~452). Bấm vào vòng nào thì vòng đó nhảy ra giữa hàng
-(x ~198), mỗi lần thấy ~5 vòng: giữa ±2 (cách nhau ~87 px). Vòng chưa mở có ổ khoá ở góc
-trên phải. Lúc mở màn, vòng đang chọn là vòng train lần trước (không phải cao nhất).
+Màn Train có hàng vòng tròn (y ~452). Bấm vào vòng nào thì vòng đó được chọn và nhảy ra giữa
+hàng (x ~198), mỗi lần thấy ~5 vòng: giữa ±2 (cách nhau ~87 px). Lúc mở màn, vòng đang chọn là
+vòng train lần trước (không phải cao nhất, có khi chưa nằm giữa).
 
-- Lính (Ground / Mounted / Ranged / Siege): mỗi cấp một vòng (I, II, ...). Cấp khoá luôn
-  là các cấp cao nhất.
-- Bẫy (Defense Force): mỗi cấp 4 vòng liền nhau (4 loại bẫy), loại nào cũng được. Khoá
-  theo từng loại (VD Fire Arrow III khoá mà Trap IV mở) -> một cấp chỉ coi là khoá khi cả
-  4 loại đều khoá.
+Hình lính trên vòng tròn khác nhau theo nền văn minh nên KHÔNG dùng ảnh lính:
+- Cấp của vòng đang chọn: đọc huy hiệu số La Mã cạnh tên lính ("VII Man-at-Arms", y ~364) —
+  huy hiệu nền tối, số giống nhau ở mọi loại lính / nền văn minh: ảnh BADGE_DIR/<cấp>.png (I ..
+  XVI). Đo trên 46 màn Train (4 loại lính + bẫy, cả hàng đang cuộn): đọc đúng 46/46; kiểm tra
+  chéo (mẫu dựng không có ảnh đang đọc) 39/39, cấp đúng hơn cấp gần nhất >= 0,12.
+- Vị trí các vòng: khung đồng của vòng tròn (RING, chỉ so phần vành RING_MASK, bỏ hình lính
+  bên trong): 0,63 .. 0,90 trên mọi màn Train; vòng sát mép có khi không thấy.
+- Train được hay khoá: nút "+" (TRAIN_PLUS) của vòng đang chọn.
 
-`tiers` = {cấp: ảnh} (mỗi cấp một vòng) hoặc {cấp: [ảnh loại 1, ảnh loại 2, ...]} theo thứ
-tự trên hàng. Vòng tròn thứ tự trên hàng = (cấp, loại).
+- Lính (Ground / Mounted / Ranged / Siege): mỗi cấp một vòng. Cấp khoá luôn là các cấp cao nhất.
+- Bẫy (Defense Force): mỗi cấp 4 vòng liền nhau (4 loại bẫy), loại nào cũng được. Khoá theo
+  từng loại (VD Fire Arrow III khoá mà Trap IV mở) -> một cấp chỉ coi là khoá khi cả 4 loại đều
+  khoá.
 
-choose_tier(): đi lên từ vòng đang thấy (bấm vòng phải nhất, nó nhảy ra giữa) tới khi thấy
-cấp muốn train hoặc gặp cấp khoá (kiểm tra vòng vừa bấm bằng nút "+"); cấp muốn train bị
-khoá thì lấy cấp mở cao nhất dưới nó. Không cần tìm cấp cao nhất của tài khoản.
+choose_tier(): tìm vòng đang chọn (viền cam — không phải lúc nào cũng nằm giữa: cấp đầu / cuối hàng
+không cuộn ra giữa được), đọc huy hiệu, rồi bấm vòng cách nó 1 .. 2 ô về phía cấp muốn train, đọc
+lại, tới khi vòng đang chọn đúng cấp và train được; cấp muốn train khoá thì lấy cấp mở cao nhất
+dưới nó. Không cần tìm cấp cao nhất của tài khoản.
+
+`tiers` (ảnh lính cũ, {cấp: ảnh} hoặc {cấp: [ảnh từng loại]}) chỉ còn dùng để biết số loại mỗi cấp.
 """
-from dataclasses import dataclass
+import cv2
+import numpy as np
 
 from ....common import images_in
 from ..constants import EV
 
-# Ổ khoá trên vòng tròn cấp lính (khác ổ khoá tab Day): tâm (x+21, 431) với tâm vòng tròn
-# (x, 452), tức lệch (+21, -32) so với điểm khớp ảnh cấp (tâm phần dưới vòng tròn, y 463).
-# Khớp 0,95-1,00 trên vòng thường; vòng đang chọn (viền vàng sáng phía sau) 0,70-0,82;
-# vòng tròn không khoá <= 0,5 -> ngưỡng 0,6.
+# Ổ khoá trên vòng tròn cấp lính (khác ổ khoá tab Day). Khớp 0,95-1,00 trên vòng thường; vòng
+# đang chọn 0,70-0,82; vòng không khoá <= 0,5.
 TIER_LOCK = f"{EV}/GatherTroops/Train/tierLock.png"
 TIER_LOCK_THRESHOLD = 0.6
-TIER_LOCK_OFFSET = (21, -32)
-# Nút "+" cạnh thanh kéo số lượng, tâm (256, 581): chỉ có khi cấp đang chọn (ở giữa) train
-# được; cấp khoá thay bằng chữ đỏ "Upgrade to Level ..." -> cách chắc nhất để biết cấp vừa
-# bấm có khoá không. Khớp 1,00 trên mọi màn Train cấp mở (cả lính kỵ, bẫy...); cấp khoá
-# <= 0,32; màn khác <= 0,51.
+# Nút "+" cạnh thanh kéo số lượng, tâm (256, 581): chỉ có khi cấp đang chọn train được; cấp khoá
+# thay bằng chữ đỏ "Upgrade to Level ..." -> cách chắc nhất để biết cấp đang chọn có khoá không.
+# Khớp 1,00 trên mọi màn Train cấp mở (cả lính kỵ, bẫy...); cấp khoá <= 0,32; màn khác <= 0,51.
 TRAIN_PLUS = f"{EV}/GatherTroops/Train/trainPlus.png"
 TRAIN_PLUS_REGION = (50, 75, 75, 90)
-# Hàng vòng tròn cấp lính (% màn hình) và tâm hàng (px trên màn 396x704).
+# Hàng vòng tròn cấp lính (% màn hình).
 TIER_ROW_REGION = (0, 59, 100, 70)
-TIER_CENTER_X = 198
-TIER_CENTER_TOLERANCE = 25          # px: vòng tròn cách TIER_CENTER_X <= mức này là đang ở giữa
-# Mỗi vòng là một ảnh (phần dưới vòng tròn: hình lính + số La Mã, tránh góc ổ khoá). Lính:
-# đo trên 9 ảnh (giữa V..XIII): cùng cấp >= 0,78 ở vị trí thường, 0,70 khi vòng tròn bị cắt
-# ở mép; cấp khác <= 0,55 -> ngưỡng 0,65 không khớp nhầm cấp. Bẫy: các loại cùng cấp khớp
-# chéo tới 0,83 -> tại mỗi vòng lấy ảnh khớp CAO NHẤT (luôn đúng loại); cấp khác <= 0,65.
+# Ảnh vòng lính cũ (hình lính + số): ngưỡng khi còn dùng để nhận màn Train ở nơi khác.
 TIER_THRESHOLD = 0.65
+
+# Huy hiệu số La Mã cạnh tên lính: ảnh <cấp>.png (30x20, phần trong vòng huy hiệu); vị trí ngang
+# đổi theo độ dài tên lính -> tìm cả dải. Cấp đúng 0,76 .. 1,00; cấp khác <= 0,86 khi cấp đúng cao.
+BADGE_DIR = f"{EV}/GatherTroops/Train/Badge"
+BADGE_REGION = (10, 48, 90, 56)     # % màn hình: y 338 .. 394
+BADGE_THRESHOLD = 0.7
+# Khung vòng tròn (60x60, vành bán kính 21 .. 28 px).
+RING = f"{EV}/GatherTroops/Train/tierRing.png"
+RING_RADII = (21, 28)
+RING_THRESHOLD = 0.6
+RING_ROW_Y = 452                    # px: tâm hàng vòng tròn (màn 396x704)
+RING_SEARCH = 25                    # px: tìm lệch lên / xuống quanh RING_ROW_Y
+TIER_CENTER_X = 198
+TIER_STEP = 87                      # px: khoảng cách hai vòng liền nhau
+TIER_CENTER_TOLERANCE = 25          # px: vòng cách TIER_CENTER_X <= mức này là đang ở giữa
 TIER_SAME_CIRCLE = 40               # px: hai chỗ khớp gần hơn mức này là cùng một vòng tròn
 TAP_DELAY = 1.5                     # giây chờ vòng tròn vừa bấm trượt ra giữa
-MAX_STEPS = 30                      # số lần bấm tối đa (bẫy: 4 vòng mỗi cấp)
+MAX_STEPS = 60                      # số lần bấm tối đa (bẫy: 4 vòng mỗi cấp; lùi qua nhiều cấp khoá ~25)
+END_OF_ROW = 1000                   # cấp giả của "vòng" sau đầu / cuối hàng (choose_tier)
+# Vòng đang chọn: viền cam sáng trên vành bán kính GLOW_R (px). Tỉ lệ pixel cam: vòng đang chọn
+# 0,06 .. 0,11; vòng khác <= 0,03.
+GLOW_R = (26, 33)
+SELECTED_GLOW = 0.045
 
 
 def tier_images(folder: str) -> dict[int, str]:
@@ -68,115 +88,173 @@ def kind_images(folder: str, kinds: list[str]) -> dict[int, list[str]]:
             for level in levels}
 
 
-@dataclass(frozen=True)
-class Circle:
-    """Một vòng tròn đang thấy trên hàng: (cấp, loại) và vị trí."""
-    tier: int
-    kind: int        # thứ tự loại trong cấp (lính: luôn 0)
-    x: int
-    y: int
-    locked: bool     # có ổ khoá
+BADGES = tier_images(BADGE_DIR)
 
 
-def visible_circles(bot, screen, tiers) -> list[Circle]:
-    """Các vòng tròn đang thấy trên hàng, trái sang phải. Mỗi vòng lấy ảnh khớp cao nhất.
-    Lính (mỗi cấp một vòng): cấp khoá luôn là các cấp cao nhất, thấy một cấp khoá thì mọi
-    cấp cao hơn cũng khoá (vòng tròn sát mép phải bị cắt mất ổ khoá)."""
-    images = [(tier, kind, path) for tier, paths in sorted(_as_lists(tiers).items())
-              for kind, path in enumerate(paths)]
-    spots = []   # tâm các vòng tròn (từ mọi ảnh khớp >= ngưỡng)
-    for _, _, path in images:
-        for pos in bot.find_all(path, threshold=TIER_THRESHOLD, screen=screen,
-                                region=TIER_ROW_REGION):
-            if all(abs(pos[0] - x) > TIER_SAME_CIRCLE for x, _ in spots):
-                spots.append(pos)
-    circles = []
-    for x, y in sorted(spots):
-        area = bot.crop(screen, x - TIER_SAME_CIRCLE, y - 20, 2 * TIER_SAME_CIRCLE, 40)
-        _, tier, kind = max((bot.best_match(path, screen=area)[0], tier, kind)
-                            for tier, kind, path in images)
-        circles.append(Circle(tier, kind, x, y, _locked(bot, screen, x, y)))
-    if all(len(paths) == 1 for paths in _as_lists(tiers).values()):
-        locked = [c.tier for c in circles if c.locked]
-        if locked:
-            circles = [Circle(c.tier, c.kind, c.x, c.y, c.locked or c.tier > min(locked))
-                       for c in circles]
-    return circles
+def read_tier(bot, screen) -> int | None:
+    """Cấp của vòng đang chọn (huy hiệu số La Mã cạnh tên lính), hoặc None."""
+    score, tier = max((bot.best_match(path, screen=screen, region=BADGE_REGION)[0], tier)
+                      for tier, path in BADGES.items())
+    return tier if score >= BADGE_THRESHOLD else None
+
+
+def tier_circles(bot, screen) -> list[int]:
+    """Tâm x các vòng tròn đang thấy trên hàng (khung đồng, không xét hình lính), trái sang phải."""
+    ring = bot._template(RING)
+    size = ring.shape[0] // 2
+    yy, xx = np.mgrid[-size:size, -size:size]
+    radius = np.hypot(xx + 0.5, yy + 0.5)
+    mask = ((radius >= RING_RADII[0]) & (radius <= RING_RADII[1])).astype(np.uint8)
+    top = RING_ROW_Y - size - RING_SEARCH
+    band = screen[max(0, top):RING_ROW_Y + size + RING_SEARCH]
+    result = cv2.matchTemplate(band, ring, cv2.TM_CCOEFF_NORMED, mask=np.dstack([mask] * 3))
+    column = np.nan_to_num(result, nan=-1, posinf=-1, neginf=-1).max(0)
+    found = []
+    for x in np.argsort(-column):
+        if column[x] < RING_THRESHOLD:
+            break
+        if all(abs(int(x) - other) > TIER_SAME_CIRCLE for other in found):
+            found.append(int(x))
+    return sorted(x + size for x in found)
+
+
+def selected_circle(screen, circles) -> int | None:
+    """Tâm x vòng đang chọn (viền cam sáng: tỉ lệ pixel cam trên vành >= SELECTED_GLOW; vòng khác
+    <= 0,03), hoặc None nếu vòng đang chọn không có trên màn (hàng đã cuộn). Xét cả các vị trí
+    cách vòng thấy được k ô (vòng đang chọn có viền sáng nên có khi không khớp khung RING).
+    Đo trên 50 màn Train: vòng đang chọn 0,06 .. 0,11 — ở giữa, sát đầu hàng (x 37, 124) hay lệch
+    (x 233)."""
+    spots = []
+    for x in sorted({x + k * TIER_STEP for x in circles for k in range(-2, 3)}):
+        if GLOW_R[1] <= x <= screen.shape[1] - GLOW_R[1] and all(abs(x - s) > 20 for s in spots):
+            spots.append(x)
+    best, best_x = 0.0, None
+    for x in spots:
+        glow = _glow(screen, x)
+        if glow > best:
+            best, best_x = glow, x
+    if best_x is None or best < SELECTED_GLOW:
+        return None
+    # Vị trí ước lượng (vòng thấy được + k ô) có thể lệch vài px: lấy vòng thấy được gần nhất.
+    near = [c for c in circles if abs(c - best_x) <= TIER_CENTER_TOLERANCE]
+    return near[0] if near else best_x
+
+
+def _glow(screen, x: int) -> float:
+    """Tỉ lệ pixel cam sáng trên vành (bán kính GLOW_R) quanh tâm (x, RING_ROW_Y)."""
+    r = GLOW_R[1]
+    hsv = cv2.cvtColor(screen[RING_ROW_Y - r:RING_ROW_Y + r, x - r:x + r], cv2.COLOR_BGR2HSV)
+    yy, xx = np.mgrid[-r:r, -r:r]
+    radius = np.hypot(xx + 0.5, yy + 0.5)
+    ring = (radius >= GLOW_R[0]) & (radius <= GLOW_R[1])
+    h, s, v = hsv[..., 0], hsv[..., 1], hsv[..., 2]
+    orange = (h >= 8) & (h <= 30) & (s >= 120) & (v >= 150)
+    return float(orange[ring].mean())
 
 
 def choose_tier(bot, tiers, want: int, lowest: int) -> int | None:
-    """Chọn (bấm, để nằm giữa hàng) một vòng của cấp mở cao nhất <= `want`. Trả cấp đã
-    chọn, hoặc None nếu mọi cấp từ `lowest` tới `want` đều khoá / không nhận ra hàng.
+    """Chọn (bấm) một vòng của cấp mở cao nhất <= `want`. Trả cấp đã chọn, hoặc None nếu mọi cấp
+    từ `lowest` tới `want` đều khoá / không đọc được hàng.
 
-    Vòng ở giữa (lúc mới vào là vòng train lần trước, luôn mở; sau đó là vòng vừa bấm)
-    được kiểm tra bằng nút "+" (có = train được, không = khoá). Ổ khoá trên các vòng khác
-    giúp bớt số lần bấm."""
-    tiers = _as_lists(tiers)
-    kinds = max(len(paths) for paths in tiers.values())
-    single = kinds == 1
-    locked = set()   # (cấp, loại) đã biết là khoá
+    Mỗi bước tìm vòng đang chọn (viền cam, selected_circle — KHÔNG giả định nằm giữa: cấp thấp
+    nhất / cao nhất ở đầu hàng không cuộn ra giữa được), đọc cấp, rồi bấm vòng cách nó 1 .. 2 ô."""
+    kinds = max((len(paths) if isinstance(paths, (list, tuple)) else 1)
+                for paths in tiers.values()) if tiers else 1
+    seen: dict[int, tuple[int, bool]] = {}   # thứ tự vòng (tính từ vòng chọn đầu tiên) -> (cấp, khoá)
+    index = 0
     for _ in range(MAX_STEPS):
         screen = bot.screenshot()
-        circles = visible_circles(bot, screen, tiers)
+        circles = tier_circles(bot, screen)
         if not circles:
             bot.record("Train: tier row not found")
             return None
-        center = next((c for c in circles if abs(c.x - TIER_CENTER_X) <= TIER_CENTER_TOLERANCE),
-                      None)
+        selected = selected_circle(screen, circles)
+        if selected is None:
+            # Vòng đang chọn đã cuộn khỏi màn: chọn vòng gần giữa nhất, đếm lại từ đầu.
+            nearest = min(circles, key=lambda x: abs(x - TIER_CENTER_X))
+            bot.log("Train: selected tier not visible, tapping the circle nearest to center")
+            bot.tap(nearest, RING_ROW_Y, delay=TAP_DELAY)
+            seen, index = {}, 0
+            continue
+        tier = read_tier(bot, screen)
+        if tier is None:
+            bot.record("Train: tier badge not readable")
+            return None
         trainable = bot.find(TRAIN_PLUS, screen=screen, region=TRAIN_PLUS_REGION) is not None
-        locked |= {(c.tier, c.kind) for c in circles if c.locked}
-        if center is not None and not trainable:
-            locked.add((center.tier, center.kind))
-        goal = _goal(tiers, locked, want, lowest, single)
-        bot.log(f"Train: center {_name(center)} {'open' if trainable else 'locked'}, "
-                f"tiers {sorted({c.tier for c in circles})}, goal {goal}")
+        seen[index] = (tier, not trainable)
+        goal = _goal(seen, want, lowest, kinds)
+        bot.log(f"Train: selected tier {tier} {'open' if trainable else 'locked'}, goal {goal}")
         if goal is None:
             bot.log(f"Train: tier {lowest} locked")
             return None
-        if center is not None and center.tier == goal and trainable:
+        if tier == goal and trainable:
             return goal
-        target = _next_tap(circles, locked, goal, kinds)
-        bot.tap(target.x, target.y, delay=TAP_DELAY)
+        move = _move(seen, index, tier, goal, kinds)
+        target = _circle_at(circles, selected, move)
+        if target is None and tier == goal:
+            # Đang thử các loại cùng cấp mà hết hàng phía đó (cấp cao / thấp nhất của game):
+            # ghi một "vòng" giả khác cấp ở đầu hàng rồi xét lại (sang phía còn lại).
+            side = 1 if move > 0 else -1
+            seen[index + side] = (tier + side * END_OF_ROW, True)
+            continue
+        if target is None:
+            bot.record("Train: next tier circle not found")
+            return None
+        x, step = target
+        bot.tap(x, RING_ROW_Y, delay=TAP_DELAY)
+        index += step
     bot.record("Train: cannot choose tier")
     return None
 
 
-def _goal(tiers, locked, want, lowest, single) -> int | None:
-    """Cấp cao nhất trong [lowest, want] chưa biết là khoá. Lính: khoá từ cấp khoá thấp
-    nhất trở lên; bẫy: một cấp khoá khi cả mọi loại của nó đều khoá."""
-    if single:
-        locked_from = min((tier for tier, _ in locked), default=None)
-        goal = want if locked_from is None else min(want, locked_from - 1)
+def _goal(seen, want, lowest, kinds) -> int | None:
+    """Cấp cao nhất trong [lowest, want] chưa biết là khoá. Lính: cấp khoá thấp nhất trở lên đều
+    khoá. Bẫy: một cấp khoá khi mọi vòng của nó đã thấy đều khoá và đã thấy đủ `kinds` vòng,
+    hoặc đã thấy hết các vòng của nó (hai đầu là vòng cấp khác)."""
+    if kinds == 1:
+        locked = [tier for tier, is_locked in seen.values() if is_locked]
+        goal = min([want] + [tier - 1 for tier in locked])
         return goal if goal >= lowest else None
     for tier in range(want, lowest - 1, -1):
-        kinds = len(tiers.get(tier, [None]))
-        if any((tier, kind) not in locked for kind in range(kinds)):
+        indices = [i for i, (t, _) in seen.items() if t == tier]
+        if not indices or any(not seen[i][1] for i in indices):
+            return tier
+        if len(indices) < kinds and _open_side(seen, indices[0], tier) is not None:
             return tier
     return None
 
 
-def _next_tap(circles, locked, goal, kinds) -> Circle:
-    """Vòng cần bấm để tới cấp `goal`: đang thấy một vòng của nó chưa biết khoá thì bấm vòng
-    đó (gần giữa nhất); chưa thấy thì bấm vòng phải nhất (đi lên) / trái nhất (đi xuống)
-    về phía loại chưa biết khoá của cấp đó."""
-    candidates = [c for c in circles if c.tier == goal and (c.tier, c.kind) not in locked]
-    if candidates:
-        return min(candidates, key=lambda c: abs(c.x - TIER_CENTER_X))
-    order = [c.tier * kinds + c.kind for c in circles]
-    wanted = max(goal * kinds + kind for kind in range(kinds) if (goal, kind) not in locked)
-    return circles[-1] if wanted > max(order) else circles[0]
+def _move(seen, index, tier, goal, kinds) -> int:
+    """Số ô cần đi từ vòng giữa (âm: sang trái). Khác cấp: đi về phía `goal` (tối đa 2 ô, vì
+    mỗi lần thấy giữa ±2). Đúng cấp mà khoá (bẫy): sang vòng chưa thử của cùng cấp."""
+    if tier != goal:
+        return max(-2, min(2, (goal - tier) * kinds))
+    side = _open_side(seen, index, goal)
+    return 1 if side is None else max(-2, min(2, side - index))
 
 
-def _name(circle) -> str:
-    return "None" if circle is None else f"{circle.tier}/{circle.kind}"
+def _open_side(seen, index, tier) -> int | None:
+    """Thứ tự vòng chưa thấy gần nhất nằm trong dãy vòng cùng `tier` quanh `index` (bên phải
+    trước), hoặc None nếu dãy đã thấy hết (hai đầu là vòng cấp khác)."""
+    right = index + 1
+    while right in seen and seen[right][0] == tier:
+        right += 1
+    if right not in seen:
+        return right
+    left = index - 1
+    while left in seen and seen[left][0] == tier:
+        left -= 1
+    return left if left not in seen else None
 
 
-def _as_lists(tiers) -> dict[int, list[str]]:
-    return {tier: [paths] if isinstance(paths, str) else list(paths)
-            for tier, paths in tiers.items()}
-
-
-def _locked(bot, screen, x: int, y: int) -> bool:
-    dx, dy = TIER_LOCK_OFFSET
-    lock = bot.crop(screen, x + dx - 18, y + dy - 18, 36, 36)
-    return bot.find(TIER_LOCK, threshold=TIER_LOCK_THRESHOLD, screen=lock) is not None
+def _circle_at(circles, selected, move):
+    """(x, số ô thật) của vòng cách vòng đang chọn `move` ô; không thấy (sát mép / hết hàng) thì
+    thử ô gần hơn."""
+    step = move
+    while step != 0:
+        x = selected + step * TIER_STEP
+        near = [c for c in circles if abs(c - x) <= TIER_CENTER_TOLERANCE]
+        if near:
+            return near[0], step
+        step -= 1 if step > 0 else -1
+    return None

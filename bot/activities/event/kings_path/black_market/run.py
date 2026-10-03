@@ -11,12 +11,13 @@ Màn Black Market (6 món ở vị trí cố định, mỗi bước chụp 1 ả
    xác nhận thì Confirm) -> chờ 2 s -> ô 1 đã khác = refresh xong, mua tiếp bộ mới; còn giống thì
    chờ thêm 1 s (tối đa 10 lần), vẫn giống thì bấm Refresh lại.
 Dừng (Back): số đã mua (OCR dòng Go) + số mua lượt này >= mục tiêu -> xong cả vòng event
-(mark_complete). Chưa mua đủ mà dừng (hết hàng / không thấy Instant Refresh / kẹt) -> không lưu done,
+(mark_target_reached). Chưa mua đủ mà dừng (hết hàng / không thấy Instant Refresh / kẹt) -> không lưu done,
 lượt sau đọc lại số đã mua ở dòng Go rồi mua tiếp; bị ngắt (120 s / boss) cũng vậy.
 """
 import numpy as np
 
-from ...common import EventState, mark_complete
+from ...city_building import MARKET
+from ...common import EventState, mark_target_reached
 from .. import path_task
 from ..building import open_menu
 from ..constants import SCREEN_WAIT
@@ -49,7 +50,7 @@ NAME = "Black Market"
 
 def _buy(bot, path, done, target):
     """Sau Go: mở Black Market rồi mua các món không trả bằng kim cương cho đủ mục tiêu."""
-    _, pos = open_menu(bot, NAME, {"black_market": MENU_BLACK_MARKET})
+    _, pos = open_menu(bot, NAME, MARKET, {"black_market": MENU_BLACK_MARKET})
     if pos is None:
         return None
     bot.tap(*pos)
@@ -135,7 +136,7 @@ def _finish(bot, path, message: str):
     """Đã mua đủ mục tiêu: Back, xong cả vòng event."""
     bot.log(f"{NAME}: {message}")
     bot.back(delay=1)
-    mark_complete(bot, path.key)
+    mark_target_reached(bot, path.key)
     return None
 
 

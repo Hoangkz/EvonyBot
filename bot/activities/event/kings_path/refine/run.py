@@ -27,6 +27,7 @@ Không đọc được số đã refine ở dòng Go thì không refine (không 
 import cv2
 import numpy as np
 
+from ...city_building import FORGE
 from ...common import EventState
 from .. import path_task
 from ..building import open_menu
@@ -210,7 +211,7 @@ def _refine(bot, path, done, target):
         _last_done.pop(id(bot), None)
         bot.mark_daily_done(path.key)
         return None
-    _, pos = open_menu(bot, NAME, {"craft": MENU_CRAFT})
+    _, pos = open_menu(bot, NAME, FORGE, {"craft": MENU_CRAFT})
     if pos is None:
         return None
     bot.tap(*pos, delay=STEP_WAIT)

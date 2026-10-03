@@ -78,6 +78,7 @@ class MainWindow(QMainWindow):
         self.home_view.auto_timeout_changed.connect(self._on_auto_timeout_changed)
         self.bots.daily_task_done.connect(self.db.mark_daily_task_done)
         self.bots.bubble_found.connect(self._on_bubble_found)
+        self.bots.civilization_found.connect(self.db.set_civilization)
         self.bots.bubble_disabled.connect(self._on_bubble_disabled)
         self.bots.log_message.connect(self._on_log_message)
         self.bots.history.connect(self._on_history)
@@ -224,6 +225,8 @@ class MainWindow(QMainWindow):
         init = settings.setdefault("Initialization", {})
         # Bubble còn hạn trong DB thì bot không cần vào game kiểm tra lại.
         init["bubble_until"] = saved.get("Initialization", {}).get("bubble_until") or ""
+        # Nền văn minh bot đã tự xếp (ảnh công trình học chung theo nền văn minh).
+        init["civilization"] = saved.get("Initialization", {}).get("civilization")
         self.bots.start(
             device_id,
             view.initialization_tab.selected_activities(),

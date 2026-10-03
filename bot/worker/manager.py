@@ -18,6 +18,7 @@ class BotManager(QObject):
 
     daily_task_done = pyqtSignal(str, str)    # (serial, task Daily Activities vừa xong)
     bubble_found = pyqtSignal(str, int)       # (serial, giây bubble còn lại; 0 = không có)
+    civilization_found = pyqtSignal(str, int) # (serial, nền văn minh bot tự xếp từ ảnh công trình)
     bubble_disabled = pyqtSignal(str)         # (serial) không đủ kim cương -> bỏ tích Bubble
     log_message = pyqtSignal(str, str)        # (serial, dòng log) -> tab Logs > Info
     history = pyqtSignal(str, str)            # (serial, sự kiện) -> lưu DB + tab Logs > History
@@ -53,6 +54,7 @@ class BotManager(QObject):
         worker.server_found.connect(self.server_found.emit)
         worker.daily_task_done.connect(self.daily_task_done.emit)
         worker.bubble_found.connect(self.bubble_found.emit)
+        worker.civilization_found.connect(self.civilization_found.emit)
         worker.bubble_disabled.connect(self.bubble_disabled.emit)
         worker.log_message.connect(self.log_message.emit)
         worker.history.connect(self.history.emit)

@@ -70,6 +70,7 @@ class BotWorker(QThread):
 
     daily_task_done = pyqtSignal(str, str)    # (serial, task Daily Activities vừa xong)
     bubble_found = pyqtSignal(str, int)       # (serial, giây bubble còn lại; 0 = không có)
+    civilization_found = pyqtSignal(str, int) # (serial, nền văn minh bot tự xếp từ ảnh công trình)
     bubble_disabled = pyqtSignal(str)         # (serial) không đủ kim cương -> bỏ tích Bubble
     log_message = pyqtSignal(str, str)        # (serial, dòng log) -> tab Logs > Info
     history = pyqtSignal(str, str)            # (serial, sự kiện) -> lưu DB + tab Logs > History
@@ -134,7 +135,11 @@ class BotWorker(QThread):
             self.ctx.is_daily_done = self._is_daily_done
             self.ctx.mark_daily_done = self._mark_daily_done
             self.ctx.done_at = self.daily_done.get
+            self.ctx.daily_keys = lambda: list(self.daily_done)
             self.ctx.record = self.record
+            # Nền văn minh đã lưu DB (None = chưa biết); bot tự xếp thì lưu lại qua signal.
+            self.ctx.civilization = self.settings.get("Initialization", {}).get("civilization") or None
+            self.ctx.set_civilization = self._set_civilization
             self._register_boss_listener()
             self._run_tasks()
         # Ngắt có chủ đích (Stop/timeout truyền tới đây) không xem là lỗi.
@@ -358,6 +363,10 @@ class BotWorker(QThread):
 
     def _is_daily_done(self, task: str) -> bool:
         return done_today(self.daily_done.get(task), self.server_time)
+
+    def _set_civilization(self, civ: int):
+        self.ctx.civilization = civ
+        self.civilization_found.emit(self.serial, int(civ))
 
     def _mark_daily_done(self, task: str):
         self.daily_done[task] = datetime.now().isoformat(timespec="seconds")

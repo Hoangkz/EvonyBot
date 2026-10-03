@@ -22,12 +22,16 @@ TRAIN_THRESHOLD = 0.8
 # trình vẫn ở giữa) -> mở lại menu, lúc này có "Train".
 SPEED_UP = f"{EV}/GatherTroops/Train/speedUp.png"
 GO_WAIT = 10              # giây chờ sau khi bấm Go
-CENTER = (50, 50)         # % màn hình: công trình sau khi bấm Go
 MENU_CHECK_DELAY = 1      # giây chờ menu hiện trước khi tìm icon Train
 CENTER_TAP_EXTRA = 2      # giây chờ thêm sau mỗi lần bấm giữa màn hình (menu công trình hiện chậm)
 MENU_WAIT = 3             # giây chờ sau mỗi bước của menu
 
 # ---- Màn Train (bấm icon Train trong menu công trình) --------------------------------
+# Nhận ra màn Train (mở ở loại / cấp bất kỳ): nút "i" tròn góc trên (320, 45), giống nhau ở mọi
+# màn Train và mọi nền văn minh (không dùng ảnh hình lính): 50 màn Train (cả bẫy) 1,00; màn khác
+# <= 0,36. Chỉ tìm trong vùng góc trên phải (% màn hình).
+TRAIN_INFO = f"{EV}/GatherTroops/Train/info.png"
+TRAIN_INFO_REGION = (70, 2, 91, 12)
 LOWEST_TIER = 7           # nhiệm vụ chỉ tính "tier 7 and above"
 TRAIN_WAIT = 3            # giây chờ màn Train mở sau khi bấm icon Train
 # Số lính tối đa một lần train: ô bên phải nút "+" (đọc bằng bot.ocr.read_train_count).

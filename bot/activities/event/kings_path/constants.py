@@ -46,11 +46,9 @@ ROWS_REGION = (0, 35, 100, 100)   # % màn hình: danh sách dòng dưới hàng
 GO_WAIT = 5
 
 # ---- Sau Go: công trình trong thành (building.py) ----------------------------------
-# Go -> về thành, công trình của nhiệm vụ ở giữa màn hình. Chờ thêm GO_EXTRA_WAIT giây (cùng
-# GO_WAIT là 10 s) -> bấm giữa màn hình -> chờ MENU_WAIT giây -> menu công trình; không thấy
-# icon thì bấm giữa thêm lần nữa (MENU_TRIES lần). Rồi chờ màn chức năng tối đa SCREEN_WAIT giây.
-GO_EXTRA_WAIT = 5
-BUILDING_CENTER = (50, 50)   # % màn hình
+# Go -> về thành, công trình của nhiệm vụ ở giữa màn hình. Tìm ảnh công trình đã học / giữ ảnh
+# để học (../city_building.py) -> bấm giữa -> chờ MENU_WAIT giây -> menu công trình; không thấy
+# icon thì làm lại (MENU_TRIES lần). Rồi chờ màn chức năng tối đa SCREEN_WAIT giây.
 MENU_WAIT = 5
 MENU_TRIES = 2
 SCREEN_WAIT = 10

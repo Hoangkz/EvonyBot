@@ -29,6 +29,12 @@ class BotContext(FlowMixin, InputMixin, ScreenMixin):
         self.mark_daily_done = lambda task: None
         # Giờ (ISO) lưu `task` trong daily_done, kể cả ngày cũ; None nếu chưa có.
         self.done_at = lambda task: None
+        # Mọi key đang có trong daily_done (kể cả ngày cũ), VD tìm "<key>_reached_<mục tiêu>".
+        self.daily_keys = lambda: []
+        # Nền văn minh của tài khoản (1 .. 7, None = chưa biết), bot tự xếp từ ảnh công trình
+        # (activities/event/city_building.py); worker gán set_civilization để lưu DB.
+        self.civilization: int | None = None
+        self.set_civilization = lambda civ: setattr(self, "civilization", civ)
         self._log = log
         # Sự kiện đáng lưu lịch sử (DB + tab Logs > History); worker gán BotWorker.record,
         # mặc định (test / chạy tay) chỉ là log thường.
