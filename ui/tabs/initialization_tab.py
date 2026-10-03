@@ -68,6 +68,7 @@ class InitializationTab(DesignerTab):
     start_clicked = pyqtSignal()
     start_all_clicked = pyqtSignal()
     server_changed = pyqtSignal(str)   # server mới sau khi nhập xong
+    settings_changed = pyqtSignal()
 
     def __init__(self, device_id="", parent=None):
         super().__init__("tabPage1", DESIGNER_DATA, COMBO_ITEMS, PAGE_SIZE, parent=parent)
@@ -91,6 +92,7 @@ class InitializationTab(DesignerTab):
         for name in ACTIVITY_BUTTON_TARGETS:
             c[name].setCheckable(True)
             c[name].setStyleSheet(ACTIVITY_BUTTON_STYLE)
+            c[name].toggled.connect(self.settings_changed.emit)
 
     def set_running(self, running: bool):
         """While the bot runs, Start becomes Stop (same button, same signal)."""

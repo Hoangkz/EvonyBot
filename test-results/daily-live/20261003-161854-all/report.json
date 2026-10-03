@@ -1,0 +1,923 @@
+{
+  "task": "ALL",
+  "serial": "127.0.0.1:21503",
+  "status": "full-flow-complete",
+  "completed": true,
+  "passes": 0,
+  "logs": [
+    "Daily Activities: Monster Killing",
+    "Daily Activities: Resource Collecting",
+    "Daily Activities: Offering",
+    "Daily Activities: Resource Tax",
+    "Daily Activities: Gold Levy",
+    "Daily Activities: Troop Training",
+    "Daily Activities: Troop Heading",
+    "Daily Activities: Trap Buiding",
+    "Daily Activities: Alliance Donation",
+    "Daily Activities: Black Market",
+    "Daily Activities: General Enhancing",
+    "Daily Activities: Wheel of Fortune",
+    "Daily Activities: Patrol",
+    "Daily Activities: Material Composing"
+  ],
+  "daily_done": [
+    "Activity Rewards",
+    "Alliance Donation",
+    "Black Market",
+    "General Enhancing",
+    "Gold Levy",
+    "Material Composing",
+    "Monster Killing",
+    "Offering",
+    "Patrol",
+    "Resource Collecting",
+    "Resource Gathering",
+    "Resource Tax",
+    "Trap Buiding",
+    "Troop Heading",
+    "Troop Training",
+    "Wheel of Fortune"
+  ],
+  "events": [
+    {
+      "at": "2026-10-03T16:18:55.428",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/Click_ActivitiesLight.png",
+      "position": [
+        45,
+        395
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T16:18:55.539",
+      "kind": "swipe",
+      "x1": 277,
+      "y1": 492,
+      "x2": 217,
+      "y2": 387,
+      "duration": 1.0
+    },
+    {
+      "at": "2026-10-03T16:18:58.126",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/ActivitiesAttackMonster.png",
+      "position": [
+        19,
+        488
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T16:18:58.130",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/Go.png",
+      "position": [
+        336,
+        50
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T16:18:58.130",
+      "kind": "tap",
+      "x": 336,
+      "y": 538
+    },
+    {
+      "at": "2026-10-03T16:19:02.695",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/FindMonster.png",
+      "position": [
+        134,
+        624
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T16:19:04.717",
+      "kind": "tap",
+      "x": 134,
+      "y": 624
+    },
+    {
+      "at": "2026-10-03T16:19:07.232",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/TapMonster.png",
+      "position": [
+        140,
+        525
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T16:19:07.232",
+      "kind": "tap",
+      "x": 140,
+      "y": 525
+    },
+    {
+      "at": "2026-10-03T16:19:09.400",
+      "kind": "tap",
+      "x": 200,
+      "y": 670
+    },
+    {
+      "at": "2026-10-03T16:19:13.905",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/AttackMonster.png",
+      "position": [
+        100,
+        285
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T16:19:13.905",
+      "kind": "tap",
+      "x": 100,
+      "y": 285
+    },
+    {
+      "at": "2026-10-03T16:19:16.093",
+      "kind": "tap",
+      "x": 200,
+      "y": 500
+    },
+    {
+      "at": "2026-10-03T16:19:18.515",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/March.png",
+      "position": [
+        196,
+        40
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T16:19:18.515",
+      "kind": "tap",
+      "x": 320,
+      "y": 520
+    },
+    {
+      "at": "2026-10-03T16:19:21.678",
+      "kind": "shell",
+      "command": "input keyevent KEYCODE_DEL"
+    },
+    {
+      "at": "2026-10-03T16:19:21.861",
+      "kind": "shell",
+      "command": "input keyevent KEYCODE_DEL"
+    },
+    {
+      "at": "2026-10-03T16:19:22.032",
+      "kind": "shell",
+      "command": "input keyevent KEYCODE_DEL"
+    },
+    {
+      "at": "2026-10-03T16:19:22.208",
+      "kind": "shell",
+      "command": "input keyevent KEYCODE_DEL"
+    },
+    {
+      "at": "2026-10-03T16:19:22.384",
+      "kind": "shell",
+      "command": "input keyevent KEYCODE_DEL"
+    },
+    {
+      "at": "2026-10-03T16:19:22.564",
+      "kind": "shell",
+      "command": "input keyevent KEYCODE_DEL"
+    },
+    {
+      "at": "2026-10-03T16:19:22.756",
+      "kind": "shell",
+      "command": "input keyevent KEYCODE_DEL"
+    },
+    {
+      "at": "2026-10-03T16:19:22.952",
+      "kind": "shell",
+      "command": "input keyevent KEYCODE_DEL"
+    },
+    {
+      "at": "2026-10-03T16:19:23.128",
+      "kind": "shell",
+      "command": "input text 100"
+    },
+    {
+      "at": "2026-10-03T16:19:23.312",
+      "kind": "shell",
+      "command": "input keyevent KEYCODE_ENTER"
+    },
+    {
+      "at": "2026-10-03T16:19:25.519",
+      "kind": "tap",
+      "x": 300,
+      "y": 660
+    },
+    {
+      "at": "2026-10-03T16:19:28.041",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/FindMonster.png",
+      "position": [
+        134,
+        624
+      ],
+      "region": [
+        19.83838383838384,
+        78.63636363636364,
+        47.83838383838384,
+        98.63636363636364
+      ]
+    },
+    {
+      "at": "2026-10-03T16:19:30.064",
+      "kind": "tap",
+      "x": 134,
+      "y": 624
+    },
+    {
+      "at": "2026-10-03T16:19:32.533",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/TapMonster.png",
+      "position": [
+        140,
+        525
+      ],
+      "region": [
+        21.353535353535356,
+        64.57386363636364,
+        49.35353535353536,
+        84.57386363636364
+      ]
+    },
+    {
+      "at": "2026-10-03T16:19:32.533",
+      "kind": "tap",
+      "x": 140,
+      "y": 525
+    },
+    {
+      "at": "2026-10-03T16:19:34.729",
+      "kind": "tap",
+      "x": 200,
+      "y": 670
+    },
+    {
+      "at": "2026-10-03T16:19:39.187",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/AttackMonster.png",
+      "position": [
+        100,
+        285
+      ],
+      "region": [
+        11.252525252525253,
+        30.482954545454547,
+        39.25252525252525,
+        50.48295454545455
+      ]
+    },
+    {
+      "at": "2026-10-03T16:19:39.187",
+      "kind": "tap",
+      "x": 100,
+      "y": 285
+    },
+    {
+      "at": "2026-10-03T16:19:41.366",
+      "kind": "tap",
+      "x": 200,
+      "y": 500
+    },
+    {
+      "at": "2026-10-03T16:19:43.757",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/March.png",
+      "position": [
+        196,
+        40
+      ],
+      "region": [
+        35.494949494949495,
+        0,
+        63.494949494949495,
+        15.681818181818182
+      ]
+    },
+    {
+      "at": "2026-10-03T16:19:43.757",
+      "kind": "tap",
+      "x": 320,
+      "y": 520
+    },
+    {
+      "at": "2026-10-03T16:19:46.938",
+      "kind": "shell",
+      "command": "input keyevent KEYCODE_DEL"
+    },
+    {
+      "at": "2026-10-03T16:19:47.096",
+      "kind": "shell",
+      "command": "input keyevent KEYCODE_DEL"
+    },
+    {
+      "at": "2026-10-03T16:19:47.272",
+      "kind": "shell",
+      "command": "input keyevent KEYCODE_DEL"
+    },
+    {
+      "at": "2026-10-03T16:19:47.436",
+      "kind": "shell",
+      "command": "input keyevent KEYCODE_DEL"
+    },
+    {
+      "at": "2026-10-03T16:19:47.604",
+      "kind": "shell",
+      "command": "input keyevent KEYCODE_DEL"
+    },
+    {
+      "at": "2026-10-03T16:19:47.776",
+      "kind": "shell",
+      "command": "input keyevent KEYCODE_DEL"
+    },
+    {
+      "at": "2026-10-03T16:19:47.956",
+      "kind": "shell",
+      "command": "input keyevent KEYCODE_DEL"
+    },
+    {
+      "at": "2026-10-03T16:19:48.144",
+      "kind": "shell",
+      "command": "input keyevent KEYCODE_DEL"
+    },
+    {
+      "at": "2026-10-03T16:19:48.332",
+      "kind": "shell",
+      "command": "input text 100"
+    },
+    {
+      "at": "2026-10-03T16:19:48.508",
+      "kind": "shell",
+      "command": "input keyevent KEYCODE_ENTER"
+    },
+    {
+      "at": "2026-10-03T16:19:50.719",
+      "kind": "tap",
+      "x": 300,
+      "y": 660
+    },
+    {
+      "at": "2026-10-03T16:19:53.141",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/AttackMonsterFinish.png",
+      "position": [
+        190,
+        107
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T16:19:53.767",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesSourceCollecting/Click_Activities2.png",
+      "position": [
+        35,
+        619
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T16:19:55.781",
+      "kind": "tap",
+      "x": 35,
+      "y": 619
+    },
+    {
+      "at": "2026-10-03T16:19:58.167",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesSourceCollecting/ActivitiesSourceCollecting.png",
+      "position": [
+        37,
+        536
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T16:19:58.167",
+      "kind": "swipe",
+      "x1": 277,
+      "y1": 492,
+      "x2": 257,
+      "y2": 457,
+      "duration": 1.0
+    },
+    {
+      "at": "2026-10-03T16:20:01.624",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesSourceCollecting/ActivitiesSourceCollecting.png",
+      "position": [
+        37,
+        495
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T16:20:01.628",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesSourceCollecting/Go.png",
+      "position": [
+        336,
+        49
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T16:20:01.628",
+      "kind": "tap",
+      "x": 336,
+      "y": 544
+    },
+    {
+      "at": "2026-10-03T16:20:05.828",
+      "kind": "tap",
+      "x": 198,
+      "y": 352
+    },
+    {
+      "at": "2026-10-03T16:20:07.247",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesSourceCollecting/Finish1.png",
+      "position": [
+        109,
+        247
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T16:20:07.866",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesOffer/Click_Activities.png",
+      "position": [
+        19,
+        617
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T16:20:09.888",
+      "kind": "tap",
+      "x": 19,
+      "y": 617
+    },
+    {
+      "at": "2026-10-03T16:20:12.583",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesOffer/Click_ActivitiesLight.png",
+      "position": [
+        45,
+        395
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T16:20:12.583",
+      "kind": "swipe",
+      "x1": 277,
+      "y1": 492,
+      "x2": 217,
+      "y2": 387,
+      "duration": 1.0
+    },
+    {
+      "at": "2026-10-03T16:20:15.240",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesOffer/Click_ActivitiesLight.png",
+      "position": [
+        45,
+        444
+      ],
+      "region": [
+        0,
+        46.10795454545455,
+        25.363636363636363,
+        66.10795454545455
+      ]
+    },
+    {
+      "at": "2026-10-03T16:20:15.240",
+      "kind": "swipe",
+      "x1": 277,
+      "y1": 492,
+      "x2": 217,
+      "y2": 387,
+      "duration": 1.0
+    },
+    {
+      "at": "2026-10-03T16:20:17.932",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesOffer/Click_ActivitiesLight.png",
+      "position": [
+        45,
+        494
+      ],
+      "region": [
+        0,
+        53.06818181818182,
+        25.363636363636363,
+        73.06818181818181
+      ]
+    },
+    {
+      "at": "2026-10-03T16:20:17.932",
+      "kind": "swipe",
+      "x1": 277,
+      "y1": 492,
+      "x2": 217,
+      "y2": 387,
+      "duration": 1.0
+    },
+    {
+      "at": "2026-10-03T16:20:20.617",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesOffer/Click_ActivitiesLight.png",
+      "position": [
+        45,
+        444
+      ],
+      "region": [
+        0,
+        60.17045454545455,
+        25.363636363636363,
+        80.17045454545455
+      ]
+    },
+    {
+      "at": "2026-10-03T16:20:20.618",
+      "kind": "swipe",
+      "x1": 277,
+      "y1": 492,
+      "x2": 217,
+      "y2": 387,
+      "duration": 1.0
+    },
+    {
+      "at": "2026-10-03T16:20:23.349",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesOffer/Click_ActivitiesLight.png",
+      "position": [
+        45,
+        393
+      ],
+      "region": [
+        0,
+        53.06818181818182,
+        25.363636363636363,
+        73.06818181818181
+      ]
+    },
+    {
+      "at": "2026-10-03T16:20:23.349",
+      "kind": "swipe",
+      "x1": 277,
+      "y1": 492,
+      "x2": 217,
+      "y2": 387,
+      "duration": 1.0
+    },
+    {
+      "at": "2026-10-03T16:20:26.055",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesOffer/Click_ActivitiesLight.png",
+      "position": [
+        45,
+        433
+      ],
+      "region": [
+        0,
+        45.82386363636363,
+        25.363636363636363,
+        65.82386363636363
+      ]
+    },
+    {
+      "at": "2026-10-03T16:20:26.055",
+      "kind": "swipe",
+      "x1": 277,
+      "y1": 492,
+      "x2": 217,
+      "y2": 387,
+      "duration": 1.0
+    },
+    {
+      "at": "2026-10-03T16:20:28.762",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesOffer/Click_ActivitiesLight.png",
+      "position": [
+        45,
+        478
+      ],
+      "region": [
+        0,
+        51.50568181818182,
+        25.363636363636363,
+        71.50568181818181
+      ]
+    },
+    {
+      "at": "2026-10-03T16:20:28.762",
+      "kind": "swipe",
+      "x1": 277,
+      "y1": 492,
+      "x2": 217,
+      "y2": 387,
+      "duration": 1.0
+    },
+    {
+      "at": "2026-10-03T16:20:31.133",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesOffer/Offerdone.png",
+      "position": [
+        95,
+        570
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T16:20:31.699",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesTaxResource/Click_ActivitiesLight.png",
+      "position": [
+        45,
+        606
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T16:20:31.699",
+      "kind": "swipe",
+      "x1": 277,
+      "y1": 492,
+      "x2": 217,
+      "y2": 387,
+      "duration": 1.0
+    },
+    {
+      "at": "2026-10-03T16:20:34.118",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesTaxResource/TaxFinish1.png",
+      "position": [
+        31,
+        516
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T16:20:34.301",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesLevyGold/LevyGoldFinish.png",
+      "position": [
+        40,
+        608
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T16:20:34.965",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesTroopTrain/Click_ActivitiesLight.png",
+      "position": [
+        45,
+        458
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T16:20:34.965",
+      "kind": "swipe",
+      "x1": 277,
+      "y1": 492,
+      "x2": 217,
+      "y2": 387,
+      "duration": 1.0
+    },
+    {
+      "at": "2026-10-03T16:20:37.372",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesTroopTrain/TroopFinish1.png",
+      "position": [
+        38,
+        555
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T16:20:37.920",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesTroopHeal/Click_ActivitiesLight.png",
+      "position": [
+        45,
+        500
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T16:20:37.920",
+      "kind": "swipe",
+      "x1": 277,
+      "y1": 492,
+      "x2": 217,
+      "y2": 387,
+      "duration": 1.0
+    },
+    {
+      "at": "2026-10-03T16:20:40.278",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesTroopHeal/HealFinish1.png",
+      "position": [
+        34,
+        504
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T16:20:40.453",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesBuildTrap/TrapFinish1.png",
+      "position": [
+        34,
+        594
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T16:20:40.926",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesDonateAlliance/Click_ActivitiesLight.png",
+      "position": [
+        45,
+        539
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T16:20:40.926",
+      "kind": "swipe",
+      "x1": 277,
+      "y1": 492,
+      "x2": 217,
+      "y2": 387,
+      "duration": 1.0
+    },
+    {
+      "at": "2026-10-03T16:20:43.292",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesDonateAlliance/AllianceDonateFinish.png",
+      "position": [
+        83,
+        556
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T16:20:43.823",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesBuyMarket/Click_ActivitiesLight.png",
+      "position": [
+        45,
+        407
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T16:20:43.823",
+      "kind": "swipe",
+      "x1": 277,
+      "y1": 492,
+      "x2": 217,
+      "y2": 387,
+      "duration": 1.0
+    },
+    {
+      "at": "2026-10-03T16:20:46.244",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesBuyMarket/BlackMarketFinish.png",
+      "position": [
+        45,
+        502
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T16:20:46.445",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesGeneralEnhancing/CultivateFinish.png",
+      "position": [
+        47,
+        593
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T16:20:46.902",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesWheelofFortune/Click_ActivitiesLight.png",
+      "position": [
+        45,
+        445
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T16:20:46.902",
+      "kind": "swipe",
+      "x1": 277,
+      "y1": 492,
+      "x2": 217,
+      "y2": 387,
+      "duration": 1.0
+    },
+    {
+      "at": "2026-10-03T16:20:49.260",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesWheelofFortune/SpinFinishCurrent.png",
+      "position": [
+        195,
+        572
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T16:20:49.776",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesPatrol/Click_ActivitiesLight.png",
+      "position": [
+        45,
+        394
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T16:20:49.776",
+      "kind": "swipe",
+      "x1": 277,
+      "y1": 492,
+      "x2": 217,
+      "y2": 387,
+      "duration": 1.0
+    },
+    {
+      "at": "2026-10-03T16:20:52.201",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesPatrol/PatrolFinishCurrent.png",
+      "position": [
+        195,
+        523
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T16:20:52.382",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesComposeMaterials/ComposeMaterialsFinishCurrent.png",
+      "position": [
+        195,
+        521
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T16:20:52.578",
+      "kind": "match",
+      "template": "DailyActivites/CollectionActivities/Claim_All.png",
+      "position": [
+        197,
+        638
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T16:20:54.586",
+      "kind": "tap",
+      "x": 197,
+      "y": 638
+    },
+    {
+      "at": "2026-10-03T16:20:56.978",
+      "kind": "match",
+      "template": "DailyActivites/CollectionActivities/80.png",
+      "position": [
+        199,
+        306
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T16:20:56.978",
+      "kind": "tap",
+      "x": 199,
+      "y": 306
+    }
+  ]
+}

@@ -1,67 +1,139 @@
+"""Configuration UI for the Daily Activities automation.
+
+Only tasks backed by an implementation in ``bot.activities.daily_activities``
+are selectable. The remaining legacy entries stay visible at the bottom, but
+cannot accidentally enable work that the bot cannot perform.
 """
-daily_activities_tab.py — 1:1 rebuild of tabPage4 ("Daily Activities")
-from Form3_Designer.cs.
-"""
-from .tab_placeholder import DesignerTab
+from PyQt5.QtCore import QSignalBlocker
+from PyQt5.QtWidgets import QCheckBox, QComboBox, QGridLayout, QGroupBox, QLabel
 
-DESIGNER_DATA = {
-    "buttonDailyActivitiesApplyALL": {"loc": [935, 16], "size": [132, 43], "text": "Apply ALL", "type": "Button"},
-    "checkBox2": {"loc": [534, 283], "size": [207, 28], "text": "Resource Garthering", "type": "CheckBox"},
-    "checkBox21": {"loc": [534, 131], "size": [140, 28], "text": "Trap Buiding", "type": "CheckBox"},
-    "checkBox22": {"loc": [36, 81], "size": [116, 28], "text": "Gold Levy", "type": "CheckBox"},
-    "checkBox23": {"loc": [286, 183], "size": [113, 28], "text": "Research", "type": "CheckBox"},
-    "checkBox24": {"loc": [286, 236], "size": [137, 28], "text": "Construction", "type": "CheckBox"},
-    "checkBox25": {"loc": [36, 183], "size": [151, 28], "text": "Resource Tax", "type": "CheckBox"},
-    "checkBox26": {"checked": True, "loc": [818, 31], "size": [160, 28], "text": "Troop Heading", "type": "CheckBox"},
-    "checkBox27": {"loc": [534, 183], "size": [115, 28], "text": "PvP Battle", "type": "CheckBox"},
-    "checkBox28": {"loc": [36, 329], "size": [171, 28], "text": "Buy x10 Stamina", "type": "CheckBox"},
-    "checkBox29": {"loc": [286, 283], "size": [80, 28], "text": "Labor", "type": "CheckBox"},
-    "checkBox3": {"loc": [534, 236], "size": [202, 28], "text": "Resource Collecting", "type": "CheckBox"},
-    "checkBox30": {"loc": [534, 79], "size": [79, 28], "text": "Patrol", "type": "CheckBox"},
-    "checkBox31": {"loc": [818, 131], "size": [199, 28], "text": "Material Composing", "type": "CheckBox"},
-    "checkBox32": {"loc": [36, 31], "size": [178, 28], "text": "Wheel of Fortune", "type": "CheckBox"},
-    "checkBox33": {"loc": [36, 131], "size": [138, 28], "text": "Black Market", "type": "CheckBox"},
-    "checkBox34": {"loc": [286, 31], "size": [179, 28], "text": "Alliance Donation", "type": "CheckBox"},
-    "checkBox35": {"loc": [36, 236], "size": [175, 28], "text": "Boss Monster Kill", "type": "CheckBox"},
-    "checkBox36": {"loc": [818, 236], "size": [155, 28], "text": "Monster Killing", "type": "CheckBox"},
-    "checkBox37": {"loc": [818, 183], "size": [138, 28], "text": "Troop Killing", "type": "CheckBox"},
-    "checkBox38": {"loc": [534, 31], "size": [196, 28], "text": "General Enhancing", "type": "CheckBox"},
-    "checkBox39": {"loc": [36, 283], "size": [174, 28], "text": "Relic Exploration", "type": "CheckBox"},
-    "checkBox4": {"loc": [818, 79], "size": [157, 28], "text": "Troop Training", "type": "CheckBox"},
-    "checkBox40": {"loc": [286, 329], "size": [160, 28], "text": "Valueble Event", "type": "CheckBox"},
-    "checkBox5": {"loc": [286, 81], "size": [144, 28], "text": "Alliance Help", "type": "CheckBox"},
-    "checkBox6": {"loc": [286, 131], "size": [98, 28], "text": "Offering", "type": "CheckBox"},
-    "groupBox6": {"children": ["panelDailyActivites"], "loc": [20, 65], "size": [1045, 502],
-                  "text": "Selection Activity", "type": "GroupBox"},
-    "panelDailyActivites": {
-        "children": ["checkBox40", "checkBox28", "checkBox39", "checkBox38", "checkBox37",
-                      "checkBox36", "checkBox35", "checkBox34", "checkBox33", "checkBox32",
-                      "checkBox31", "checkBox30", "checkBox29", "checkBox27", "checkBox26",
-                      "checkBox25", "checkBox24", "checkBox23", "checkBox22", "checkBox21",
-                      "checkBox6", "checkBox5", "checkBox4", "checkBox3", "checkBox2"],
-        "loc": [3, 24], "size": [1039, 475], "type": "Panel",
-    },
-    "tabPage4": {"children": ["buttonDailyActivitiesApplyALL", "groupBox6"],
-                 "loc": [4, 31], "size": [1088, 609], "text": "Daily Activities", "type": "TabPage"},
-}
-COMBO_ITEMS = {}
-PAGE_SIZE = (1088, 609)
-
-_CHECKBOX_NAMES = [n for n in DESIGNER_DATA if n.startswith("checkBox")]
+from .tab_placeholder import BaseTab
 
 
-class DailyActivitiesTab(DesignerTab):
+# The key stays compatible with the database and automation Task label; display
+# text fixes spelling mistakes from the original WinForms form.
+SUPPORTED_TASKS = (
+    ("Monster Killing", "Monster Killing"),
+    ("Resource Collecting", "Resource Collecting"),
+    ("Offering", "Offering"),
+    ("Resource Gathering", "Resource Gathering"),
+    ("Resource Tax", "Resource Tax"),
+    ("Gold Levy", "Gold Levy"),
+    ("Troop Training", "Troop Training"),
+    ("Troop Heading", "Troop Healing"),
+    ("Trap Buiding", "Trap Building"),
+    ("Alliance Donation", "Alliance Donation"),
+    ("Black Market", "Black Market"),
+    ("General Enhancing", "General Enhancing"),
+    ("Wheel of Fortune", "Wheel of Fortune"),
+    ("Patrol", "Patrol"),
+    ("Material Composing", "Material Composing"),
+)
+
+UNSUPPORTED_TASKS = (
+    ("Alliance Help", "Alliance Help"),
+    ("Research", "Research"),
+    ("Construction", "Construction"),
+    ("PvP Battle", "PvP Battle"),
+    ("Troop Killing", "Troop Killing"),
+    ("Boss Monster Kill", "Boss Monster Kill"),
+    ("Relic Exploration", "Relic Exploration"),
+    ("Labor", "Labor"),
+    ("Valueble Event", "Valuable Event"),
+    ("Buy x10 Stamina", "Buy x10 Stamina (legacy)"),
+)
+
+GENERAL_KEY = "General"
+
+
+class DailyActivitiesTab(BaseTab):
     def __init__(self, parent=None):
-        super().__init__("tabPage4", DESIGNER_DATA, COMBO_ITEMS, PAGE_SIZE, parent=parent)
+        super().__init__(title="Daily Activities", show_apply_all=True, parent=parent)
+
+        self.task_boxes: dict[str, QCheckBox] = {}
+        self.unsupported_boxes: dict[str, QCheckBox] = {}
+
+        general = QGroupBox("General")
+        general_grid = QGridLayout(general)
+        self.buy_stamina = QCheckBox("Buy Stamina")
+        self.stamina_quantity = QComboBox()
+        self.stamina_quantity.addItems(["10", "20", "30"])
+        self.stamina_quantity.setCurrentText("10")
+        self.stamina_quantity.setEnabled(False)
+        self.buy_hammers = QCheckBox("Buy All Hammers")
+        general_grid.addWidget(self.buy_stamina, 0, 0)
+        general_grid.addWidget(QLabel("Quantity"), 0, 1)
+        general_grid.addWidget(self.stamina_quantity, 0, 2)
+        general_grid.addWidget(self.buy_hammers, 0, 3)
+        general_grid.setColumnStretch(4, 1)
+        self.add_row(general)
+
+        selection = QGroupBox("Selection Daily")
+        selection_grid = QGridLayout(selection)
+        for index, (key, label) in enumerate(SUPPORTED_TASKS):
+            box = QCheckBox(label)
+            # Preserve the old form's default while keeping the stored key compatible.
+            box.setChecked(key == "Troop Heading")
+            self.task_boxes[key] = box
+            selection_grid.addWidget(box, index // 4, index % 4)
+        for column in range(4):
+            selection_grid.setColumnStretch(column, 1)
+        self.add_row(selection)
+
+        unavailable = QGroupBox("Unavailable Daily — not implemented yet")
+        unavailable_grid = QGridLayout(unavailable)
+        for index, (key, label) in enumerate(UNSUPPORTED_TASKS):
+            box = QCheckBox(label)
+            box.setEnabled(False)
+            box.setToolTip("This daily activity does not have automation logic yet.")
+            self.unsupported_boxes[key] = box
+            unavailable_grid.addWidget(box, index // 4, index % 4)
+        for column in range(4):
+            unavailable_grid.setColumnStretch(column, 1)
+        self.add_row(unavailable)
+
+        self.buy_stamina.toggled.connect(self.stamina_quantity.setEnabled)
+        self.buy_stamina.clicked.connect(self.settings_changed)
+        self.buy_hammers.clicked.connect(self.settings_changed)
+        self.stamina_quantity.activated.connect(self.settings_changed)
+        for box in self.task_boxes.values():
+            box.clicked.connect(self.settings_changed)
 
     def get_settings(self) -> dict:
-        return {
-            self.controls[name].text(): self.controls[name].isChecked()
-            for name in _CHECKBOX_NAMES
+        settings = {key: box.isChecked() for key, box in self.task_boxes.items()}
+        # Clear legacy unsupported selections instead of sending them to the runner.
+        settings.update({key: False for key in self.unsupported_boxes})
+        settings[GENERAL_KEY] = {
+            "buy_stamina": self.buy_stamina.isChecked(),
+            "stamina_quantity": int(self.stamina_quantity.currentText()),
+            "buy_all_hammers": self.buy_hammers.isChecked(),
         }
+        return settings
 
     def set_settings(self, data: dict):
-        by_text = {self.controls[n].text(): n for n in _CHECKBOX_NAMES}
-        for label, checked in data.items():
-            if label in by_text:
-                self.controls[by_text[label]].setChecked(bool(checked))
+        # Avoid writing partially restored state while loading a device.
+        widgets = [self.buy_stamina, self.stamina_quantity, self.buy_hammers,
+                   *self.task_boxes.values()]
+        blockers = [QSignalBlocker(widget) for widget in widgets]
+        try:
+            for key, box in self.task_boxes.items():
+                value = data.get(key)
+                if key == "Resource Gathering" and key not in data:
+                    value = data.get("Resource Garthering")
+                if value is not None:
+                    box.setChecked(bool(value))
+
+            general = data.get(GENERAL_KEY, {})
+            if not isinstance(general, dict):
+                general = {}
+            # Migrate the old standalone checkbox into the new General setting.
+            buy_stamina = general.get("buy_stamina", data.get("Buy x10 Stamina", False))
+            self.buy_stamina.setChecked(bool(buy_stamina))
+            quantity = str(general.get("stamina_quantity", 10))
+            if self.stamina_quantity.findText(quantity) >= 0:
+                self.stamina_quantity.setCurrentText(quantity)
+            self.buy_hammers.setChecked(bool(general.get("buy_all_hammers", False)))
+            self.stamina_quantity.setEnabled(self.buy_stamina.isChecked())
+        finally:
+            # Keep blockers alive through every assignment, then release together.
+            del blockers

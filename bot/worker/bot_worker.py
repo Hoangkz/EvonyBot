@@ -102,7 +102,11 @@ class BotWorker(QThread):
             # Thử lấy server nếu chưa biết, sau đó báo activity hiện tại cho UI.
             # Lấy giờ reset trước: menu này cũng nằm trên đường lấy server.
             self._ensure_server_time()
-            self._ensure_server()
+            # Số server chỉ phục vụ chia sẻ boss giữa các máy. Daily Activities
+            # không cần nó; cố đọc ở đây làm bot bấm Settings trước khi Daily
+            # có cơ hội mở nút Quests, và có thể giữ luồng tại đó 30 vòng.
+            if activity == JOIN_BOSS:
+                self._ensure_server()
             self.activity_changed.emit(self.serial, activity)
             # Truyền cấu hình riêng theo tên; nếu thiếu thì dùng dict rỗng.
             self._run_activity(activity, self.settings.get(activity, {}))

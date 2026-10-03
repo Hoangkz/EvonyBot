@@ -1,0 +1,525 @@
+{
+  "task": "Resource Collecting",
+  "serial": "127.0.0.1:21513",
+  "status": "TimedOut",
+  "completed": false,
+  "passes": 1,
+  "logs": [
+    "LIVE Resource Collecting: pass 1/5",
+    "Daily Activities: end of list reached; returning to top"
+  ],
+  "daily_done": [],
+  "events": [
+    {
+      "at": "2026-10-03T18:47:33.101",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesSourceCollecting/Collection.png",
+      "position": [
+        106,
+        420
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T18:47:33.101",
+      "kind": "tap",
+      "x": 106,
+      "y": 420
+    },
+    {
+      "at": "2026-10-03T18:47:37.619",
+      "kind": "tap",
+      "x": 330,
+      "y": 670
+    },
+    {
+      "at": "2026-10-03T18:47:38.796",
+      "kind": "match",
+      "template": "DailyActivites/UseAllActivities/QuestButtonCity.png",
+      "position": [
+        21,
+        619
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T18:47:40.810",
+      "kind": "tap",
+      "x": 21,
+      "y": 619
+    },
+    {
+      "at": "2026-10-03T18:47:44.447",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesSourceCollecting/ClaimCollecting.png",
+      "position": [
+        19,
+        345
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T18:47:44.451",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesSourceCollecting/Claim.png",
+      "position": [
+        335,
+        54
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T18:47:44.451",
+      "kind": "tap",
+      "x": 335,
+      "y": 399
+    },
+    {
+      "at": "2026-10-03T18:47:49.874",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesSourceCollecting/ClaimCollecting.png",
+      "position": [
+        19,
+        345
+      ],
+      "region": [
+        0,
+        39.00568181818182,
+        18.7979797979798,
+        59.00568181818182
+      ]
+    },
+    {
+      "at": "2026-10-03T18:47:49.877",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesSourceCollecting/Claim.png",
+      "position": [
+        335,
+        54
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T18:47:49.877",
+      "kind": "tap",
+      "x": 335,
+      "y": 399
+    },
+    {
+      "at": "2026-10-03T18:47:55.546",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesSourceCollecting/Click_ActivitiesLight.png",
+      "position": [
+        45,
+        395
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T18:47:55.704",
+      "kind": "swipe",
+      "x1": 277,
+      "y1": 492,
+      "x2": 217,
+      "y2": 387,
+      "duration": 1.0
+    },
+    {
+      "at": "2026-10-03T18:47:58.984",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesSourceCollecting/ActivitiesSourceCollecting.png",
+      "position": [
+        37,
+        504
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T18:47:58.985",
+      "kind": "swipe",
+      "x1": 277,
+      "y1": 492,
+      "x2": 257,
+      "y2": 457,
+      "duration": 1.0
+    },
+    {
+      "at": "2026-10-03T18:48:03.064",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesSourceCollecting/ActivitiesSourceCollecting.png",
+      "position": [
+        37,
+        460
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T18:48:03.068",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesSourceCollecting/Go.png",
+      "position": [
+        336,
+        49
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T18:48:03.068",
+      "kind": "tap",
+      "x": 336,
+      "y": 509
+    },
+    {
+      "at": "2026-10-03T18:48:08.134",
+      "kind": "tap",
+      "x": 198,
+      "y": 352
+    },
+    {
+      "at": "2026-10-03T18:48:10.236",
+      "kind": "match",
+      "template": "DailyActivites/UseAllActivities/QuestButtonCity.png",
+      "position": [
+        21,
+        619
+      ],
+      "region": [
+        0,
+        77.92613636363636,
+        19.303030303030305,
+        97.92613636363636
+      ]
+    },
+    {
+      "at": "2026-10-03T18:48:12.240",
+      "kind": "tap",
+      "x": 21,
+      "y": 619
+    },
+    {
+      "at": "2026-10-03T18:48:15.302",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesSourceCollecting/Click_ActivitiesLight.png",
+      "position": [
+        45,
+        395
+      ],
+      "region": [
+        0,
+        46.10795454545455,
+        25.363636363636363,
+        66.10795454545455
+      ]
+    },
+    {
+      "at": "2026-10-03T18:48:15.302",
+      "kind": "swipe",
+      "x1": 277,
+      "y1": 492,
+      "x2": 217,
+      "y2": 387,
+      "duration": 1.0
+    },
+    {
+      "at": "2026-10-03T18:48:18.027",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesSourceCollecting/ActivitiesSourceCollecting.png",
+      "position": [
+        37,
+        494
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T18:48:18.031",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesSourceCollecting/Go.png",
+      "position": [
+        336,
+        49
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T18:48:18.031",
+      "kind": "tap",
+      "x": 336,
+      "y": 543
+    },
+    {
+      "at": "2026-10-03T18:48:22.762",
+      "kind": "tap",
+      "x": 198,
+      "y": 352
+    },
+    {
+      "at": "2026-10-03T18:48:24.679",
+      "kind": "match",
+      "template": "DailyActivites/UseAllActivities/QuestButtonCity.png",
+      "position": [
+        21,
+        619
+      ],
+      "region": [
+        0,
+        77.92613636363636,
+        19.303030303030305,
+        97.92613636363636
+      ]
+    },
+    {
+      "at": "2026-10-03T18:48:26.693",
+      "kind": "tap",
+      "x": 21,
+      "y": 619
+    },
+    {
+      "at": "2026-10-03T18:48:29.717",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesSourceCollecting/Click_ActivitiesLight.png",
+      "position": [
+        45,
+        395
+      ],
+      "region": [
+        0,
+        46.10795454545455,
+        25.363636363636363,
+        66.10795454545455
+      ]
+    },
+    {
+      "at": "2026-10-03T18:48:29.717",
+      "kind": "swipe",
+      "x1": 217,
+      "y1": 387,
+      "x2": 277,
+      "y2": 492,
+      "duration": 0.35
+    },
+    {
+      "at": "2026-10-03T18:48:30.757",
+      "kind": "swipe",
+      "x1": 217,
+      "y1": 387,
+      "x2": 277,
+      "y2": 492,
+      "duration": 0.35
+    },
+    {
+      "at": "2026-10-03T18:48:31.858",
+      "kind": "swipe",
+      "x1": 217,
+      "y1": 387,
+      "x2": 277,
+      "y2": 492,
+      "duration": 0.35
+    },
+    {
+      "at": "2026-10-03T18:48:32.875",
+      "kind": "swipe",
+      "x1": 217,
+      "y1": 387,
+      "x2": 277,
+      "y2": 492,
+      "duration": 0.35
+    },
+    {
+      "at": "2026-10-03T18:48:33.873",
+      "kind": "swipe",
+      "x1": 217,
+      "y1": 387,
+      "x2": 277,
+      "y2": 492,
+      "duration": 0.35
+    },
+    {
+      "at": "2026-10-03T18:48:34.902",
+      "kind": "swipe",
+      "x1": 217,
+      "y1": 387,
+      "x2": 277,
+      "y2": 492,
+      "duration": 0.35
+    },
+    {
+      "at": "2026-10-03T18:48:35.909",
+      "kind": "swipe",
+      "x1": 217,
+      "y1": 387,
+      "x2": 277,
+      "y2": 492,
+      "duration": 0.35
+    },
+    {
+      "at": "2026-10-03T18:48:36.939",
+      "kind": "swipe",
+      "x1": 217,
+      "y1": 387,
+      "x2": 277,
+      "y2": 492,
+      "duration": 0.35
+    },
+    {
+      "at": "2026-10-03T18:48:37.986",
+      "kind": "swipe",
+      "x1": 217,
+      "y1": 387,
+      "x2": 277,
+      "y2": 492,
+      "duration": 0.35
+    },
+    {
+      "at": "2026-10-03T18:48:39.011",
+      "kind": "swipe",
+      "x1": 217,
+      "y1": 387,
+      "x2": 277,
+      "y2": 492,
+      "duration": 0.35
+    },
+    {
+      "at": "2026-10-03T18:48:40.100",
+      "kind": "swipe",
+      "x1": 217,
+      "y1": 387,
+      "x2": 277,
+      "y2": 492,
+      "duration": 0.35
+    },
+    {
+      "at": "2026-10-03T18:48:41.216",
+      "kind": "swipe",
+      "x1": 217,
+      "y1": 387,
+      "x2": 277,
+      "y2": 492,
+      "duration": 0.35
+    },
+    {
+      "at": "2026-10-03T18:48:42.849",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesSourceCollecting/Click_ActivitiesLight.png",
+      "position": [
+        45,
+        396
+      ],
+      "region": [
+        0,
+        46.10795454545455,
+        25.363636363636363,
+        66.10795454545455
+      ]
+    },
+    {
+      "at": "2026-10-03T18:48:42.849",
+      "kind": "swipe",
+      "x1": 277,
+      "y1": 492,
+      "x2": 217,
+      "y2": 387,
+      "duration": 1.0
+    },
+    {
+      "at": "2026-10-03T18:48:45.593",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesSourceCollecting/ActivitiesSourceCollecting.png",
+      "position": [
+        37,
+        490
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T18:48:45.597",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesSourceCollecting/Go.png",
+      "position": [
+        336,
+        49
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T18:48:45.597",
+      "kind": "tap",
+      "x": 336,
+      "y": 539
+    },
+    {
+      "at": "2026-10-03T18:48:50.186",
+      "kind": "tap",
+      "x": 198,
+      "y": 352
+    },
+    {
+      "at": "2026-10-03T18:48:52.100",
+      "kind": "match",
+      "template": "DailyActivites/UseAllActivities/QuestButtonCity.png",
+      "position": [
+        21,
+        619
+      ],
+      "region": [
+        0,
+        77.92613636363636,
+        19.303030303030305,
+        97.92613636363636
+      ]
+    },
+    {
+      "at": "2026-10-03T18:48:54.114",
+      "kind": "tap",
+      "x": 21,
+      "y": 619
+    },
+    {
+      "at": "2026-10-03T18:48:57.393",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesSourceCollecting/Click_ActivitiesLight.png",
+      "position": [
+        45,
+        404
+      ],
+      "region": [
+        0,
+        46.25,
+        25.363636363636363,
+        66.25
+      ]
+    },
+    {
+      "at": "2026-10-03T18:48:57.393",
+      "kind": "swipe",
+      "x1": 277,
+      "y1": 492,
+      "x2": 217,
+      "y2": 387,
+      "duration": 1.0
+    },
+    {
+      "at": "2026-10-03T18:49:00.702",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesSourceCollecting/Click_ActivitiesLight.png",
+      "position": [
+        45,
+        404
+      ],
+      "region": [
+        0,
+        47.38636363636363,
+        25.363636363636363,
+        67.38636363636363
+      ]
+    },
+    {
+      "at": "2026-10-03T18:49:00.702",
+      "kind": "swipe",
+      "x1": 277,
+      "y1": 492,
+      "x2": 217,
+      "y2": 387,
+      "duration": 1.0
+    }
+  ]
+}

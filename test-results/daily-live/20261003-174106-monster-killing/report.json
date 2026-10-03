@@ -1,0 +1,2262 @@
+{
+  "task": "Monster Killing",
+  "serial": "127.0.0.1:21513",
+  "status": "TimedOut",
+  "completed": false,
+  "passes": 2,
+  "logs": [
+    "LIVE Monster Killing: pass 1/5",
+    "Daily Activities: task row has no Go button; completed",
+    "Daily Activities: Monster march 3/5 confirmed",
+    "Daily Activities: Monster search stale; reopening search",
+    "Daily Activities: Monster search stale; reopening search",
+    "Daily Activities: Monster search stale; reopening search",
+    "Daily Activities: Monster march 4/5 confirmed",
+    "Daily Activities: Monster search stale; reopening search",
+    "Daily Activities: Monster search stale; reopening search",
+    "Daily Activities: Monster search stale; reopening search",
+    "Daily Activities: Monster search stale; reopening search",
+    "Daily Activities: Monster march 5/5 confirmed",
+    "Daily Activities: Quests/Activity button was not found",
+    "LIVE Monster Killing: pass 2/5",
+    "Daily Activities: Monster search stale; reopening search"
+  ],
+  "daily_done": [],
+  "events": [
+    {
+      "at": "2026-10-03T17:41:07.228",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/ActivitiesAttackMonster.png",
+      "position": [
+        19,
+        442
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T17:41:07.247",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesSourceCollecting/Claim.png",
+      "position": [
+        335,
+        50
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T17:41:07.247",
+      "kind": "tap",
+      "x": 335,
+      "y": 492
+    },
+    {
+      "at": "2026-10-03T17:41:13.038",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/Click_ActivitiesLight.png",
+      "position": [
+        45,
+        395
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T17:41:13.141",
+      "kind": "swipe",
+      "x1": 277,
+      "y1": 492,
+      "x2": 217,
+      "y2": 387,
+      "duration": 1.0
+    },
+    {
+      "at": "2026-10-03T17:41:15.928",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/Click_ActivitiesLight.png",
+      "position": [
+        45,
+        449
+      ],
+      "region": [
+        0,
+        46.10795454545455,
+        25.363636363636363,
+        66.10795454545455
+      ]
+    },
+    {
+      "at": "2026-10-03T17:41:15.928",
+      "kind": "swipe",
+      "x1": 277,
+      "y1": 492,
+      "x2": 217,
+      "y2": 387,
+      "duration": 1.0
+    },
+    {
+      "at": "2026-10-03T17:41:18.628",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/Click_ActivitiesLight.png",
+      "position": [
+        45,
+        496
+      ],
+      "region": [
+        0,
+        53.77840909090909,
+        25.363636363636363,
+        73.7784090909091
+      ]
+    },
+    {
+      "at": "2026-10-03T17:41:18.628",
+      "kind": "swipe",
+      "x1": 277,
+      "y1": 492,
+      "x2": 217,
+      "y2": 387,
+      "duration": 1.0
+    },
+    {
+      "at": "2026-10-03T17:41:21.299",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/Click_ActivitiesLight.png",
+      "position": [
+        45,
+        451
+      ],
+      "region": [
+        0,
+        60.45454545454545,
+        25.363636363636363,
+        80.45454545454545
+      ]
+    },
+    {
+      "at": "2026-10-03T17:41:21.299",
+      "kind": "swipe",
+      "x1": 277,
+      "y1": 492,
+      "x2": 217,
+      "y2": 387,
+      "duration": 1.0
+    },
+    {
+      "at": "2026-10-03T17:41:23.960",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/Click_ActivitiesLight.png",
+      "position": [
+        45,
+        497
+      ],
+      "region": [
+        0,
+        54.0625,
+        25.363636363636363,
+        74.0625
+      ]
+    },
+    {
+      "at": "2026-10-03T17:41:23.960",
+      "kind": "swipe",
+      "x1": 277,
+      "y1": 492,
+      "x2": 217,
+      "y2": 387,
+      "duration": 1.0
+    },
+    {
+      "at": "2026-10-03T17:41:26.657",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/Click_ActivitiesLight.png",
+      "position": [
+        45,
+        546
+      ],
+      "region": [
+        0,
+        60.59659090909091,
+        25.363636363636363,
+        80.5965909090909
+      ]
+    },
+    {
+      "at": "2026-10-03T17:41:26.657",
+      "kind": "swipe",
+      "x1": 277,
+      "y1": 492,
+      "x2": 217,
+      "y2": 387,
+      "duration": 1.0
+    },
+    {
+      "at": "2026-10-03T17:41:29.285",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/Click_ActivitiesLight.png",
+      "position": [
+        45,
+        589
+      ],
+      "region": [
+        0,
+        67.55681818181819,
+        25.363636363636363,
+        87.55681818181819
+      ]
+    },
+    {
+      "at": "2026-10-03T17:41:29.285",
+      "kind": "swipe",
+      "x1": 277,
+      "y1": 492,
+      "x2": 217,
+      "y2": 387,
+      "duration": 1.0
+    },
+    {
+      "at": "2026-10-03T17:41:31.918",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/Click_ActivitiesLight.png",
+      "position": [
+        45,
+        537
+      ],
+      "region": [
+        0,
+        73.66477272727273,
+        25.363636363636363,
+        93.66477272727273
+      ]
+    },
+    {
+      "at": "2026-10-03T17:41:31.918",
+      "kind": "swipe",
+      "x1": 277,
+      "y1": 492,
+      "x2": 217,
+      "y2": 387,
+      "duration": 1.0
+    },
+    {
+      "at": "2026-10-03T17:41:34.562",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/Click_ActivitiesLight.png",
+      "position": [
+        45,
+        486
+      ],
+      "region": [
+        0,
+        66.2784090909091,
+        25.363636363636363,
+        86.2784090909091
+      ]
+    },
+    {
+      "at": "2026-10-03T17:41:34.562",
+      "kind": "swipe",
+      "x1": 277,
+      "y1": 492,
+      "x2": 217,
+      "y2": 387,
+      "duration": 1.0
+    },
+    {
+      "at": "2026-10-03T17:41:37.227",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/Click_ActivitiesLight.png",
+      "position": [
+        45,
+        441
+      ],
+      "region": [
+        0,
+        59.03409090909091,
+        25.363636363636363,
+        79.0340909090909
+      ]
+    },
+    {
+      "at": "2026-10-03T17:41:37.227",
+      "kind": "swipe",
+      "x1": 277,
+      "y1": 492,
+      "x2": 217,
+      "y2": 387,
+      "duration": 1.0
+    },
+    {
+      "at": "2026-10-03T17:41:39.902",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/Click_ActivitiesLight.png",
+      "position": [
+        45,
+        487
+      ],
+      "region": [
+        0,
+        52.64204545454545,
+        25.363636363636363,
+        72.64204545454545
+      ]
+    },
+    {
+      "at": "2026-10-03T17:41:39.902",
+      "kind": "swipe",
+      "x1": 277,
+      "y1": 492,
+      "x2": 217,
+      "y2": 387,
+      "duration": 1.0
+    },
+    {
+      "at": "2026-10-03T17:41:42.595",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/Click_ActivitiesLight.png",
+      "position": [
+        45,
+        533
+      ],
+      "region": [
+        0,
+        59.17613636363636,
+        25.363636363636363,
+        79.17613636363636
+      ]
+    },
+    {
+      "at": "2026-10-03T17:41:42.595",
+      "kind": "swipe",
+      "x1": 277,
+      "y1": 492,
+      "x2": 217,
+      "y2": 387,
+      "duration": 1.0
+    },
+    {
+      "at": "2026-10-03T17:41:45.289",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/Click_ActivitiesLight.png",
+      "position": [
+        45,
+        486
+      ],
+      "region": [
+        0,
+        65.71022727272727,
+        25.363636363636363,
+        85.71022727272727
+      ]
+    },
+    {
+      "at": "2026-10-03T17:41:45.289",
+      "kind": "swipe",
+      "x1": 277,
+      "y1": 492,
+      "x2": 217,
+      "y2": 387,
+      "duration": 1.0
+    },
+    {
+      "at": "2026-10-03T17:41:47.759",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/ActivitiesAttackMonsterNext.png",
+      "position": [
+        18,
+        485
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T17:41:47.763",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/Go.png",
+      "position": [
+        336,
+        50
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T17:41:47.763",
+      "kind": "tap",
+      "x": 336,
+      "y": 535
+    },
+    {
+      "at": "2026-10-03T17:41:52.254",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/FindMonster.png",
+      "position": [
+        134,
+        624
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T17:41:54.269",
+      "kind": "tap",
+      "x": 134,
+      "y": 624
+    },
+    {
+      "at": "2026-10-03T17:41:56.676",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/TapMonster.png",
+      "position": [
+        140,
+        525
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T17:41:56.676",
+      "kind": "tap",
+      "x": 140,
+      "y": 525
+    },
+    {
+      "at": "2026-10-03T17:41:58.861",
+      "kind": "tap",
+      "x": 200,
+      "y": 670
+    },
+    {
+      "at": "2026-10-03T17:42:03.241",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/AttackMonster.png",
+      "position": [
+        100,
+        285
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T17:42:03.473",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/AttackMonster.png",
+      "position": [
+        100,
+        285
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T17:42:03.473",
+      "kind": "tap",
+      "x": 100,
+      "y": 285
+    },
+    {
+      "at": "2026-10-03T17:42:05.690",
+      "kind": "tap",
+      "x": 200,
+      "y": 500
+    },
+    {
+      "at": "2026-10-03T17:42:08.062",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/March.png",
+      "position": [
+        196,
+        40
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T17:42:08.064",
+      "kind": "tap",
+      "x": 320,
+      "y": 520
+    },
+    {
+      "at": "2026-10-03T17:42:11.292",
+      "kind": "shell",
+      "command": "input keyevent KEYCODE_DEL"
+    },
+    {
+      "at": "2026-10-03T17:42:11.555",
+      "kind": "shell",
+      "command": "input keyevent KEYCODE_DEL"
+    },
+    {
+      "at": "2026-10-03T17:42:11.739",
+      "kind": "shell",
+      "command": "input keyevent KEYCODE_DEL"
+    },
+    {
+      "at": "2026-10-03T17:42:11.927",
+      "kind": "shell",
+      "command": "input keyevent KEYCODE_DEL"
+    },
+    {
+      "at": "2026-10-03T17:42:12.123",
+      "kind": "shell",
+      "command": "input keyevent KEYCODE_DEL"
+    },
+    {
+      "at": "2026-10-03T17:42:12.315",
+      "kind": "shell",
+      "command": "input keyevent KEYCODE_DEL"
+    },
+    {
+      "at": "2026-10-03T17:42:12.491",
+      "kind": "shell",
+      "command": "input keyevent KEYCODE_DEL"
+    },
+    {
+      "at": "2026-10-03T17:42:12.675",
+      "kind": "shell",
+      "command": "input keyevent KEYCODE_DEL"
+    },
+    {
+      "at": "2026-10-03T17:42:12.855",
+      "kind": "shell",
+      "command": "input text 100"
+    },
+    {
+      "at": "2026-10-03T17:42:13.051",
+      "kind": "shell",
+      "command": "input keyevent KEYCODE_ENTER"
+    },
+    {
+      "at": "2026-10-03T17:42:15.249",
+      "kind": "tap",
+      "x": 300,
+      "y": 660
+    },
+    {
+      "at": "2026-10-03T17:42:19.100",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/FindMonster.png",
+      "position": [
+        134,
+        624
+      ],
+      "region": [
+        19.83838383838384,
+        78.63636363636364,
+        47.83838383838384,
+        98.63636363636364
+      ]
+    },
+    {
+      "at": "2026-10-03T17:42:21.122",
+      "kind": "tap",
+      "x": 134,
+      "y": 624
+    },
+    {
+      "at": "2026-10-03T17:42:23.630",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/TapMonster.png",
+      "position": [
+        140,
+        525
+      ],
+      "region": [
+        21.353535353535356,
+        64.57386363636364,
+        49.35353535353536,
+        84.57386363636364
+      ]
+    },
+    {
+      "at": "2026-10-03T17:42:23.630",
+      "kind": "tap",
+      "x": 140,
+      "y": 525
+    },
+    {
+      "at": "2026-10-03T17:42:25.876",
+      "kind": "tap",
+      "x": 200,
+      "y": 670
+    },
+    {
+      "at": "2026-10-03T17:42:30.501",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/TapMonster.png",
+      "position": [
+        140,
+        525
+      ],
+      "region": [
+        21.353535353535356,
+        64.57386363636364,
+        49.35353535353536,
+        84.57386363636364
+      ]
+    },
+    {
+      "at": "2026-10-03T17:42:30.501",
+      "kind": "tap",
+      "x": 140,
+      "y": 525
+    },
+    {
+      "at": "2026-10-03T17:42:32.702",
+      "kind": "tap",
+      "x": 200,
+      "y": 670
+    },
+    {
+      "at": "2026-10-03T17:42:37.323",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/TapMonster.png",
+      "position": [
+        140,
+        525
+      ],
+      "region": [
+        21.353535353535356,
+        64.57386363636364,
+        49.35353535353536,
+        84.57386363636364
+      ]
+    },
+    {
+      "at": "2026-10-03T17:42:37.323",
+      "kind": "tap",
+      "x": 140,
+      "y": 525
+    },
+    {
+      "at": "2026-10-03T17:42:39.509",
+      "kind": "tap",
+      "x": 200,
+      "y": 670
+    },
+    {
+      "at": "2026-10-03T17:42:43.927",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/TapMonster.png",
+      "position": [
+        140,
+        525
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T17:42:43.927",
+      "kind": "key",
+      "key": "KEYCODE_BACK"
+    },
+    {
+      "at": "2026-10-03T17:42:49.406",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/FindMonster.png",
+      "position": [
+        134,
+        624
+      ],
+      "region": [
+        19.83838383838384,
+        78.63636363636364,
+        47.83838383838384,
+        98.63636363636364
+      ]
+    },
+    {
+      "at": "2026-10-03T17:42:51.412",
+      "kind": "tap",
+      "x": 134,
+      "y": 624
+    },
+    {
+      "at": "2026-10-03T17:42:53.873",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/TapMonster.png",
+      "position": [
+        140,
+        525
+      ],
+      "region": [
+        21.353535353535356,
+        64.57386363636364,
+        49.35353535353536,
+        84.57386363636364
+      ]
+    },
+    {
+      "at": "2026-10-03T17:42:53.873",
+      "kind": "tap",
+      "x": 140,
+      "y": 525
+    },
+    {
+      "at": "2026-10-03T17:42:56.065",
+      "kind": "tap",
+      "x": 200,
+      "y": 670
+    },
+    {
+      "at": "2026-10-03T17:43:00.682",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/TapMonster.png",
+      "position": [
+        140,
+        525
+      ],
+      "region": [
+        21.353535353535356,
+        64.57386363636364,
+        49.35353535353536,
+        84.57386363636364
+      ]
+    },
+    {
+      "at": "2026-10-03T17:43:00.682",
+      "kind": "tap",
+      "x": 140,
+      "y": 525
+    },
+    {
+      "at": "2026-10-03T17:43:02.852",
+      "kind": "tap",
+      "x": 200,
+      "y": 670
+    },
+    {
+      "at": "2026-10-03T17:43:07.502",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/TapMonster.png",
+      "position": [
+        140,
+        525
+      ],
+      "region": [
+        21.353535353535356,
+        64.57386363636364,
+        49.35353535353536,
+        84.57386363636364
+      ]
+    },
+    {
+      "at": "2026-10-03T17:43:07.502",
+      "kind": "tap",
+      "x": 140,
+      "y": 525
+    },
+    {
+      "at": "2026-10-03T17:43:09.666",
+      "kind": "tap",
+      "x": 200,
+      "y": 670
+    },
+    {
+      "at": "2026-10-03T17:43:14.143",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/TapMonster.png",
+      "position": [
+        140,
+        525
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T17:43:14.143",
+      "kind": "key",
+      "key": "KEYCODE_BACK"
+    },
+    {
+      "at": "2026-10-03T17:43:19.751",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/FindMonster.png",
+      "position": [
+        134,
+        624
+      ],
+      "region": [
+        19.83838383838384,
+        78.63636363636364,
+        47.83838383838384,
+        98.63636363636364
+      ]
+    },
+    {
+      "at": "2026-10-03T17:43:21.757",
+      "kind": "tap",
+      "x": 134,
+      "y": 624
+    },
+    {
+      "at": "2026-10-03T17:43:24.290",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/TapMonster.png",
+      "position": [
+        140,
+        525
+      ],
+      "region": [
+        21.353535353535356,
+        64.57386363636364,
+        49.35353535353536,
+        84.57386363636364
+      ]
+    },
+    {
+      "at": "2026-10-03T17:43:24.290",
+      "kind": "tap",
+      "x": 140,
+      "y": 525
+    },
+    {
+      "at": "2026-10-03T17:43:26.505",
+      "kind": "tap",
+      "x": 200,
+      "y": 670
+    },
+    {
+      "at": "2026-10-03T17:43:31.137",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/TapMonster.png",
+      "position": [
+        140,
+        525
+      ],
+      "region": [
+        21.353535353535356,
+        64.57386363636364,
+        49.35353535353536,
+        84.57386363636364
+      ]
+    },
+    {
+      "at": "2026-10-03T17:43:31.137",
+      "kind": "tap",
+      "x": 140,
+      "y": 525
+    },
+    {
+      "at": "2026-10-03T17:43:33.333",
+      "kind": "tap",
+      "x": 200,
+      "y": 670
+    },
+    {
+      "at": "2026-10-03T17:43:37.935",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/TapMonster.png",
+      "position": [
+        140,
+        525
+      ],
+      "region": [
+        21.353535353535356,
+        64.57386363636364,
+        49.35353535353536,
+        84.57386363636364
+      ]
+    },
+    {
+      "at": "2026-10-03T17:43:37.935",
+      "kind": "tap",
+      "x": 140,
+      "y": 525
+    },
+    {
+      "at": "2026-10-03T17:43:40.126",
+      "kind": "tap",
+      "x": 200,
+      "y": 670
+    },
+    {
+      "at": "2026-10-03T17:43:44.552",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/TapMonster.png",
+      "position": [
+        140,
+        525
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T17:43:44.552",
+      "kind": "key",
+      "key": "KEYCODE_BACK"
+    },
+    {
+      "at": "2026-10-03T17:43:50.040",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/FindMonster.png",
+      "position": [
+        134,
+        624
+      ],
+      "region": [
+        19.83838383838384,
+        78.63636363636364,
+        47.83838383838384,
+        98.63636363636364
+      ]
+    },
+    {
+      "at": "2026-10-03T17:43:52.054",
+      "kind": "tap",
+      "x": 134,
+      "y": 624
+    },
+    {
+      "at": "2026-10-03T17:43:54.513",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/TapMonster.png",
+      "position": [
+        140,
+        525
+      ],
+      "region": [
+        21.353535353535356,
+        64.57386363636364,
+        49.35353535353536,
+        84.57386363636364
+      ]
+    },
+    {
+      "at": "2026-10-03T17:43:54.513",
+      "kind": "tap",
+      "x": 140,
+      "y": 525
+    },
+    {
+      "at": "2026-10-03T17:43:56.737",
+      "kind": "tap",
+      "x": 200,
+      "y": 670
+    },
+    {
+      "at": "2026-10-03T17:44:01.400",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/TapMonster.png",
+      "position": [
+        140,
+        525
+      ],
+      "region": [
+        21.353535353535356,
+        64.57386363636364,
+        49.35353535353536,
+        84.57386363636364
+      ]
+    },
+    {
+      "at": "2026-10-03T17:44:01.400",
+      "kind": "tap",
+      "x": 140,
+      "y": 525
+    },
+    {
+      "at": "2026-10-03T17:44:03.585",
+      "kind": "tap",
+      "x": 200,
+      "y": 670
+    },
+    {
+      "at": "2026-10-03T17:44:08.225",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/TapMonster.png",
+      "position": [
+        140,
+        525
+      ],
+      "region": [
+        21.353535353535356,
+        64.57386363636364,
+        49.35353535353536,
+        84.57386363636364
+      ]
+    },
+    {
+      "at": "2026-10-03T17:44:08.225",
+      "kind": "tap",
+      "x": 140,
+      "y": 525
+    },
+    {
+      "at": "2026-10-03T17:44:10.531",
+      "kind": "tap",
+      "x": 200,
+      "y": 670
+    },
+    {
+      "at": "2026-10-03T17:44:15.053",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/AttackMonster.png",
+      "position": [
+        100,
+        285
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T17:44:15.253",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/AttackMonster.png",
+      "position": [
+        100,
+        285
+      ],
+      "region": [
+        11.252525252525253,
+        30.482954545454547,
+        39.25252525252525,
+        50.48295454545455
+      ]
+    },
+    {
+      "at": "2026-10-03T17:44:15.253",
+      "kind": "tap",
+      "x": 100,
+      "y": 285
+    },
+    {
+      "at": "2026-10-03T17:44:17.557",
+      "kind": "tap",
+      "x": 200,
+      "y": 500
+    },
+    {
+      "at": "2026-10-03T17:44:19.990",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/March.png",
+      "position": [
+        196,
+        40
+      ],
+      "region": [
+        35.494949494949495,
+        0,
+        63.494949494949495,
+        15.681818181818182
+      ]
+    },
+    {
+      "at": "2026-10-03T17:44:19.992",
+      "kind": "tap",
+      "x": 320,
+      "y": 520
+    },
+    {
+      "at": "2026-10-03T17:44:23.288",
+      "kind": "shell",
+      "command": "input keyevent KEYCODE_DEL"
+    },
+    {
+      "at": "2026-10-03T17:44:23.611",
+      "kind": "shell",
+      "command": "input keyevent KEYCODE_DEL"
+    },
+    {
+      "at": "2026-10-03T17:44:23.839",
+      "kind": "shell",
+      "command": "input keyevent KEYCODE_DEL"
+    },
+    {
+      "at": "2026-10-03T17:44:24.015",
+      "kind": "shell",
+      "command": "input keyevent KEYCODE_DEL"
+    },
+    {
+      "at": "2026-10-03T17:44:24.194",
+      "kind": "shell",
+      "command": "input keyevent KEYCODE_DEL"
+    },
+    {
+      "at": "2026-10-03T17:44:24.367",
+      "kind": "shell",
+      "command": "input keyevent KEYCODE_DEL"
+    },
+    {
+      "at": "2026-10-03T17:44:24.551",
+      "kind": "shell",
+      "command": "input keyevent KEYCODE_DEL"
+    },
+    {
+      "at": "2026-10-03T17:44:24.751",
+      "kind": "shell",
+      "command": "input keyevent KEYCODE_DEL"
+    },
+    {
+      "at": "2026-10-03T17:44:24.935",
+      "kind": "shell",
+      "command": "input text 100"
+    },
+    {
+      "at": "2026-10-03T17:44:25.122",
+      "kind": "shell",
+      "command": "input keyevent KEYCODE_ENTER"
+    },
+    {
+      "at": "2026-10-03T17:44:27.314",
+      "kind": "tap",
+      "x": 300,
+      "y": 660
+    },
+    {
+      "at": "2026-10-03T17:44:31.115",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/FindMonster.png",
+      "position": [
+        134,
+        624
+      ],
+      "region": [
+        19.83838383838384,
+        78.63636363636364,
+        47.83838383838384,
+        98.63636363636364
+      ]
+    },
+    {
+      "at": "2026-10-03T17:44:33.133",
+      "kind": "tap",
+      "x": 134,
+      "y": 624
+    },
+    {
+      "at": "2026-10-03T17:44:35.664",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/TapMonster.png",
+      "position": [
+        140,
+        525
+      ],
+      "region": [
+        21.353535353535356,
+        64.57386363636364,
+        49.35353535353536,
+        84.57386363636364
+      ]
+    },
+    {
+      "at": "2026-10-03T17:44:35.664",
+      "kind": "tap",
+      "x": 140,
+      "y": 525
+    },
+    {
+      "at": "2026-10-03T17:44:37.923",
+      "kind": "tap",
+      "x": 200,
+      "y": 670
+    },
+    {
+      "at": "2026-10-03T17:44:42.596",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/TapMonster.png",
+      "position": [
+        140,
+        525
+      ],
+      "region": [
+        21.353535353535356,
+        64.57386363636364,
+        49.35353535353536,
+        84.57386363636364
+      ]
+    },
+    {
+      "at": "2026-10-03T17:44:42.596",
+      "kind": "tap",
+      "x": 140,
+      "y": 525
+    },
+    {
+      "at": "2026-10-03T17:44:44.870",
+      "kind": "tap",
+      "x": 200,
+      "y": 670
+    },
+    {
+      "at": "2026-10-03T17:44:49.512",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/TapMonster.png",
+      "position": [
+        140,
+        525
+      ],
+      "region": [
+        21.353535353535356,
+        64.57386363636364,
+        49.35353535353536,
+        84.57386363636364
+      ]
+    },
+    {
+      "at": "2026-10-03T17:44:49.512",
+      "kind": "tap",
+      "x": 140,
+      "y": 525
+    },
+    {
+      "at": "2026-10-03T17:44:51.775",
+      "kind": "tap",
+      "x": 200,
+      "y": 670
+    },
+    {
+      "at": "2026-10-03T17:44:56.256",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/TapMonster.png",
+      "position": [
+        140,
+        525
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T17:44:56.256",
+      "kind": "key",
+      "key": "KEYCODE_BACK"
+    },
+    {
+      "at": "2026-10-03T17:45:01.763",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/FindMonster.png",
+      "position": [
+        134,
+        624
+      ],
+      "region": [
+        19.83838383838384,
+        78.63636363636364,
+        47.83838383838384,
+        98.63636363636364
+      ]
+    },
+    {
+      "at": "2026-10-03T17:45:03.772",
+      "kind": "tap",
+      "x": 134,
+      "y": 624
+    },
+    {
+      "at": "2026-10-03T17:45:06.286",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/TapMonster.png",
+      "position": [
+        140,
+        525
+      ],
+      "region": [
+        21.353535353535356,
+        64.57386363636364,
+        49.35353535353536,
+        84.57386363636364
+      ]
+    },
+    {
+      "at": "2026-10-03T17:45:06.286",
+      "kind": "tap",
+      "x": 140,
+      "y": 525
+    },
+    {
+      "at": "2026-10-03T17:45:08.565",
+      "kind": "tap",
+      "x": 200,
+      "y": 670
+    },
+    {
+      "at": "2026-10-03T17:45:13.256",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/TapMonster.png",
+      "position": [
+        140,
+        525
+      ],
+      "region": [
+        21.353535353535356,
+        64.57386363636364,
+        49.35353535353536,
+        84.57386363636364
+      ]
+    },
+    {
+      "at": "2026-10-03T17:45:13.256",
+      "kind": "tap",
+      "x": 140,
+      "y": 525
+    },
+    {
+      "at": "2026-10-03T17:45:15.552",
+      "kind": "tap",
+      "x": 200,
+      "y": 670
+    },
+    {
+      "at": "2026-10-03T17:45:20.304",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/TapMonster.png",
+      "position": [
+        140,
+        525
+      ],
+      "region": [
+        21.353535353535356,
+        64.57386363636364,
+        49.35353535353536,
+        84.57386363636364
+      ]
+    },
+    {
+      "at": "2026-10-03T17:45:20.304",
+      "kind": "tap",
+      "x": 140,
+      "y": 525
+    },
+    {
+      "at": "2026-10-03T17:45:22.555",
+      "kind": "tap",
+      "x": 200,
+      "y": 670
+    },
+    {
+      "at": "2026-10-03T17:45:27.060",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/TapMonster.png",
+      "position": [
+        140,
+        525
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T17:45:27.060",
+      "kind": "key",
+      "key": "KEYCODE_BACK"
+    },
+    {
+      "at": "2026-10-03T17:45:32.609",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/FindMonster.png",
+      "position": [
+        134,
+        624
+      ],
+      "region": [
+        19.83838383838384,
+        78.63636363636364,
+        47.83838383838384,
+        98.63636363636364
+      ]
+    },
+    {
+      "at": "2026-10-03T17:45:34.618",
+      "kind": "tap",
+      "x": 134,
+      "y": 624
+    },
+    {
+      "at": "2026-10-03T17:45:37.088",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/TapMonster.png",
+      "position": [
+        140,
+        525
+      ],
+      "region": [
+        21.353535353535356,
+        64.57386363636364,
+        49.35353535353536,
+        84.57386363636364
+      ]
+    },
+    {
+      "at": "2026-10-03T17:45:37.088",
+      "kind": "tap",
+      "x": 140,
+      "y": 525
+    },
+    {
+      "at": "2026-10-03T17:45:39.277",
+      "kind": "tap",
+      "x": 200,
+      "y": 670
+    },
+    {
+      "at": "2026-10-03T17:45:43.981",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/TapMonster.png",
+      "position": [
+        140,
+        525
+      ],
+      "region": [
+        21.353535353535356,
+        64.57386363636364,
+        49.35353535353536,
+        84.57386363636364
+      ]
+    },
+    {
+      "at": "2026-10-03T17:45:43.981",
+      "kind": "tap",
+      "x": 140,
+      "y": 525
+    },
+    {
+      "at": "2026-10-03T17:45:46.214",
+      "kind": "tap",
+      "x": 200,
+      "y": 670
+    },
+    {
+      "at": "2026-10-03T17:45:50.869",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/TapMonster.png",
+      "position": [
+        140,
+        525
+      ],
+      "region": [
+        21.353535353535356,
+        64.57386363636364,
+        49.35353535353536,
+        84.57386363636364
+      ]
+    },
+    {
+      "at": "2026-10-03T17:45:50.869",
+      "kind": "tap",
+      "x": 140,
+      "y": 525
+    },
+    {
+      "at": "2026-10-03T17:45:53.054",
+      "kind": "tap",
+      "x": 200,
+      "y": 670
+    },
+    {
+      "at": "2026-10-03T17:45:57.487",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/TapMonster.png",
+      "position": [
+        140,
+        525
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T17:45:57.487",
+      "kind": "key",
+      "key": "KEYCODE_BACK"
+    },
+    {
+      "at": "2026-10-03T17:46:03.054",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/FindMonster.png",
+      "position": [
+        134,
+        624
+      ],
+      "region": [
+        19.83838383838384,
+        78.63636363636364,
+        47.83838383838384,
+        98.63636363636364
+      ]
+    },
+    {
+      "at": "2026-10-03T17:46:05.071",
+      "kind": "tap",
+      "x": 134,
+      "y": 624
+    },
+    {
+      "at": "2026-10-03T17:46:07.592",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/TapMonster.png",
+      "position": [
+        140,
+        525
+      ],
+      "region": [
+        21.353535353535356,
+        64.57386363636364,
+        49.35353535353536,
+        84.57386363636364
+      ]
+    },
+    {
+      "at": "2026-10-03T17:46:07.592",
+      "kind": "tap",
+      "x": 140,
+      "y": 525
+    },
+    {
+      "at": "2026-10-03T17:46:09.875",
+      "kind": "tap",
+      "x": 200,
+      "y": 670
+    },
+    {
+      "at": "2026-10-03T17:46:14.508",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/TapMonster.png",
+      "position": [
+        140,
+        525
+      ],
+      "region": [
+        21.353535353535356,
+        64.57386363636364,
+        49.35353535353536,
+        84.57386363636364
+      ]
+    },
+    {
+      "at": "2026-10-03T17:46:14.508",
+      "kind": "tap",
+      "x": 140,
+      "y": 525
+    },
+    {
+      "at": "2026-10-03T17:46:16.734",
+      "kind": "tap",
+      "x": 200,
+      "y": 670
+    },
+    {
+      "at": "2026-10-03T17:46:21.430",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/TapMonster.png",
+      "position": [
+        140,
+        525
+      ],
+      "region": [
+        21.353535353535356,
+        64.57386363636364,
+        49.35353535353536,
+        84.57386363636364
+      ]
+    },
+    {
+      "at": "2026-10-03T17:46:21.430",
+      "kind": "tap",
+      "x": 140,
+      "y": 525
+    },
+    {
+      "at": "2026-10-03T17:46:23.651",
+      "kind": "tap",
+      "x": 200,
+      "y": 670
+    },
+    {
+      "at": "2026-10-03T17:46:28.165",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/TapMonster.png",
+      "position": [
+        140,
+        525
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T17:46:28.165",
+      "kind": "key",
+      "key": "KEYCODE_BACK"
+    },
+    {
+      "at": "2026-10-03T17:46:33.679",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/FindMonster.png",
+      "position": [
+        134,
+        624
+      ],
+      "region": [
+        19.83838383838384,
+        78.63636363636364,
+        47.83838383838384,
+        98.63636363636364
+      ]
+    },
+    {
+      "at": "2026-10-03T17:46:35.699",
+      "kind": "tap",
+      "x": 134,
+      "y": 624
+    },
+    {
+      "at": "2026-10-03T17:46:38.227",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/TapMonster.png",
+      "position": [
+        140,
+        525
+      ],
+      "region": [
+        21.353535353535356,
+        64.57386363636364,
+        49.35353535353536,
+        84.57386363636364
+      ]
+    },
+    {
+      "at": "2026-10-03T17:46:38.227",
+      "kind": "tap",
+      "x": 140,
+      "y": 525
+    },
+    {
+      "at": "2026-10-03T17:46:40.473",
+      "kind": "tap",
+      "x": 200,
+      "y": 670
+    },
+    {
+      "at": "2026-10-03T17:46:44.989",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/AttackMonster.png",
+      "position": [
+        100,
+        285
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T17:46:45.216",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/AttackMonster.png",
+      "position": [
+        100,
+        285
+      ],
+      "region": [
+        11.252525252525253,
+        30.482954545454547,
+        39.25252525252525,
+        50.48295454545455
+      ]
+    },
+    {
+      "at": "2026-10-03T17:46:45.216",
+      "kind": "tap",
+      "x": 100,
+      "y": 285
+    },
+    {
+      "at": "2026-10-03T17:46:47.506",
+      "kind": "tap",
+      "x": 200,
+      "y": 500
+    },
+    {
+      "at": "2026-10-03T17:46:50.002",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/March.png",
+      "position": [
+        196,
+        40
+      ],
+      "region": [
+        35.494949494949495,
+        0,
+        63.494949494949495,
+        15.681818181818182
+      ]
+    },
+    {
+      "at": "2026-10-03T17:46:50.004",
+      "kind": "tap",
+      "x": 320,
+      "y": 520
+    },
+    {
+      "at": "2026-10-03T17:46:53.282",
+      "kind": "shell",
+      "command": "input keyevent KEYCODE_DEL"
+    },
+    {
+      "at": "2026-10-03T17:46:53.995",
+      "kind": "shell",
+      "command": "input keyevent KEYCODE_DEL"
+    },
+    {
+      "at": "2026-10-03T17:46:54.227",
+      "kind": "shell",
+      "command": "input keyevent KEYCODE_DEL"
+    },
+    {
+      "at": "2026-10-03T17:46:54.515",
+      "kind": "shell",
+      "command": "input keyevent KEYCODE_DEL"
+    },
+    {
+      "at": "2026-10-03T17:46:54.722",
+      "kind": "shell",
+      "command": "input keyevent KEYCODE_DEL"
+    },
+    {
+      "at": "2026-10-03T17:46:54.931",
+      "kind": "shell",
+      "command": "input keyevent KEYCODE_DEL"
+    },
+    {
+      "at": "2026-10-03T17:46:55.107",
+      "kind": "shell",
+      "command": "input keyevent KEYCODE_DEL"
+    },
+    {
+      "at": "2026-10-03T17:46:55.278",
+      "kind": "shell",
+      "command": "input keyevent KEYCODE_DEL"
+    },
+    {
+      "at": "2026-10-03T17:46:55.455",
+      "kind": "shell",
+      "command": "input text 100"
+    },
+    {
+      "at": "2026-10-03T17:46:55.659",
+      "kind": "shell",
+      "command": "input keyevent KEYCODE_ENTER"
+    },
+    {
+      "at": "2026-10-03T17:46:57.864",
+      "kind": "tap",
+      "x": 300,
+      "y": 660
+    },
+    {
+      "at": "2026-10-03T17:47:01.686",
+      "kind": "key",
+      "key": "KEYCODE_BACK"
+    },
+    {
+      "at": "2026-10-03T17:47:10.355",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/FindMonster.png",
+      "position": [
+        134,
+        624
+      ],
+      "region": [
+        19.83838383838384,
+        78.63636363636364,
+        47.83838383838384,
+        98.63636363636364
+      ]
+    },
+    {
+      "at": "2026-10-03T17:47:12.371",
+      "kind": "tap",
+      "x": 134,
+      "y": 624
+    },
+    {
+      "at": "2026-10-03T17:47:14.927",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/FindMonster.png",
+      "position": [
+        134,
+        624
+      ],
+      "region": [
+        19.83838383838384,
+        78.63636363636364,
+        47.83838383838384,
+        98.63636363636364
+      ]
+    },
+    {
+      "at": "2026-10-03T17:47:16.935",
+      "kind": "tap",
+      "x": 134,
+      "y": 624
+    },
+    {
+      "at": "2026-10-03T17:47:19.443",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/FindMonster.png",
+      "position": [
+        134,
+        624
+      ],
+      "region": [
+        19.83838383838384,
+        78.63636363636364,
+        47.83838383838384,
+        98.63636363636364
+      ]
+    },
+    {
+      "at": "2026-10-03T17:47:21.458",
+      "kind": "tap",
+      "x": 134,
+      "y": 624
+    },
+    {
+      "at": "2026-10-03T17:47:23.942",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/FindMonster.png",
+      "position": [
+        134,
+        624
+      ],
+      "region": [
+        19.83838383838384,
+        78.63636363636364,
+        47.83838383838384,
+        98.63636363636364
+      ]
+    },
+    {
+      "at": "2026-10-03T17:47:25.952",
+      "kind": "tap",
+      "x": 134,
+      "y": 624
+    },
+    {
+      "at": "2026-10-03T17:47:28.396",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/FindMonster.png",
+      "position": [
+        134,
+        624
+      ],
+      "region": [
+        19.83838383838384,
+        78.63636363636364,
+        47.83838383838384,
+        98.63636363636364
+      ]
+    },
+    {
+      "at": "2026-10-03T17:47:30.418",
+      "kind": "tap",
+      "x": 134,
+      "y": 624
+    },
+    {
+      "at": "2026-10-03T17:47:32.909",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/FindMonster.png",
+      "position": [
+        134,
+        624
+      ],
+      "region": [
+        19.83838383838384,
+        78.63636363636364,
+        47.83838383838384,
+        98.63636363636364
+      ]
+    },
+    {
+      "at": "2026-10-03T17:47:34.912",
+      "kind": "tap",
+      "x": 134,
+      "y": 624
+    },
+    {
+      "at": "2026-10-03T17:47:37.356",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/FindMonster.png",
+      "position": [
+        134,
+        624
+      ],
+      "region": [
+        19.83838383838384,
+        78.63636363636364,
+        47.83838383838384,
+        98.63636363636364
+      ]
+    },
+    {
+      "at": "2026-10-03T17:47:39.368",
+      "kind": "tap",
+      "x": 134,
+      "y": 624
+    },
+    {
+      "at": "2026-10-03T17:47:41.813",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/FindMonster.png",
+      "position": [
+        134,
+        624
+      ],
+      "region": [
+        19.83838383838384,
+        78.63636363636364,
+        47.83838383838384,
+        98.63636363636364
+      ]
+    },
+    {
+      "at": "2026-10-03T17:47:43.820",
+      "kind": "tap",
+      "x": 134,
+      "y": 624
+    },
+    {
+      "at": "2026-10-03T17:47:46.256",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/FindMonster.png",
+      "position": [
+        134,
+        624
+      ],
+      "region": [
+        19.83838383838384,
+        78.63636363636364,
+        47.83838383838384,
+        98.63636363636364
+      ]
+    },
+    {
+      "at": "2026-10-03T17:47:48.272",
+      "kind": "tap",
+      "x": 134,
+      "y": 624
+    },
+    {
+      "at": "2026-10-03T17:47:50.722",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/FindMonster.png",
+      "position": [
+        134,
+        624
+      ],
+      "region": [
+        19.83838383838384,
+        78.63636363636364,
+        47.83838383838384,
+        98.63636363636364
+      ]
+    },
+    {
+      "at": "2026-10-03T17:47:52.724",
+      "kind": "tap",
+      "x": 134,
+      "y": 624
+    },
+    {
+      "at": "2026-10-03T17:47:55.146",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/FindMonster.png",
+      "position": [
+        134,
+        624
+      ],
+      "region": [
+        19.83838383838384,
+        78.63636363636364,
+        47.83838383838384,
+        98.63636363636364
+      ]
+    },
+    {
+      "at": "2026-10-03T17:47:57.169",
+      "kind": "tap",
+      "x": 134,
+      "y": 624
+    },
+    {
+      "at": "2026-10-03T17:47:59.602",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/FindMonster.png",
+      "position": [
+        134,
+        624
+      ],
+      "region": [
+        19.83838383838384,
+        78.63636363636364,
+        47.83838383838384,
+        98.63636363636364
+      ]
+    },
+    {
+      "at": "2026-10-03T17:48:01.619",
+      "kind": "tap",
+      "x": 134,
+      "y": 624
+    },
+    {
+      "at": "2026-10-03T17:48:04.068",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/FindMonster.png",
+      "position": [
+        134,
+        624
+      ],
+      "region": [
+        19.83838383838384,
+        78.63636363636364,
+        47.83838383838384,
+        98.63636363636364
+      ]
+    },
+    {
+      "at": "2026-10-03T17:48:06.093",
+      "kind": "tap",
+      "x": 134,
+      "y": 624
+    },
+    {
+      "at": "2026-10-03T17:48:08.527",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/FindMonster.png",
+      "position": [
+        134,
+        624
+      ],
+      "region": [
+        19.83838383838384,
+        78.63636363636364,
+        47.83838383838384,
+        98.63636363636364
+      ]
+    },
+    {
+      "at": "2026-10-03T17:48:10.534",
+      "kind": "tap",
+      "x": 134,
+      "y": 624
+    },
+    {
+      "at": "2026-10-03T17:48:12.964",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/FindMonster.png",
+      "position": [
+        134,
+        624
+      ],
+      "region": [
+        19.83838383838384,
+        78.63636363636364,
+        47.83838383838384,
+        98.63636363636364
+      ]
+    },
+    {
+      "at": "2026-10-03T17:48:14.984",
+      "kind": "tap",
+      "x": 134,
+      "y": 624
+    },
+    {
+      "at": "2026-10-03T17:48:17.493",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/FindMonster.png",
+      "position": [
+        134,
+        624
+      ],
+      "region": [
+        19.83838383838384,
+        78.63636363636364,
+        47.83838383838384,
+        98.63636363636364
+      ]
+    },
+    {
+      "at": "2026-10-03T17:48:19.510",
+      "kind": "tap",
+      "x": 134,
+      "y": 624
+    },
+    {
+      "at": "2026-10-03T17:48:21.958",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/TapMonster.png",
+      "position": [
+        140,
+        525
+      ],
+      "region": [
+        21.353535353535356,
+        64.57386363636364,
+        49.35353535353536,
+        84.57386363636364
+      ]
+    },
+    {
+      "at": "2026-10-03T17:48:21.958",
+      "kind": "tap",
+      "x": 140,
+      "y": 525
+    },
+    {
+      "at": "2026-10-03T17:48:24.186",
+      "kind": "tap",
+      "x": 200,
+      "y": 670
+    },
+    {
+      "at": "2026-10-03T17:48:28.845",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/TapMonster.png",
+      "position": [
+        140,
+        525
+      ],
+      "region": [
+        21.353535353535356,
+        64.57386363636364,
+        49.35353535353536,
+        84.57386363636364
+      ]
+    },
+    {
+      "at": "2026-10-03T17:48:28.845",
+      "kind": "tap",
+      "x": 140,
+      "y": 525
+    },
+    {
+      "at": "2026-10-03T17:48:31.063",
+      "kind": "tap",
+      "x": 200,
+      "y": 670
+    },
+    {
+      "at": "2026-10-03T17:48:35.731",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/TapMonster.png",
+      "position": [
+        140,
+        525
+      ],
+      "region": [
+        21.353535353535356,
+        64.57386363636364,
+        49.35353535353536,
+        84.57386363636364
+      ]
+    },
+    {
+      "at": "2026-10-03T17:48:35.731",
+      "kind": "tap",
+      "x": 140,
+      "y": 525
+    },
+    {
+      "at": "2026-10-03T17:48:38.024",
+      "kind": "tap",
+      "x": 200,
+      "y": 670
+    },
+    {
+      "at": "2026-10-03T17:48:42.495",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/TapMonster.png",
+      "position": [
+        140,
+        525
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T17:48:42.495",
+      "kind": "key",
+      "key": "KEYCODE_BACK"
+    },
+    {
+      "at": "2026-10-03T17:48:48.112",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/FindMonster.png",
+      "position": [
+        134,
+        624
+      ],
+      "region": [
+        19.83838383838384,
+        78.63636363636364,
+        47.83838383838384,
+        98.63636363636364
+      ]
+    },
+    {
+      "at": "2026-10-03T17:48:50.121",
+      "kind": "tap",
+      "x": 134,
+      "y": 624
+    },
+    {
+      "at": "2026-10-03T17:48:52.735",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/TapMonster.png",
+      "position": [
+        140,
+        525
+      ],
+      "region": [
+        21.353535353535356,
+        64.57386363636364,
+        49.35353535353536,
+        84.57386363636364
+      ]
+    },
+    {
+      "at": "2026-10-03T17:48:52.735",
+      "kind": "tap",
+      "x": 140,
+      "y": 525
+    },
+    {
+      "at": "2026-10-03T17:48:55.021",
+      "kind": "tap",
+      "x": 200,
+      "y": 670
+    },
+    {
+      "at": "2026-10-03T17:48:59.905",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/TapMonster.png",
+      "position": [
+        140,
+        525
+      ],
+      "region": [
+        21.353535353535356,
+        64.57386363636364,
+        49.35353535353536,
+        84.57386363636364
+      ]
+    },
+    {
+      "at": "2026-10-03T17:48:59.905",
+      "kind": "tap",
+      "x": 140,
+      "y": 525
+    },
+    {
+      "at": "2026-10-03T17:49:02.216",
+      "kind": "tap",
+      "x": 200,
+      "y": 670
+    },
+    {
+      "at": "2026-10-03T17:49:06.728",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/AttackMonster.png",
+      "position": [
+        100,
+        285
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T17:49:06.941",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/AttackMonster.png",
+      "position": [
+        100,
+        285
+      ],
+      "region": [
+        11.252525252525253,
+        30.482954545454547,
+        39.25252525252525,
+        50.48295454545455
+      ]
+    }
+  ]
+}

@@ -1,0 +1,231 @@
+{
+  "task": "Monster Killing",
+  "serial": "127.0.0.1:21513",
+  "status": "TimedOut",
+  "completed": false,
+  "passes": 1,
+  "logs": [
+    "LIVE Monster Killing: pass 1/5",
+    "Daily Activities: Monster march 6/5 confirmed"
+  ],
+  "daily_done": [],
+  "events": [
+    {
+      "at": "2026-10-03T18:29:06.979",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/FindMonster.png",
+      "position": [
+        134,
+        624
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T18:29:08.992",
+      "kind": "tap",
+      "x": 134,
+      "y": 624
+    },
+    {
+      "at": "2026-10-03T18:29:11.604",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/TapMonster.png",
+      "position": [
+        140,
+        525
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T18:29:11.605",
+      "kind": "tap",
+      "x": 140,
+      "y": 525
+    },
+    {
+      "at": "2026-10-03T18:29:13.917",
+      "kind": "tap",
+      "x": 200,
+      "y": 670
+    },
+    {
+      "at": "2026-10-03T18:29:18.476",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/AttackMonster.png",
+      "position": [
+        100,
+        285
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T18:29:18.692",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/AttackMonster.png",
+      "position": [
+        100,
+        285
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T18:29:18.692",
+      "kind": "tap",
+      "x": 100,
+      "y": 285
+    },
+    {
+      "at": "2026-10-03T18:29:20.974",
+      "kind": "tap",
+      "x": 200,
+      "y": 500
+    },
+    {
+      "at": "2026-10-03T18:29:23.509",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/March.png",
+      "position": [
+        196,
+        40
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-03T18:29:23.512",
+      "kind": "tap",
+      "x": 320,
+      "y": 520
+    },
+    {
+      "at": "2026-10-03T18:29:26.824",
+      "kind": "shell",
+      "command": "input keyevent KEYCODE_DEL"
+    },
+    {
+      "at": "2026-10-03T18:29:27.160",
+      "kind": "shell",
+      "command": "input keyevent KEYCODE_DEL"
+    },
+    {
+      "at": "2026-10-03T18:29:27.488",
+      "kind": "shell",
+      "command": "input keyevent KEYCODE_DEL"
+    },
+    {
+      "at": "2026-10-03T18:29:27.796",
+      "kind": "shell",
+      "command": "input keyevent KEYCODE_DEL"
+    },
+    {
+      "at": "2026-10-03T18:29:28.108",
+      "kind": "shell",
+      "command": "input keyevent KEYCODE_DEL"
+    },
+    {
+      "at": "2026-10-03T18:29:28.456",
+      "kind": "shell",
+      "command": "input keyevent KEYCODE_DEL"
+    },
+    {
+      "at": "2026-10-03T18:29:28.743",
+      "kind": "shell",
+      "command": "input keyevent KEYCODE_DEL"
+    },
+    {
+      "at": "2026-10-03T18:29:29.056",
+      "kind": "shell",
+      "command": "input keyevent KEYCODE_DEL"
+    },
+    {
+      "at": "2026-10-03T18:29:29.381",
+      "kind": "shell",
+      "command": "input text 100"
+    },
+    {
+      "at": "2026-10-03T18:29:29.688",
+      "kind": "shell",
+      "command": "input keyevent KEYCODE_ENTER"
+    },
+    {
+      "at": "2026-10-03T18:29:32.028",
+      "kind": "tap",
+      "x": 300,
+      "y": 660
+    },
+    {
+      "at": "2026-10-03T18:29:35.971",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/FindMonster.png",
+      "position": [
+        134,
+        624
+      ],
+      "region": [
+        19.83838383838384,
+        78.63636363636364,
+        47.83838383838384,
+        98.63636363636364
+      ]
+    },
+    {
+      "at": "2026-10-03T18:29:37.981",
+      "kind": "tap",
+      "x": 134,
+      "y": 624
+    },
+    {
+      "at": "2026-10-03T18:29:40.557",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/TapMonster.png",
+      "position": [
+        140,
+        525
+      ],
+      "region": [
+        21.353535353535356,
+        64.57386363636364,
+        49.35353535353536,
+        84.57386363636364
+      ]
+    },
+    {
+      "at": "2026-10-03T18:29:40.557",
+      "kind": "tap",
+      "x": 140,
+      "y": 525
+    },
+    {
+      "at": "2026-10-03T18:29:42.867",
+      "kind": "tap",
+      "x": 200,
+      "y": 670
+    },
+    {
+      "at": "2026-10-03T18:29:47.684",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesAttackMonster/TapMonster.png",
+      "position": [
+        140,
+        525
+      ],
+      "region": [
+        21.353535353535356,
+        64.57386363636364,
+        49.35353535353536,
+        84.57386363636364
+      ]
+    },
+    {
+      "at": "2026-10-03T18:29:47.684",
+      "kind": "tap",
+      "x": 140,
+      "y": 525
+    },
+    {
+      "at": "2026-10-03T18:29:49.997",
+      "kind": "tap",
+      "x": 200,
+      "y": 670
+    }
+  ]
+}
