@@ -78,6 +78,9 @@ VARIANTS = {
     "no_blue": lambda bgr: _blank(555, 602, 70, 118)(_blank(555, 602, 225, 273)(bgr)),
     # Refine: thanh trang bị trống (không có món nào).
     "no_items": _blank(550, 606, 0, 396),
+    # Bấm nút event mà chưa vào được danh sách: không có tiêu đề "Wine Festival Event", không có
+    # icon King's Path (45, 512).
+    "no_list": lambda bgr: _blank(0, 45, 40, 356)(_blank(470, 555, 0, 100)(bgr)),
 }
 
 
@@ -86,6 +89,34 @@ def _run(testcase, flow, settings, **kw):
 
 
 class KingsPathFlow(unittest.TestCase):
+    def test_event_list_not_opened_retries(self):
+        """Bấm nút event mà không vào được danh sách (không thấy tiêu đề, cuộn hết không thấy icon ->
+        Back): thử lại thêm 2 lần (EVENT_OPEN_RETRIES), vẫn không được thì bỏ nhiệm vụ."""
+        flow = [
+            *[step for _ in range(3) for step in (
+                Step("03_main.png?main_claimed", tap_at(*EVENT_BUTTON)),
+                Step("04_event_list.png?no_list", *[swipe(50, 80, 50, 50) for _ in range(4)], back()),
+            )],
+            Step("03_main.png?main_claimed", end()),
+        ]
+        device = _run(self, flow, {wheel.KEY: {"value": 100, "day": 4}})
+        self.assertIn("Wheel: event list not opened after 3 tries, skip to next task", device.logs)
+        self.assertNotIn(wheel.KEY, device.daily_done)
+
+    def test_event_list_retry_then_open(self):
+        """Lần đầu không vào được danh sách -> thử lại -> lần 2 vào được, mở King's Path như thường."""
+        flow = [
+            Step("03_main.png?main_claimed", tap_at(*EVENT_BUTTON)),
+            Step("04_event_list.png?no_list", *[swipe(50, 80, 50, 50) for _ in range(4)], back()),
+            Step("03_main.png?main_claimed", tap_at(*EVENT_BUTTON)),
+            Step("04_event_list.png", tap(KINGS_PATH_ICON)),
+            Step("day4_fortune_wheel.png", tap_at(335, 344)),
+            Step("wheel_of_fortune.png", tap(SPINS_100), back(), end()),
+        ]
+        device = _run(self, flow, {wheel.KEY: {"value": 100, "day": 4}})
+        self.assertIn("Wheel: event list not opened, retry 1/2", device.logs)
+        self.assertIn(wheel.KEY, device.daily_done)
+
     def test_open_from_main(self):
         """Màn chính -> nút dưới Event Center -> danh sách event (đã cuộn, King's Path ở dưới)
         -> icon King's Path -> màn King's Path Day 4 -> tab Fortune Wheel đang chọn -> Go."""
