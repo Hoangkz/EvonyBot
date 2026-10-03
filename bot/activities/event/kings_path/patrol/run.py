@@ -15,7 +15,8 @@ mai làm tiếp (tiến độ game lưu ở dòng Go, lượt sau đọc lại).
 import cv2
 import numpy as np
 
-from ...common import EventState, mark_complete
+from ...city_building import WALLS
+from ...common import EventState, mark_target_reached
 from .. import path_task
 from ..building import open_building
 from .constants import (
@@ -60,7 +61,7 @@ def rounds_today(bot) -> int:
 
 def _patrol(bot, path, done, target):
     """Sau Go: mở màn Patrol rồi patrol từng lượt (Select All -> Patrol -> Refresh)."""
-    if not open_building(bot, NAME, MENU_PATROL, PATROL_TITLE):
+    if not open_building(bot, NAME, WALLS, MENU_PATROL, PATROL_TITLE):
         return
     progress = done or 0
     refreshed = False   # vừa bấm Refresh, chưa thấy bộ phần thưởng mới
@@ -115,7 +116,7 @@ def _finish(bot, path, message: str, complete: bool = False):
     bot.log(f"{NAME}: {message}")
     bot.back(delay=1)
     if complete:
-        mark_complete(bot, path.key)
+        mark_target_reached(bot, path.key)
     else:
         bot.mark_daily_done(path.key)
 

@@ -16,7 +16,8 @@ Bị ngắt giữa chừng: lượt sau đọc lại số đã làm ở dòng Go
 """
 import math
 
-from ...common import EventState, mark_complete
+from ...city_building import MARKET
+from ...common import EventState, mark_target_reached
 from .. import path_task
 from ..building import open_building
 from .constants import (
@@ -69,7 +70,7 @@ def _tax(bot, path, done, target):
         return
     counts = split_counts(target - done)
     bot.log(f"{NAME}: done {done}, target {target}, tax {counts}")
-    if not open_building(bot, NAME, TAX_MENU, TAX_SCREEN):
+    if not open_building(bot, NAME, MARKET, TAX_MENU, TAX_SCREEN):
         return
     for row, count in enumerate(counts):
         if count == 0:
@@ -80,7 +81,7 @@ def _tax(bot, path, done, target):
         if not result:
             return None
     bot.record(f"{NAME}: all rows taxed, done")
-    mark_complete(bot, path.key)
+    mark_target_reached(bot, path.key)
     return None
 
 

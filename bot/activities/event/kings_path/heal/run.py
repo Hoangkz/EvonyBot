@@ -21,6 +21,7 @@ Hospital "Wounded Troops 0/0" không có dòng lính nào (heal_empty.png).
 """
 from .....ocr import read_heal_count
 from .....ocr.read_heal_count import CROP as HEAL_COUNT_CROP
+from ...city_building import HOSPITAL
 from ...common import EventState
 from ...gather_troops.train_troop.constants import (
     CHECKBOX_OFF,
@@ -73,7 +74,7 @@ _SPEED_UP, _HEAL, _EMPTY = "speed_up", "heal", "empty"
 def _heal(bot, path, done, target):
     """Sau Go: menu Bệnh viện -> Speed Up hoặc Heal; xong trả AGAIN (đọc lại tiến độ)."""
     # Upgrade có cả ở menu rảnh -> xét sau cùng: không có Speed Up, không có Heal mà có Upgrade.
-    action, pos = open_menu(bot, NAME, {_SPEED_UP: MENU_SPEED_UP, _HEAL: MENU_HEAL,
+    action, pos = open_menu(bot, NAME, HOSPITAL, {_SPEED_UP: MENU_SPEED_UP, _HEAL: MENU_HEAL,
                                         _EMPTY: MENU_UPGRADE})
     if action == _EMPTY:
         return _no_wounded(bot, path)

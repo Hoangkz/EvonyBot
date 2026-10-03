@@ -27,10 +27,11 @@ Flow:
      Speedup -> Finish All như bước 10 (không tính) -> về lại thành (công trình vẫn ở giữa)
      -> làm lại bước 6 (bấm giữa màn hình), lúc này menu có "Train".
    - Có icon "Train": bấm -> màn Train.
-8. Màn Train: chọn cấp (troop_tier.choose_tier): bấm cấp phải nhất để đi lên (cấp vừa bấm
-   nhảy ra giữa) tới khi thấy cấp người dùng chọn hoặc thấy ổ khoá; cấp chọn bị khoá thì
-   lấy cấp mở cao nhất dưới nó, mục tiêu đổi theo cấp đó (bảng trong event.json). Cấp 7
-   cũng khoá -> lưu "chưa thể thực hiện" (locked_key) và dừng.
+8. Màn Train (nhận ra bằng nút "i" góc trên, TRAIN_INFO — không dùng hình lính, khác nhau theo
+   nền văn minh): chọn cấp (troop_tier.choose_tier): đọc cấp vòng đang chọn ở huy hiệu số La Mã
+   cạnh tên lính, bấm vòng cách giữa 1 .. 2 ô về phía cấp người dùng chọn rồi đọc lại; cấp chọn
+   bị khoá (không có nút "+") thì lấy cấp mở cao nhất dưới nó, mục tiêu đổi theo cấp đó (bảng
+   trong event.json). Cấp 7 cũng khoá -> lưu "chưa thể thực hiện" (locked_key) và dừng.
 9. Đọc số lính tối đa một lần train (ô bên phải nút "+"), tính số lần bấm Train
    (VD 10000 / 1500 -> 7 lần).
     Vừa vào màn Train đã có mẻ đang train sẵn (nút là "Training Speedup"): Finish All mẻ đó
@@ -45,22 +46,24 @@ from dataclasses import dataclass, field
 
 from .....context.templates import TEMPLATE_DIR
 from .....ocr import read_train_count
+from ...city_building import remember_building, tap_building
 from ...common import (
     EVENT_OPENED,
     HANDLED,
     STOP,
     EventState,
     day_locked,
+    is_done_today,
     mark_complete,
+    mark_target_reached,
     nearest_go,
     read_go_progress,
     run_task,
 )
 from ...constants import GATHER_TROOPS_ICON, THRESHOLDS as EVENT_THRESHOLDS
-from ..troop_tier import TIER_ROW_REGION, TIER_THRESHOLD, choose_tier
+from ..troop_tier import choose_tier
 from .constants import (
     BUTTON_WAIT,
-    CENTER,
     CENTER_TAP_EXTRA,
     CHECKBOX_OFF,
     CONFIRM,
@@ -90,6 +93,8 @@ from .constants import (
     TRAIN_BUTTON_POS,
     TRAIN_BUTTON_REGION,
     TRAIN_COUNT_BOX,
+    TRAIN_INFO,
+    TRAIN_INFO_REGION,
     TRAIN_THRESHOLD,
     TRAIN_WAIT,
     TRAINING_SPEEDUP,
@@ -110,6 +115,8 @@ class TroopTask:
     # {cấp: ảnh cấp lính} (troop_tier.tier_images), hoặc {cấp: [ảnh từng loại]} khi một cấp
     # có nhiều vòng tròn (bẫy: troop_tier.kind_images)
     tiers: dict
+    # Công trình game kéo vào giữa sau khi bấm Go (tên thư mục ảnh trong city_building.py).
+    building: str
     # Ngưỡng riêng của ảnh tab Day / tab phụ (đo chéo chưa chọn - đang chọn).
     thresholds: dict[str, float] = field(default_factory=dict)
     lowest: int = LOWEST_TIER     # cấp thấp nhất nhiệm vụ tính ("tier 7 and above")
@@ -134,7 +141,7 @@ def run(bot, task: dict, state: EventState, troop: TroopTask):
     if not (TEMPLATE_DIR / troop.event_icon).exists():
         bot.log(f"{name}: no event icon image yet ({troop.event_icon}), skipped")
         return
-    if bot.is_daily_done(key):
+    if is_done_today(bot, key):
         bot.log(f"{name}: already done")
         return
     if bot.is_daily_done(locked_key):
@@ -194,7 +201,7 @@ def run(bot, task: dict, state: EventState, troop: TroopTask):
                 bot.log(f"{name}: done {done}, remaining {max(0, target - done)}")
             bot.tap(*go, delay=GO_WAIT)
             progress["went"] = True
-            _open_building_menu(bot, name, troop.menu_icon)
+            _open_building_menu(bot, name, troop.building, troop.menu_icon)
         elif action == ON_SPEED_UP_MENU:
             # Công trình đang train (không phải của nhiệm vụ): Finish All ở màn speedup rồi
             # mở lại menu (xem nhánh ON_SPEEDUP).
@@ -239,7 +246,7 @@ def run(bot, task: dict, state: EventState, troop: TroopTask):
                     # Mở từ menu công trình: Finish All đưa về lại thành (công trình vẫn ở
                     # giữa) chứ không về màn Train -> mở lại menu như sau khi bấm Go.
                     plan.from_menu = False
-                    _open_building_menu(bot, name, troop.menu_icon)
+                    _open_building_menu(bot, name, troop.building, troop.menu_icon)
         else:
             return None
         return HANDLED
@@ -255,20 +262,25 @@ _AFTER_GO_ACTIONS = (ON_SPEED_UP_MENU, ON_TRAIN_MENU, ON_TRAIN_SCREEN, ON_FINISH
                      ON_SPEEDUP)
 
 
-def _open_building_menu(bot, name: str, menu_icon: str = TRAIN):
-    """Sau khi bấm Go (công trình ở giữa màn hình): bấm giữa màn hình (mỗi lần bấm giữa chờ
-    thêm CENTER_TAP_EXTRA giây cho menu hiện); thấy icon Train thì
-    chờ MENU_WAIT giây, không thấy thì chờ MENU_WAIT giây, bấm thêm 1 lần rồi chờ
-    MENU_WAIT giây. Vòng lặp kế tiếp tự nhận ra menu (ON_TRAIN_MENU)."""
-    bot.tap_percent(*CENTER, delay=MENU_CHECK_DELAY + CENTER_TAP_EXTRA)
-    screen = bot.screenshot()
-    if (bot.find(SPEED_UP, threshold=TRAIN_THRESHOLD, screen=screen) is not None
-            or bot.find(menu_icon, threshold=TRAIN_THRESHOLD, screen=screen) is not None):
-        bot.sleep(MENU_WAIT)
-        return
-    bot.log(f"{name}: Train menu not shown, tapping center again")
-    bot.sleep(MENU_WAIT)
-    bot.tap_percent(*CENTER, delay=MENU_WAIT + CENTER_TAP_EXTRA)
+def _open_building_menu(bot, name: str, building: str, menu_icon: str = TRAIN, also=()):
+    """Sau khi bấm Go (công trình ở giữa màn hình): tap_building (tìm ảnh đã học của
+    `building` / `also`, bấm giữa, chờ thêm CENTER_TAP_EXTRA giây cho menu hiện); thấy icon
+    Train / Speed Up thì lưu ảnh công trình nếu chưa nhận ra (../../city_building.py) rồi chờ
+    MENU_WAIT giây, không thấy thì chờ MENU_WAIT giây, làm lại 1 lần rồi chờ MENU_WAIT giây.
+    Vòng lặp kế tiếp tự nhận ra menu (ON_TRAIN_MENU)."""
+    for attempt in range(2):
+        if attempt:
+            bot.log(f"{name}: Train menu not shown, tapping center again")
+            bot.sleep(MENU_WAIT)
+        delay = MENU_CHECK_DELAY + CENTER_TAP_EXTRA if not attempt else MENU_WAIT + CENTER_TAP_EXTRA
+        tap = tap_building(bot, name, building, delay=delay, also=also)
+        screen = bot.screenshot()
+        if (bot.find(SPEED_UP, threshold=TRAIN_THRESHOLD, screen=screen) is not None
+                or bot.find(menu_icon, threshold=TRAIN_THRESHOLD, screen=screen) is not None):
+            remember_building(bot, name, tap)
+            if not attempt:
+                bot.sleep(MENU_WAIT)
+            return
 
 
 @dataclass
@@ -286,7 +298,7 @@ def _plan_batches(bot, plan: _Plan, count: int, name: str, key: str) -> bool:
     được hoặc không cần train nữa (đã đánh dấu xong)."""
     if count <= 0:
         bot.log(f"{name}: nothing left to train, done")
-        mark_complete(bot, key)
+        mark_target_reached(bot, key)
         return False
     batch = read_train_count(bot.crop(bot.screenshot(), *TRAIN_COUNT_BOX))
     if not batch:
@@ -310,7 +322,7 @@ def _train_step(bot, plan: _Plan, name: str, key: str):
         bot.tap(*TRAIN_BUTTON_POS, delay=BUTTON_WAIT)     # không nhận ra nút: bấm chỗ nút
     elif plan.started >= plan.times:
         bot.record(f"{name}: trained {plan.started} batch(es), done")
-        mark_complete(bot, key)
+        mark_target_reached(bot, key)
         return STOP
     else:
         plan.started += 1
@@ -347,7 +359,7 @@ def _targets(troop: TroopTask) -> list[tuple[str, str]]:
     return [
         (FINISH_ALL_TITLE, ON_FINISH_ALL_DIALOG),
         (troop.speedup_title, ON_SPEEDUP),
-        *[(path, ON_TRAIN_SCREEN) for path in _tier_paths(troop)],
+        (TRAIN_INFO, ON_TRAIN_SCREEN),
         (SPEED_UP, ON_SPEED_UP_MENU),   # trước TRAIN: icon "View" của menu này khớp nhầm TRAIN
         (troop.menu_icon, ON_TRAIN_MENU),
         (troop.tab_selected, ON_TAB),
@@ -356,14 +368,8 @@ def _targets(troop: TroopTask) -> list[tuple[str, str]]:
     ]
 
 
-def _tier_paths(troop: TroopTask) -> list[str]:
-    """Mọi ảnh vòng tròn cấp (một hoặc nhiều ảnh mỗi cấp)."""
-    return [path for paths in troop.tiers.values()
-            for path in ([paths] if isinstance(paths, str) else paths)]
-
-
 def _regions(troop: TroopTask) -> dict[str, tuple]:
-    return {path: TIER_ROW_REGION for path in _tier_paths(troop)}
+    return {TRAIN_INFO: TRAIN_INFO_REGION}
 
 
 def _thresholds(troop: TroopTask) -> dict[str, float]:
@@ -372,5 +378,4 @@ def _thresholds(troop: TroopTask) -> dict[str, float]:
         troop.menu_icon: TRAIN_THRESHOLD,
         SPEED_UP: TRAIN_THRESHOLD,
         **troop.thresholds,
-        **{path: TIER_THRESHOLD for path in _tier_paths(troop)},
     }

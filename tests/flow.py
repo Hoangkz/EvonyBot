@@ -8,6 +8,7 @@ làm xong bước cuối harness bật Stop và activity phải ném StopRequest
 
 Thời gian là đồng hồ giả: sleep/delay không chờ thật, nên test chạy nhanh.
 """
+import tempfile
 import threading
 import time
 from pathlib import Path
@@ -17,6 +18,7 @@ import cv2
 import numpy as np
 from PIL import Image
 
+from bot.activities.event import city_building, constants as event_constants
 from bot.context import TEMPLATE_DIR, BotContext, StopRequested, TimedOut
 
 TAP_THRESHOLD = 0.8     # điểm khớp tối thiểu để coi template có trên ảnh
@@ -319,11 +321,18 @@ def run_flow(testcase, run, screens_dir: Path, flow: list[Step], settings: dict,
     done = dict(daily_done or {})
     ctx.is_daily_done = lambda task: task in done
     ctx.mark_daily_done = lambda task: done.__setitem__(task, "flow-test")
+    ctx.daily_keys = lambda: list(done)
     device.daily_done = done
     device.logs = logs
     device.ctx = ctx
 
-    with mock.patch.object(time, "monotonic", clock):
+    # Ảnh công trình / tiêu đề bot tự học ghi vào thư mục tạm của từng lần chạy, không vào
+    # %LOCALAPPDATA% thật; test cần ảnh học sẵn thì chép vào trong `setup`.
+    with tempfile.TemporaryDirectory() as learned, \
+            mock.patch.object(city_building, "LEARNED_DIR", Path(learned)), \
+            mock.patch.object(event_constants, "LEARNED_TITLES_DIR", Path(learned) / "titles"), \
+            mock.patch.object(time, "monotonic", clock):
+        device.learned_dir = Path(learned)
         if setup is not None:
             setup(ctx)
         ctx._deadline = clock.now + STUCK_SECONDS * len(flow)

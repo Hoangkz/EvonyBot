@@ -2,6 +2,7 @@
 constants.py — ảnh riêng của nhiệm vụ Train Troop (King's Path, Day 3). Màn Train /
 Training Speedup dùng chung với Gather Troops: xem gather_troops/train_troop/constants.py.
 """
+from ...gather_troops.train_troop.constants import TRAIN_INFO, TRAIN_INFO_REGION  # noqa: F401
 from ..constants import DAY_TABS, DAY_THRESHOLD, KP, TAB_THRESHOLD
 
 # Ô chọn ở group King's Path: {"value": số lính, "day": 3}.
@@ -15,15 +16,11 @@ TAB = f"{KP}/Tab/strongTroops.png"
 TAB_SELECTED = f"{KP}/Tab/strongTroopsSelected.png"
 
 # Go -> game mở ngẫu nhiên công trình train của 1 trong 4 loại lính (bộ / kỵ / cung / xe).
-# Nhiệm vụ tính mọi cấp lính -> luôn train cấp I (rẻ, nhanh nhất): ảnh cấp I của cả 4 loại, loại
-# nào thấy trước cũng được (troop_tier.choose_first_tier vuốt hàng cấp sang trái tới khi thấy).
+# Nhiệm vụ tính mọi cấp lính -> luôn train cấp I (rẻ, nhanh nhất), đọc cấp bằng huy hiệu số La Mã
+# (gather_troops/troop_tier.py), loại lính nào cũng được. Ảnh cấp I cũ của 4 loại giữ lại cho test.
 KINDS = ("GroundTroop", "MountedTroop", "RangedTroop", "SiegeMachine")
 TIERS = {1: [f"Event/GatherTroops/{kind}/Tier/1.png" for kind in KINDS]}
-# Nhận ra màn Train (mở ở loại / cấp bất kỳ, VD trường bắn cấp IV — train_ranged_t04.png): nút "i"
-# tròn góc trên (320, 45), giống nhau ở mọi màn Train: 50 màn Train (cả bẫy) 1,00; màn khác <= 0,36.
-# Chỉ tìm trong vùng góc trên phải (% màn hình).
-TRAIN_INFO = "Event/GatherTroops/Train/info.png"
-TRAIN_INFO_REGION = (70, 2, 91, 12)
+# Nhận ra màn Train: TRAIN_INFO (nút "i"), xem gather_troops/train_troop/constants.py.
 # Chọn cấp I (tier.py): vuốt hàng cấp sang trái (ngón tay kéo trái -> phải, % màn hình; hàng ở
 # y ~452 = 64%) về phía cấp I, sau mỗi lần vuốt chờ rồi kiểm tra; tối đa FIRST_TIER_SWIPES lần.
 # Cấp I hiện trên hàng: ảnh cấp I khớp 0,98 .. 1,00; chỉ có cấp cao hơn: <= 0,46.

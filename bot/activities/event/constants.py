@@ -1,6 +1,9 @@
 """
 constants.py — Event image folders, limits and action names.
 """
+import os
+from pathlib import Path
+
 from . import milestones
 
 EV = "Event"
@@ -91,6 +94,13 @@ EVENT_OPEN_RETRIES = 2
 # ô. Khớp 1,00 trên 7 ảnh 04_event_list.png; 315 màn khác <= 0,49. Bấm nút event xong chờ tối đa
 # EVENT_LIST_WAIT giây; không thấy (đổi đợt lễ hội / chưa tải) vẫn cuộn tìm icon (open_event).
 EVENT_LIST_TITLE = f"{EV}/EventList/title.png"
+# Tiêu đề danh sách event của các đợt lễ hội khác: <n>.png.
+# - EVENT_LIST_TITLES_DIR (trong Images/, có trong bản build): ảnh thêm tay.
+# - LEARNED_TITLES_DIR (%LOCALAPPDATA%, riêng từng máy, giữ qua các lần cập nhật app — Images/ bị
+#   thay mỗi lần cập nhật): ảnh bot tự thêm (add_title). Test đổi biến này sang thư mục tạm.
+# Kiểm tra màn danh sách event = so với title.png và mọi ảnh trong hai thư mục (event_list_titles).
+EVENT_LIST_TITLES_DIR = f"{EV}/EventList/Title"
+LEARNED_TITLES_DIR = Path(os.environ.get("LOCALAPPDATA", Path.home())) / "EvonyBot" / "titles" / "event_list"
 # ---- Rương Login Rewards ở đầu danh sách event (claim_login_reward trong common.py) ----------
 # Mỗi ngày kiểm 1 lần (daily_done LOGIN_REWARD_KEY, tới lần reset server): tìm đầu thanh tiến độ
 # màu cam dưới hàng rương (progressTip.png, (122, 306) trên event_list_reward.png: 1,00; (68, 306)
@@ -110,15 +120,16 @@ CHEST_FROM_TIP = (-40, -70, 70, 50)   # (dx, dy, w, h) ô tìm rương so với 
 CHEST_TAP = (0, -35)                  # bấm (đầu thanh x, đầu thanh y - 35): lên rương hôm nay
 CHEST_WAIT = 2   # sau khi bấm rương (mọi bước chờ 2-3 s)
 # ---- Voyage to Civilizations trong danh sách event (open_voyage trong common.py) -----------
-# Mỗi ngày bấm Free 1 lần (daily_done VOYAGE_KEY, tới lần reset server; không xét chấm đỏ): hôm nay
-# đã bấm Free thì không vào. Chưa bấm: thấy icon Voyage (phần dưới trái icon con tàu, bỏ góc chấm đỏ: 1,00 trên mọi màn danh
-# sách có Voyage, icon event khác <= 0,56) -> bấm vào -> màn Voyage to Civilizations:
+# Mỗi ngày vào 1 lần (daily_done VOYAGE_KEY, tới lần reset server; không xét chấm đỏ): hôm nay đã
+# vào thì không vào nữa. Chưa vào: thấy icon Voyage (phần dưới trái icon con tàu, bỏ góc chấm đỏ: 1,00
+# trên mọi màn danh sách có Voyage, có hay không chấm đỏ; icon event khác <= 0,56; các màn Voyage
+# <= 0,49) -> bấm vào, lưu VOYAGE_KEY ngay (có Free hay không) -> màn Voyage to Civilizations:
 # 1. Ô "Skip animation" (281, 622) chưa tích -> bấm tích.
-# 2. Nút "Voyage Once" có chữ "Free" -> bấm 1 lần (mỗi ngày 1 lượt miễn phí).
-# 3. Đã bấm Free -> lưu VOYAGE_KEY. Không thấy Free -> KHÔNG lưu (vẫn tính là chưa bấm, lần sau vào
-#    kiểm lại). Back về danh sách event (tối đa VOYAGE_BACKS lần, tới khi thấy
-#    tiêu đề danh sách). Sau khi bấm Free: popup "Congratulations" (voyage_congrats.png) -> Back 1 đóng
-#    popup, về màn Voyage hết Free (voyage_no_free.png) -> Back 2 về danh sách.
+# 2. Nút "Voyage Once" có chữ "Free" -> bấm 1 lần (mỗi ngày 1 lượt miễn phí); không có thì thôi.
+# 3. Back về danh sách event (tối đa VOYAGE_BACKS lần, tới khi thấy tiêu đề danh sách hoặc icon
+#    Voyage — tiêu đề đổi theo đợt lễ hội). Sau khi bấm Free: popup "Congratulations"
+#    (voyage_congrats.png) -> Back 1 đóng popup, về màn Voyage hết Free (voyage_no_free.png) -> Back 2
+#    về danh sách.
 VOYAGE_ICON = f"{EV}/Voyage/icon.png"
 VOYAGE_THRESHOLD = 0.8
 VOYAGE_KEY = "event_voyage"
@@ -156,13 +167,14 @@ GATHER_TROOPS_TITLE = f"{EV}/GatherTroops/title.png"
 KINGS_PATH_TITLE = f"{EV}/KingsPath/title.png"
 EVENT_TITLE_REGION = (20, 0, 80, 8)   # % màn hình: thanh tiêu đề
 
-# ---- Tự cập nhật ảnh tiêu đề (open_event trong common.py) --------------------------------
+# ---- Tự thêm ảnh tiêu đề (open_event trong common.py) ------------------------------------
 # Không thấy tiêu đề danh sách event (VD đổi đợt lễ hội: "Wine Festival Event" -> tên khác) sau
 # khi bấm nút event: vẫn cuộn tìm icon như thường, chỉ nhớ là không thấy (biến tạm, không lưu DB);
 # gặp icon King's Path / Gather Troops = đúng là danh sách event -> chụp màn, cắt ô tiêu đề
-# EVENT_LIST_TITLE_BOX (x, y, w, h — đúng chỗ đã cắt ảnh mẫu) ghi đè ảnh mẫu. Chỉ ghi khi ảnh cắt
-# khác ảnh mẫu (điểm < TITLE_SAME) và không phải vùng trơn (độ lệch chuẩn >= TITLE_MIN_STD, VD màn
-# đen lúc đang tải).
+# EVENT_LIST_TITLE_BOX (x, y, w, h — đúng chỗ đã cắt ảnh mẫu) lưu thành ảnh MỚI trong
+# LEARNED_TITLES_DIR (không ghi đè ảnh cũ: đợt lễ hội cũ quay lại vẫn nhận ra). Chỉ lưu khi ảnh
+# cắt khác mọi ảnh tiêu đề đã có (điểm < TITLE_SAME) và không phải vùng trơn (độ lệch chuẩn >=
+# TITLE_MIN_STD, VD màn đen lúc đang tải).
 EVENT_LIST_TITLE_BOX = (60, 8, 276, 30)
 REFRESH_TITLE_ICONS = (GATHER_TROOPS_ICON, KINGS_PATH_ICON)
 TITLE_SAME = 0.9

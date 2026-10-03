@@ -38,7 +38,9 @@ from ..common import (
     STOP,
     EventState,
     day_locked,
+    is_done_today,
     mark_complete,
+    mark_target_reached,
     read_go_progress,
     run_task,
 )
@@ -97,7 +99,7 @@ def run(bot, task: dict, state: EventState, path: PathTask):
     if not (TEMPLATE_DIR / KINGS_PATH_ICON).exists():
         bot.log(f"{name}: no King's Path icon image yet ({KINGS_PATH_ICON}), skipped")
         return
-    if bot.is_daily_done(key):
+    if is_done_today(bot, key):
         bot.log(f"{name}: already done")
         return
     if bot.is_daily_done(path.locked_key):
@@ -144,7 +146,7 @@ def run(bot, task: dict, state: EventState, path: PathTask):
                 bot.log(f"{name}: done {done}, target {target}")
                 if done >= target:
                     bot.record(f"{name}: target reached, done")
-                    mark_complete(bot, key)
+                    mark_target_reached(bot, key)
                     return STOP
             bot.tap(*go, delay=GO_WAIT)
             if path.after_go is None:

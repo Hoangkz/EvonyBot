@@ -18,16 +18,19 @@ Flow: màn chính -> Event Center -> King's Path (run_task) -> Day 3 (khoá -> _
 Strong Troops -> Go (OCR số đã làm; không còn Go -> xong) -> bấm giữa -> menu công trình (Speed Up
 -> Finish All mẻ đang train, không tính / Train) -> màn Train -> cấp I -> số mẻ = (mục tiêu - đã
 làm) / số lính mỗi mẻ -> mỗi mẻ: Train -> Training Speedup -> (lần đầu Speedup Settings) Finish
-All -> đủ mẻ -> xong (mark_complete).
+All -> đủ mẻ -> xong (mark_target_reached; hết Go -> mark_complete).
 """
 from .....context.templates import TEMPLATE_DIR
+from ...city_building import TROOP, TROOP_BUILDINGS
 from ...common import (
     EVENT_OPENED,
     HANDLED,
     STOP,
     EventState,
     day_locked,
+    is_done_today,
     mark_complete,
+    mark_target_reached,
     nearest_go,
     read_go_progress,
     run_task,
@@ -93,7 +96,7 @@ def run(bot, task: dict, state: EventState):
     if not (TEMPLATE_DIR / KINGS_PATH_ICON).exists():
         bot.log(f"{NAME}: no event icon image yet ({KINGS_PATH_ICON}), skipped")
         return
-    if bot.is_daily_done(KEY):
+    if is_done_today(bot, KEY):
         bot.log(f"{NAME}: already done")
         return
     if bot.is_daily_done(LOCKED_KEY):
@@ -142,9 +145,14 @@ def run(bot, task: dict, state: EventState):
                 bot.record(f"{NAME}: cannot read progress")
             else:
                 bot.log(f"{NAME}: done {done}, remaining {max(0, target - done)}")
+                if done >= target:
+                    # Đã đủ số lính người dùng chọn (count = 0): không bấm Go, xong luôn.
+                    bot.log(f"{NAME}: target {target} reached, done without Go")
+                    mark_target_reached(bot, KEY)
+                    return STOP
             bot.tap(*go, delay=GO_WAIT)
             progress["went"] = True
-            _open_building_menu(bot, NAME, TRAIN)
+            _open_building_menu(bot, NAME, TROOP, TRAIN, also=TROOP_BUILDINGS)
         elif action == ON_SPEED_UP_MENU:
             bot.log(f"{NAME}: building already training, Speed Up from menu (not counted)")
             bot.tap(*pos, delay=BUTTON_WAIT)
@@ -179,7 +187,7 @@ def run(bot, task: dict, state: EventState):
                 bot.tap(*_pos_of(bot, screen, FINISH_ALL, FINISH_ALL_POS), delay=FINISH_WAIT)
                 if plan.from_menu:
                     plan.from_menu = False
-                    _open_building_menu(bot, NAME, TRAIN)
+                    _open_building_menu(bot, NAME, TROOP, TRAIN, also=TROOP_BUILDINGS)
         else:
             return None
         return HANDLED

@@ -63,6 +63,7 @@ CREATE TABLE IF NOT EXISTS devices (
     serial      TEXT PRIMARY KEY,
     server      TEXT,
     bubble_until TEXT,
+    civilization INTEGER,
     {json_columns},
     created_at  TEXT NOT NULL,
     updated_at  TEXT NOT NULL
@@ -148,6 +149,8 @@ def _add_missing_columns(conn: sqlite3.Connection):
     columns = {row["name"] for row in conn.execute("PRAGMA table_info(devices)")}
     if "bubble_until" not in columns:
         conn.execute("ALTER TABLE devices ADD COLUMN bubble_until TEXT")
+    if "civilization" not in columns:
+        conn.execute("ALTER TABLE devices ADD COLUMN civilization INTEGER")
 
 
 class Database:
@@ -265,6 +268,14 @@ class Database:
             (bubble_until or None, now, serial),
         ))
 
+    def set_civilization(self, serial: str, civilization: int):
+        """Lưu nền văn minh (1 .. 7) bot tự xếp cho thiết bị từ ảnh công trình."""
+        now = _now()
+        self._write(lambda conn: conn.execute(
+            "UPDATE devices SET civilization = ?, updated_at = ? WHERE serial = ?",
+            (civilization or None, now, serial),
+        ))
+
     # ---- settings ----------------------------------------------------
     def save_settings(self, serial: str, settings: dict):
         """Save a DeviceView.get_settings()-style dict (keyed by tab title)."""
@@ -290,6 +301,7 @@ class Database:
         result = {tab: data for tab, data in result.items() if data}
         result.setdefault(INIT_TAB, {})["server"] = row["server"] or ""
         result[INIT_TAB]["bubble_until"] = row["bubble_until"] or ""
+        result[INIT_TAB]["civilization"] = row["civilization"]
         return result
 
     # ---- daily task progress -----------------------------------------
@@ -366,9 +378,9 @@ def _save_settings(conn: sqlite3.Connection, serial: str, settings: dict, now: s
             if "server" in data:
                 conn.execute("UPDATE devices SET server = ? WHERE serial = ?",
                              (data["server"] or None, serial))
-            # bubble_until chỉ được ghi qua set_*, không sao chép qua Apply ALL.
+            # bubble_until / civilization chỉ được ghi qua set_*, không sao chép qua Apply ALL.
             data = {k: v for k, v in data.items()
-                    if k not in ("device_id", "server", "server_time", "bubble_until")}
+                    if k not in ("device_id", "server", "server_time", "bubble_until", "civilization")}
         conn.execute(
             f"UPDATE devices SET {column} = ? WHERE serial = ?",
             (json.dumps(data, ensure_ascii=False), serial),

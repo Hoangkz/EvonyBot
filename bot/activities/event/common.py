@@ -31,15 +31,18 @@ Ví dụ một nhiệm vụ mới (xem gather_troops/ground_troop/run.py là b�
 màn sau đặt trước màn trước. `handle` trả None cho action không phải của nhiệm vụ để
 handle_common() lo (quà, Event Center, BACK, go_home...).
 """
+import time
 from dataclasses import dataclass
+from pathlib import Path
 
 import cv2
 import numpy as np
 
-from ...common import click_images, delay, exit_images, find_first, go_home
+from ...common import click_images, delay, exit_images, find_first, go_home, images_in
 from ...context.templates import TEMPLATE_DIR
 from ...ocr import read_progress
 from ...ocr.read_progress import run_two_lines as read_progress_two_lines
+from . import constants
 from .constants import (
     BACK,
     CLAIM,
@@ -82,6 +85,7 @@ from .constants import (
     PROGRESS_TIP_THRESHOLD,
     EVENT_LIST_TITLE,
     EVENT_LIST_TITLE_BOX,
+    EVENT_LIST_TITLES_DIR,
     EVENT_LIST_TITLE_THRESHOLD,
     EVENT_LIST_WAIT,
     EVENT_LIST_SWIPE,
@@ -129,18 +133,70 @@ class EventState:
 # daily_done: không hết hạn ở lần reset server, event/run.py bỏ qua nhiệm vụ luôn (hàm dọn dẹp
 # khi event hết hạn sẽ xoá — TODO). Chỉ hết lượt / hết tài nguyên trong ngày thì vẫn
 # mark_daily_done(key) như cũ (mai kiểm tra tiếp).
-def complete_key(key: str) -> str:
-    return f"{key}_complete"
+#
+# Hai kiểu xong:
+# - mark_complete: hết nút Go (đã làm tới mốc cao nhất của nhiệm vụ) -> "<key>_complete", xong hẳn
+#   dù người dùng chọn mục tiêu nào.
+# - mark_target_reached: đạt số lượng người dùng chọn (ô chọn: settings Event {key: {"value": N}})
+#   mà vẫn còn Go -> "<key>_complete_<N>" và "<key>_reached_<N>" (đạt N hôm nay). Người dùng tăng
+#   mục tiêu (N -> M > N) thì không còn key ứng với M -> nhiệm vụ chạy lại (is_complete /
+#   is_done_today). Ô tích (không có số): như mark_complete.
+def task_target(bot, key: str) -> int | None:
+    """Mục tiêu người dùng chọn cho nhiệm vụ `key` (tab Event, "value"), hoặc None (ô tích)."""
+    task = (getattr(bot, "settings", None) or {}).get("Event", {}).get(key)
+    value = task.get("value") if isinstance(task, dict) else None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def complete_key(key: str, target: int | None = None) -> str:
+    return f"{key}_complete" if target is None else f"{key}_complete_{target}"
+
+
+def reached_key(key: str, target: int) -> str:
+    return f"{key}_reached_{target}"
 
 
 def is_complete(bot, key: str) -> bool:
-    return bool(bot.done_at(complete_key(key)))
+    """Xong cả vòng event: hết Go (xong hẳn), hoặc đã đạt mục tiêu HIỆN TẠI của nhiệm vụ."""
+    target = task_target(bot, key)
+    return bool(bot.done_at(complete_key(key))
+                or (target is not None and bot.done_at(complete_key(key, target))))
 
 
 def mark_complete(bot, key: str):
-    """Xong hôm nay (đếm cho claim.py) và xong cả vòng event."""
+    """Hết nút Go: xong hôm nay (đếm cho claim.py) và xong hẳn cả vòng event (mọi mục tiêu)."""
     bot.mark_daily_done(key)
     bot.mark_daily_done(complete_key(key))
+
+
+def mark_target_reached(bot, key: str):
+    """Đạt số lượng người dùng chọn (vẫn còn Go): xong hôm nay và xong vòng event VỚI mục tiêu
+    này; tăng mục tiêu thì chưa xong. Ô tích (không có số): như mark_complete."""
+    target = task_target(bot, key)
+    if target is None:
+        mark_complete(bot, key)
+        return
+    bot.mark_daily_done(key)
+    bot.mark_daily_done(complete_key(key, target))
+    bot.mark_daily_done(reached_key(key, target))
+
+
+def is_done_today(bot, key: str) -> bool:
+    """Nhiệm vụ đã xong hôm nay (daily_done `key`), TRỪ khi hôm nay xong là vì đạt một mục tiêu nhỏ
+    hơn mục tiêu hiện tại (người dùng vừa tăng lên) -> chưa xong, chạy lại. Xong vì hết lượt / hết
+    tài nguyên trong ngày (không có "<key>_reached_*" hôm nay) vẫn tính là xong."""
+    if not bot.is_daily_done(key):
+        return False
+    target = task_target(bot, key)
+    if target is None or bot.done_at(complete_key(key)):
+        return True
+    prefix = f"{key}_reached_"
+    reached = [int(k[len(prefix):]) for k in bot.daily_keys()
+               if k.startswith(prefix) and k[len(prefix):].isdigit() and bot.is_daily_done(k)]
+    return not reached or max(reached) >= target
 
 
 def run_task(bot, state: EventState, name: str, event_icon: str, handle=None, *,
@@ -160,7 +216,8 @@ def run_task(bot, state: EventState, name: str, event_icon: str, handle=None, *,
         screen = bot.screenshot()
         action, pos = find_first(bot, screen, priority_targets() + list(targets)
                                  + common_targets(state), regions=regions,
-                                 thresholds={EVENT_LIST_TITLE: EVENT_LIST_TITLE_THRESHOLD,
+                                 thresholds={**{title: EVENT_LIST_TITLE_THRESHOLD
+                                                for title in event_list_titles()},
                                              **(thresholds or {})})
         if action is None:
             bot.log(f"{name}: unknown screen (no image matched), Back / go home")
@@ -222,7 +279,7 @@ def common_targets(state: EventState) -> list[tuple[str, str]]:
     if not state.login_done:
         targets.append((LOGIN_GIFT_TITLE, CLAIM_LOGIN_GIFT))
     # Đang ở sẵn danh sách event: tìm icon luôn (trước đây không nhận ra màn -> go_home Back ra thành).
-    targets.append((EVENT_LIST_TITLE, ON_EVENT_LIST))
+    targets += [(title, ON_EVENT_LIST) for title in event_list_titles()]
     targets += [(path, BACK) for path in exit_images()]
     targets += [(path, TAP) for path in click_images()]
     if not state.login_done:
@@ -277,11 +334,10 @@ def open_event(bot, icon: str) -> str:
     hoặc NOT_IN_LIST (không thấy).
     Chờ tiêu đề danh sách event (EVENT_LIST_TITLE, VD "Wine Festival Event") tối đa EVENT_LIST_WAIT
     giây; không thấy vẫn cuộn tìm như thường, chỉ nhớ là không thấy (không lưu DB): tìm được icon
-    King's Path / Gather Troops thì chụp màn, cắt lại tiêu đề danh sách ghi đè ảnh mẫu.
+    King's Path / Gather Troops thì chụp màn, cắt tiêu đề danh sách lưu thành ảnh mới (add_title).
     Lần đầu thấy tiêu đề danh sách: kiểm rương Login Rewards hôm nay (claim_login_reward) rồi mới
     tìm icon. Gặp Voyage to Civilizations mà hôm nay chưa làm: vào bấm Free rồi Back (open_voyage)."""
-    list_seen = bot.wait_for(EVENT_LIST_TITLE, timeout=EVENT_LIST_WAIT,
-                             threshold=EVENT_LIST_TITLE_THRESHOLD) is not None
+    list_seen = wait_event_list_title(bot, EVENT_LIST_WAIT)
     if not list_seen:
         bot.log(f"Event: event list title not seen after {EVENT_LIST_WAIT} s, still searching")
     best = 0.0   # điểm khớp cao nhất qua các lần cuộn (ghi vào lịch sử khi không thấy)
@@ -289,8 +345,7 @@ def open_event(bot, icon: str) -> str:
     for scroll in range(EVENT_LIST_MAX_SCROLLS + 1):
         screen = bot.screenshot()
         # Danh sách tải chậm hơn EVENT_LIST_WAIT: thấy tiêu đề ở lần cuộn nào cũng tính là đã vào.
-        list_seen = list_seen or bot.find(EVENT_LIST_TITLE, threshold=EVENT_LIST_TITLE_THRESHOLD,
-                                          screen=screen) is not None
+        list_seen = list_seen or find_event_list_title(bot, screen) is not None
         if list_seen and not reward_checked:
             reward_checked = True
             if claim_login_reward(bot, screen):
@@ -301,7 +356,8 @@ def open_event(bot, icon: str) -> str:
         score, pos = bot.best_match(icon, screen=screen)
         if pos is not None and score >= EVENT_ICON_THRESHOLD:
             if not list_seen and icon in REFRESH_TITLE_ICONS:
-                refresh_template(bot, screen, EVENT_LIST_TITLE, EVENT_LIST_TITLE_BOX)
+                add_title(bot, screen, event_list_titles(), constants.LEARNED_TITLES_DIR,
+                          EVENT_LIST_TITLE_BOX)
             bot.tap(*pos, delay=3)
             return OPENED
         best = max(best, score)
@@ -335,9 +391,9 @@ def claim_login_reward(bot, screen) -> bool:
 
 
 def open_voyage(bot, screen) -> bool:
-    """Voyage to Civilizations (xem constants.py): hôm nay chưa bấm Free và thấy icon trên `screen` ->
-    vào, tích Skip animation, có Free thì bấm Voyage Once và lưu VOYAGE_KEY (không có Free thì không
-    lưu, lần sau kiểm lại), Back về danh sách. True nếu đã vào (màn hình đã đổi)."""
+    """Voyage to Civilizations (xem constants.py): hôm nay chưa vào và thấy icon trên `screen` ->
+    vào và lưu VOYAGE_KEY ngay (mỗi ngày chỉ vào 1 lần, có Free hay không), tích Skip animation, có
+    Free thì bấm Voyage Once, Back về danh sách. True nếu đã vào (màn hình đã đổi)."""
     if bot.is_daily_done(VOYAGE_KEY):
         return False
     pos = bot.find(VOYAGE_ICON, threshold=VOYAGE_THRESHOLD, screen=screen)
@@ -345,6 +401,7 @@ def open_voyage(bot, screen) -> bool:
         return False
     bot.log("Event: open Voyage to Civilizations")
     bot.tap(*pos, delay=VOYAGE_WAIT)
+    bot.mark_daily_done(VOYAGE_KEY)
     if bot.wait_for(VOYAGE_TITLE, timeout=VOYAGE_SCREEN_WAIT) is None:
         bot.record("Event: Voyage to Civilizations screen not shown")
         _back_to_event_list(bot)
@@ -361,40 +418,75 @@ def open_voyage(bot, screen) -> bool:
     if free is not None:
         bot.record("Event: Voyage: free Voyage Once")
         bot.tap(free[0], free[1] + VOYAGE_ONCE_DY, delay=VOYAGE_WAIT)
-        bot.mark_daily_done(VOYAGE_KEY)
     else:
-        bot.log("Event: Voyage: no Free, check again next time")
+        bot.log("Event: Voyage: no Free today")
     _back_to_event_list(bot)
     return True
 
 
 def _back_to_event_list(bot):
-    """Back tới khi thấy tiêu đề danh sách event (tối đa VOYAGE_BACKS lần; popup kết quả cũng đóng
-    bằng Back)."""
+    """Back tới khi về danh sách event (tối đa VOYAGE_BACKS lần; popup kết quả cũng đóng bằng
+    Back): thấy tiêu đề danh sách HOẶC icon Voyage to Civilizations (chính dòng vừa bấm vào). Không
+    chỉ dựa vào tiêu đề: đợt lễ hội đổi tiêu đề (VD "Event Center") thì không thấy tiêu đề, Back đủ
+    VOYAGE_BACKS lần ra tới màn chính (máy 21943: event -> màn chính -> hộp thoát game)."""
     for _ in range(VOYAGE_BACKS):
         bot.back(delay=VOYAGE_STEP_WAIT)
-        if bot.find(EVENT_LIST_TITLE, threshold=EVENT_LIST_TITLE_THRESHOLD) is not None:
+        screen = bot.screenshot()
+        if (find_event_list_title(bot, screen) is not None
+                or bot.find(VOYAGE_ICON, threshold=VOYAGE_THRESHOLD, screen=screen) is not None):
             return
     bot.log("Event: event list not shown after Voyage")
 
 
-def refresh_template(bot, screen, template: str, box) -> bool:
-    """Cắt ô `box` (x, y, w, h) của `screen`; khác ảnh mẫu `template` (điểm < TITLE_SAME) thì ghi
-    đè file ảnh mẫu và bỏ bản đã nạp của thiết bị này. True nếu đã ghi."""
+def event_list_titles() -> list[str]:
+    """Mọi ảnh tiêu đề danh sách event: title.png gốc, ảnh thêm tay (EVENT_LIST_TITLES_DIR, đường
+    dẫn dưới Images/) và ảnh bot tự thêm (LEARNED_TITLES_DIR, đường dẫn tuyệt đối)."""
+    learned = constants.LEARNED_TITLES_DIR
+    added = sorted(learned.glob("*.png")) if learned.is_dir() else []
+    return [EVENT_LIST_TITLE, *images_in(EVENT_LIST_TITLES_DIR), *(str(p) for p in added)]
+
+
+def find_event_list_title(bot, screen=None):
+    """Vị trí tiêu đề danh sách event (khớp bất kỳ ảnh nào trong event_list_titles), hoặc None."""
+    screen = bot.screenshot() if screen is None else screen
+    for title in event_list_titles():
+        pos = bot.find(title, threshold=EVENT_LIST_TITLE_THRESHOLD, screen=screen)
+        if pos is not None:
+            return pos
+    return None
+
+
+def wait_event_list_title(bot, timeout: float) -> bool:
+    """Chờ tối đa `timeout` giây tới khi thấy tiêu đề danh sách event (mọi ảnh tiêu đề)."""
+    end = time.monotonic() + timeout
+    while True:
+        if find_event_list_title(bot) is not None:
+            return True
+        if time.monotonic() >= end:
+            return False
+        bot.sleep(0.5)
+
+
+def add_title(bot, screen, titles: list[str], folder, box) -> bool:
+    """Cắt ô `box` (x, y, w, h) của `screen`; khác MỌI ảnh trong `titles` (đường dẫn dưới Images/ hoặc
+    tuyệt đối, điểm < TITLE_SAME) thì lưu thành ảnh mới <n>.png trong thư mục `folder` (không ghi đè
+    ảnh nào). True nếu đã lưu."""
     crop = bot.crop(screen, *box)
     if crop.size == 0 or float(crop.std()) < TITLE_MIN_STD:
-        bot.log(f"Event: {template} area is blank, not updating")
+        bot.log("Event: title area is blank, not saving")
         return False
-    path = TEMPLATE_DIR / template
-    old = cv2.imdecode(np.fromfile(str(path), np.uint8), cv2.IMREAD_COLOR) if path.exists() else None
-    if old is not None and old.shape == crop.shape:
-        score = float(cv2.matchTemplate(crop, old, cv2.TM_CCOEFF_NORMED).max())
-        if score >= TITLE_SAME:
+    for template in titles:
+        path = TEMPLATE_DIR / template
+        old = cv2.imdecode(np.fromfile(str(path), np.uint8), cv2.IMREAD_COLOR) if path.exists() else None
+        if old is not None and old.shape == crop.shape \
+                and float(cv2.matchTemplate(crop, old, cv2.TM_CCOEFF_NORMED).max()) >= TITLE_SAME:
             return False
-    path.parent.mkdir(parents=True, exist_ok=True)
+    directory = Path(folder)
+    directory.mkdir(parents=True, exist_ok=True)
+    number = 1 + max((int(p.stem) for p in directory.glob("*.png") if p.stem.isdigit()), default=0)
+    path = directory / f"{number}.png"
     cv2.imencode(".png", crop)[1].tofile(str(path))
-    bot._templates.pop(template, None)
-    bot.record(f"Event: updated title image {template}")
+    bot.record(f"Event: new title image {path}")
     return True
 
 

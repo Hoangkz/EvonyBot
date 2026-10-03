@@ -3,6 +3,7 @@ run.py — nhiệm vụ Ranged Troop (Gather Troops, Day 3): Day 3 -> tab phụ 
 (bên phải) -> Go -> trại cung (Archer Camp) -> Train lính cung. Flow chung: xem
 ../train_troop/run.py.
 """
+from ...city_building import ARCHER_CAMP
 from ...common import EventState
 from .. import train_troop
 from .constants import DAY, DAY_3, KEY, RANGED_TROOP, RANGED_TROOP_SELECTED, THRESHOLDS, TIERS
@@ -12,7 +13,7 @@ NAME = "Ranged Troop"
 TROOP = train_troop.TroopTask(
     key=KEY, name=NAME, day=DAY, day_tab=DAY_3,
     tab=RANGED_TROOP, tab_selected=RANGED_TROOP_SELECTED,
-    tiers=TIERS, thresholds=THRESHOLDS,
+    tiers=TIERS, building=ARCHER_CAMP, thresholds=THRESHOLDS,
 )
 
 
