@@ -13,7 +13,7 @@ kim cương). Bị ngắt giữa chừng: lượt sau đọc lại số đã là
 Ô Patrol ở tab Event = 0 (không làm Patrol): không vào King's Path mà donate qua Liên minh ->
 Alliance Science (alliance.py). Vòng donate dùng chung: donating.py.
 """
-from ...common import EventState
+from ...common import EventState, mark_complete
 from .. import path_task
 from . import alliance
 from .constants import (
@@ -45,7 +45,7 @@ def _donate(bot, path, done, target):
     donated = donate_times(bot, NAME, need)
     if donated >= need:
         bot.record(f"{NAME}: donated {donated}, done")
-        bot.mark_daily_done(path.key)
+        mark_complete(bot, path.key)
 
 
 def _patrol_enabled(bot) -> bool:

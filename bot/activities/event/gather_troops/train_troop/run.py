@@ -51,6 +51,7 @@ from ...common import (
     STOP,
     EventState,
     day_locked,
+    mark_complete,
     nearest_go,
     read_go_progress,
     run_task,
@@ -187,7 +188,7 @@ def run(bot, task: dict, state: EventState, troop: TroopTask):
             go = nearest_go(bot, screen, pos)
             if go is None:
                 bot.log(f"{name}: no Go left, done")
-                bot.mark_daily_done(key)
+                mark_complete(bot, key)
                 return STOP
             done = read_go_progress(bot, screen, go)
             if done is None:
@@ -289,7 +290,7 @@ def _plan_batches(bot, plan: _Plan, count: int, name: str, key: str) -> bool:
     được hoặc không cần train nữa (đã đánh dấu xong)."""
     if count <= 0:
         bot.log(f"{name}: nothing left to train, done")
-        bot.mark_daily_done(key)
+        mark_complete(bot, key)
         return False
     batch = read_train_count(bot.crop(bot.screenshot(), *TRAIN_COUNT_BOX))
     if not batch:
@@ -313,7 +314,7 @@ def _train_step(bot, plan: _Plan, name: str, key: str):
         bot.tap(*TRAIN_BUTTON_POS, delay=BUTTON_WAIT)     # không nhận ra nút: bấm chỗ nút
     elif plan.started >= plan.times:
         bot.record(f"{name}: trained {plan.started} batch(es), done")
-        bot.mark_daily_done(key)
+        mark_complete(bot, key)
         return STOP
     else:
         plan.started += 1

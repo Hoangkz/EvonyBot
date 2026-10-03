@@ -203,6 +203,7 @@ class EventFlow(unittest.TestCase):
     def test_gather_troops_not_found(self):
         """Danh sách event không có Gather Troops: cuộn xuống 4 lần rồi BACK, bỏ nhiệm vụ."""
         flow = [
+            # Đang ở danh sách event (thấy tiêu đề) mà không thấy icon: Back, bỏ nhiệm vụ (không thử lại).
             Step("03_main.png?claimed", tap_at(*EVENT_BUTTON)),
             Step("04_event_list.png?no_gather_troops",
                  *[swipe(50, 80, 50, 50) for _ in range(4)], back()),

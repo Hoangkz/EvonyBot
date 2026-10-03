@@ -10,12 +10,13 @@ Màn Black Market (6 món ở vị trí cố định, mỗi bước chụp 1 ả
 3. Mua hết -> cắt ô vật phẩm 1 -> Instant Refresh (hết lượt miễn phí thì bằng kim cương; có hộp
    xác nhận thì Confirm) -> chờ 2 s -> ô 1 đã khác = refresh xong, mua tiếp bộ mới; còn giống thì
    chờ thêm 1 s (tối đa 10 lần), vẫn giống thì bấm Refresh lại.
-Dừng (Back): số đã mua (OCR dòng Go) + số mua lượt này >= mục tiêu -> xong. Bị ngắt (120 s /
-boss) thì lượt sau đọc lại số đã mua ở dòng Go rồi mua tiếp.
+Dừng (Back): số đã mua (OCR dòng Go) + số mua lượt này >= mục tiêu -> xong cả vòng event
+(mark_complete). Chưa mua đủ mà dừng (hết hàng / không thấy Instant Refresh / kẹt) -> không lưu done,
+lượt sau đọc lại số đã mua ở dòng Go rồi mua tiếp; bị ngắt (120 s / boss) cũng vậy.
 """
 import numpy as np
 
-from ...common import EventState
+from ...common import EventState, mark_complete
 from .. import path_task
 from ..building import open_menu
 from ..constants import SCREEN_WAIT
@@ -83,7 +84,10 @@ def _buy(bot, path, done, target):
             last = "buy"
             continue
         if bot.find(INSTANT_REFRESH, screen=screen) is None:
-            return _finish(bot, path, "nothing to buy and no Instant Refresh, done for today")
+            # Chưa mua đủ: không lưu done (kể cả hôm nay), lượt sau đọc lại tiến độ rồi thử lại.
+            bot.record(f"{NAME}: nothing to buy and no Instant Refresh ({progress} / {target}), stop")
+            bot.back(delay=1)
+            return None
         bot.record(f"{NAME}: all bought, Instant Refresh ({progress} / {target})")
         if not _refresh(bot, screen):
             bot.record(f"{NAME}: items did not change after {REFRESH_TRIES} refreshes, stop")
@@ -128,9 +132,10 @@ def _buyable(bot, screen, x: int, y: int) -> bool:
 
 
 def _finish(bot, path, message: str):
+    """Đã mua đủ mục tiêu: Back, xong cả vòng event."""
     bot.log(f"{NAME}: {message}")
     bot.back(delay=1)
-    bot.mark_daily_done(path.key)
+    mark_complete(bot, path.key)
     return None
 
 

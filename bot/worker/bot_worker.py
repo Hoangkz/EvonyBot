@@ -6,6 +6,8 @@ Thứ tự ưu tiên: Bubble > Join Boss > nhiệm vụ (scheduler.py, độ ưu
 - Có chọn Join Boss: mỗi vòng chạy Join Boss (rảnh thì nhường), rồi 1 nhiệm vụ tối đa OTHERS_WINDOW
   giây; xong nhiệm vụ là quay lại Join Boss ngay. Hết giờ / có boss mới -> quay lại, nhiệm vụ đang dở
   làm lại đầu tiên ở vòng sau. Join Boss dừng hẳn (không phải rảnh) -> vẫn chạy tiếp các nhiệm vụ.
+- Nhiệm vụ must_finish (priority.json): đã bắt đầu thì chạy tới xong; Bubble / boss mới / 120 giây không
+  ngắt (chỉ Stop). Xong rồi mới tới Bubble và Join Boss.
 - Không chọn Join Boss: không có giới hạn 120 giây, các nhiệm vụ chạy lần lượt tới khi xong.
 - Không tích Bubble: không có luật Bubble (không lo bubble, không bị ngắt vì bubble).
 - Không còn nhiệm vụ tới lượt: nghỉ ngắn rồi xét lại (thread vẫn sống); qua mốc reset server thì các
@@ -28,14 +30,14 @@ from ..context import BotContext, BotInterrupted, TimedOut
 from ..context.errors import BossAvailable, BubbleDue, StopRequested, YieldToBoss
 from .scheduler import Scheduler
 from .server_clock import ServerClock
-from .tasks import build_tasks, load_priorities
+from .tasks import build_tasks, load_must_finish, load_priorities
 from .status import STATUS_ERROR, STATUS_RUNNING, STATUS_STOPPED
 
 JOIN_BOSS = "Join Monster War"
 OTHERS_WINDOW = 120   # giây tối đa cho 1 nhiệm vụ khi có Join Boss (không có Join Boss: không giới hạn)
 IDLE_WAIT = 5         # giây nghỉ khi không còn nhiệm vụ nào tới lượt
 BUBBLE = "Bubble"
-BUBBLE_RENEW_BEFORE = 3600   # bubble còn <= 1 tiếng -> dùng bubble mới
+BUBBLE_RENEW_BEFORE = 7200   # bubble còn <= 2 tiếng -> dùng bubble mới
 BUBBLE_RETRY = 300           # đọc / dùng bubble không được -> 5 phút sau thử lại
 
 
@@ -92,8 +94,9 @@ class BotWorker(QThread):
         self.bubble_type = init.get("bubble_type") or "24h"
         self._bubble_expiry = None       # time.monotonic() lúc bubble hết; None = chưa biết
         self._bubble_next_check = 0.0    # time.monotonic() lần xử lý bubble tiếp theo
-        # Thời điểm bubble hết đã lưu trong DB: còn hơn 1 tiếng thì không vào game
-        # kiểm tra, hẹn lúc còn 1 tiếng.
+        self._hold_bubble = False        # đang chạy nhiệm vụ must_finish: hoãn bubble tới khi xong
+        # Thời điểm bubble hết đã lưu trong DB: còn hơn 2 tiếng thì không vào game
+        # kiểm tra, hẹn lúc còn 2 tiếng.
         left = _seconds_until(init.get("bubble_until"))
         if left is not None and left > 0:
             self._bubble_expiry = time.monotonic() + left
@@ -153,7 +156,7 @@ class BotWorker(QThread):
     def _run_tasks(self):
         """Vòng lặp chính (xem docstring đầu file) cho tới khi Stop."""
         boss = JOIN_BOSS in self.activities
-        tasks = build_tasks(self.activities, {JOIN_BOSS}, load_priorities())
+        tasks = build_tasks(self.activities, {JOIN_BOSS}, load_priorities(), load_must_finish())
         if boss and not tasks:
             self._run_once([JOIN_BOSS])   # chỉ Join Boss: chạy liên tục như trước
             return
@@ -184,14 +187,19 @@ class BotWorker(QThread):
 
     def _run_task(self, scheduler: Scheduler, task, boss: bool) -> bool:
         """Chạy 1 nhiệm vụ. Có Join Boss: tối đa OTHERS_WINDOW giây, boss mới cũng ngắt; không có Join
-        Boss: không giới hạn thời gian. True nếu chạy tới cuối (xong), False nếu bị ngắt (làm lại ở vòng sau)."""
-        if boss:
+        Boss: không giới hạn thời gian. must_finish: không bị Bubble / boss / thời gian ngắt (chỉ Stop).
+        True nếu chạy tới cuối (xong), False nếu bị ngắt (làm lại ở vòng sau)."""
+        if boss and not task.must_finish:
             # Timeout chỉ phát hiện khi BotContext kiểm tra; không ngắt cưỡng chế.
             self.ctx._deadline = time.monotonic() + OTHERS_WINDOW
             self.ctx._boss_interrupt_enabled = True
         try:
             # Lo bubble trước (không có Join Boss thì không có bước nào khác lo), rồi xét Stop / boss mới.
             self._with_bubble(None, self.ctx.check)
+            if task.must_finish:
+                # Bubble vừa lo xong (còn > 2 tiếng hoặc đã thử) -> hoãn tới khi nhiệm vụ xong.
+                self._hold_bubble = True
+                self.ctx._bubble_due_at = None
             self.activity_changed.emit(self.serial, task.group)
             scheduler.started(task)
             self.record(f"Bắt đầu: {task.key}")
@@ -213,6 +221,7 @@ class BotWorker(QThread):
             raise
         # Luôn gỡ deadline, kể cả khi Stop/lỗi, để không ảnh hưởng lượt chạy boss.
         finally:
+            self._hold_bubble = False
             self.ctx._boss_interrupt_enabled = False
             self.ctx._deadline = None
 
@@ -248,12 +257,15 @@ class BotWorker(QThread):
                 self.log(f"Bubble tới hạn; xử lý bubble rồi làm lại {label or 'bước đang dở'}")
 
     def _ensure_bubble(self) -> bool:
-        """Có tích Bubble: chưa biết thời gian -> đi lấy; còn <= 1 tiếng -> dùng
+        """Có tích Bubble: chưa biết thời gian -> đi lấy; còn <= 2 tiếng -> dùng
         bubble mới. Rồi hẹn ctx ngắt activity đúng lúc cần xử lý lần sau.
         Trả về True nếu vừa thao tác trong game (màn hình đã đổi)."""
         if not self.bubble_enabled:
             return False
         ctx = self.ctx
+        if self._hold_bubble:
+            ctx._bubble_due_at = None
+            return False
         if time.monotonic() < self._bubble_next_check:
             ctx._bubble_due_at = self._bubble_next_check
             return False
@@ -281,7 +293,7 @@ class BotWorker(QThread):
                     self.log(f"Bubble: chưa dùng được bubble {self.bubble_type}, sẽ thử lại sau")
         finally:
             ctx._deadline, ctx._boss_interrupt_enabled = saved
-            # Còn > 1 tiếng -> hẹn lúc còn đúng 1 tiếng; không thì thử lại sau BUBBLE_RETRY.
+            # Còn > 2 tiếng -> hẹn lúc còn đúng 2 tiếng; không thì thử lại sau BUBBLE_RETRY.
             if self._bubble_expiry is not None and self._bubble_left() > BUBBLE_RENEW_BEFORE:
                 self._bubble_next_check = self._bubble_expiry - BUBBLE_RENEW_BEFORE
             else:

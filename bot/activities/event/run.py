@@ -15,10 +15,10 @@ Mỗi nhiệm vụ là một file riêng (gather_troops/..., kings_path/...) v�
 `state` giữ qua các nhiệm vụ để quà đăng nhập chỉ nhận 1 lần mỗi lượt.
 """
 from . import claim
-from .common import EventState
+from .common import EventState, is_complete
 from .constants import GATHER_TROOPS_ICON, KINGS_PATH_ICON
 from .gather_troops import cultivate_generals, ground_troop, mounted_troop, ranged_troop, siege_machine, defense_force
-from .kings_path import black_market, city_tax, donate, heal, patrol, train_troop, wheel
+from .kings_path import black_market, city_tax, donate, heal, patrol, refine, train_troop, wheel
 
 # (key event, tên log, icon trong danh sách event, [(key nhiệm vụ trong settings / event.json,
 # hàm chạy nhiệm vụ)] theo thứ tự chạy).
@@ -38,6 +38,7 @@ EVENTS = [
         (train_troop.KEY, train_troop.run),
         (heal.KEY, heal.run),
         (wheel.KEY, wheel.run),
+        (refine.KEY, refine.run),
         (black_market.KEY, black_market.run),
     ]),
 ]
@@ -53,6 +54,9 @@ def run(bot, settings: dict):
         for key, run_task in tasks:
             task = settings.get(key)
             if not _enabled(task):
+                continue
+            if is_complete(bot, key):
+                bot.log(f"Event: {key} target reached earlier, skipped")
                 continue
             bot.check()
             was_done = bot.is_daily_done(key)

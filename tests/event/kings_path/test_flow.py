@@ -19,7 +19,7 @@ import cv2
 
 from bot.activities import event
 from bot.activities.event.constants import CLAIM_ALL, KINGS_PATH_ICON
-from bot.activities.event.kings_path import black_market, city_tax, donate, heal, patrol, path_task, train_troop, wheel
+from bot.activities.event.kings_path import black_market, city_tax, donate, heal, patrol, path_task, refine, train_troop, wheel
 from bot.activities.event.kings_path.city_tax.constants import POPUP_TAX, TAX_MENU
 from bot.activities.event.kings_path.city_tax.run import split_counts
 from bot.activities.event.kings_path.donate.constants import DONATE_BUTTON, GEMS_BUTTON, OKAY
@@ -35,6 +35,9 @@ from bot.activities.event.kings_path.patrol.constants import (
     MENU_PATROL, PATROL_BUTTON, REFRESH_BUTTON as PATROL_REFRESH, SELECT_ALL_OFF as PATROL_SELECT_ALL_OFF)
 from bot.activities.event.kings_path.patrol.run import round_key as patrol_round_key
 from bot.activities.event.kings_path.wheel.constants import SPINS_10, SPINS_100
+from bot.activities.event.kings_path.refine.constants import MENU_CRAFT, REFINE_BUTTON, TAB_REFINE
+from bot.activities.event.kings_path.refine.constants import CANCEL as REFINE_CANCEL, EQUIPMENT_REFINE as REFINE_EQUIPMENT_BUTTON
+from bot.activities.event.kings_path.refine.run import _last_done as refine_last_done, blue_items
 from bot.context import TEMPLATE_DIR, BotContext
 from bot.context.errors import YieldToBoss
 from bot.activities.event.gather_troops.troop_tier import choose_first_tier
@@ -71,6 +74,10 @@ VARIANTS = {
     "claimed": _blank(655, 695, 140, 256),
     # Màn event cùng khung nhưng không phải King's Path (VD Gather Troops): xoá tiêu đề.
     "not_kp": _blank(5, 40, 120, 280),
+    # Refine: thanh trang bị không có món viền xanh — tô đen 2 món xanh (x 94, 249).
+    "no_blue": lambda bgr: _blank(555, 602, 70, 118)(_blank(555, 602, 225, 273)(bgr)),
+    # Refine: thanh trang bị trống (không có món nào).
+    "no_items": _blank(550, 606, 0, 396),
 }
 
 
@@ -254,7 +261,8 @@ class KingsPathFlow(unittest.TestCase):
     def test_city_tax(self):
         """Day 1 City Tax (ảnh thật): dòng Go trên cùng 93 / 110, các dòng Claimed dồn xuống dưới
         -> Go -> bấm giữa thành -> icon Tax -> màn Tax: còn 17 / 4 = 4,25 -> mỗi dòng 5 -> mỗi
-        dòng Tax -> popup gõ số -> Tax -> xong."""
+        dòng Tax -> popup: bấm "−" 3 lần (ảnh tĩnh: ô số đứng yên = nhỏ nhất) -> "+" 4 lần -> Tax
+        -> xong."""
         rows = [284, 383, 482, 581]
         flow = [
             Step("day1_city_tax_go.png", tap_at(335, 344)),
@@ -264,15 +272,13 @@ class KingsPathFlow(unittest.TestCase):
         for y in rows:
             flow += [
                 Step("tax_screen.png", tap_at(308, y)),
-                Step("tax_popup.png", tap_at(198, 300)),
-                Step("tax_input.png", tap_at(62, 300)),   # thanh nhập -> bấm chỗ trống cho mất
-                Step("tax_popup.png", tap(POPUP_TAX)),
+                Step("tax_popup.png", *[tap_at(71, 345) for _ in range(3)],
+                     *[tap_at(324, 345) for _ in range(4)], tap(POPUP_TAX)),
             ]
         flow.append(Step("tax_screen.png", end()))
         device = _run(self, flow, {city_tax.KEY: {"value": 110, "day": 1}})
-        texts = [c for c in device.shells if c.startswith("input text")]
         self.assertIn("City Tax: done 93, target 110, tax [5, 5, 5, 5]", device.logs)
-        self.assertEqual(texts, ["input text 5"] * 4)
+        self.assertFalse([c for c in device.shells if c.startswith("input text")])
         self.assertIn(city_tax.KEY, device.daily_done)
 
     def test_train_troop(self):
@@ -370,6 +376,88 @@ class KingsPathFlow(unittest.TestCase):
         device = _run(self, flow, {wheel.KEY: {"value": 100, "day": 4}})
         self.assertNotIn(wheel.KEY, device.daily_done)
 
+
+    def test_refine(self):
+        """Refine: Day 4 -> Sharp Weapons (9 / 10) -> Go -> bấm giữa (Lò rèn) -> Craft -> tab Refine
+        -> chọn món viền xanh trái nhất (94, 579) -> nút Refine -> màn Refine Equipment (2 ô trống,
+        không bỏ tích) -> Refine 10 - 9 = 1 lần -> Cancel -> Back 2 lần -> làm lại từ đầu (harness
+        dừng bot)."""
+        refine_last_done.clear()
+        flow = [
+            Step("day4_sharp_weapons.png", tap_at(335, 344)),
+            Step("refine_city.png", tap_pct(50, 50)),
+            Step("refine_menu.png", tap(MENU_CRAFT)),
+            Step("refine_craft.png", tap(TAB_REFINE)),
+            Step("refine_items.png", tap_at(94, 579), tap(REFINE_BUTTON)),
+            Step("refine_equipment.png", tap(REFINE_EQUIPMENT_BUTTON)),
+            Step("refine_equipment_new.png", tap(REFINE_CANCEL)),
+            Step("refine_equipment.png", back(), back()),   # đủ 1 lần -> Back 2 lần -> AGAIN
+        ]
+        device = _run(self, flow, {refine.KEY: {"value": 10, "day": 4}})
+        self.assertIn("Refine: refine 1 time(s) (done 9, target 10)", device.logs)
+        refine_last_done.clear()
+
+    def test_refine_purple_when_no_blue(self):
+        """Thanh trang bị không có món xanh: vuốt thanh sang trái tìm tiếp; thanh không đổi (hết
+        thanh) -> món tím trái nhất (145, 578) -> Refine -> Back -> làm lại từ đầu."""
+        refine_last_done.clear()
+        flow = [
+            Step("day4_sharp_weapons.png", tap_at(335, 344)),
+            Step("refine_city.png", tap_pct(50, 50)),
+            Step("refine_menu.png", tap(MENU_CRAFT)),
+            Step("refine_items.png?no_blue", swipe(75, 82, 15, 82), tap_at(145, 578),
+                 tap(REFINE_BUTTON)),
+            Step("refine_equipment.png", tap(REFINE_EQUIPMENT_BUTTON)),
+            Step("refine_equipment_new.png", tap(REFINE_CANCEL)),
+            Step("refine_equipment.png", back(), back()),   # đủ 1 lần -> Back 2 lần -> AGAIN
+        ]
+        device = _run(self, flow, {refine.KEY: {"value": 10, "day": 4}})
+        self.assertTrue(any(line.startswith("Refine: purple equipment") for line in device.logs))
+        refine_last_done.clear()
+
+    def test_refine_no_items(self):
+        """Không có món xanh lẫn tím: vuốt thanh tìm, hết thanh -> bấm loại bên trái (121, 645); ảnh
+        tĩnh nên vòng giữa không đổi sau 10 lần kiểm tra -> Back, không lưu done (lượt sau làm lại)."""
+        refine_last_done.clear()
+        flow = [
+            Step("day4_sharp_weapons.png", tap_at(335, 344)),
+            Step("refine_city.png", tap_pct(50, 50)),
+            Step("refine_menu.png", tap(MENU_CRAFT)),
+            Step("refine_items.png?no_items", swipe(75, 82, 15, 82), tap_at(121, 645), back(), end()),
+        ]
+        device = _run(self, flow, {refine.KEY: {"value": 10, "day": 4}})
+        self.assertTrue(any(line.startswith("Refine: equipment type still") for line in device.logs))
+        self.assertNotIn(refine.KEY, device.daily_done)
+
+    def test_refine_helmet_no_items(self):
+        """Tới mũ (loại cuối bên trái) mà không có món xanh / tím (ảnh thật ở loại mũ, xoá trắng thanh
+        trang bị): không bấm sang trái nữa -> lỗi không tìm thấy, Back, xong hôm nay (không complete)."""
+        refine_last_done.clear()
+        flow = [
+            Step("day4_sharp_weapons.png", tap_at(335, 344)),
+            Step("refine_city.png", tap_pct(50, 50)),
+            Step("refine_menu.png", tap(MENU_CRAFT)),
+            Step("refine_helmet_items.png?no_items", swipe(75, 82, 15, 82), back(), end()),
+        ]
+        device = _run(self, flow, {refine.KEY: {"value": 10, "day": 4}})
+        self.assertIn("Refine: helmet: no blue / purple, last type", device.logs)
+        self.assertIn("Refine: ERROR no blue / purple equipment found (ring -> helmet), "
+                      "done for today, retry tomorrow", device.logs)
+        self.assertIn(refine.KEY, device.daily_done)
+        self.assertNotIn(refine.KEY + "_complete", device.daily_done)
+
+    def test_refine_target_reached(self):
+        """Dòng Go đã 9 / 10, mục tiêu 9: không bấm Go, xong hẳn."""
+        flow = [Step("day4_sharp_weapons.png", end())]
+        device = _run(self, flow, {refine.KEY: {"value": 9, "day": 4}})
+        self.assertIn(refine.KEY, device.daily_done)
+
+    def test_refine_blue_items(self):
+        """Món viền xanh nhận theo màu: màn Refine x 94 / 249 (vàng, tím bỏ qua); màn Craft x 42."""
+        items = blue_items(cv2.imread(str(SCREENS / "refine_items.png")))
+        self.assertEqual([x for x, _ in items], [94, 249])
+        items = blue_items(cv2.imread(str(SCREENS / "refine_craft.png")))
+        self.assertEqual([x for x, _ in items], [42])
     def test_yield_to_boss_after_task_done(self):
         """Đang chạy theo lịch ưu tiên boss: nhiệm vụ vừa xong (đủ mục tiêu ở dòng Go) -> nhường ngay
         để kiểm tra boss (YieldToBoss), không làm nhiệm vụ sau."""

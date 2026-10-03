@@ -81,11 +81,28 @@ SWIPE_TIMES = 3
 # quá EVENT_LIST_MAX_SCROLLS lần vẫn không thấy thì BACK.
 EVENT_LIST_SWIPE = (50, 80, 50, 50)   # % màn hình, ngón tay kéo lên = cuộn danh sách xuống
 EVENT_LIST_MAX_SCROLLS = 4
+# Bấm nút event mà không vào được danh sách (không thấy tiêu đề "Wine Festival Event", cuộn hết
+# không thấy icon -> Back): thử lại thêm EVENT_OPEN_RETRIES lần (về màn chính, bấm nút event lại);
+# vẫn không được thì dừng nhiệm vụ, chuyển sang nhiệm vụ khác. Vào được danh sách (thấy tiêu đề) thì
+# đếm lại từ 0; đã ở danh sách mà cuộn hết không thấy icon = event không có -> dừng luôn, không thử lại.
+EVENT_OPEN_RETRIES = 2
+# Tiêu đề màn danh sách event ("Wine Festival Event"; đổi theo đợt lễ hội, cố định khi cuộn): thấy =
+# đã vào danh sách. Cắt cả khúc giữa thanh tiêu đề (60, 8) 276x30 để tên dài / ngắn hơn vẫn nằm trong
+# ô. Khớp 1,00 trên 7 ảnh 04_event_list.png; 315 màn khác <= 0,49. Bấm nút event xong chờ tối đa
+# EVENT_LIST_WAIT giây; không thấy (đổi đợt lễ hội / chưa tải) vẫn cuộn tìm icon (open_event).
+EVENT_LIST_TITLE = f"{EV}/EventList/title.png"
+# Không dùng ngưỡng 1: đúng màn 1,00, màn khác <= 0,49 -> 0,8 vẫn cách xa mà chịu được sai khác nhỏ.
+EVENT_LIST_TITLE_THRESHOLD = 0.8
+EVENT_LIST_WAIT = 10
 # Icon event Gather Troops trong danh sách: khớp 1,00 tại (50, 362); 126 màn khác <= 0,23.
 GATHER_TROOPS_ICON = f"{EV}/GatherTroops/icon.png"
 # Icon event King's Path (hộp quà, không lấy chấm đỏ góc trên phải) trong danh sách event:
 # khớp 1,00 tại (45, 512) (tests/event/kings_path/screens/04_event_list.png); màn khác <= 0,47.
 KINGS_PATH_ICON = f"{EV}/KingsPath/icon.png"
+# Ngưỡng tìm icon event trong danh sách. Icon Gather Troops có chấm đỏ thông báo (còn thưởng chưa
+# nhận) đè góc trên phải ảnh mẫu: chỉ còn 0,89 - 0,94 (dưới ngưỡng mặc định 0,9 -> lúc thấy lúc
+# không); icon event khác / màn khác <= 0,47.
+EVENT_ICON_THRESHOLD = 0.8
 
 # Tiêu đề màn event (đầu màn, tâm (199, 23)): thấy là đang ở sẵn bảng event đó.
 # "Gather Troops": 1,00 trên 20 màn Gather Troops trong tests; màn khác (cả King's Path) <= 0,50.
@@ -93,6 +110,18 @@ GATHER_TROOPS_TITLE = f"{EV}/GatherTroops/title.png"
 # "King's Path": 1,00 trên mọi màn King's Path; màn khác <= 0,74 (xem kings_path/constants.py).
 KINGS_PATH_TITLE = f"{EV}/KingsPath/title.png"
 EVENT_TITLE_REGION = (20, 0, 80, 8)   # % màn hình: thanh tiêu đề
+
+# ---- Tự cập nhật ảnh tiêu đề (open_event trong common.py) --------------------------------
+# Không thấy tiêu đề danh sách event (VD đổi đợt lễ hội: "Wine Festival Event" -> tên khác) sau
+# khi bấm nút event: vẫn cuộn tìm icon như thường, chỉ nhớ là không thấy (biến tạm, không lưu DB);
+# gặp icon King's Path / Gather Troops = đúng là danh sách event -> chụp màn, cắt ô tiêu đề
+# EVENT_LIST_TITLE_BOX (x, y, w, h — đúng chỗ đã cắt ảnh mẫu) ghi đè ảnh mẫu. Chỉ ghi khi ảnh cắt
+# khác ảnh mẫu (điểm < TITLE_SAME) và không phải vùng trơn (độ lệch chuẩn >= TITLE_MIN_STD, VD màn
+# đen lúc đang tải).
+EVENT_LIST_TITLE_BOX = (60, 8, 276, 30)
+REFRESH_TITLE_ICONS = (GATHER_TROOPS_ICON, KINGS_PATH_ICON)
+TITLE_SAME = 0.9
+TITLE_MIN_STD = 10
 
 # ---- Màn một event (Gather Troops, King's Path, ...) -------------------
 # Nút "Claim All" ở cuối màn event: thấy là bấm trước mọi thứ khác. Khớp 1,00;
@@ -163,5 +192,6 @@ THRESHOLDS = {
 CLAIM_LOGIN_GIFT = "claim_login_gift"
 OPEN_LOGIN_GIFT = "open_login_gift"
 ON_MAIN_SCREEN = "on_main_screen"
+ON_EVENT_LIST = "on_event_list"   # đang ở sẵn danh sách event (thấy tiêu đề danh sách)
 BACK, TAP = "back", "tap"
 CLAIM = "claim_all"   # nút Claim All (đếm số lần bấm liên tiếp, xem CLAIM_ALL_MAX_TAPS)

@@ -57,7 +57,10 @@ def run_task(bot, name: str, tab: str, icon: str, handle, *, targets=(), regions
     for _ in range(MAX_STEPS):
         screen = bot.screenshot()
         action, pos = find_first(bot, screen, all_targets, regions=regions, thresholds=thresholds)
-        bot.log(f"{name}: {action} at {pos}")
+        if action is None:
+            bot.log(f"{name}: unknown screen (no image matched), Back / go home")
+        else:
+            bot.log(f"{name}: {action} at {pos}")
         result = handle(action, pos, screen)
         if result == HANDLED:
             continue

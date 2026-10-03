@@ -9,7 +9,7 @@ tab cấu hình). Bộ chọn lấy thẳng nhiệm vụ: ưu tiên cao làm tr�
 ## 1. Đã chốt (2026-10-03)
 
 - **Bubble và Join Boss cũng là nhiệm vụ** của bộ chọn (có trong `priority.json`), nhưng có luật riêng: Bubble tới hạn khi
-  còn <= 1 giờ (hoặc chưa biết) và ngắt được mọi nhiệm vụ; Join Boss chạy giữa mỗi 2 nhiệm vụ thường, rảnh thì nhường,
+  còn <= 2 giờ (hoặc chưa biết) và ngắt được mọi nhiệm vụ; Join Boss chạy giữa mỗi 2 nhiệm vụ thường, rảnh thì nhường,
   có boss mới thì ngắt nhiệm vụ thường. Nhiệm vụ thường: tối đa 120 giây, xong thì quay lại Join Boss.
 - **Thứ tự ưu tiên**: Bubble > Join Boss > các nhiệm vụ (theo `priority.json`). Bubble đã như vậy và phải giữ khi viết
   lại worker: lo bubble trước mọi lần chạy (`_with_bubble`, kể cả Join Boss) và `check()` ngắt mọi thứ đang chạy, kể
@@ -67,8 +67,8 @@ tab cấu hình). Bộ chọn lấy thẳng nhiệm vụ: ưu tiên cao làm tr�
 
 ## 4. Khác
 
-- [ ] **Dọn dẹp event khi hết hạn**: hàm xoá key của event (kể cả `<nhiệm vụ>_complete` — hiện có
-  `kings_path_heal_complete`, không tự hết hạn) trong `daily_done` khi event kết thúc, để vòng mới làm lại.
+- [ ] **Dọn dẹp event khi hết hạn**: hàm xoá key của event (kể cả `<nhiệm vụ>_complete` của mọi nhiệm vụ
+  Event — `event/common.py` `mark_complete`, không tự hết hạn) trong `daily_done` khi event kết thúc, để vòng mới làm lại.
   Người dùng tự làm sau.
 
 - [x] Đã xoá `bot/common/get_server_time.py`, `bot/ocr/read_server_time.py`, `Images/Server/serverTime.png` (2026-10-03).

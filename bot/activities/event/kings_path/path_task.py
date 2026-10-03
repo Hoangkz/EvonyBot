@@ -32,7 +32,16 @@ from dataclasses import dataclass, field
 from typing import Callable
 
 from ....context.templates import TEMPLATE_DIR
-from ..common import EVENT_OPENED, HANDLED, STOP, EventState, day_locked, read_go_progress, run_task
+from ..common import (
+    EVENT_OPENED,
+    HANDLED,
+    STOP,
+    EventState,
+    day_locked,
+    mark_complete,
+    read_go_progress,
+    run_task,
+)
 from ..constants import DAY_TABS_REGION, GO_BUTTON, GO_REGION, KINGS_PATH_ICON
 from .constants import (
     DAY_TABS,
@@ -75,19 +84,11 @@ class PathTask:
     row_title: str | None = None
     # Làm nhiệm vụ sau khi bấm Go: (bot, path, done, target) -> None / AGAIN. None = chưa làm.
     after_go: Callable | None = field(default=None, compare=False)
-    # True: đạt mục tiêu (target reached / hết Go) -> lưu thêm complete_key, bỏ qua luôn (không hết
-    # hạn ở lần reset server; hàm dọn dẹp khi event hết hạn sẽ xoá). False: chỉ lưu xong hôm nay.
-    complete: bool = False
 
     @property
     def locked_key(self) -> str:
         """Lưu trong daily_done khi tab Day còn khoá: bỏ qua tới lần reset server."""
         return f"{self.key}_locked"
-
-    @property
-    def complete_key(self) -> str:
-        """Lưu trong daily_done khi đã đạt mục tiêu (complete = True)."""
-        return f"{self.key}_complete"
 
 
 def run(bot, task: dict, state: EventState, path: PathTask):
@@ -95,9 +96,6 @@ def run(bot, task: dict, state: EventState, path: PathTask):
     name, key = path.name, path.key
     if not (TEMPLATE_DIR / KINGS_PATH_ICON).exists():
         bot.log(f"{name}: no King's Path icon image yet ({KINGS_PATH_ICON}), skipped")
-        return
-    if _completed(bot, path):
-        bot.log(f"{name}: target reached earlier, skipped")
         return
     if bot.is_daily_done(key):
         bot.log(f"{name}: already done")
@@ -137,7 +135,7 @@ def run(bot, task: dict, state: EventState, path: PathTask):
             go = _find_go(bot, screen, path)
             if go is None:
                 bot.record(f"{name}: no Go left, done")
-                _mark_complete(bot, path)
+                mark_complete(bot, key)
                 return STOP
             done = read_go_progress(bot, screen, go)
             if done is None:
@@ -146,7 +144,7 @@ def run(bot, task: dict, state: EventState, path: PathTask):
                 bot.log(f"{name}: done {done}, target {target}")
                 if done >= target:
                     bot.record(f"{name}: target reached, done")
-                    _mark_complete(bot, path)
+                    mark_complete(bot, key)
                     return STOP
             bot.tap(*go, delay=GO_WAIT)
             if path.after_go is None:
@@ -165,18 +163,6 @@ def run(bot, task: dict, state: EventState, path: PathTask):
 
 
 _EVENT_ACTIONS = (OPEN_DAY, ON_DAY, OPEN_TAB, ON_TAB)
-
-
-def _mark_complete(bot, path: PathTask):
-    """Đã đạt mục tiêu: xong hôm nay, và (complete) xong cả vòng event."""
-    bot.mark_daily_done(path.key)
-    if path.complete:
-        bot.mark_daily_done(path.complete_key)
-
-
-def _completed(bot, path: PathTask) -> bool:
-    """Đã lưu complete_key (đạt mục tiêu ở lượt trước, chưa bị dọn)."""
-    return path.complete and bool(bot.done_at(path.complete_key))
 
 
 def _find_go(bot, screen, path: PathTask):

@@ -222,7 +222,6 @@ def _pos_of(bot, screen, template, fallback):
 PATH = path_task.PathTask(
     key=KEY, name=NAME, day=DAY, tab_index=TAB_INDEX,
     tab_selected=TAB_SELECTED, tab=TAB, after_go=_heal,
-    complete=True,
 )
 
 

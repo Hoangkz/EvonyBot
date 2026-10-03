@@ -15,7 +15,7 @@ mai làm tiếp (tiến độ game lưu ở dòng Go, lượt sau đọc lại).
 import cv2
 import numpy as np
 
-from ...common import EventState
+from ...common import EventState, mark_complete
 from .. import path_task
 from ..building import open_building
 from .constants import (
@@ -68,7 +68,7 @@ def _patrol(bot, path, done, target):
     for _ in range(MAX_STEPS):
         today = rounds_today(bot)
         if progress >= target:
-            return _finish(bot, path, f"progress {progress} / {target}, done")
+            return _finish(bot, path, f"progress {progress} / {target}, done", complete=True)
         if today >= ROUNDS_PER_DAY:
             return _finish(bot, path, f"{today} rounds today, done for today")
         screen = bot.screenshot()
@@ -110,10 +110,14 @@ def _patrol(bot, path, done, target):
     bot.record(f"{NAME}: too many steps, stop")
 
 
-def _finish(bot, path, message: str):
+def _finish(bot, path, message: str, complete: bool = False):
+    """Back, xong hôm nay; `complete` (đạt mục tiêu) -> xong cả vòng event."""
     bot.log(f"{NAME}: {message}")
     bot.back(delay=1)
-    bot.mark_daily_done(path.key)
+    if complete:
+        mark_complete(bot, path.key)
+    else:
+        bot.mark_daily_done(path.key)
 
 
 def _claimed(screen) -> bool:

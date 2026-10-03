@@ -96,7 +96,7 @@ flowchart TD
 Bật khi tích **Bubble** ở tab Initialization (`settings["Initialization"]["bubble"]`), loại dùng lấy từ ô select (`bubble_type`: 8h / 24h / 3d / 7d, mặc định 24h). Thao tác trong game là `keep_bubble()` ở [bot/common/bubble.py](bot/common/bubble.py), làm trong một lần vào game:
 
 1. Màn hình chính: bấm icon buff (`Bubble/1.png`) để mở City Buff. Popup `exit` được đóng và nút `click` được bấm trước.
-2. City Buff: dòng Truce Agreement có thanh thời gian thì OCR (font `Timer`). Còn hơn 1 tiếng thì thoát ra, không dùng. Không có thanh hoặc còn ít hơn thì bấm icon Truce.
+2. City Buff: dòng Truce Agreement có thanh thời gian thì OCR (font `Timer`). Còn hơn 2 tiếng thì thoát ra, không dùng. Không có thanh hoặc còn ít hơn thì bấm icon Truce.
 3. Use Item: tìm tiêu đề dòng của loại đã chọn (4 dòng xếp 8h, 24h, 3d, 7d), bấm nút cùng dòng (Use hoặc giá kim cương).
 4. Popup Confirm (thay bubble đang có, dùng, mua): bấm Confirm, bình thường tối đa 2 lần.
 5. Về Use Item: đọc `Remaining Time` mới, BACK 2 lần về màn hình chính. Đọc 3 lần không ra thời gian mới thì tính theo loại vừa dùng.
@@ -107,7 +107,7 @@ flowchart TD
     B -->|Không| R[Chạy activity]
     B -->|Có| C[Tắt tạm deadline 120s và ngắt boss]
     C --> D[Đọc thời gian bubble còn lại]
-    D --> E{Còn <= 1 tiếng hoặc không có bubble?}
+    D --> E{Còn <= 2 tiếng hoặc không có bubble?}
     E -->|Có| F[Dùng bubble loại đã chọn, đọc lại thời gian]
     E -->|Không| G
     F --> G[Khôi phục deadline / ngắt boss; hẹn lần sau]
@@ -115,11 +115,11 @@ flowchart TD
     R -->|ctx.check: tới hẹn -> BubbleDue| C
 ```
 
-- Hẹn lần sau: bubble còn hơn 1 tiếng thì hẹn đúng lúc còn 1 tiếng; đọc hoặc dùng không được thì 5 phút sau thử lại (`BUBBLE_RETRY`), không đọc lại trước từng activity.
+- Hẹn lần sau: bubble còn hơn 2 tiếng thì hẹn đúng lúc còn 2 tiếng; đọc hoặc dùng không được thì 5 phút sau thử lại (`BUBBLE_RETRY`), không đọc lại trước từng activity.
 - Tới hẹn, `ctx.check()` ném `BubbleDue` ở bất kỳ activity nào, kể cả Join Boss. Thứ tự ưu tiên: Stop → Bubble → thông báo boss → timeout.
 - `_with_bubble()` bắt `BubbleDue`, xử lý bubble rồi gọi lại activity từ đầu (giống khi timeout). Bước bubble không bị deadline 120 giây hoặc thông báo boss cắt ngang.
 - Mỗi lần biết thời gian, worker phát `bubble_found(serial, giây)`; main lưu thời điểm bubble hết vào cột `devices.bubble_until` và UI đếm ngược ở tab Initialization (ẩn khi không có bubble).
-- Lần chạy sau, worker đọc `bubble_until` từ DB: còn hơn 1 tiếng thì không vào game kiểm tra, chỉ hẹn lúc còn 1 tiếng. `bubble_until` không bị chép qua Apply ALL.
+- Lần chạy sau, worker đọc `bubble_until` từ DB: còn hơn 2 tiếng thì không vào game kiểm tra, chỉ hẹn lúc còn 2 tiếng. `bubble_until` không bị chép qua Apply ALL.
 - OCR thời gian (font `Timer`): dưới 1 ngày game hiện `06:55:22`, từ 1 ngày trở lên hiện `2d 23:38`.
 - Không đủ kim cương (khi có ảnh `Bubble/noGems.png`): bỏ tích Bubble và không thử lại.
 

@@ -26,7 +26,7 @@ Flow:
 """
 from .....common import wait_gone
 from .....ocr import read_progress
-from ...common import HANDLED, STOP, EventState, run_task
+from ...common import HANDLED, STOP, EventState, mark_complete, run_task
 from ...constants import GATHER_TROOPS_ICON, GO_BUTTON, GO_REGION, PROGRESS_FROM_GO
 from .constants import (
     CANCEL,
@@ -92,7 +92,7 @@ def run(bot, task: dict, state: EventState):
             done += CULTIVATE_X100_TIMES
             bot.record(f"Cultivate Generals: Cultivate x100 -> {done}/{TOTAL}")
             if done >= TOTAL:
-                bot.mark_daily_done(KEY)
+                mark_complete(bot, KEY)
                 return STOP
             # Chờ nút đổi thành Cancel để không bấm (và đếm) x100 hai lần.
             wait_gone(bot, [(CULTIVATE_X100, _X100)], _X100, x100, timeout=X100_WAIT)
@@ -106,7 +106,7 @@ def run(bot, task: dict, state: EventState):
             go = _nearest_go(bot, screen, pos)
             if go is None:
                 bot.log("Cultivate Generals: no Go left, done")
-                bot.mark_daily_done(KEY)
+                mark_complete(bot, KEY)
                 return STOP
             done = _read_done(bot, screen, go)
             bot.tap(*go, delay=3)

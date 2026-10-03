@@ -57,7 +57,7 @@ class BubbleFlowTests(unittest.TestCase):
         self.assertEqual(game.calls, [])
         self.assertIsNone(worker.ctx._bubble_due_at)
 
-    def test_schedules_one_hour_before_expiry(self):
+    def test_schedules_renew_before_expiry(self):
         worker = make_worker()
         game = FakeGame([5 * 3600])
         with game.patch():
@@ -71,7 +71,7 @@ class BubbleFlowTests(unittest.TestCase):
 
     def test_could_not_renew_retries_later(self):
         worker = make_worker()
-        game = FakeGame([1800])     # vẫn còn <= 1 tiếng: dùng không được
+        game = FakeGame([1800])     # vẫn còn <= 2 tiếng: dùng không được
         with game.patch():
             worker._ensure_bubble()
             worker._ensure_bubble()
@@ -117,7 +117,7 @@ class BubbleFlowTests(unittest.TestCase):
         def activity(ctx, settings):
             runs.append(ctx._bubble_due_at is not None)
             if len(runs) == 1:
-                # Giả lập đã tới lúc bubble còn 1 tiếng giữa activity.
+                # Giả lập đã tới lúc bubble còn 2 tiếng giữa activity.
                 worker._bubble_next_check = ctx._bubble_due_at = time.monotonic() - 1
                 ctx.check()
             return "done"
@@ -134,7 +134,7 @@ class BubbleFlowTests(unittest.TestCase):
         self.assertEqual(worker.ctx._deadline, saved_deadline)
         self.assertTrue(worker.ctx._boss_interrupt_enabled)
 
-    def test_saved_bubble_skips_check_until_one_hour_left(self):
+    def test_saved_bubble_skips_check_until_renew_time(self):
         until = (datetime.now() + timedelta(hours=5)).isoformat(timespec="seconds")
         worker = make_worker(bubble_until=until)
         game = FakeGame([])
@@ -142,7 +142,7 @@ class BubbleFlowTests(unittest.TestCase):
             self.assertFalse(worker._ensure_bubble())
         self.assertEqual(game.calls, [])
         self.assertAlmostEqual(worker.ctx._bubble_due_at - time.monotonic(),
-                               4 * 3600, delta=5)
+                               5 * 3600 - BUBBLE_RENEW_BEFORE, delta=5)
 
     def test_saved_bubble_almost_over_is_checked(self):
         until = (datetime.now() + timedelta(minutes=30)).isoformat(timespec="seconds")
