@@ -13,7 +13,8 @@ nằm trong Images/Event/Building/civ<N>/<công trình>/ — dùng cùng ảnh h
 Flow (tap_building rồi remember_building):
 1. Tìm ảnh học của công trình ở vùng giữa (tối đa BUILDING_TIMEOUT giây): máy đã biết nền văn
    minh -> chỉ ảnh của nền văn minh đó; chưa biết -> ảnh của mọi nền văn minh (khớp civ N thì
-   gán máy vào civ N) và ảnh tạm của máy (pending). Thấy -> bấm giữa, làm tiếp các bước sau.
+   gán máy vào civ N) và ảnh tạm của máy (pending). Thấy -> bấm vào chỗ khớp (không học thêm),
+   làm tiếp các bước sau. Tài liệu đầy đủ: CITY_BUILDING.md.
 2. Không thấy (hoặc chưa có ảnh): chờ camera đứng yên, GIỮ LEARN_FRAMES ảnh màn hình -> bấm giữa.
    Người gọi kiểm tra menu công trình: hiện đúng icon (Tax / Train / Heal ...) thì gọi
    remember_building -> cắt vùng ít thay đổi nhất của công trình (stable_crop) và lưu:
