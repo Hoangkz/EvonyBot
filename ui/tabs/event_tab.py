@@ -12,7 +12,7 @@ event.json liệt kê từng group (Gather Troops, King's Path, ...): các ô t�
 Vị trí control được tính tự động (ô tích bên trái, ô chọn xếp 3 cột mỗi hàng).
 
 Settings (lưu ở cột `event` của DB) giữ đủ thông tin mỗi nhiệm vụ:
-{"ground_troop": {"value": 500, "level": 7, "day": 1},
+{"gather_troops_ground_troop": {"value": 500, "level": 7, "day": 1},
  "gather_troops_cultivate_generals": {"enabled": true, "day": 1}, ...}
 """
 import json

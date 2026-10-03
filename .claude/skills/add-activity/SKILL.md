@@ -98,11 +98,24 @@ Quy tắc bắt buộc:
 
 Mỗi activity phải có `tests/<snake_name>/test_flow.py` kèm ảnh chụp flow chính trong `tests/<snake_name>/screens/`. Làm theo skill `flow-test` và thêm flow của activity vào `.claude/skills/flow-test/flows.md`.
 
-## 5. Kiểm tra
+## 5. FLOW.md (bắt buộc)
+
+Mỗi activity **mới viết**, và mỗi nhiệm vụ con mới không đăng ký thành activity (VD `event_center/crazy_eggs/`), phải có `FLOW.md` cạnh `run.py`. Activity cũ chưa có `FLOW.md` thì tạm chưa cần viết bù (trừ khi người dùng yêu cầu). File viết bằng tiếng Việt, giống [join_monster_war/FLOW.md](../../../bot/activities/join_monster_war/FLOW.md) và [event_center/crazy_eggs/FLOW.md](../../../bot/activities/event_center/crazy_eggs/FLOW.md). Tối thiểu có:
+- **Điểm vào**: `run(bot, settings)`, các key cấu hình, giá trị trả về; activity hay nhiệm vụ được gọi từ đâu.
+- **Vòng lặp chính**: sơ đồ `mermaid` flowchart từ màn chính tới lúc return, kèm giới hạn bước / cuộn.
+- **Thứ tự nhận diện**: bảng `_targets()` theo ưu tiên (template, action, vùng/ngưỡng, ghi chú).
+- **Logic riêng** của activity (sơ đồ nếu có nhánh) và các điều kiện kết thúc.
+- **Ngưỡng đã đo**: điểm trên màn đúng / màn khác cao nhất / ngưỡng chọn.
+- **Test**: các test flow và ảnh tổng hợp đang dùng tạm.
+- **Chưa biết / cần ảnh**: màn chưa chụp, giả định chưa kiểm chứng.
+
+Sửa `run.py` / `constants.py` (thứ tự target, ngưỡng, điều kiện kết thúc...) thì cập nhật `FLOW.md` cùng lúc.
+
+## 6. Kiểm tra
 
 ```powershell
 .\venv\Scripts\python.exe -c "import bot.activities as a; print(list(a.ACTIVITIES))"
 .\venv\Scripts\python.exe -c "import ui.tabs"
 .\venv\Scripts\python.exe -m unittest discover -s tests -v
 ```
-Sau đó chạy app (`venv\Scripts\poe dev`), chọn activity trên một giả lập và xem log `[serial] ...` trong terminal. Nếu activity có flow phức tạp, viết `FLOW.md` cạnh `run.py` giống [join_monster_war/FLOW.md](../../../bot/activities/join_monster_war/FLOW.md).
+Sau đó chạy app (`venv\Scripts\poe dev`), chọn activity trên một giả lập và xem log `[serial] ...` trong terminal.

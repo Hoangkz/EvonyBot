@@ -14,18 +14,19 @@ def go_home(bot, screen):
     - game shows a load error: force-stop it (next Home call relaunches);
     - otherwise: press BACK."""
     if "launcher" in current_focus(bot):
-        bot.log("Home: launching game")
+        bot.record("Home: mở lại game")
         bot.shell(f"monkey -p {GAME_PACKAGE} -c android.intent.category.LAUNCHER 1")
         delay(bot, 1)
         for _ in range(15):
             pos = bot.find("en/tryagain.png")
             if pos is not None:
+                bot.record("Home: game báo lỗi kết nối, bấm Try Again")
                 bot.tap(*pos)
                 bot.tap_percent(30, 59, count=15)
                 return
             delay(bot)
     elif bot.find("en/errorload.png", threshold=0.7, screen=screen) is not None:
-        bot.log("Home: load error, force-stopping game")
+        bot.record("Home: load error, force-stopping game")
         bot.shell(f"am force-stop {GAME_PACKAGE}")
         delay(bot, 10)
     else:

@@ -6,7 +6,7 @@ from ...constants import EV
 from ..troop_tier import tier_images
 
 # Ô chọn ở group Gather Troops (Day 4): {"value": số lính, "level": cấp lính, "day": 4}.
-KEY = "siege_machine"
+KEY = "gather_troops_siege_machine"
 DAY = 4   # ngày mở nhiệm vụ (dùng khi settings thiếu "day")
 LOCKED_KEY = f"{KEY}_locked"   # giống TroopTask.locked_key
 

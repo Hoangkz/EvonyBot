@@ -1,0 +1,64 @@
+{
+    "_doc": "Độ ưu tiên của từng nhiệm vụ cho bộ chọn nhiệm vụ của worker (chưa dùng). Nhóm = activity (nút Select Activity / tab UI). key = key nhiệm vụ trong settings / daily_done. Ưu tiên cao hơn làm trước; cùng ưu tiên thì xoay vòng. Mặc định 1. Bubble và Join Boss cũng là nhiệm vụ nhưng có luật riêng (bot/worker/TODO.md mục 1): bubble luôn cao nhất, Join Boss chạy giữa mỗi 2 nhiệm vụ thường. Thêm \"must_finish\": true vào nhiệm vụ cần làm tới xong: đã bắt đầu thì không bị Bubble / Join Boss / giới hạn 120 giây ngắt (chỉ Stop), xong rồi mới tới Bubble và Join Boss; khi cả activity còn chạy nguyên khối thì mọi nhiệm vụ của nhóm phải có cờ này.",
+    "Bubble": [
+        { "key": "bubble", "label": "Bubble (giữ khiên)", "priority": 99999, "note": "Luật riêng: luôn cao nhất, tới hạn khi còn <= 2 giờ, ngắt được mọi nhiệm vụ kể cả Join Boss" }
+    ],
+    "Join Monster War": [
+        { "key": "join_monster_war", "label": "Join Monster War", "priority": 9999 }
+    ],
+    "Crazy Eggs": [
+        { "key": "crazy_eggs", "label": "Crazy Eggs", "priority": 999 }
+    ],
+    "Open Gift Box": [
+        { "key": "open_gift_box", "label": "Open Gift Box", "priority": 888 }
+    ],
+    "Alliance Capacity": [
+        { "key": "alliance_capacity", "label": "Alliance Capacity: donate Alliance Science", "priority": 777 }
+    ],
+    "Event": [
+        { "key": "gather_troops_cultivate_generals", "label": "Gather Troops: Cultivate Generals", "priority": 600 },
+        { "key": "gather_troops_ground_troop", "label": "Gather Troops: Ground Troop", "priority": 552 },
+        { "key": "gather_troops_mounted_troop", "label": "Gather Troops: Mounted Troop", "priority": 551 },
+        { "key": "gather_troops_ranged_troop", "label": "Gather Troops: Ranged Troop", "priority": 550 },
+        { "key": "gather_troops_siege_machine", "label": "Gather Troops: Siege Machine", "priority": 549 },
+        { "key": "gather_troops_defense_force", "label": "Gather Troops: Defense Force", "priority": 548 },
+        { "key": "kings_path_wheel", "label": "King's Path: Wheel", "priority": 559 },
+        { "key": "kings_path_black_market", "label": "King's Path: Black Market", "priority": 558 },
+        { "key": "kings_path_patrol", "label": "King's Path: Patrol", "priority": 557, "note": "Yêu cầu phải cao hơn King's Path: Donate" },
+        { "key": "kings_path_donate", "label": "King's Path: Donate", "priority": 556 },
+        { "key": "kings_path_city_tax", "label": "King's Path: City Tax", "priority": 554 },
+        { "key": "kings_path_train_troop", "label": "King's Path: Train Troop", "priority": 553 },
+        { "key": "kings_path_heal", "label": "King's Path: Heal", "priority": 547 },
+        { "key": "kings_path_refine", "label": "King's Path: Refine Equipment", "priority": 546 },
+        { "key": "gather_troops_claim", "label": "Gather Troops: nhận thưởng (chấm đỏ + rương mốc)", "priority": 500 },
+        { "key": "kings_path_claim", "label": "King's Path: nhận thưởng (chấm đỏ)", "priority": 499 }
+    ],
+    "Daily Activities": [
+        { "key": "daily_offering", "label": "Offering", "priority": 666 },
+        { "key": "daily_resource_tax", "label": "Resource Tax", "priority": 399 },
+        { "key": "daily_gold_levy", "label": "Gold Levy", "priority": 398 },
+        { "key": "daily_troop_training", "label": "Troop Training", "priority": 397 },
+        { "key": "daily_troop_heading", "label": "Troop Heading", "priority": 396 },
+        { "key": "daily_trap_buiding", "label": "Trap Buiding", "priority": 395 },
+        { "key": "daily_alliance_donation", "label": "Alliance Donation", "priority": 394 },
+        { "key": "daily_alliance_science", "label": "Alliance Science", "priority": 393 },
+        { "key": "daily_alliance_research", "label": "Alliance Research", "priority": 392 },
+        { "key": "daily_alliance_technology", "label": "Alliance Technology", "priority": 391 },
+        { "key": "daily_black_market", "label": "Black Market", "priority": 390 },
+        { "key": "daily_general_enhancing", "label": "General Enhancing", "priority": 389, "note": "Cần làm thêm" },
+        { "key": "daily_wheel_of_fortune", "label": "Wheel of Fortune", "priority": 388 },
+        { "key": "daily_patrol", "label": "Patrol", "priority": 387, "must_finish": true },
+        { "key": "daily_material_composing", "label": "Material Composing", "priority": 386 },
+        { "key": "daily_greet_champion", "label": "Greet Champion", "priority": 385, "must_finish": true },
+        { "key": "daily_monster_killing", "label": "Monster Killing", "priority": 384 },
+        { "key": "daily_resource_collecting", "label": "Resource Collecting", "priority": 383 },
+        { "key": "daily_rewards", "label": "Activity Rewards (nhận thưởng cuối)", "priority": 300 }
+    ],
+    "Black Market": [
+        { "key": "black_market_market", "label": "Black Market: mua ở Market", "priority": 0 },
+        { "key": "black_market_auction_house", "label": "Black Market: đấu giá Auction House", "priority": -1 }
+    ],
+    "Battlefield Shop": [
+        { "key": "battlefield_shop", "label": "Battlefield Shop", "priority": -1 }
+    ]
+}

@@ -25,6 +25,7 @@ from bot.activities import event
 from bot.activities.event.gather_troops import siege_machine
 from bot.activities.event.gather_troops.siege_machine.constants import LOCKED_KEY
 from tests.flow import Step, back, end, run_flow, tap, tap_at
+from tests.event import setUpModule, tearDownModule  # noqa: F401 (tắt lượt nhận thưởng)
 
 SCREENS = Path(__file__).parent / "screens"
 KEY = siege_machine.KEY
@@ -32,7 +33,7 @@ SETTINGS = {KEY: {"value": 20000, "level": 13, "day": 4}}
 
 LOGIN_GIFT_ICON = (361, 148)   # icon Login Gifts ở cột phải
 LOGIN_REWARD = (37, 197)       # hộp quà dưới chữ "Login Gifts" (56, 141) + (-19, 56)
-EVENT_BUTTON = (369, 281)      # chữ "Event Center" + (10, 40)
+EVENT_BUTTON = (361, 280)   # nút event: đuôi ruy băng cột phải (331, 308) + (30, -28)
 
 FIRST_GO = (335, 344)          # nút Go gần tab Siege Machine nhất (dòng "0 / 500")
 CENTER = (198, 352)            # giữa màn hình: xưởng sau khi bấm Go

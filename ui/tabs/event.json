@@ -7,7 +7,7 @@
             ],
             "combos": [
                 {
-                    "key": "ground_troop", "label": "Ground Troop:", "day": 2, "default": 20000,
+                    "key": "gather_troops_ground_troop", "label": "Ground Troop:", "day": 2, "default": 20000,
                     "values": [
                         { "value": 0, "level": null },
                         { "value": 500, "level": 7 },
@@ -20,7 +20,7 @@
                     ]
                 },
                 {
-                    "key": "mounted_troop", "label": "Mounted Troop:", "day": 3, "default": 20000,
+                    "key": "gather_troops_mounted_troop", "label": "Mounted Troop:", "day": 3, "default": 20000,
                     "values": [
                         { "value": 0, "level": null },
                         { "value": 500, "level": 7 },
@@ -33,7 +33,7 @@
                     ]
                 },
                 {
-                    "key": "ranged_troop", "label": "Ranged Troop:", "day": 3, "default": 20000,
+                    "key": "gather_troops_ranged_troop", "label": "Ranged Troop:", "day": 3, "default": 20000,
                     "values": [
                         { "value": 0, "level": null },
                         { "value": 500, "level": 7 },
@@ -46,7 +46,7 @@
                     ]
                 },
                 {
-                    "key": "siege_machine", "label": "Siege Machine:", "day": 4, "default": 20000,
+                    "key": "gather_troops_siege_machine", "label": "Siege Machine:", "day": 4, "default": 20000,
                     "values": [
                         { "value": 0, "level": null },
                         { "value": 500, "level": 7 },
@@ -59,7 +59,7 @@
                     ]
                 },
                 {
-                    "key": "defense_force", "label": "Defense Force:", "day": 4, "default": 7000,
+                    "key": "gather_troops_defense_force", "label": "Defense Force:", "day": 4, "default": 7000,
                     "values": [
                         { "value": 0, "level": null },
                         { "value": 1000, "level": 3 },
@@ -77,14 +77,14 @@
             "title": "King's Path",
             "checkboxes": [ ],
             "combos": [
-                { "key": "kings_path_city_tax", "label": "City Tax:", "day": 1, "values": [ 0, 3, 10, 20, 40, 70, 110 ], "default": 110 },
+                { "key": "kings_path_city_tax", "label": "City Tax:", "day": 5, "values": [ 0, 3, 10, 20, 40, 70, 110 ], "default": 110 },
                 { "key": "kings_path_patrol", "label": "Patrol:", "day": 2, "values": [ 0, 50, 100, 150, 200 ], "default": 200 },
-                { "key": "kings_path_donate", "label": "Donate:", "day": 2, "values": [ 0, 10, 20, 40, 60 ], "default": 60 },
-                { "key": "kings_path_train_troop", "label": "Train Troop:", "day": 3, "values": [ 2000, 5000, 10000, 20000, 50000, 10000, 200000 ], "default": 200000 },
-                { "key": "kings_path_offer", "label": "Offer:", "day": 3, "values": [ 1, 5, 10, 20, 30, 50, 100 ], "default": 100 },
-                { "key": "kings_path_heal", "label": "Heal:", "day": 3, "values": [ 1000, 2000, 5000, 8000, 12000, 30000, 50000 ], "default": 50000 },
-                { "key": "kings_path_wheel", "label": "Wheel:", "day": 4, "values": [ 5, 10, 30, 60, 100 ], "default": 100 },
-                { "key": "kings_path_black_market", "label": "Black Market:", "day": 5, "values": [ 1, 5, 10, 20, 50, 100 ], "default": 100 }
+                { "key": "kings_path_donate", "label": "Donate:", "day": 5, "values": [ 0, 10, 20, 40, 60 ], "default": 60 },
+                { "key": "kings_path_train_troop", "label": "Train Troop:", "day": 3, "values": [ 0, 2000, 5000, 10000, 20000, 50000, 100000, 200000 ], "default": 200000 },
+                { "key": "kings_path_heal", "label": "Heal:", "day": 3, "values": [ 0, 1000, 2000, 5000, 8000, 12000, 30000, 50000 ], "default": 50000 },
+                { "key": "kings_path_wheel", "label": "Wheel:", "day": 4, "values": [ 0, 5, 10, 30, 60, 100 ], "default": 100 },
+                { "key": "kings_path_refine", "label": "Refine Equipment:", "day": 4, "values": [ 0, 10, 20, 50, 100 ], "default": 100 },
+                { "key": "kings_path_black_market", "label": "Black Market:", "day": 5, "values": [ 0, 1, 5, 10, 20, 50, 100 ], "default": 100 }
             ]
         }
     ]

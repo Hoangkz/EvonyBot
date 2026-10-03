@@ -4,7 +4,8 @@ device_view.py — the workspace for a single connected device.
 Python/PyQt5 counterpart of the C# `panelData` + `Start` TabControl: a
 QTabWidget hosting one tab per bot module, in the same order as the
 original Form3 (Initialization, Join Monster War, Alliance Capacity,
-Daily Activities, Open Gift Box, Black Market, Event, Battlefield Shop).
+Daily Activities, Open Gift Box, Black Market, Event, Battlefield Shop),
+plus a Logs tab showing this device's bot log (not a settings tab).
 """
 from PyQt5.QtCore import pyqtSignal
 from PyQt5.QtWidgets import QTabWidget, QVBoxLayout, QWidget
@@ -17,6 +18,7 @@ from .tabs import (
     EventTab,
     InitializationTab,
     JoinMonsterWarTab,
+    LogsTab,
     OpenGiftBoxTab,
 )
 
@@ -59,6 +61,9 @@ class DeviceView(QWidget):
         self._add_tab(self.black_market_tab, "Black Market")
         self._add_tab(self.event_tab, "Event")
         self._add_tab(self.battlefield_shop_tab, "Battlefield Shop")
+        # Logs không có cấu hình: thêm thẳng, không nối Apply ALL / settings.
+        self.logs_tab = LogsTab()
+        self.tabs.addTab(self.logs_tab, "Logs")
 
         self.initialization_tab.start_clicked.connect(
             lambda: self.start_requested.emit(self.device_id)
@@ -87,6 +92,12 @@ class DeviceView(QWidget):
         }
         self.apply_all_requested.emit(self.device_id, settings)
 
+    def append_log(self, message: str):
+        self.logs_tab.append(message)
+
+    def append_history(self, created_at: str, message: str):
+        self.logs_tab.append_history(created_at, message)
+
     def set_running(self, running: bool):
         self.initialization_tab.set_running(running)
 
@@ -96,10 +107,10 @@ class DeviceView(QWidget):
     def get_settings(self) -> dict:
         """Collect settings from every tab into one dict, keyed by tab title."""
         return {self.tabs.tabText(i): self.tabs.widget(i).get_settings()
-                for i in range(self.tabs.count())}
+                for i in range(self.tabs.count()) if self.tabs.widget(i) is not self.logs_tab}
 
     def set_settings(self, data: dict):
         for i in range(self.tabs.count()):
             title = self.tabs.tabText(i)
-            if title in data:
+            if title in data and self.tabs.widget(i) is not self.logs_tab:
                 self.tabs.widget(i).set_settings(data[title])

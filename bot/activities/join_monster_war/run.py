@@ -86,6 +86,7 @@ class _Boss:
             if action == OUT_OF_STAMINA:
                 # Không đủ thể lực: use_stamina = No -> dừng hẳn Join Boss
                 if self.use_stamina not in ("ALL", "100"):
+                    bot.record("Join Monster War: hết thể lực, không dùng vật phẩm -> dừng Join Boss")
                     return
                 bot.tap(*pos)
                 self._use_stamina()
@@ -141,7 +142,7 @@ class _Boss:
                         self.next_screen = shot
                         break
                 else:
-                    bot.log("Màn hình vẫn không nhận ra: go_home")
+                    bot.record("Màn hình vẫn không nhận ra: go_home")
                     go_home(bot, shot)
                 continue
 
@@ -230,7 +231,7 @@ class _Boss:
             # Hết vật phẩm thể lực: Back 2 lần (thoát màn Use Item, rồi màn March). Không dừng Join
             # Boss (thể lực tự hồi theo thời gian): nhớ boss này là đã tham gia để không thử lại
             # ngay, và coi như đang rảnh (worker làm activity khác / chờ rồi quét lại).
-            bot.log("Hết vật phẩm thể lực")
+            bot.record("Join Monster War: hết vật phẩm thể lực")
             bot.back(delay=1)
             bot.back(delay=1)
             coords, self.pending = self.pending, None
@@ -253,7 +254,7 @@ class _Boss:
             bot.tap_percent(*STAMINA_SLIDER_END)
             delay(bot, 0.5)
         bot.tap(*use)
-        bot.log(f"Dùng vật phẩm thể lực ({self.use_stamina})")
+        bot.record(f"Join Monster War: dùng vật phẩm thể lực ({self.use_stamina})")
 
         # Chờ 5 giây, Back về màn March rồi bấm March lại (đội đã chọn giữ nguyên)
         delay(bot, STAMINA_REFILL_WAIT)
@@ -318,6 +319,7 @@ class _Boss:
                 return
             if bot.find(MARCH, screen=shot, region=REGIONS[MARCH]) is None:
                 self.memory.mark(coords, MEMORY_JOINED)
+                bot.record(f"Join Monster War: đã tham gia boss {coords}")
                 return
         bot.back()
 
@@ -334,7 +336,7 @@ class _Boss:
         locked = len(bot.find_all(PRESET_LOCKED, screen=screen, region=REGIONS[PRESET_LOCKED]))
         usable = [t for t in self.troops if t <= PRESET_COUNT - locked]
         if not usable:
-            bot.log(f"Đội quân đã chọn {self.troops} đều đang khoá ({locked} ô khoá)")
+            bot.record(f"Join Monster War: đội quân đã chọn {self.troops} đều đang khoá ({locked} ô khoá)")
             return None
         for troop in usable:
             self.last_troop = troop   # đội đang được chọn trên màn March (nếu cần chọn tướng cho nó)
@@ -370,7 +372,7 @@ class _Boss:
                     or bot.find(FAVORITE_OFF, screen=screen, region=REGIONS[FAVORITE_OFF]) is not None):
                 break
         else:
-            bot.log(f"Chọn {name}: không mở được màn Select a General")
+            bot.record(f"Chọn {name}: không mở được màn Select a General")
             return False
 
         # Chỉ hiện tướng phát triển: bấm tab Development (không thấy cái búa = tab đang chọn sẵn)
@@ -396,7 +398,7 @@ class _Boss:
         if not buttons:
             # Không có tướng yêu thích nào ("No favorite General"), hoặc chỉ còn tướng đang là
             # tướng chính (nút xám) -> quay về màn March
-            bot.log(f"Chọn {name}: không có tướng nào để chọn")
+            bot.record(f"Chọn {name}: không có tướng nào để chọn")
             bot.back(delay=GENERAL_TAP_DELAY)
             for _ in range(6):
                 delay(bot, 0.5)
@@ -411,7 +413,7 @@ class _Boss:
             if bot.find(GENERAL_SEARCH, region=slot) is not None:
                 bot.log(f"Đã chọn {name}")
                 return True
-        bot.log(f"Chọn {name}: chưa thấy tướng trong ô sau khi Select")
+        bot.record(f"Chọn {name}: chưa thấy tướng trong ô sau khi Select")
         return False
 
     def _join(self, screen) -> bool:

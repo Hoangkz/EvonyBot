@@ -2,8 +2,8 @@
 common.py — phần dùng chung cho mọi nhiệm vụ Event.
 
 Mọi nhiệm vụ (gather_troops/..., kings_path/...) đều đi qua cùng các bước để tới màn
-event: màn chính -> nhận quà đăng nhập -> nút dưới Event Center -> danh sách event ->
-icon event. Các bước đó nằm trong run_task(); nhiệm vụ chỉ khai báo ảnh riêng của mình
+event: màn chính -> nhận quà đăng nhập -> nút event (nút có ruy băng đếm ngược, xem
+find_event_button) -> danh sách event -> icon event. Các bước đó nằm trong run_task(); nhiệm vụ chỉ khai báo ảnh riêng của mình
 và hàm `handle` xử lý action của các ảnh đó.
 
 Ví dụ một nhiệm vụ mới (xem gather_troops/ground_troop/run.py là bản tối giản):
@@ -33,8 +33,13 @@ handle_common() lo (quà, Event Center, BACK, go_home...).
 """
 from dataclasses import dataclass
 
+import cv2
+import numpy as np
+
 from ...common import click_images, delay, exit_images, find_first, go_home
+from ...context.templates import TEMPLATE_DIR
 from ...ocr import read_progress
+from ...ocr.read_progress import run_two_lines as read_progress_two_lines
 from .constants import (
     BACK,
     CLAIM,
@@ -49,17 +54,55 @@ from .constants import (
     EVENT_CENTER,
     EVENT_CENTER_REGION,
     EVENT_CENTER_THRESHOLDS,
+    EVENT_ICON_THRESHOLD,
     EVENT_LIST_MAX_SCROLLS,
+    EVENT_OPEN_RETRIES,
+    CHEST_FROM_TIP,
+    CHEST_OPENED,
+    CHEST_OPENED_THRESHOLD,
+    CHEST_TAP,
+    CHEST_WAIT,
+    LOGIN_REWARD_KEY,
+    VOYAGE_BACKS,
+    VOYAGE_FREE,
+    VOYAGE_FREE_REGION,
+    VOYAGE_ICON,
+    VOYAGE_KEY,
+    VOYAGE_ONCE_DY,
+    VOYAGE_SCREEN_WAIT,
+    VOYAGE_SKIP_OFF,
+    VOYAGE_SKIP_REGION,
+    VOYAGE_SKIP_THRESHOLD,
+    VOYAGE_STEP_WAIT,
+    VOYAGE_THRESHOLD,
+    VOYAGE_TITLE,
+    VOYAGE_WAIT,
+    PROGRESS_TIP,
+    PROGRESS_TIP_REGION,
+    PROGRESS_TIP_THRESHOLD,
+    EVENT_LIST_TITLE,
+    EVENT_LIST_TITLE_BOX,
+    EVENT_LIST_TITLE_THRESHOLD,
+    EVENT_LIST_WAIT,
     EVENT_LIST_SWIPE,
+    REFRESH_TITLE_ICONS,
+    TITLE_MIN_STD,
+    TITLE_SAME,
     GO_BUTTON,
     GO_REGION,
     LOGIN_GIFT_ICON,
     LOGIN_GIFT_REWARD_OFFSET,
     LOGIN_GIFT_TITLE,
     MAIN_SCREEN,
+    ON_EVENT_LIST,
     ON_MAIN_SCREEN,
     OPEN_LOGIN_GIFT,
     PROGRESS_FROM_GO,
+    PROGRESS_LINE1_FROM_GO,
+    PROGRESS_LINE2_FROM_GO,
+    RIBBON_BUTTON_OFFSET,
+    RIBBON_SEARCH,
+    RIBBON_TAIL,
     SWIPE_RIGHT,
     SWIPE_TIMES,
     SWIPE_UP,
@@ -68,7 +111,7 @@ from .constants import (
 
 # Kết quả của handle_common() để vòng lặp nhiệm vụ biết vừa xảy ra gì; run_task() cũng
 # gọi handle(EVENT_OPENED, None, None) ngay sau khi mở được icon event.
-EVENT_OPENED = "event_opened"   # vừa bấm nút event dưới Event Center
+EVENT_OPENED = "event_opened"   # vừa bấm nút event
 # Giá trị `handle` của nhiệm vụ trả cho run_task().
 HANDLED = "handled"             # action riêng đã xử lý xong -> quét lại
 STOP = "stop"                   # nhiệm vụ kết thúc -> run_task() return
@@ -81,6 +124,25 @@ class EventState:
     claim_all_taps: int = 0    # số lần bấm Claim All liên tiếp (xem CLAIM_ALL_MAX_TAPS)
 
 
+# ---- Nhiệm vụ đã đạt mục tiêu ------------------------------------------------------------
+# Đạt mục tiêu (target reached / hết nút Go / làm đủ số cần) -> lưu "<key>_complete" trong
+# daily_done: không hết hạn ở lần reset server, event/run.py bỏ qua nhiệm vụ luôn (hàm dọn dẹp
+# khi event hết hạn sẽ xoá — TODO). Chỉ hết lượt / hết tài nguyên trong ngày thì vẫn
+# mark_daily_done(key) như cũ (mai kiểm tra tiếp).
+def complete_key(key: str) -> str:
+    return f"{key}_complete"
+
+
+def is_complete(bot, key: str) -> bool:
+    return bool(bot.done_at(complete_key(key)))
+
+
+def mark_complete(bot, key: str):
+    """Xong hôm nay (đếm cho claim.py) và xong cả vòng event."""
+    bot.mark_daily_done(key)
+    bot.mark_daily_done(complete_key(key))
+
+
 def run_task(bot, state: EventState, name: str, event_icon: str, handle=None, *,
              targets=(), regions=None, thresholds=None):
     """Vòng lặp chung của một nhiệm vụ Event: chụp màn hình -> find_first(
@@ -88,13 +150,22 @@ def run_task(bot, state: EventState, name: str, event_icon: str, handle=None, *,
     trước; handle trả None thì handle_common() xử lý. Khi handle_common vừa bấm nút
     event: mở `event_icon` trong danh sách event (không thấy thì return), rồi gọi
     `handle(EVENT_OPENED, None, None)`. `handle` trả STOP thì return.
-    Không có `handle`: dừng ngay khi vừa mở được event."""
+    Không có `handle`: dừng ngay khi vừa mở được event.
+    Không vào được danh sách event (open_event trả NOT_IN_LIST, đã Back): thử lại thêm
+    EVENT_OPEN_RETRIES lần, vẫn không được thì return (nhiệm vụ dừng, event/run.py chuyển sang
+    nhiệm vụ khác). Vào được danh sách thì đếm lại từ 0; ở danh sách mà không thấy icon
+    (NOT_FOUND) thì return luôn."""
+    failures = 0   # số lần liên tiếp không vào được danh sách event
     while True:
         screen = bot.screenshot()
         action, pos = find_first(bot, screen, priority_targets() + list(targets)
                                  + common_targets(state), regions=regions,
-                                 thresholds=thresholds)
-        bot.log(f"{name}: {action} at {pos}")
+                                 thresholds={EVENT_LIST_TITLE: EVENT_LIST_TITLE_THRESHOLD,
+                                             **(thresholds or {})})
+        if action is None:
+            bot.log(f"{name}: unknown screen (no image matched), Back / go home")
+        else:
+            bot.log(f"{name}: {action} at {pos}")
         if action == CLAIM:
             claim_all(bot, state, pos)
             continue
@@ -107,9 +178,18 @@ def run_task(bot, state: EventState, name: str, event_icon: str, handle=None, *,
         if handle_common(bot, state, action, pos, screen) != EVENT_OPENED:
             continue
         # Màn danh sách event: tìm (cuộn tối đa 4 lần) rồi bấm icon event.
-        if not open_event(bot, event_icon):
-            bot.log(f"{name}: event not found")
+        result = open_event(bot, event_icon)
+        if result == NOT_FOUND:
+            bot.record(f"{name}: event not found in event list, skip to next task")
             return
+        if result == NOT_IN_LIST:
+            failures += 1
+            if failures > EVENT_OPEN_RETRIES:
+                bot.record(f"{name}: event list not opened after {failures} tries, skip to next task")
+                return
+            bot.record(f"{name}: event list not opened, retry {failures}/{EVENT_OPEN_RETRIES}")
+            continue
+        failures = 0
         bot.log(f"{name}: event opened")
         if handle is None or handle(EVENT_OPENED, None, None) == STOP:
             return
@@ -120,7 +200,7 @@ def claim_all(bot, state: EventState, pos):
     Back và đếm lại từ 0."""
     state.claim_all_taps += 1
     if state.claim_all_taps > CLAIM_ALL_MAX_TAPS:
-        bot.log(f"Event: Claim All still there after {CLAIM_ALL_MAX_TAPS} taps, back")
+        bot.record(f"Event: Claim All still there after {CLAIM_ALL_MAX_TAPS} taps, back")
         state.claim_all_taps = 0
         bot.back(delay=1)
         return
@@ -135,13 +215,19 @@ def priority_targets() -> list[tuple[str, str]]:
 def common_targets(state: EventState) -> list[tuple[str, str]]:
     """(ảnh, action) dùng chung, đặt SAU ảnh riêng của nhiệm vụ. Màn quà (chữ "Login
     Gifts") xét trước icon vì tab trong màn đó cũng giống icon; hết quà thì bỏ cả hai.
+    Ảnh exit/click (popup) xét trước ảnh của màn chính (icon quà, MAIN_SCREEN): popup đè
+    lên thành thì vẫn thấy ảnh màn chính nhưng bấm không được, phải đóng popup trước.
     Icon quà xét trước nút "•••" để ở màn chính luôn nhận quà trước khi tìm Event Center."""
     targets = []
     if not state.login_done:
-        targets += [(LOGIN_GIFT_TITLE, CLAIM_LOGIN_GIFT), (LOGIN_GIFT_ICON, OPEN_LOGIN_GIFT)]
-    targets.append((MAIN_SCREEN, ON_MAIN_SCREEN))
+        targets.append((LOGIN_GIFT_TITLE, CLAIM_LOGIN_GIFT))
+    # Đang ở sẵn danh sách event: tìm icon luôn (trước đây không nhận ra màn -> go_home Back ra thành).
+    targets.append((EVENT_LIST_TITLE, ON_EVENT_LIST))
     targets += [(path, BACK) for path in exit_images()]
     targets += [(path, TAP) for path in click_images()]
+    if not state.login_done:
+        targets.append((LOGIN_GIFT_ICON, OPEN_LOGIN_GIFT))
+    targets.append((MAIN_SCREEN, ON_MAIN_SCREEN))
     return targets
 
 
@@ -157,14 +243,17 @@ def handle_common(bot, state: EventState, action, pos, screen):
     elif action == OPEN_LOGIN_GIFT:
         bot.log("Event: open Login Gifts")
         bot.tap(*pos, delay=2)
+    elif action == ON_EVENT_LIST:
+        bot.log("Event: already on event list")
+        return EVENT_OPENED
     elif action == ON_MAIN_SCREEN:
-        event_center = find_event_center(bot, screen)
-        if event_center is None:
-            bot.log("Event: Event Center not found, swiping")
+        button = find_event_button(bot, screen)
+        if button is None:
+            bot.log("Event: event button not found, swiping")
             swipe_around(bot)
             return None
-        dx, dy = EVENT_BUTTON_OFFSET
-        bot.tap(event_center[0] + dx, event_center[1] + dy, delay=5)
+        bot.log(f"Event: tap event button {button}")
+        bot.tap(*button, delay=5)
         return EVENT_OPENED
     elif action == BACK:
         bot.back(delay=1)
@@ -176,19 +265,137 @@ def handle_common(bot, state: EventState, action, pos, screen):
     return None
 
 
-def open_event(bot, icon: str) -> bool:
-    """Ở màn danh sách event: tìm `icon` rồi bấm vào. Không thấy thì cuộn xuống, cuộn quá
-    EVENT_LIST_MAX_SCROLLS lần vẫn không thấy thì BACK và trả False."""
+# Kết quả open_event.
+OPENED = "opened"            # đã bấm icon event
+NOT_IN_LIST = "not_in_list"  # không thấy tiêu đề danh sách lẫn icon: có thể chưa vào được danh sách
+NOT_FOUND = "not_found"      # đang ở danh sách (thấy tiêu đề) mà cuộn hết không thấy icon
+
+
+def open_event(bot, icon: str) -> str:
+    """Ở màn danh sách event: tìm `icon` rồi bấm vào (OPENED). Không thấy thì cuộn xuống, cuộn quá
+    EVENT_LIST_MAX_SCROLLS lần vẫn không thấy thì BACK và trả NOT_FOUND (đã thấy tiêu đề danh sách)
+    hoặc NOT_IN_LIST (không thấy).
+    Chờ tiêu đề danh sách event (EVENT_LIST_TITLE, VD "Wine Festival Event") tối đa EVENT_LIST_WAIT
+    giây; không thấy vẫn cuộn tìm như thường, chỉ nhớ là không thấy (không lưu DB): tìm được icon
+    King's Path / Gather Troops thì chụp màn, cắt lại tiêu đề danh sách ghi đè ảnh mẫu.
+    Lần đầu thấy tiêu đề danh sách: kiểm rương Login Rewards hôm nay (claim_login_reward) rồi mới
+    tìm icon. Gặp Voyage to Civilizations mà hôm nay chưa làm: vào bấm Free rồi Back (open_voyage)."""
+    list_seen = bot.wait_for(EVENT_LIST_TITLE, timeout=EVENT_LIST_WAIT,
+                             threshold=EVENT_LIST_TITLE_THRESHOLD) is not None
+    if not list_seen:
+        bot.log(f"Event: event list title not seen after {EVENT_LIST_WAIT} s, still searching")
+    best = 0.0   # điểm khớp cao nhất qua các lần cuộn (ghi vào lịch sử khi không thấy)
+    reward_checked = voyage_checked = False
     for scroll in range(EVENT_LIST_MAX_SCROLLS + 1):
-        pos = bot.find(icon)
-        if pos is not None:
+        screen = bot.screenshot()
+        # Danh sách tải chậm hơn EVENT_LIST_WAIT: thấy tiêu đề ở lần cuộn nào cũng tính là đã vào.
+        list_seen = list_seen or bot.find(EVENT_LIST_TITLE, threshold=EVENT_LIST_TITLE_THRESHOLD,
+                                          screen=screen) is not None
+        if list_seen and not reward_checked:
+            reward_checked = True
+            if claim_login_reward(bot, screen):
+                screen = bot.screenshot()
+        if not voyage_checked and open_voyage(bot, screen):
+            voyage_checked = True
+            screen = bot.screenshot()
+        score, pos = bot.best_match(icon, screen=screen)
+        if pos is not None and score >= EVENT_ICON_THRESHOLD:
+            if not list_seen and icon in REFRESH_TITLE_ICONS:
+                refresh_template(bot, screen, EVENT_LIST_TITLE, EVENT_LIST_TITLE_BOX)
             bot.tap(*pos, delay=3)
-            return True
+            return OPENED
+        best = max(best, score)
         if scroll < EVENT_LIST_MAX_SCROLLS:
-            bot.swipe_percent(*EVENT_LIST_SWIPE, duration=0.5, delay=1)
-    bot.log(f"Event: {icon} not found after {EVENT_LIST_MAX_SCROLLS} scrolls")
+            bot.swipe_percent(*EVENT_LIST_SWIPE, duration=0.5, delay=2)
+    bot.record(f"Event: {icon} not found after {EVENT_LIST_MAX_SCROLLS} scrolls (best {best:.2f})")
     bot.back(delay=1)
-    return False
+    return NOT_FOUND if list_seen else NOT_IN_LIST
+
+
+def claim_login_reward(bot, screen) -> bool:
+    """Rương Login Rewards hôm nay (xem constants.py): mỗi ngày kiểm 1 lần. True nếu vừa bấm nhận
+    (màn hình đã đổi)."""
+    if bot.is_daily_done(LOGIN_REWARD_KEY):
+        return False
+    tip = bot.find(PROGRESS_TIP, threshold=PROGRESS_TIP_THRESHOLD, screen=screen,
+                   region=PROGRESS_TIP_REGION)
+    if tip is None:
+        bot.log("Event: login reward progress bar not found, check next time")
+        return False
+    dx, dy, w, h = CHEST_FROM_TIP
+    area = bot.crop(screen, tip[0] + dx, tip[1] + dy, w, h)
+    if bot.find(CHEST_OPENED, threshold=CHEST_OPENED_THRESHOLD, screen=area) is not None:
+        bot.log("Event: login reward already opened")
+        bot.mark_daily_done(LOGIN_REWARD_KEY)
+        return False
+    bot.record(f"Event: claim login reward at progress bar {tip}")
+    bot.tap(tip[0] + CHEST_TAP[0], tip[1] + CHEST_TAP[1], delay=CHEST_WAIT)
+    bot.mark_daily_done(LOGIN_REWARD_KEY)
+    return True
+
+
+def open_voyage(bot, screen) -> bool:
+    """Voyage to Civilizations (xem constants.py): hôm nay chưa bấm Free và thấy icon trên `screen` ->
+    vào, tích Skip animation, có Free thì bấm Voyage Once và lưu VOYAGE_KEY (không có Free thì không
+    lưu, lần sau kiểm lại), Back về danh sách. True nếu đã vào (màn hình đã đổi)."""
+    if bot.is_daily_done(VOYAGE_KEY):
+        return False
+    pos = bot.find(VOYAGE_ICON, threshold=VOYAGE_THRESHOLD, screen=screen)
+    if pos is None:
+        return False
+    bot.log("Event: open Voyage to Civilizations")
+    bot.tap(*pos, delay=VOYAGE_WAIT)
+    if bot.wait_for(VOYAGE_TITLE, timeout=VOYAGE_SCREEN_WAIT) is None:
+        bot.record("Event: Voyage to Civilizations screen not shown")
+        _back_to_event_list(bot)
+        return True
+    bot.sleep(VOYAGE_STEP_WAIT)   # màn vừa hiện: chờ tải xong rồi mới bấm
+    screen = bot.screenshot()
+    skip = bot.find(VOYAGE_SKIP_OFF, threshold=VOYAGE_SKIP_THRESHOLD, screen=screen,
+                    region=VOYAGE_SKIP_REGION)
+    if skip is not None:
+        bot.log("Event: Voyage: tick Skip animation")
+        bot.tap(*skip, delay=VOYAGE_WAIT)
+        screen = bot.screenshot()
+    free = bot.find(VOYAGE_FREE, screen=screen, region=VOYAGE_FREE_REGION)
+    if free is not None:
+        bot.record("Event: Voyage: free Voyage Once")
+        bot.tap(free[0], free[1] + VOYAGE_ONCE_DY, delay=VOYAGE_WAIT)
+        bot.mark_daily_done(VOYAGE_KEY)
+    else:
+        bot.log("Event: Voyage: no Free, check again next time")
+    _back_to_event_list(bot)
+    return True
+
+
+def _back_to_event_list(bot):
+    """Back tới khi thấy tiêu đề danh sách event (tối đa VOYAGE_BACKS lần; popup kết quả cũng đóng
+    bằng Back)."""
+    for _ in range(VOYAGE_BACKS):
+        bot.back(delay=VOYAGE_STEP_WAIT)
+        if bot.find(EVENT_LIST_TITLE, threshold=EVENT_LIST_TITLE_THRESHOLD) is not None:
+            return
+    bot.log("Event: event list not shown after Voyage")
+
+
+def refresh_template(bot, screen, template: str, box) -> bool:
+    """Cắt ô `box` (x, y, w, h) của `screen`; khác ảnh mẫu `template` (điểm < TITLE_SAME) thì ghi
+    đè file ảnh mẫu và bỏ bản đã nạp của thiết bị này. True nếu đã ghi."""
+    crop = bot.crop(screen, *box)
+    if crop.size == 0 or float(crop.std()) < TITLE_MIN_STD:
+        bot.log(f"Event: {template} area is blank, not updating")
+        return False
+    path = TEMPLATE_DIR / template
+    old = cv2.imdecode(np.fromfile(str(path), np.uint8), cv2.IMREAD_COLOR) if path.exists() else None
+    if old is not None and old.shape == crop.shape:
+        score = float(cv2.matchTemplate(crop, old, cv2.TM_CCOEFF_NORMED).max())
+        if score >= TITLE_SAME:
+            return False
+    path.parent.mkdir(parents=True, exist_ok=True)
+    cv2.imencode(".png", crop)[1].tofile(str(path))
+    bot._templates.pop(template, None)
+    bot.record(f"Event: updated title image {template}")
+    return True
 
 
 def day_locked(bot, screen, day: int) -> bool:
@@ -210,9 +417,43 @@ def nearest_go(bot, screen, tab):
 
 
 def read_go_progress(bot, screen, go) -> int | None:
-    """Số đã làm ở "300 / 500" ngay trên nút `go` (OCR), hoặc None nếu đọc lỗi."""
-    dx, dy, w, h = PROGRESS_FROM_GO
-    return read_progress(bot.crop(screen, go[0] + dx, go[1] + dy, w, h))
+    """Số đã làm ở "300 / 500" ngay trên nút `go` (OCR), hoặc None nếu đọc lỗi. Đọc 1 dòng
+    lỗi thì thử kiểu số lớn bị xuống 2 dòng ("23,530 /" + "50,000")."""
+    def crop(box):
+        dx, dy, w, h = box
+        return bot.crop(screen, go[0] + dx, go[1] + dy, w, h)
+
+    done = read_progress(crop(PROGRESS_FROM_GO))
+    if done is None:
+        done = read_progress_two_lines(crop(PROGRESS_LINE1_FROM_GO), crop(PROGRESS_LINE2_FROM_GO))
+    return done
+
+
+def find_event_button(bot, screen):
+    """Điểm bấm nút event (MỘT kết quả duy nhất), hoặc None. `screen` là chính ảnh chụp vừa
+    nhận ra màn chính (nút "•••"), không chụp lại.
+    Nút event = nút có ruy băng đỏ đếm ngược, vị trí đổi theo số nút khác (có khi ngay dưới
+    Event Center, có khi lên hàng trên cùng). Tìm đuôi ruy băng trong cả 2 vùng RIBBON_SEARCH:
+    vùng nào trả về toạ độ thì vùng đó đúng. Ngưỡng thứ nhất trước, không vùng nào đạt thì lần
+    lượt thử các ngưỡng thấp hơn; cả 2 vùng cùng đạt thì lấy chỗ khớp cao hơn. Ngưỡng thấp nhất
+    cũng không đạt: bấm ngay dưới chữ "Event Center" như trước (không thấy cả Event Center ->
+    None)."""
+    matches = [(*bot.best_match(RIBBON_TAIL, screen=screen, region=region), thresholds)
+               for region, thresholds in RIBBON_SEARCH]
+    dx, dy = RIBBON_BUTTON_OFFSET
+    for level in range(len(RIBBON_SEARCH[0][1])):
+        passed = [(score, tail) for score, tail, thresholds in matches
+                  if tail is not None and score >= thresholds[level]]
+        if passed:
+            score, (x, y) = max(passed)
+            bot.log(f"Event: ribbon at {(x, y)} score {score:.3f} (level {level})")
+            return x + dx, y + dy
+    event_center = find_event_center(bot, screen)
+    if event_center is None:
+        return None
+    bot.log("Event: no ribbon, using button below Event Center")
+    ox, oy = EVENT_BUTTON_OFFSET
+    return event_center[0] + ox, event_center[1] + oy
 
 
 def find_event_center(bot, screen):

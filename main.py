@@ -9,16 +9,20 @@ the selected device's tabbed control panel.
 import ctypes
 import platform
 import sys
+import threading
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import QApplication, QMainWindow, QStackedWidget, QWidget, QHBoxLayout
 
+from bot.common import GAME_PACKAGE
 from bot.worker import BotManager
 from database import Database
 from ui import DeviceView, HomeView, Sidebar
 from ui import theme
+from ui.tabs.logs_tab import SHOW_SECONDS
 
 
 class MainWindow(QMainWindow):
@@ -62,8 +66,21 @@ class MainWindow(QMainWindow):
         )
         self.bots.running_changed.connect(self._on_bot_running_changed)
         self.bots.server_found.connect(self._on_server_found)
-        self.bots.server_time_found.connect(self.db.set_server_time)
+        # Giờ reset server chung mọi thiết bị (bảng settings, mặc định 14:00): người dùng chọn ở màn
+        # Home; đổi là lưu DB và các worker đang chạy dùng giá trị mới ngay.
+        self.bots.server_clock.set(self.db.server_time())
+        self.home_view.set_reset_time(self.bots.server_clock.value)
+        self.home_view.reset_time_changed.connect(self._on_reset_time_changed)
+        # "Auto Times Out" chung mọi thiết bị (bảng settings): nạp lại giá trị đã lưu; đổi là lưu DB và
+        # các worker đang chạy dùng ngay (tới giờ thì đóng game, ưu tiên ngay sau Bubble).
+        self.home_view.set_auto_timeout(self.db.auto_timeout())
+        self.bots.auto_timeout_minutes = self.home_view.auto_timeout_minutes
+        self.home_view.auto_timeout_changed.connect(self._on_auto_timeout_changed)
         self.bots.daily_task_done.connect(self.db.mark_daily_task_done)
+        self.bots.bubble_found.connect(self._on_bubble_found)
+        self.bots.bubble_disabled.connect(self._on_bubble_disabled)
+        self.bots.log_message.connect(self._on_log_message)
+        self.bots.history.connect(self._on_history)
         # Sub-tab index kept across devices, so switching device stays on
         # the same tab instead of jumping back to Initialization.
         self._current_tab_index = 0
@@ -73,7 +90,6 @@ class MainWindow(QMainWindow):
         self.home_view.devices_loaded.connect(self._on_devices_loaded)
         self.home_view.start_all_requested.connect(self._on_start_all_requested)
         self.home_view.exit_all_requested.connect(self._on_exit_all_requested)
-        self.home_view.close_all_requested.connect(self._on_close_all_requested)
 
     def _center_on_screen(self):
         frame = self.frameGeometry()
@@ -131,6 +147,10 @@ class MainWindow(QMainWindow):
         self.home_view.update_device(
             device_id, server=view.initialization_tab.get_settings()["server"]
         )
+        # Tab Logs chỉ hiện log trong SHOW_SECONDS gần nhất; DB vẫn giữ đủ.
+        since = (datetime.now() - timedelta(seconds=SHOW_SECONDS)).isoformat(timespec="seconds")
+        for created_at, message in self.db.load_logs(device_id, since):
+            view.append_history(created_at, message)
 
         self.device_views[device_id] = view
         view.set_all_running(self._all_running())
@@ -181,6 +201,14 @@ class MainWindow(QMainWindow):
             if not self.bots.is_running(device_id):
                 self._start_bot(device_id)
 
+    def _on_reset_time_changed(self, server_time: str):
+        self.db.set_server_time(server_time)
+        self.bots.server_clock.set(server_time)
+
+    def _on_auto_timeout_changed(self, minutes: str):
+        self.db.set_auto_timeout(minutes)
+        self.bots.auto_timeout_minutes = int(minutes)
+
     def _all_running(self) -> bool:
         return bool(self.device_views) and all(
             self.bots.is_running(d) for d in self.device_views
@@ -193,9 +221,9 @@ class MainWindow(QMainWindow):
         settings = view.get_settings()
         # Đây là dữ liệu riêng của thiết bị trong DB, không phải cấu hình Apply ALL.
         saved = self.db.load_settings(device_id)
-        settings.setdefault("Initialization", {})["server_time"] = (
-            saved.get("Initialization", {}).get("server_time") or ""
-        )
+        init = settings.setdefault("Initialization", {})
+        # Bubble còn hạn trong DB thì bot không cần vào game kiểm tra lại.
+        init["bubble_until"] = saved.get("Initialization", {}).get("bubble_until") or ""
         self.bots.start(
             device_id,
             view.initialization_tab.selected_activities(),
@@ -224,13 +252,46 @@ class MainWindow(QMainWindow):
         if view is not None:
             view.initialization_tab.set_settings({"server": server})
 
-    def _on_exit_all_requested(self):
-        # TODO: wire up to the actual automation/bot backend.
-        print("[EvonyBot] Exit ALL requested")
+    def _on_bubble_found(self, device_id: str, seconds: int):
+        """Bot vừa đọc / gia hạn bubble -> lưu DB và đếm ngược ở tab Initialization."""
+        until = datetime.now() + timedelta(seconds=seconds) if seconds else None
+        self.db.set_bubble_until(device_id, until.isoformat(timespec="seconds") if until else "")
+        view = self.device_views.get(device_id)
+        if view is not None:
+            view.initialization_tab.set_bubble_remaining(seconds or None)
 
-    def _on_close_all_requested(self):
-        # TODO: wire up to the actual automation/bot backend.
-        print("[EvonyBot] Close ALL requested")
+    def _on_bubble_disabled(self, device_id: str):
+        """Không đủ kim cương mua bubble -> bỏ tích Bubble (tự lưu qua settings_changed)."""
+        view = self.device_views.get(device_id)
+        if view is not None:
+            view.initialization_tab.set_settings({"bubble": False})
+
+    def _on_log_message(self, device_id: str, message: str):
+        """Dòng log của bot -> tab Logs của thiết bị đó."""
+        view = self.device_views.get(device_id)
+        if view is not None:
+            view.append_log(message)
+
+    def _on_history(self, device_id: str, message: str):
+        """Sự kiện của bot (bắt đầu / xong / dừng nhiệm vụ, lỗi...) -> lưu DB (ghi nền, không chờ)
+        và hiện ở tab Logs > History."""
+        created_at = datetime.now().isoformat(timespec="seconds")
+        self.db.add_log(device_id, message, created_at)
+        view = self.device_views.get(device_id)
+        if view is not None:
+            view.append_history(created_at, message)
+
+    def _on_exit_all_requested(self):
+        """Exit All: đóng game (force-stop) trên mọi thiết bị. Gọi ADB trên thread nền để không đơ UI."""
+        def close_games(serials):
+            import adbutils
+            for serial in serials:
+                try:
+                    adbutils.adb.device(serial=serial).shell(f"am force-stop {GAME_PACKAGE}")
+                except Exception as e:
+                    print(f"[{serial}] Exit All: không đóng được game: {e}")
+        threading.Thread(target=close_games, args=(list(self.device_views),),
+                         name="exit-all", daemon=True).start()
 
 
 def main():

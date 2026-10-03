@@ -3,7 +3,7 @@ home_view.py — landing screen: scans ADB ports and lists devices.
 """
 from pathlib import Path
 
-from PyQt5.QtCore import QThread, Qt, pyqtSignal
+from PyQt5.QtCore import QThread, Qt, QTime, pyqtSignal
 from PyQt5.QtWidgets import (
     QAbstractItemView,
     QComboBox,
@@ -15,6 +15,7 @@ from PyQt5.QtWidgets import (
     QPushButton,
     QTableWidget,
     QTableWidgetItem,
+    QTimeEdit,
     QVBoxLayout,
     QWidget,
 )
@@ -30,8 +31,9 @@ TIMEOUT_OPTIONS = ["30", "60", "90", "120", "180", "240", "300", "360"]
 class HomeView(QWidget):
     devices_loaded = pyqtSignal(list)
     start_all_requested = pyqtSignal()
-    exit_all_requested = pyqtSignal()
-    close_all_requested = pyqtSignal()
+    exit_all_requested = pyqtSignal()       # đóng game trên mọi thiết bị
+    reset_time_changed = pyqtSignal(str)   # giờ reset server "HH:MM" người dùng vừa chọn
+    auto_timeout_changed = pyqtSignal(str)  # số phút "Auto Times Out" người dùng vừa chọn
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -74,19 +76,25 @@ class HomeView(QWidget):
         self.timeout_combo.addItems(TIMEOUT_OPTIONS)
         self.timeout_combo.setCurrentText("180")
         self.timeout_combo.setFixedWidth(75)
+        self.timeout_combo.currentTextChanged.connect(self.auto_timeout_changed.emit)
         toolbar.addWidget(self.timeout_combo)
         toolbar.addWidget(QLabel("Minutes"))
+        toolbar.addSpacing(12)
+
+        # Giờ reset server (giờ máy), dùng chung mọi thiết bị: nhiệm vụ đã xong làm lại sau mốc này.
+        toolbar.addWidget(QLabel("Reset Time"))
+        self.reset_time_edit = QTimeEdit(QTime(14, 0))
+        self.reset_time_edit.setDisplayFormat("HH:mm")
+        self.reset_time_edit.setFixedWidth(75)
+        self.reset_time_edit.timeChanged.connect(
+            lambda value: self.reset_time_changed.emit(value.toString("HH:mm")))
+        toolbar.addWidget(self.reset_time_edit)
         toolbar.addSpacing(12)
 
         exit_all = QPushButton("Exit All")
         exit_all.setMinimumSize(100, 36)
         exit_all.clicked.connect(self.exit_all_requested.emit)
         toolbar.addWidget(exit_all)
-
-        close_all = QPushButton("Close All")
-        close_all.setMinimumSize(100, 36)
-        close_all.clicked.connect(self.close_all_requested.emit)
-        toolbar.addWidget(close_all)
 
         toolbar.addStretch(1)
 
@@ -241,6 +249,22 @@ class HomeView(QWidget):
                 if status is not None:
                     self.table.item(row, 3).setText(status)
                 return
+
+    def set_reset_time(self, server_time: str):
+        """Hiện giờ reset "HH:MM" đã lưu (không phát reset_time_changed)."""
+        value = QTime.fromString(server_time, "HH:mm")
+        if value.isValid():
+            self.reset_time_edit.blockSignals(True)
+            self.reset_time_edit.setTime(value)
+            self.reset_time_edit.blockSignals(False)
+
+    def set_auto_timeout(self, minutes: str):
+        """Hiện số phút "Auto Times Out" đã lưu (không phát auto_timeout_changed); giá trị không có
+        trong TIMEOUT_OPTIONS thì giữ nguyên."""
+        if minutes in TIMEOUT_OPTIONS:
+            self.timeout_combo.blockSignals(True)
+            self.timeout_combo.setCurrentText(minutes)
+            self.timeout_combo.blockSignals(False)
 
     @property
     def auto_timeout_minutes(self) -> int:

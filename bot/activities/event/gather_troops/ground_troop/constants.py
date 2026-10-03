@@ -6,7 +6,7 @@ from ...constants import EV
 from ..troop_tier import tier_images
 
 # Ô chọn ở group Gather Troops (Day 2): {"value": số lính, "level": cấp lính, "day": 2}.
-KEY = "ground_troop"
+KEY = "gather_troops_ground_troop"
 DAY = 2   # ngày mở nhiệm vụ (dùng khi settings thiếu "day")
 # Lưu trong daily_done khi tab Day của nhiệm vụ còn khoá: bỏ qua nhiệm vụ tới lần reset
 # server kế tiếp (ngày mới mở theo reset). Giống TroopTask.locked_key.

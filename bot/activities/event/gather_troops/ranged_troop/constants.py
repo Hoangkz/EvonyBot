@@ -7,7 +7,7 @@ from ..mounted_troop.constants import DAY_3, THRESHOLDS as MOUNTED_THRESHOLDS
 from ..troop_tier import tier_images
 
 # Ô chọn ở group Gather Troops (Day 3): {"value": số lính, "level": cấp lính, "day": 3}.
-KEY = "ranged_troop"
+KEY = "gather_troops_ranged_troop"
 DAY = 3   # ngày mở nhiệm vụ (dùng khi settings thiếu "day")
 LOCKED_KEY = f"{KEY}_locked"   # giống TroopTask.locked_key
 

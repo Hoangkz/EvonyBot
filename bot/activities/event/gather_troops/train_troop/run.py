@@ -2,6 +2,8 @@
 run.py — flow chung của các nhiệm vụ train lính trong Gather Troops (Ground Troop Day 2,
 Mounted Troop Day 3, ...). Mỗi nhiệm vụ chỉ khác tab Day, tab phụ và ảnh cấp lính: khai
 báo một TroopTask rồi gọi run(bot, task, state, troop).
+King's Path Train Troop có code riêng (kings_path/train_troop/run.py), chỉ import dùng lại các
+bước chung trong file này (menu công trình, tính số mẻ, bấm Train, Finish All).
 
 Phần đi từ màn chính tới màn event nằm trong run_task() (xem event/common.py).
 
@@ -41,6 +43,7 @@ TODO: `done` đọc ở dòng Go đầu tiên (tier 7); khi train cấp khác c�
 import math
 from dataclasses import dataclass, field
 
+from .....context.templates import TEMPLATE_DIR
 from .....ocr import read_train_count
 from ...common import (
     EVENT_OPENED,
@@ -48,6 +51,7 @@ from ...common import (
     STOP,
     EventState,
     day_locked,
+    mark_complete,
     nearest_go,
     read_go_progress,
     run_task,
@@ -97,7 +101,7 @@ from .constants import (
 @dataclass(frozen=True)
 class TroopTask:
     """Phần riêng của một nhiệm vụ train lính."""
-    key: str                      # key trong settings / event.json (VD "ground_troop")
+    key: str                      # key trong settings / event.json (VD "gather_troops_ground_troop")
     name: str                     # tên trong log (VD "Ground Troop")
     day: int                      # ngày mở nhiệm vụ (dùng khi settings thiếu "day")
     day_tab: str                  # ảnh tab "Day N" khi CHƯA chọn
@@ -111,6 +115,11 @@ class TroopTask:
     lowest: int = LOWEST_TIER     # cấp thấp nhất nhiệm vụ tính ("tier 7 and above")
     menu_icon: str = TRAIN        # icon mở màn Train trong menu công trình (bẫy: "Build")
     speedup_title: str = SPEEDUP_TITLE   # tiêu đề màn speedup (bẫy: "Trap Building Speedup")
+    event_icon: str = GATHER_TROOPS_ICON  # icon event trong danh sách (King's Path: KINGS_PATH_ICON)
+    # Tiêu đề màn event, phải thấy mới bấm tab Day / tab phụ / Go (King's Path: hàng tab Day
+    # giống hệt Gather Troops). None = không kiểm tra.
+    title: str | None = None
+    title_region: tuple | None = None
 
     @property
     def locked_key(self) -> str:
@@ -122,6 +131,9 @@ class TroopTask:
 def run(bot, task: dict, state: EventState, troop: TroopTask):
     """`task` là settings của nhiệm vụ: {"value": int, "level": int, "day": int}."""
     name, key, locked_key = troop.name, troop.key, troop.locked_key
+    if not (TEMPLATE_DIR / troop.event_icon).exists():
+        bot.log(f"{name}: no event icon image yet ({troop.event_icon}), skipped")
+        return
     if bot.is_daily_done(key):
         bot.log(f"{name}: already done")
         return
@@ -146,7 +158,7 @@ def run(bot, task: dict, state: EventState, troop: TroopTask):
         """Lần đầu ở màn Gather Troops trong lượt này: Day khoá -> lưu, STOP."""
         progress["entered"] = True
         if day_locked(bot, screen, day):
-            bot.log(f"{name}: Day {day} locked, cannot do this task yet")
+            bot.record(f"{name}: Day {day} locked, cannot do this task yet")
             bot.mark_daily_done(locked_key)
             return STOP
         return None
@@ -155,6 +167,11 @@ def run(bot, task: dict, state: EventState, troop: TroopTask):
         nonlocal done
         if action == EVENT_OPENED:
             return enter(bot.screenshot())   # Day đã mở: quét tiếp
+        if (action in _EVENT_ACTIONS and troop.title is not None
+                and bot.find(troop.title, screen=screen, region=troop.title_region) is None):
+            bot.log(f"{name}: event tabs but not this event, back")
+            bot.back(delay=1)
+            return HANDLED
         if action in _EVENT_ACTIONS and not progress["entered"]:
             if enter(screen) == STOP:
                 return STOP
@@ -168,11 +185,11 @@ def run(bot, task: dict, state: EventState, troop: TroopTask):
             go = nearest_go(bot, screen, pos)
             if go is None:
                 bot.log(f"{name}: no Go left, done")
-                bot.mark_daily_done(key)
+                mark_complete(bot, key)
                 return STOP
             done = read_go_progress(bot, screen, go)
             if done is None:
-                bot.log(f"{name}: cannot read progress")
+                bot.record(f"{name}: cannot read progress")
             else:
                 bot.log(f"{name}: done {done}, remaining {max(0, target - done)}")
             bot.tap(*go, delay=GO_WAIT)
@@ -199,7 +216,7 @@ def run(bot, task: dict, state: EventState, troop: TroopTask):
                     return HANDLED
                 tier = choose_tier(bot, troop.tiers, level, troop.lowest)
                 if tier is None:
-                    bot.log(f"{name}: tier {troop.lowest} locked, cannot do this task yet")
+                    bot.record(f"{name}: tier {troop.lowest} locked, cannot do this task yet")
                     bot.mark_daily_done(locked_key)
                     return STOP
                 goal = target if tier == level else targets_by_tier.get(tier, 0)
@@ -227,7 +244,7 @@ def run(bot, task: dict, state: EventState, troop: TroopTask):
             return None
         return HANDLED
 
-    run_task(bot, state, name, GATHER_TROOPS_ICON, handle,
+    run_task(bot, state, name, troop.event_icon, handle,
              targets=_targets(troop), regions=_regions(troop), thresholds=_thresholds(troop))
 
 
@@ -269,11 +286,11 @@ def _plan_batches(bot, plan: _Plan, count: int, name: str, key: str) -> bool:
     được hoặc không cần train nữa (đã đánh dấu xong)."""
     if count <= 0:
         bot.log(f"{name}: nothing left to train, done")
-        bot.mark_daily_done(key)
+        mark_complete(bot, key)
         return False
     batch = read_train_count(bot.crop(bot.screenshot(), *TRAIN_COUNT_BOX))
     if not batch:
-        bot.log(f"{name}: cannot read train count")
+        bot.record(f"{name}: cannot read train count")
         return False
     plan.times = math.ceil(count / batch)
     bot.log(f"{name}: {batch} per batch -> {plan.times} batch(es)")
@@ -292,8 +309,8 @@ def _train_step(bot, plan: _Plan, name: str, key: str):
     elif train is None:
         bot.tap(*TRAIN_BUTTON_POS, delay=BUTTON_WAIT)     # không nhận ra nút: bấm chỗ nút
     elif plan.started >= plan.times:
-        bot.log(f"{name}: trained {plan.started} batch(es), done")
-        bot.mark_daily_done(key)
+        bot.record(f"{name}: trained {plan.started} batch(es), done")
+        mark_complete(bot, key)
         return STOP
     else:
         plan.started += 1

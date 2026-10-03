@@ -14,6 +14,7 @@ from pathlib import Path
 from bot.activities.event._template import my_task
 from bot.activities.event.common import EventState
 from tests.flow import Step, back, end, run_flow, swipe, tap, tap_at
+from tests.event import setUpModule, tearDownModule  # noqa: F401 (tắt lượt nhận thưởng)
 
 SCREENS = Path(__file__).parents[2] / "gather_troops" / "cultivate_generals" / "screens"
 KEY = my_task.KEY
@@ -22,7 +23,7 @@ SETTINGS = {KEY: {"enabled": True, "day": 1}}
 # Toạ độ bấm cứng (lệch so với template, xem bot/activities/event/constants.py):
 LOGIN_GIFT_ICON = (361, 148)   # icon Login Gifts ở cột phải (góc dưới trái cũng có)
 LOGIN_REWARD = (37, 197)       # hộp quà dưới chữ "Login Gifts" (56, 141) + (-19, 56)
-EVENT_BUTTON = (369, 281)      # chữ "Event Center" (359, 241) + (10, 40)
+EVENT_BUTTON = (361, 280)   # nút event: đuôi ruy băng cột phải (331, 308) + (30, -28)
 
 # Màn chính -> event vừa mở: giống mọi nhiệm vụ Event.
 TO_EVENT = [
@@ -82,6 +83,7 @@ class MyTaskFlow(unittest.TestCase):
     def test_event_not_found(self):
         """Danh sách event không có icon event: cuộn xuống 4 lần rồi BACK, bỏ nhiệm vụ."""
         flow = [
+            # Đang ở danh sách event (thấy tiêu đề) mà không thấy icon: Back, bỏ nhiệm vụ (không thử lại).
             Step("03_main.png?claimed", tap_at(*EVENT_BUTTON)),
             Step("04_event_list.png?no_event",
                  *[swipe(50, 80, 50, 50) for _ in range(4)], back()),

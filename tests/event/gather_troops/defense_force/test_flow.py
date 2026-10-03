@@ -20,6 +20,7 @@ from bot.activities import event
 from bot.activities.event.gather_troops import defense_force
 from bot.activities.event.gather_troops.defense_force.constants import LOCKED_KEY
 from tests.flow import Step, back, end, run_flow, tap, tap_at
+from tests.event import setUpModule, tearDownModule  # noqa: F401 (tắt lượt nhận thưởng)
 
 SCREENS = Path(__file__).parent / "screens"
 KEY = defense_force.KEY
@@ -27,7 +28,7 @@ SETTINGS = {KEY: {"value": 7000, "level": 6, "day": 4}}
 
 LOGIN_GIFT_ICON = (361, 148)
 LOGIN_REWARD = (37, 197)       # hộp quà dưới chữ "Login Gifts" (56, 141) + (-19, 56)
-EVENT_BUTTON = (369, 281)
+EVENT_BUTTON = (361, 280)   # nút event: đuôi ruy băng cột phải (331, 308) + (30, -28)
 
 FIRST_GO = (335, 344)          # nút Go gần tab Defense Force nhất (dòng "0 / 1,000")
 CENTER = (198, 352)            # giữa màn hình: xưởng bẫy sau khi bấm Go

@@ -19,11 +19,20 @@ class BotContext(FlowMixin, InputMixin, ScreenMixin):
         self._deadline = deadline    # time.monotonic() value, or None for no limit
         self._boss_event = threading.Event()
         self._boss_interrupt_enabled = False
+        # time.monotonic() lúc cần quay lại xử lý bubble (None = không theo dõi).
+        self._bubble_due_at: float | None = None
+        # time.monotonic() lúc tới giờ Auto Times Out: đóng game (None = không theo dõi).
+        self._restart_due_at: float | None = None
         self.report_boss = lambda coords: None
         # Daily Activities: task đã xong từ lần reset gần nhất chưa / đánh dấu xong.
         self.is_daily_done = lambda task: False
         self.mark_daily_done = lambda task: None
+        # Giờ (ISO) lưu `task` trong daily_done, kể cả ngày cũ; None nếu chưa có.
+        self.done_at = lambda task: None
         self._log = log
+        # Sự kiện đáng lưu lịch sử (DB + tab Logs > History); worker gán BotWorker.record,
+        # mặc định (test / chạy tay) chỉ là log thường.
+        self.record = log
         self._templates: dict[str, np.ndarray] = {}
         self._window_size: tuple[int, int] | None = None
         # Every tab's config ({tab title: settings}), for activities that
