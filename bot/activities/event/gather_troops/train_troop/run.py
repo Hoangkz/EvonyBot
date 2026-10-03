@@ -2,8 +2,8 @@
 run.py — flow chung của các nhiệm vụ train lính trong Gather Troops (Ground Troop Day 2,
 Mounted Troop Day 3, ...). Mỗi nhiệm vụ chỉ khác tab Day, tab phụ và ảnh cấp lính: khai
 báo một TroopTask rồi gọi run(bot, task, state, troop).
-King's Path Train Troop (kings_path/train_troop/) dùng lại flow này với event_icon /
-title của King's Path và first_tier=True (luôn train cấp I, troop_tier.choose_first_tier).
+King's Path Train Troop có code riêng (kings_path/train_troop/run.py), chỉ import dùng lại các
+bước chung trong file này (menu công trình, tính số mẻ, bấm Train, Finish All).
 
 Phần đi từ màn chính tới màn event nằm trong run_task() (xem event/common.py).
 
@@ -57,7 +57,7 @@ from ...common import (
     run_task,
 )
 from ...constants import GATHER_TROOPS_ICON, THRESHOLDS as EVENT_THRESHOLDS
-from ..troop_tier import TIER_ROW_REGION, TIER_THRESHOLD, choose_first_tier, choose_tier
+from ..troop_tier import TIER_ROW_REGION, TIER_THRESHOLD, choose_tier
 from .constants import (
     BUTTON_WAIT,
     CENTER,
@@ -120,9 +120,6 @@ class TroopTask:
     # giống hệt Gather Troops). None = không kiểm tra.
     title: str | None = None
     title_region: tuple | None = None
-    # True: luôn train cấp thấp nhất (vòng đầu tiên, troop_tier.choose_first_tier) thay vì
-    # cấp người dùng chọn (King's Path: "Train N Troop(s)" tính mọi cấp).
-    first_tier: bool = False
 
     @property
     def locked_key(self) -> str:
@@ -217,8 +214,7 @@ def run(bot, task: dict, state: EventState, troop: TroopTask):
                     bot.log(f"{name}: troops already training, finishing them first (not counted)")
                     bot.tap(*speedup, delay=BUTTON_WAIT)
                     return HANDLED
-                tier = (choose_first_tier(bot, troop.tiers) if troop.first_tier
-                        else choose_tier(bot, troop.tiers, level, troop.lowest))
+                tier = choose_tier(bot, troop.tiers, level, troop.lowest)
                 if tier is None:
                     bot.record(f"{name}: tier {troop.lowest} locked, cannot do this task yet")
                     bot.mark_daily_done(locked_key)

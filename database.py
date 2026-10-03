@@ -5,7 +5,8 @@ Table `devices`: one row per ADB serial. Besides the device columns
 (server nhập ở tab Initialization, bubble_until, timestamps) every tab has
 its own column holding that tab's settings as JSON (see TAB_COLUMNS).
 Table `settings`: cài đặt chung mọi thiết bị ({key: value}), VD SERVER_TIME — giờ reset server "HH:MM"
-người dùng chọn ở màn Home (mặc định 14:00; DB cũ có cột devices.server_time thì chuyển sang đây rồi xoá cột).
+người dùng chọn ở màn Home (mặc định 14:00; DB cũ có cột devices.server_time thì chuyển sang đây rồi xoá cột),
+AUTO_TIMEOUT — số phút "Auto Times Out" ở màn Home.
 Daily Activities stores {task: enabled}; which tasks are done today lives
 in `daily_done` ({task: done_at}) so saving the tab never clears it.
 Table `logs`: lịch sử sự kiện của bot theo thiết bị (bắt đầu / xong / dừng nhiệm vụ...), chỉ thêm vào,
@@ -41,6 +42,8 @@ DAILY_TAB = "Daily Activities"
 INIT_TAB = "Initialization"  # device id is not stored; server goes to devices.server
 # Key trong bảng `settings`: giờ reset server "HH:MM" (chọn ở màn Home), dùng chung mọi thiết bị.
 SERVER_TIME = "server_time"
+# Key trong bảng `settings`: "Auto Times Out" (phút, chọn ở màn Home), dùng chung mọi thiết bị.
+AUTO_TIMEOUT = "auto_timeout"
 
 # Tab title -> column of `devices` holding that tab's settings JSON.
 TAB_COLUMNS = {
@@ -245,6 +248,14 @@ class Database:
     def set_server_time(self, server_time: str):
         """Lưu giờ reset server "HH:MM", chung mọi thiết bị."""
         self.set_setting(SERVER_TIME, reset_clock(server_time))
+
+    def auto_timeout(self) -> str:
+        """"Auto Times Out" (số phút, chọn ở màn Home); rỗng nếu chưa lưu."""
+        return self.get_setting(AUTO_TIMEOUT)
+
+    def set_auto_timeout(self, minutes: str):
+        """Lưu "Auto Times Out" (số phút), chung mọi thiết bị."""
+        self.set_setting(AUTO_TIMEOUT, minutes)
 
     def set_bubble_until(self, serial: str, bubble_until: str):
         """Lưu thời điểm bubble hết (ISO theo giờ máy; rỗng -> NULL = chưa biết)."""

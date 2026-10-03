@@ -141,29 +141,6 @@ def choose_tier(bot, tiers, want: int, lowest: int) -> int | None:
     return None
 
 
-def choose_first_tier(bot, tiers) -> int | None:
-    """Chọn cấp thấp nhất (vòng đầu tiên của hàng, VD lính cấp I — luôn mở). Cấp I nằm sát
-    mép trái hàng chứ không ra giữa (tests/event/kings_path/screens/train_t01.png: I ở x 44)
-    nên không dùng choose_tier: thấy vòng cấp thấp nhất thì bấm, chưa thấy thì bấm vòng trái
-    nhất để lùi dần. Trả cấp đã chọn, hoặc None nếu không nhận ra hàng / không train được."""
-    first = min(tiers)
-    for _ in range(MAX_STEPS):
-        circles = visible_circles(bot, bot.screenshot(), tiers)
-        if not circles:
-            bot.record("Train: tier row not found")
-            return None
-        leftmost = circles[0]
-        bot.tap(leftmost.x, leftmost.y, delay=TAP_DELAY)
-        if leftmost.tier != first:
-            continue
-        if bot.find(TRAIN_PLUS, region=TRAIN_PLUS_REGION) is None:
-            bot.log(f"Train: tier {first} cannot be trained")
-            return None
-        return first
-    bot.record("Train: cannot choose first tier")
-    return None
-
-
 def _goal(tiers, locked, want, lowest, single) -> int | None:
     """Cấp cao nhất trong [lowest, want] chưa biết là khoá. Lính: khoá từ cấp khoá thấp
     nhất trở lên; bẫy: một cấp khoá khi cả mọi loại của nó đều khoá."""

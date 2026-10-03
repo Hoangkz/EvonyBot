@@ -27,3 +27,8 @@ class YieldToBoss(BotInterrupted):
 
 class BubbleDue(BotInterrupted):
     """Bubble sắp hết: dừng activity đang chạy (kể cả Join Boss) để gia hạn trước."""
+
+
+class RestartDue(BotInterrupted):
+    """Tới giờ "Auto Times Out" (màn Home): dừng activity đang chạy để đóng game (bot tự mở lại khi chạy tiếp).
+    Xét sau BubbleDue: bubble vẫn được lo trước."""

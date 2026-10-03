@@ -40,7 +40,7 @@ from bot.activities.event.kings_path.refine.constants import CANCEL as REFINE_CA
 from bot.activities.event.kings_path.refine.run import _last_done as refine_last_done, blue_items
 from bot.context import TEMPLATE_DIR, BotContext
 from bot.context.errors import YieldToBoss
-from bot.activities.event.gather_troops.troop_tier import choose_first_tier
+from bot.activities.event.kings_path.train_troop.tier import choose_first_tier
 from bot.activities.event.kings_path.train_troop.constants import TIERS as TRAIN_TIERS
 from tests.flow import Step, back, end, run_flow, swipe, tap, tap_at, tap_pct
 from tests.event import setUpModule, tearDownModule  # noqa: F401 (tắt lượt nhận thưởng)
@@ -338,18 +338,27 @@ class KingsPathFlow(unittest.TestCase):
         self.assertIn("City Tax: done 93, target 110", device.logs)
 
     def test_train_first_tier_walks_down(self):
-        """Doanh trại mở ở cấp cao (ảnh lính bộ cấp XIII .. V của test Ground Troop): bấm vòng trái nhất
-        (nhảy ra giữa) để lùi dần XIII -> XI -> IX -> VII -> V -> III; thấy vòng cấp I (train_t01, I sát
-        mép trái) thì bấm I, có nút "+" -> chọn cấp 1."""
+        """Công trình mở ở cấp cao (ảnh lính bộ cấp XIII .. V của test Ground Troop): chưa thấy cấp I
+        của loại nào -> vuốt hàng cấp sang trái, mỗi lần vuốt kiểm tra lại; thấy vòng cấp I (train_t01,
+        I sát mép trái) thì bấm I, có nút "+" -> chọn cấp 1, thôi vuốt."""
         g = "../../gather_troops/ground_troop/screens/"
         flow = [
-            Step(g + "train_t13.png", tap_at(27, 463)),   # XI
-            Step(g + "train_t11.png", tap_at(24, 463)),   # IX
-            Step(g + "train_t09.png", tap_at(23, 463)),   # VII
-            Step(g + "train_t07.png", tap_at(22, 463)),   # V
-            Step(g + "train_t05.png", tap_at(20, 463)),   # III
-            Step("train_t01.png", tap_at(44, 463)),       # I
+            Step(g + "train_t13.png", swipe(15, 64, 90, 64)),
+            Step(g + "train_t11.png", swipe(15, 64, 90, 64)),
+            Step(g + "train_t09.png", swipe(15, 64, 90, 64)),
+            Step(g + "train_t07.png", swipe(15, 64, 90, 64)),
+            Step(g + "train_t05.png", swipe(15, 64, 90, 64)),
+            Step("train_t01.png", tap("Event/GatherTroops/GroundTroop/Tier/1.png")),
             Step("train_t01.png", end(1)),
+        ]
+        run_flow(self, lambda bot, _: choose_first_tier(bot, TRAIN_TIERS), SCREENS, flow, {})
+
+    def test_train_first_tier_other_kind(self):
+        """Game mở chuồng ngựa (lính kỵ, ảnh có cấp I ngay): nhận cấp I của loại khác lính bộ, không vuốt."""
+        flow = [
+            Step("../../gather_troops/mounted_troop/screens/train_t02.png",
+                 tap("Event/GatherTroops/MountedTroop/Tier/1.png")),
+            Step("../../gather_troops/mounted_troop/screens/train_t02.png", end(1)),
         ]
         run_flow(self, lambda bot, _: choose_first_tier(bot, TRAIN_TIERS), SCREENS, flow, {})
 

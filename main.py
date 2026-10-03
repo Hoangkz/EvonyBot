@@ -9,6 +9,7 @@ the selected device's tabbed control panel.
 import ctypes
 import platform
 import sys
+import threading
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -16,6 +17,7 @@ from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import QApplication, QMainWindow, QStackedWidget, QWidget, QHBoxLayout
 
+from bot.common import GAME_PACKAGE
 from bot.worker import BotManager
 from database import Database
 from ui import DeviceView, HomeView, Sidebar
@@ -69,6 +71,11 @@ class MainWindow(QMainWindow):
         self.bots.server_clock.set(self.db.server_time())
         self.home_view.set_reset_time(self.bots.server_clock.value)
         self.home_view.reset_time_changed.connect(self._on_reset_time_changed)
+        # "Auto Times Out" chung mọi thiết bị (bảng settings): nạp lại giá trị đã lưu; đổi là lưu DB và
+        # các worker đang chạy dùng ngay (tới giờ thì đóng game, ưu tiên ngay sau Bubble).
+        self.home_view.set_auto_timeout(self.db.auto_timeout())
+        self.bots.auto_timeout_minutes = self.home_view.auto_timeout_minutes
+        self.home_view.auto_timeout_changed.connect(self._on_auto_timeout_changed)
         self.bots.daily_task_done.connect(self.db.mark_daily_task_done)
         self.bots.bubble_found.connect(self._on_bubble_found)
         self.bots.bubble_disabled.connect(self._on_bubble_disabled)
@@ -83,7 +90,6 @@ class MainWindow(QMainWindow):
         self.home_view.devices_loaded.connect(self._on_devices_loaded)
         self.home_view.start_all_requested.connect(self._on_start_all_requested)
         self.home_view.exit_all_requested.connect(self._on_exit_all_requested)
-        self.home_view.close_all_requested.connect(self._on_close_all_requested)
 
     def _center_on_screen(self):
         frame = self.frameGeometry()
@@ -199,6 +205,10 @@ class MainWindow(QMainWindow):
         self.db.set_server_time(server_time)
         self.bots.server_clock.set(server_time)
 
+    def _on_auto_timeout_changed(self, minutes: str):
+        self.db.set_auto_timeout(minutes)
+        self.bots.auto_timeout_minutes = int(minutes)
+
     def _all_running(self) -> bool:
         return bool(self.device_views) and all(
             self.bots.is_running(d) for d in self.device_views
@@ -272,12 +282,16 @@ class MainWindow(QMainWindow):
             view.append_history(created_at, message)
 
     def _on_exit_all_requested(self):
-        # TODO: wire up to the actual automation/bot backend.
-        print("[EvonyBot] Exit ALL requested")
-
-    def _on_close_all_requested(self):
-        # TODO: wire up to the actual automation/bot backend.
-        print("[EvonyBot] Close ALL requested")
+        """Exit All: đóng game (force-stop) trên mọi thiết bị. Gọi ADB trên thread nền để không đơ UI."""
+        def close_games(serials):
+            import adbutils
+            for serial in serials:
+                try:
+                    adbutils.adb.device(serial=serial).shell(f"am force-stop {GAME_PACKAGE}")
+                except Exception as e:
+                    print(f"[{serial}] Exit All: không đóng được game: {e}")
+        threading.Thread(target=close_games, args=(list(self.device_views),),
+                         name="exit-all", daemon=True).start()
 
 
 def main():

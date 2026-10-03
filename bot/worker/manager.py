@@ -28,6 +28,9 @@ class BotManager(QObject):
         self.boss_board = BossBoard()
         # Giờ reset server chung mọi thiết bị: main gán giá trị đã lưu trong DB / chọn ở màn Home.
         self.server_clock = ServerClock()
+        # "Auto Times Out" (phút) chung mọi thiết bị: main gán giá trị đã lưu / chọn ở màn Home; worker
+        # đang chạy đọc giá trị mới ngay.
+        self.auto_timeout_minutes = 0
 
     def is_running(self, serial: str) -> bool:
         return serial in self._workers
@@ -43,7 +46,8 @@ class BotManager(QObject):
 
         worker = BotWorker(serial, activities, settings, self,
                            boss_board=self.boss_board, daily_done=daily_done,
-                           server_clock=self.server_clock)
+                           server_clock=self.server_clock,
+                           auto_timeout=lambda: self.auto_timeout_minutes)
         worker.activity_changed.connect(self.activity_changed.emit)
         worker.status_changed.connect(self.status_changed.emit)
         worker.server_found.connect(self.server_found.emit)
