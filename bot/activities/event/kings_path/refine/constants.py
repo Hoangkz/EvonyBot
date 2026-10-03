@@ -98,7 +98,7 @@ TYPE_SAME = 0.95
 TYPE_SWITCHES = 9
 # Bấm sang loại khác -> chờ TYPE_WAIT giây -> vòng giữa đã đổi chưa; chưa thì chờ thêm 1 s, kiểm
 # tra lại, tối đa TYPE_CHECKS lần; vẫn chưa đổi -> Back, dừng (không lưu done).
-TYPE_WAIT = 1
+TYPE_WAIT = 2   # mọi bước bấm chờ 2-3 s
 TYPE_CHECKS = 10
 # Loại đang mở = ảnh Equipment/<loại>/active.png khớp cao nhất quanh ACTIVE_POS (đúng loại 1,00;
 # mũ so với loại khác <= 0,29). Tới LAST_TYPE (mũ, loại cuối bên trái) mà vẫn không có món xanh /

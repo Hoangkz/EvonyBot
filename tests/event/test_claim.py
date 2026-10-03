@@ -16,7 +16,7 @@ from bot.activities.event.constants import CLAIM_ALL, DOT_DAY_Y, DOT_TAB_Y, GATH
 from bot.activities.event.gather_troops import cultivate_generals
 from bot.activities.event.kings_path import wheel
 from bot.ocr import read_milestone
-from tests.event import MAYBE_CLAIM
+from tests.event import LOGIN_REWARD_PATCHER, MAYBE_CLAIM, VOYAGE_PATCHER
 from tests.flow import Step, end, run_flow, tap, tap_at
 
 SCREENS = Path(__file__).parent / "kings_path" / "screens"
@@ -42,6 +42,17 @@ VARIANTS = {
     "no_dots": lambda bgr: _blank(DOT_TAB_Y - 9, DOT_TAB_Y + 9, 0, 396)(
         _blank(DOT_DAY_Y - 9, DOT_DAY_Y + 9, 0, 396)(_NO_CLAIM_ALL(bgr))),
 }
+
+
+def setUpModule():
+    # Tắt kiểm rương Login Rewards và mở Voyage (xem tests/event/__init__.py).
+    LOGIN_REWARD_PATCHER.start()
+    VOYAGE_PATCHER.start()
+
+
+def tearDownModule():
+    VOYAGE_PATCHER.stop()
+    LOGIN_REWARD_PATCHER.stop()
 
 
 def _run(testcase, flow, daily_done):

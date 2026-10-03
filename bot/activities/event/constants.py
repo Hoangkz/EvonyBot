@@ -91,6 +91,51 @@ EVENT_OPEN_RETRIES = 2
 # ô. Khớp 1,00 trên 7 ảnh 04_event_list.png; 315 màn khác <= 0,49. Bấm nút event xong chờ tối đa
 # EVENT_LIST_WAIT giây; không thấy (đổi đợt lễ hội / chưa tải) vẫn cuộn tìm icon (open_event).
 EVENT_LIST_TITLE = f"{EV}/EventList/title.png"
+# ---- Rương Login Rewards ở đầu danh sách event (claim_login_reward trong common.py) ----------
+# Mỗi ngày kiểm 1 lần (daily_done LOGIN_REWARD_KEY, tới lần reset server): tìm đầu thanh tiến độ
+# màu cam dưới hàng rương (progressTip.png, (122, 306) trên event_list_reward.png: 1,00; (68, 306)
+# trên event_list_reward_opened.png: 0,99; màn khác <= 0,66). Rương của hôm nay nằm ngay trên đầu
+# thanh: tìm rương đã mở (chestOpened.png, nắp mở) trong ô CHEST_FROM_TIP quanh đó — đã mở 1,00,
+# chưa mở <= 0,43. Đã mở -> lưu DB, bỏ qua. Chưa mở -> bấm (đầu thanh x, y - 35) -> lưu DB (bấm xong
+# không có popup, vẫn ở danh sách event -> tìm icon tiếp). Bấm đúng y của đầu thanh (trên thanh tiến
+# độ) không nhận được (thử thật máy 21923: (48, 306) không nhận; (48, 266) trên rương thì nhận).
+# Không thấy đầu thanh -> không lưu (lần sau kiểm lại).
+LOGIN_REWARD_KEY = "event_login_reward"
+PROGRESS_TIP = f"{EV}/EventList/progressTip.png"
+PROGRESS_TIP_THRESHOLD = 0.85
+PROGRESS_TIP_REGION = (0, 40, 100, 48)   # % màn hình: thanh tiến độ (y ~306)
+CHEST_OPENED = f"{EV}/EventList/chestOpened.png"
+CHEST_OPENED_THRESHOLD = 0.75
+CHEST_FROM_TIP = (-40, -70, 70, 50)   # (dx, dy, w, h) ô tìm rương so với tâm đầu thanh
+CHEST_TAP = (0, -35)                  # bấm (đầu thanh x, đầu thanh y - 35): lên rương hôm nay
+CHEST_WAIT = 2   # sau khi bấm rương (mọi bước chờ 2-3 s)
+# ---- Voyage to Civilizations trong danh sách event (open_voyage trong common.py) -----------
+# Mỗi ngày bấm Free 1 lần (daily_done VOYAGE_KEY, tới lần reset server; không xét chấm đỏ): hôm nay
+# đã bấm Free thì không vào. Chưa bấm: thấy icon Voyage (phần dưới trái icon con tàu, bỏ góc chấm đỏ: 1,00 trên mọi màn danh
+# sách có Voyage, icon event khác <= 0,56) -> bấm vào -> màn Voyage to Civilizations:
+# 1. Ô "Skip animation" (281, 622) chưa tích -> bấm tích.
+# 2. Nút "Voyage Once" có chữ "Free" -> bấm 1 lần (mỗi ngày 1 lượt miễn phí).
+# 3. Đã bấm Free -> lưu VOYAGE_KEY. Không thấy Free -> KHÔNG lưu (vẫn tính là chưa bấm, lần sau vào
+#    kiểm lại). Back về danh sách event (tối đa VOYAGE_BACKS lần, tới khi thấy
+#    tiêu đề danh sách). Sau khi bấm Free: popup "Congratulations" (voyage_congrats.png) -> Back 1 đóng
+#    popup, về màn Voyage hết Free (voyage_no_free.png) -> Back 2 về danh sách.
+VOYAGE_ICON = f"{EV}/Voyage/icon.png"
+VOYAGE_THRESHOLD = 0.8
+VOYAGE_KEY = "event_voyage"
+# Tiêu đề "Voyage to Civilizations" (198, 23): 1,00; màn khác <= 0,39.
+VOYAGE_TITLE = f"{EV}/Voyage/title.png"
+# Ô Skip animation: chưa tích (skipOff) / đã tích (skipOn) 1,00, khớp chéo 0,75 -> ngưỡng 0,9.
+VOYAGE_SKIP_OFF = f"{EV}/Voyage/skipOff.png"
+VOYAGE_SKIP_THRESHOLD = 0.9
+VOYAGE_SKIP_REGION = (60, 84, 80, 93)   # % màn hình: quanh ô (281, 622)
+# Chữ "Free" dưới "Voyage Once" (287, 684): 1,00; màn khác <= 0,54. Bấm vào nút (giữa nút).
+VOYAGE_FREE = f"{EV}/Voyage/free.png"
+VOYAGE_FREE_REGION = (50, 92, 100, 100)
+VOYAGE_ONCE_DY = -14   # bấm giữa nút "Voyage Once": chữ Free (287, 684) -> (287, 670)
+VOYAGE_SCREEN_WAIT = 10   # giây chờ màn Voyage sau khi bấm icon
+VOYAGE_WAIT = 3           # sau mỗi lần bấm trong màn Voyage
+VOYAGE_STEP_WAIT = 2      # sau khi màn Voyage hiện / sau mỗi lần Back
+VOYAGE_BACKS = 3
 # Không dùng ngưỡng 1: đúng màn 1,00, màn khác <= 0,49 -> 0,8 vẫn cách xa mà chịu được sai khác nhỏ.
 EVENT_LIST_TITLE_THRESHOLD = 0.8
 EVENT_LIST_WAIT = 10

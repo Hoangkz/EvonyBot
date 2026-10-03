@@ -44,6 +44,9 @@ from bot.activities.event.kings_path.train_troop.tier import choose_first_tier
 from bot.activities.event.kings_path.train_troop.constants import TIERS as TRAIN_TIERS
 from tests.flow import Step, back, end, run_flow, swipe, tap, tap_at, tap_pct
 from tests.event import setUpModule, tearDownModule  # noqa: F401 (tắt lượt nhận thưởng)
+from tests.event import CLAIM_LOGIN_REWARD, OPEN_VOYAGE
+from bot.activities.event import common as event_common
+from bot.activities.event.constants import LOGIN_REWARD_KEY, VOYAGE_ICON, VOYAGE_KEY, VOYAGE_SKIP_OFF
 
 SCREENS = Path(__file__).parent / "screens"
 KP = "Event/KingsPath"
@@ -86,6 +89,116 @@ VARIANTS = {
 
 def _run(testcase, flow, settings, **kw):
     return run_flow(testcase, event.run, SCREENS, flow, settings, variants=VARIANTS, **kw)
+
+
+class LoginRewardFlow(unittest.TestCase):
+    """Rương Login Rewards hôm nay ở đầu danh sách event (event/common.py claim_login_reward)."""
+
+    def _run(self, flow, **kw):
+        with mock.patch.object(event_common, "claim_login_reward", CLAIM_LOGIN_REWARD):
+            return _run(self, flow, {wheel.KEY: {"value": 100, "day": 4}}, **kw)
+
+    def test_unopened_chest_claimed(self):
+        """Rương trên đầu thanh tiến độ (122, 306) chưa mở: bấm (122, 271), lưu DB, rồi tìm icon King's
+        Path như thường."""
+        flow = [
+            Step("03_main.png?main_claimed", tap_at(*EVENT_BUTTON)),
+            Step("event_list_reward.png", tap_at(122, 271, tol=3)),
+            Step("04_event_list.png", tap(KINGS_PATH_ICON)),
+            Step("day4_fortune_wheel.png", tap_at(335, 344)),
+            Step("wheel_of_fortune.png", tap(SPINS_100), back(), end()),
+        ]
+        device = self._run(flow)
+        self.assertIn(LOGIN_REWARD_KEY, device.daily_done)
+        self.assertIn(wheel.KEY, device.daily_done)
+
+    def test_unopened_chest_scrolled_row(self):
+        """Hàng rương đã cuộn ngang (máy 21923): đầu thanh (68, 306), rương ngày 2 chưa nhận -> bấm
+        (68, 271)."""
+        flow = [
+            Step("03_main.png?main_claimed", tap_at(*EVENT_BUTTON)),
+            Step("event_list_reward_scrolled.png", tap_at(68, 271, tol=3)),
+            Step("04_event_list.png", tap(KINGS_PATH_ICON)),
+            Step("day4_fortune_wheel.png", tap_at(335, 344)),
+            Step("wheel_of_fortune.png", tap(SPINS_100), back(), end()),
+        ]
+        device = self._run(flow)
+        self.assertIn(LOGIN_REWARD_KEY, device.daily_done)
+
+    def test_opened_chest_skipped(self):
+        """Rương hôm nay đã mở (nắp mở): không bấm, lưu DB (hôm nay không kiểm nữa). Ảnh này không có
+        icon King's Path: cuộn hết rồi Back, bỏ nhiệm vụ."""
+        flow = [
+            Step("03_main.png?main_claimed", tap_at(*EVENT_BUTTON)),
+            Step("event_list_reward_opened.png", *[swipe(50, 80, 50, 50) for _ in range(4)], back()),
+            Step("03_main.png?main_claimed", end()),
+        ]
+        device = self._run(flow)
+        self.assertIn("Event: login reward already opened", device.logs)
+        self.assertIn(LOGIN_REWARD_KEY, device.daily_done)
+
+    def test_checked_today_not_again(self):
+        """Hôm nay đã kiểm (DB có LOGIN_REWARD_KEY): không bấm rương, tìm icon luôn."""
+        flow = [
+            Step("03_main.png?main_claimed", tap_at(*EVENT_BUTTON)),
+            Step("04_event_list.png", tap(KINGS_PATH_ICON)),
+            Step("day4_fortune_wheel.png", tap_at(335, 344)),
+            Step("wheel_of_fortune.png", tap(SPINS_100), back(), end()),
+        ]
+        device = self._run(flow, daily_done={LOGIN_REWARD_KEY: "2026-10-03T09:00:00"})
+        self.assertIn(wheel.KEY, device.daily_done)
+
+
+class VoyageFlow(unittest.TestCase):
+    """Voyage to Civilizations ở danh sách event (event/common.py open_voyage): hôm nay chưa bấm Free
+    -> vào, tích Skip animation, có Free thì bấm và lưu VOYAGE_KEY, Back về danh sách."""
+
+    def _run(self, flow, **kw):
+        with mock.patch.object(event_common, "open_voyage", OPEN_VOYAGE):
+            return _run(self, flow, {wheel.KEY: {"value": 100, "day": 4}}, **kw)
+
+    def test_free_voyage(self):
+        """Hôm nay chưa làm: vào Voyage -> tích Skip animation -> bấm Voyage Once (Free) -> popup
+        Congratulations -> Back (đóng popup) -> Back (về danh sách) -> tìm icon King's Path như thường."""
+        flow = [
+            Step("03_main.png?main_claimed", tap_at(*EVENT_BUTTON)),
+            Step("event_list_voyage_dot.png", tap(VOYAGE_ICON)),
+            Step("voyage_screen.png", tap(VOYAGE_SKIP_OFF)),
+            Step("voyage_skip_ticked.png", tap_at(287, 670, tol=5)),
+            Step("voyage_congrats.png", back()),
+            Step("voyage_no_free.png", back()),
+            Step("04_event_list.png", tap(KINGS_PATH_ICON)),
+            Step("day4_fortune_wheel.png", tap_at(335, 344)),
+            Step("wheel_of_fortune.png", tap(SPINS_100), back(), end()),
+        ]
+        device = self._run(flow)
+        self.assertIn("Event: Voyage: free Voyage Once", device.logs)
+        self.assertIn(VOYAGE_KEY, device.daily_done)
+
+    def test_no_free(self):
+        """Đã tích Skip animation, không thấy Free: không bấm gì, KHÔNG lưu VOYAGE_KEY (lần sau vào kiểm
+        lại), Back."""
+        flow = [
+            Step("03_main.png?main_claimed", tap_at(*EVENT_BUTTON)),
+            Step("event_list_voyage_dot.png", tap(VOYAGE_ICON)),
+            Step("voyage_no_free.png", back()),
+            Step("04_event_list.png", tap(KINGS_PATH_ICON)),
+            Step("day4_fortune_wheel.png", tap_at(335, 344)),
+            Step("wheel_of_fortune.png", tap(SPINS_100), back(), end()),
+        ]
+        device = self._run(flow)
+        self.assertIn("Event: Voyage: no Free, check again next time", device.logs)
+        self.assertNotIn(VOYAGE_KEY, device.daily_done)
+
+    def test_done_today_not_entered(self):
+        """Hôm nay đã bấm Free (DB có VOYAGE_KEY): không vào Voyage. Ảnh không có icon King's Path: cuộn hết,
+        Back."""
+        flow = [
+            Step("03_main.png?main_claimed", tap_at(*EVENT_BUTTON)),
+            Step("event_list_voyage_dot.png", *[swipe(50, 80, 50, 50) for _ in range(4)], back()),
+            Step("03_main.png?main_claimed", end()),
+        ]
+        self._run(flow, daily_done={VOYAGE_KEY: "2026-10-03T09:00:00"})
 
 
 class KingsPathFlow(unittest.TestCase):

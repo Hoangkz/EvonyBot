@@ -57,6 +57,29 @@ from .constants import (
     EVENT_ICON_THRESHOLD,
     EVENT_LIST_MAX_SCROLLS,
     EVENT_OPEN_RETRIES,
+    CHEST_FROM_TIP,
+    CHEST_OPENED,
+    CHEST_OPENED_THRESHOLD,
+    CHEST_TAP,
+    CHEST_WAIT,
+    LOGIN_REWARD_KEY,
+    VOYAGE_BACKS,
+    VOYAGE_FREE,
+    VOYAGE_FREE_REGION,
+    VOYAGE_ICON,
+    VOYAGE_KEY,
+    VOYAGE_ONCE_DY,
+    VOYAGE_SCREEN_WAIT,
+    VOYAGE_SKIP_OFF,
+    VOYAGE_SKIP_REGION,
+    VOYAGE_SKIP_THRESHOLD,
+    VOYAGE_STEP_WAIT,
+    VOYAGE_THRESHOLD,
+    VOYAGE_TITLE,
+    VOYAGE_WAIT,
+    PROGRESS_TIP,
+    PROGRESS_TIP_REGION,
+    PROGRESS_TIP_THRESHOLD,
     EVENT_LIST_TITLE,
     EVENT_LIST_TITLE_BOX,
     EVENT_LIST_TITLE_THRESHOLD,
@@ -254,17 +277,27 @@ def open_event(bot, icon: str) -> str:
     hoặc NOT_IN_LIST (không thấy).
     Chờ tiêu đề danh sách event (EVENT_LIST_TITLE, VD "Wine Festival Event") tối đa EVENT_LIST_WAIT
     giây; không thấy vẫn cuộn tìm như thường, chỉ nhớ là không thấy (không lưu DB): tìm được icon
-    King's Path / Gather Troops thì chụp màn, cắt lại tiêu đề danh sách ghi đè ảnh mẫu."""
+    King's Path / Gather Troops thì chụp màn, cắt lại tiêu đề danh sách ghi đè ảnh mẫu.
+    Lần đầu thấy tiêu đề danh sách: kiểm rương Login Rewards hôm nay (claim_login_reward) rồi mới
+    tìm icon. Gặp Voyage to Civilizations mà hôm nay chưa làm: vào bấm Free rồi Back (open_voyage)."""
     list_seen = bot.wait_for(EVENT_LIST_TITLE, timeout=EVENT_LIST_WAIT,
                              threshold=EVENT_LIST_TITLE_THRESHOLD) is not None
     if not list_seen:
         bot.log(f"Event: event list title not seen after {EVENT_LIST_WAIT} s, still searching")
     best = 0.0   # điểm khớp cao nhất qua các lần cuộn (ghi vào lịch sử khi không thấy)
+    reward_checked = voyage_checked = False
     for scroll in range(EVENT_LIST_MAX_SCROLLS + 1):
         screen = bot.screenshot()
         # Danh sách tải chậm hơn EVENT_LIST_WAIT: thấy tiêu đề ở lần cuộn nào cũng tính là đã vào.
         list_seen = list_seen or bot.find(EVENT_LIST_TITLE, threshold=EVENT_LIST_TITLE_THRESHOLD,
                                           screen=screen) is not None
+        if list_seen and not reward_checked:
+            reward_checked = True
+            if claim_login_reward(bot, screen):
+                screen = bot.screenshot()
+        if not voyage_checked and open_voyage(bot, screen):
+            voyage_checked = True
+            screen = bot.screenshot()
         score, pos = bot.best_match(icon, screen=screen)
         if pos is not None and score >= EVENT_ICON_THRESHOLD:
             if not list_seen and icon in REFRESH_TITLE_ICONS:
@@ -277,6 +310,72 @@ def open_event(bot, icon: str) -> str:
     bot.record(f"Event: {icon} not found after {EVENT_LIST_MAX_SCROLLS} scrolls (best {best:.2f})")
     bot.back(delay=1)
     return NOT_FOUND if list_seen else NOT_IN_LIST
+
+
+def claim_login_reward(bot, screen) -> bool:
+    """Rương Login Rewards hôm nay (xem constants.py): mỗi ngày kiểm 1 lần. True nếu vừa bấm nhận
+    (màn hình đã đổi)."""
+    if bot.is_daily_done(LOGIN_REWARD_KEY):
+        return False
+    tip = bot.find(PROGRESS_TIP, threshold=PROGRESS_TIP_THRESHOLD, screen=screen,
+                   region=PROGRESS_TIP_REGION)
+    if tip is None:
+        bot.log("Event: login reward progress bar not found, check next time")
+        return False
+    dx, dy, w, h = CHEST_FROM_TIP
+    area = bot.crop(screen, tip[0] + dx, tip[1] + dy, w, h)
+    if bot.find(CHEST_OPENED, threshold=CHEST_OPENED_THRESHOLD, screen=area) is not None:
+        bot.log("Event: login reward already opened")
+        bot.mark_daily_done(LOGIN_REWARD_KEY)
+        return False
+    bot.record(f"Event: claim login reward at progress bar {tip}")
+    bot.tap(tip[0] + CHEST_TAP[0], tip[1] + CHEST_TAP[1], delay=CHEST_WAIT)
+    bot.mark_daily_done(LOGIN_REWARD_KEY)
+    return True
+
+
+def open_voyage(bot, screen) -> bool:
+    """Voyage to Civilizations (xem constants.py): hôm nay chưa bấm Free và thấy icon trên `screen` ->
+    vào, tích Skip animation, có Free thì bấm Voyage Once và lưu VOYAGE_KEY (không có Free thì không
+    lưu, lần sau kiểm lại), Back về danh sách. True nếu đã vào (màn hình đã đổi)."""
+    if bot.is_daily_done(VOYAGE_KEY):
+        return False
+    pos = bot.find(VOYAGE_ICON, threshold=VOYAGE_THRESHOLD, screen=screen)
+    if pos is None:
+        return False
+    bot.log("Event: open Voyage to Civilizations")
+    bot.tap(*pos, delay=VOYAGE_WAIT)
+    if bot.wait_for(VOYAGE_TITLE, timeout=VOYAGE_SCREEN_WAIT) is None:
+        bot.record("Event: Voyage to Civilizations screen not shown")
+        _back_to_event_list(bot)
+        return True
+    bot.sleep(VOYAGE_STEP_WAIT)   # màn vừa hiện: chờ tải xong rồi mới bấm
+    screen = bot.screenshot()
+    skip = bot.find(VOYAGE_SKIP_OFF, threshold=VOYAGE_SKIP_THRESHOLD, screen=screen,
+                    region=VOYAGE_SKIP_REGION)
+    if skip is not None:
+        bot.log("Event: Voyage: tick Skip animation")
+        bot.tap(*skip, delay=VOYAGE_WAIT)
+        screen = bot.screenshot()
+    free = bot.find(VOYAGE_FREE, screen=screen, region=VOYAGE_FREE_REGION)
+    if free is not None:
+        bot.record("Event: Voyage: free Voyage Once")
+        bot.tap(free[0], free[1] + VOYAGE_ONCE_DY, delay=VOYAGE_WAIT)
+        bot.mark_daily_done(VOYAGE_KEY)
+    else:
+        bot.log("Event: Voyage: no Free, check again next time")
+    _back_to_event_list(bot)
+    return True
+
+
+def _back_to_event_list(bot):
+    """Back tới khi thấy tiêu đề danh sách event (tối đa VOYAGE_BACKS lần; popup kết quả cũng đóng
+    bằng Back)."""
+    for _ in range(VOYAGE_BACKS):
+        bot.back(delay=VOYAGE_STEP_WAIT)
+        if bot.find(EVENT_LIST_TITLE, threshold=EVENT_LIST_TITLE_THRESHOLD) is not None:
+            return
+    bot.log("Event: event list not shown after Voyage")
 
 
 def refresh_template(bot, screen, template: str, box) -> bool:
