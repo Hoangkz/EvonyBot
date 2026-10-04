@@ -2,7 +2,13 @@ import time
 import unittest
 from unittest import mock
 
-from bot.activities.join_monster_war.boss_memory import JOINED, SKIPPED, TTL, BossMemory
+from bot.activities.join_monster_war.boss_memory import (
+    JOINED,
+    MAX_ENTRIES,
+    SKIPPED,
+    TTL,
+    BossMemory,
+)
 
 
 class BossMemoryTests(unittest.TestCase):
@@ -41,6 +47,15 @@ class BossMemoryTests(unittest.TestCase):
         memory = BossMemory()
         memory.mark(None, JOINED)
         self.assertIsNone(memory.status(None))
+
+    def test_memory_is_bounded_when_ocr_returns_many_different_coordinates(self):
+        memory = BossMemory()
+        for value in range(MAX_ENTRIES + 20):
+            memory.mark((value, value), JOINED)
+
+        self.assertEqual(len(memory._bosses), MAX_ENTRIES)
+        self.assertIsNone(memory.status((0, 0)))
+        self.assertEqual(memory.status((MAX_ENTRIES + 19, MAX_ENTRIES + 19)), JOINED)
 
 
 if __name__ == "__main__":

@@ -1,16 +1,17 @@
 """
-boss_memory.py — BossMemory: toạ độ boss mà một giả lập đã tham gia hoặc đã bỏ
-qua, để khi thấy lại trong danh sách War thì không kiểm tra / Join nữa.
+boss_memory.py — bộ nhớ tọa độ boss của một giả lập.
 
 Mỗi giả lập có một BossMemory riêng, gắn vào BotContext của worker, nên nó
-còn qua các lần Join Boss nhường activity khác và mất khi bấm Stop. Mỗi toạ
-độ tự hết hạn sau TTL (boss đã chết, có thể có boss mới ở cùng chỗ).
+còn qua các lần Join Boss nhường activity khác và mất khi bấm Stop. Flow hiện
+chỉ dùng JOINED để chặn theo tọa độ; SKIPPED được giữ để tương thích dữ liệu/test
+cũ nhưng không được dùng để bỏ qua boss trong run.py.
 """
 import time
 
 JOINED = "joined"       # đã hành quân tới rally của boss này
-SKIPPED = "skipped"     # không tham gia (chữ Join đỏ, boss bị cấu hình skip)
+SKIPPED = "skipped"     # tương thích cũ; run.py không dùng trạng thái này để chặn boss
 TTL = 6 * 60            # giây nhớ một toạ độ
+MAX_ENTRIES = 256        # chặn bộ nhớ tăng vô hạn nếu OCR liên tục sinh tọa độ sai khác nhau
 
 
 class BossMemory:
@@ -26,8 +27,13 @@ class BossMemory:
 
     def mark(self, coords, status: str):
         """Nhớ `coords` với `status` trong TTL giây kể từ bây giờ (None thì bỏ qua)."""
-        if coords is not None:
-            self._bosses[coords] = (status, time.monotonic() + self.ttl)
+        if coords is None:
+            return
+        self._purge()
+        self._bosses[coords] = (status, time.monotonic() + self.ttl)
+        if len(self._bosses) > MAX_ENTRIES:
+            oldest = min(self._bosses, key=lambda key: self._bosses[key][1])
+            del self._bosses[oldest]
 
     def _purge(self):
         now = time.monotonic()
