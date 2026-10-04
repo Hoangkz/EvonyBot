@@ -1,0 +1,71 @@
+{
+  "task": "Offering",
+  "serial": "127.0.0.1:21913",
+  "status": "task-complete",
+  "completed": true,
+  "passes": 1,
+  "logs": [
+    "LIVE Offering: pass 1/5",
+    "Daily Activities: task row has no Go button; completed"
+  ],
+  "daily_done": [],
+  "events": [
+    {
+      "at": "2026-10-04T16:16:55.368",
+      "kind": "match",
+      "template": "exit/1escEvony.png",
+      "position": [
+        260,
+        417
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-04T16:16:55.368",
+      "kind": "key",
+      "key": "KEYCODE_BACK"
+    },
+    {
+      "at": "2026-10-04T16:16:58.015",
+      "kind": "match",
+      "template": "DailyActivites/UseAllActivities/QuestButtonCity.png",
+      "position": [
+        21,
+        619
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-04T16:17:00.007",
+      "kind": "tap",
+      "x": 21,
+      "y": 619
+    },
+    {
+      "at": "2026-10-04T16:17:03.826",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesOffer/Click_Activities1.png",
+      "position": [
+        323,
+        161
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-04T16:17:05.821",
+      "kind": "tap",
+      "x": 323,
+      "y": 161
+    },
+    {
+      "at": "2026-10-04T16:17:09.077",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesOffer/Offer.png",
+      "position": [
+        36,
+        346
+      ],
+      "region": null
+    }
+  ]
+}

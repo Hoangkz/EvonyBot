@@ -35,6 +35,7 @@
     ],
     "Daily Activities": [
         { "key": "daily_offering", "label": "Offering", "priority": 666 },
+        { "key": "daily_resource_gathering", "label": "Resource Gathering", "priority": 665, "note": "Phải chạy ngay sau Offering (bàn tay nổi trong thành)" },
         { "key": "daily_resource_tax", "label": "Resource Tax", "priority": 399 },
         { "key": "daily_gold_levy", "label": "Gold Levy", "priority": 398 },
         { "key": "daily_troop_training", "label": "Troop Training", "priority": 397 },

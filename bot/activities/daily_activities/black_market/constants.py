@@ -1,0 +1,20 @@
+"""
+constants.py — ảnh của nhiệm vụ Daily Activities "Black Market" (thư mục ảnh ActivitiesBuyMarket/).
+"""
+from ..constants import ROOT, OPEN, TAP
+
+KEY = "daily_black_market"   # key nhiệm vụ trong bot/worker/priority.json
+LABEL = "Black Market"   # ô tích ở tab Daily Activities, key daily_done
+FOLDER = "ActivitiesBuyMarket"
+FOLDER_PATH = f"{ROOT}/{FOLDER}"
+# Ảnh "đã xong" (thấy là nhiệm vụ hôm nay xong).
+DONE_IMAGES = ("BlackMarketFinishCurrent.png", "BlackMarketFinish.png", )
+# (ảnh, action) theo thứ tự ưu tiên. Action chung (OPEN / TAP / ...) do common.run_task xử lý,
+# action riêng (chuỗi) chuyển cho run.handle.
+ACTIONS = (
+    ("Confirm.png", TAP),
+    ("Market.png", "buy"),
+    ("Market1.png", "buy"),
+    ("BuyMarket.png", "market"),
+    ("ActivitiesBlackMarket.png", OPEN),
+)

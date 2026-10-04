@@ -1,7 +1,12 @@
 # Flow của Daily Activities
 
-Tài liệu này mô tả **code Python hiện tại** trong [run.py](run.py),
-[general.py](general.py) và giao diện cấu hình tại
+> Luồng mới (mở nhiệm vụ / bấm Go cho cả 2 phiên bản giao diện, sau Go giống Event): xem
+> [OPEN_TASK.md](OPEN_TASK.md). Tài liệu dưới đây mô tả luồng cũ port từ C# (`common.run_task`).
+
+Tài liệu này mô tả **code Python hiện tại** trong [run.py](run.py) (thứ tự nhiệm vụ),
+[common.py](common.py) (vòng lặp chung `run_task`), các thư mục nhiệm vụ (mỗi nhiệm vụ một thư
+mục giống activity Event: `constants.py` ảnh + `KEY` trong `bot/worker/priority.json`, `run.py`
+handler + `TASK`), [general.py](general.py) và giao diện cấu hình tại
 [daily_activities_tab.py](../../../ui/tabs/daily_activities_tab.py). Module được
 chuyển từ `DailyActivities1234.cs`, nhưng một số luồng đã được sửa cho giao
 diện Evony hiện tại.
@@ -67,7 +72,7 @@ flowchart TD
     D --> E[Duyệt TASKS theo thứ tự cố định]
     E --> F{Task đã có daily_done sau reset?}
     F -->|Có| E
-    F -->|Không| G[_run_task]
+    F -->|Không| G[common.run_task]
     G --> H{Xác nhận hoàn thành?}
     H -->|Có| I[mark_daily_done]
     H -->|Chưa| E
@@ -81,7 +86,7 @@ flowchart TD
     M --> Z
 ```
 
-- Mỗi task chỉ được lưu `daily_done` khi `_run_task()` trả `True`.
+- Mỗi task chỉ được lưu `daily_done` khi `common.run_task()` trả `True`.
 - `daily_done` lưu timestamp trong database. Timestamp chỉ còn hiệu lực nếu
   nằm sau mốc reset server gần nhất.
 - Module chạy tối đa 5 pass để có thể quay lại task chưa hoàn thành ở pass
@@ -90,7 +95,7 @@ flowchart TD
 
 ## 4. State machine dùng chung cho một task
 
-`_run_task()` tạo danh sách template theo thứ tự ưu tiên rồi lặp liên tục.
+`common.run_task()` tạo danh sách template theo thứ tự ưu tiên rồi lặp liên tục.
 
 | Action | Ý nghĩa |
 | --- | --- |
@@ -103,7 +108,7 @@ flowchart TD
 
 ### Kiểm tra nút Go theo đúng hàng
 
-`_open_task_row()` nhận góc trên trái của **nhãn task**, crop toàn bộ hàng cao
+`common.open_task_row()` nhận góc trên trái của **nhãn task**, crop toàn bộ hàng cao
 100 px rồi chỉ tìm `Go.png` trong vùng đó.
 
 - Có Go và `open_when_available=True`: bấm Go, chờ chuyển màn hình.
@@ -117,7 +122,7 @@ Việc một ảnh khác biến mất hoặc một nhiệm vụ trung gian hoàn
 
 ### Mở Quests → Activity
 
-`_open_daily_activity()` nhận diện các biến thể của nút Quests/Daily:
+`common.open_daily_activity()` nhận diện các biến thể của nút Quests/Daily:
 
 - `QuestButtonDaily.png`: ảnh người dùng cung cấp.
 - `QuestButtonCurrent.png`: biến thể ngoài thành.
@@ -198,7 +203,7 @@ Quy tắc hoàn thành:
 - Không dùng trạng thái của hàng Research technologies để kết luận.
 - Không dùng việc đã bấm Collection để kết luận.
 - Chỉ khi tìm lại đúng `ClaimCollecting.png` và trong hàng đó không còn Go thì
-  `_run_task()` mới trả `True`.
+  `common.run_task()` mới trả `True`.
 
 ## 7. Offering và Resource Gathering
 

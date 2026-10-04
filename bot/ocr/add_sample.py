@@ -40,6 +40,11 @@ The hospital wounded count font ("HealCount", read_heal_count.py) is split the s
 the row's count box "0 / 8,147" (everything up to "/" is dropped; "," not saved). Example:
 
     python -m bot.ocr.add_sample HealCount box.png "8|,|1|4|7"
+
+The Offer Gems cost font ("OfferCost", read_offer_cost.py) is split the same way, from the
+popup's Cost box ("," not saved). Example for "1,475":
+
+    python -m bot.ocr.add_sample OfferCost cost.png "1|,|4|7|5"
 """
 import sys
 from pathlib import Path
@@ -56,6 +61,8 @@ from .read_heal_count import FONT as HEAL_COUNT_FONT
 from .read_heal_count import split as split_heal_count
 from .read_milestone import FONT as MILESTONE_FONT
 from .read_milestone import split as split_milestone
+from .read_offer_cost import FONT as OFFER_COST_FONT
+from .read_offer_cost import split as split_offer_cost
 from .read_power import FONT as POWER_FONT
 from .read_power import split as split_power
 from .read_progress import FONT as PROGRESS_FONT
@@ -64,7 +71,7 @@ from .read_progress import split as split_progress
 # Fonts split into pieces by their own splitter (see _pieces.py / read_progress.py).
 PIECE_FONTS = {NAME_FONT: split_name, POWER_FONT: split_power, PROGRESS_FONT: split_progress,
                TIMER_FONT: split_timer, MILESTONE_FONT: split_milestone,
-               HEAL_COUNT_FONT: split_heal_count}
+               HEAL_COUNT_FONT: split_heal_count, OFFER_COST_FONT: split_offer_cost}
 
 
 def add_sample(font: str, image_path: str, text: str) -> list[Path]:

@@ -1,0 +1,23 @@
+{
+  "task": "Offering",
+  "serial": "127.0.0.1:21913",
+  "status": "task-complete",
+  "completed": true,
+  "passes": 1,
+  "logs": [
+    "LIVE Offering: pass 1/5"
+  ],
+  "daily_done": [],
+  "events": [
+    {
+      "at": "2026-10-04T16:16:25.136",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesOffer/Offerdone1.png",
+      "position": [
+        195,
+        248
+      ],
+      "region": null
+    }
+  ]
+}

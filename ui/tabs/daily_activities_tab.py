@@ -7,6 +7,12 @@ cannot accidentally enable work that the bot cannot perform.
 from PyQt5.QtCore import QSignalBlocker
 from PyQt5.QtWidgets import QCheckBox, QComboBox, QGridLayout, QGroupBox, QLabel
 
+from bot.activities.daily_activities.offering.constants import (
+    OFFER_GEMS_CHOICES,
+    OFFER_GEMS_DEFAULT,
+    OFFER_GEMS_KEY,
+)
+
 from .tab_placeholder import BaseTab
 
 
@@ -65,6 +71,13 @@ class DailyActivitiesTab(BaseTab):
         general_grid.addWidget(QLabel("Quantity"), 0, 1)
         general_grid.addWidget(self.stamina_quantity, 0, 2)
         general_grid.addWidget(self.buy_hammers, 0, 3)
+        # Offering: số lần bấm "Offer Gems" (tốn kim cương) — chỉ bật khi tích Offering.
+        self.offer_gems = QComboBox()
+        self.offer_gems.addItems([str(n) for n in OFFER_GEMS_CHOICES])
+        self.offer_gems.setCurrentText(str(OFFER_GEMS_DEFAULT))
+        self.offer_gems.setToolTip("Số lần bấm Offer Gems ở Đền thờ (mỗi lần tốn kim cương). 0 = không offer.")
+        general_grid.addWidget(QLabel("Offer Gems (times)"), 1, 0)
+        general_grid.addWidget(self.offer_gems, 1, 2)
         general_grid.setColumnStretch(4, 1)
         self.add_row(general)
 
@@ -96,6 +109,9 @@ class DailyActivitiesTab(BaseTab):
         self.buy_stamina.clicked.connect(self.settings_changed)
         self.buy_hammers.clicked.connect(self.settings_changed)
         self.stamina_quantity.activated.connect(self.settings_changed)
+        self.offer_gems.activated.connect(self.settings_changed)
+        self.task_boxes["Offering"].toggled.connect(self.offer_gems.setEnabled)
+        self.offer_gems.setEnabled(self.task_boxes["Offering"].isChecked())
         for box in self.task_boxes.values():
             box.clicked.connect(self.settings_changed)
 
@@ -103,6 +119,7 @@ class DailyActivitiesTab(BaseTab):
         settings = {key: box.isChecked() for key, box in self.task_boxes.items()}
         # Clear legacy unsupported selections instead of sending them to the runner.
         settings.update({key: False for key in self.unsupported_boxes})
+        settings[OFFER_GEMS_KEY] = int(self.offer_gems.currentText())
         settings[GENERAL_KEY] = {
             "buy_stamina": self.buy_stamina.isChecked(),
             "stamina_quantity": int(self.stamina_quantity.currentText()),
@@ -112,7 +129,7 @@ class DailyActivitiesTab(BaseTab):
 
     def set_settings(self, data: dict):
         # Avoid writing partially restored state while loading a device.
-        widgets = [self.buy_stamina, self.stamina_quantity, self.buy_hammers,
+        widgets = [self.buy_stamina, self.stamina_quantity, self.buy_hammers, self.offer_gems,
                    *self.task_boxes.values()]
         blockers = [QSignalBlocker(widget) for widget in widgets]
         try:
@@ -134,6 +151,10 @@ class DailyActivitiesTab(BaseTab):
                 self.stamina_quantity.setCurrentText(quantity)
             self.buy_hammers.setChecked(bool(general.get("buy_all_hammers", False)))
             self.stamina_quantity.setEnabled(self.buy_stamina.isChecked())
+            offer = str(data.get(OFFER_GEMS_KEY, OFFER_GEMS_DEFAULT))
+            if self.offer_gems.findText(offer) >= 0:
+                self.offer_gems.setCurrentText(offer)
+            self.offer_gems.setEnabled(self.task_boxes["Offering"].isChecked())
         finally:
             # Keep blockers alive through every assignment, then release together.
             del blockers

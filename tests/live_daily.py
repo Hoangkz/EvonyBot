@@ -14,7 +14,9 @@ from pathlib import Path
 
 import adbutils
 
-from bot.activities.daily_activities.run import REWARDS, TASKS, _run_task, run as run_daily
+from bot.activities.daily_activities.common import run_task as _run_task
+from bot.activities.daily_activities.constants import REWARDS
+from bot.activities.daily_activities.run import TASKS, run as run_daily
 from bot.context import BotContext, BotInterrupted
 
 

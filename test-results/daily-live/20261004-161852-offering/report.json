@@ -1,0 +1,402 @@
+{
+  "task": "Offering",
+  "serial": "127.0.0.1:21913",
+  "status": "task-complete",
+  "completed": true,
+  "passes": 1,
+  "logs": [
+    "LIVE Offering: pass 1/5"
+  ],
+  "daily_done": [],
+  "events": [
+    {
+      "at": "2026-10-04T16:18:54.610",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesOffer/Click_ActivitiesLight.png",
+      "position": [
+        45,
+        395
+      ],
+      "region": null
+    },
+    {
+      "at": "2026-10-04T16:18:55.382",
+      "kind": "swipe",
+      "x1": 277,
+      "y1": 492,
+      "x2": 217,
+      "y2": 387,
+      "duration": 1.0
+    },
+    {
+      "at": "2026-10-04T16:18:59.091",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesOffer/Click_ActivitiesLight.png",
+      "position": [
+        45,
+        445
+      ],
+      "region": [
+        0,
+        46.10795454545455,
+        25.363636363636363,
+        66.10795454545455
+      ]
+    },
+    {
+      "at": "2026-10-04T16:18:59.091",
+      "kind": "swipe",
+      "x1": 277,
+      "y1": 492,
+      "x2": 217,
+      "y2": 387,
+      "duration": 1.0
+    },
+    {
+      "at": "2026-10-04T16:19:02.644",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesOffer/Click_ActivitiesLight.png",
+      "position": [
+        45,
+        439
+      ],
+      "region": [
+        0,
+        53.21022727272727,
+        25.363636363636363,
+        73.21022727272728
+      ]
+    },
+    {
+      "at": "2026-10-04T16:19:02.644",
+      "kind": "swipe",
+      "x1": 277,
+      "y1": 492,
+      "x2": 217,
+      "y2": 387,
+      "duration": 1.0
+    },
+    {
+      "at": "2026-10-04T16:19:06.247",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesOffer/Click_ActivitiesLight.png",
+      "position": [
+        45,
+        396
+      ],
+      "region": [
+        0,
+        52.35795454545455,
+        25.363636363636363,
+        72.35795454545455
+      ]
+    },
+    {
+      "at": "2026-10-04T16:19:06.248",
+      "kind": "swipe",
+      "x1": 277,
+      "y1": 492,
+      "x2": 217,
+      "y2": 387,
+      "duration": 1.0
+    },
+    {
+      "at": "2026-10-04T16:19:09.971",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesOffer/Click_ActivitiesLight.png",
+      "position": [
+        45,
+        441
+      ],
+      "region": [
+        0,
+        46.25,
+        25.363636363636363,
+        66.25
+      ]
+    },
+    {
+      "at": "2026-10-04T16:19:09.971",
+      "kind": "swipe",
+      "x1": 277,
+      "y1": 492,
+      "x2": 217,
+      "y2": 387,
+      "duration": 1.0
+    },
+    {
+      "at": "2026-10-04T16:19:13.590",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesOffer/Click_ActivitiesLight.png",
+      "position": [
+        45,
+        391
+      ],
+      "region": [
+        0,
+        52.64204545454545,
+        25.363636363636363,
+        72.64204545454545
+      ]
+    },
+    {
+      "at": "2026-10-04T16:19:13.590",
+      "kind": "swipe",
+      "x1": 277,
+      "y1": 492,
+      "x2": 217,
+      "y2": 387,
+      "duration": 1.0
+    },
+    {
+      "at": "2026-10-04T16:19:17.171",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesOffer/Click_ActivitiesLight.png",
+      "position": [
+        45,
+        433
+      ],
+      "region": [
+        0,
+        45.53977272727273,
+        25.363636363636363,
+        65.53977272727272
+      ]
+    },
+    {
+      "at": "2026-10-04T16:19:17.171",
+      "kind": "swipe",
+      "x1": 277,
+      "y1": 492,
+      "x2": 217,
+      "y2": 387,
+      "duration": 1.0
+    },
+    {
+      "at": "2026-10-04T16:19:20.781",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesOffer/Click_ActivitiesLight.png",
+      "position": [
+        45,
+        391
+      ],
+      "region": [
+        0,
+        51.50568181818182,
+        25.363636363636363,
+        71.50568181818181
+      ]
+    },
+    {
+      "at": "2026-10-04T16:19:20.781",
+      "kind": "swipe",
+      "x1": 277,
+      "y1": 492,
+      "x2": 217,
+      "y2": 387,
+      "duration": 1.0
+    },
+    {
+      "at": "2026-10-04T16:19:24.460",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesOffer/Click_ActivitiesLight.png",
+      "position": [
+        45,
+        431
+      ],
+      "region": [
+        0,
+        45.53977272727273,
+        25.363636363636363,
+        65.53977272727272
+      ]
+    },
+    {
+      "at": "2026-10-04T16:19:24.460",
+      "kind": "swipe",
+      "x1": 277,
+      "y1": 492,
+      "x2": 217,
+      "y2": 387,
+      "duration": 1.0
+    },
+    {
+      "at": "2026-10-04T16:19:28.156",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesOffer/Click_ActivitiesLight.png",
+      "position": [
+        45,
+        390
+      ],
+      "region": [
+        0,
+        51.22159090909091,
+        25.363636363636363,
+        71.2215909090909
+      ]
+    },
+    {
+      "at": "2026-10-04T16:19:28.156",
+      "kind": "swipe",
+      "x1": 277,
+      "y1": 492,
+      "x2": 217,
+      "y2": 387,
+      "duration": 1.0
+    },
+    {
+      "at": "2026-10-04T16:19:31.840",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesOffer/Click_ActivitiesLight.png",
+      "position": [
+        45,
+        370
+      ],
+      "region": [
+        0,
+        45.39772727272727,
+        25.363636363636363,
+        65.39772727272728
+      ]
+    },
+    {
+      "at": "2026-10-04T16:19:31.840",
+      "kind": "swipe",
+      "x1": 277,
+      "y1": 492,
+      "x2": 217,
+      "y2": 387,
+      "duration": 1.0
+    },
+    {
+      "at": "2026-10-04T16:19:35.466",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesOffer/Click_ActivitiesLight.png",
+      "position": [
+        45,
+        416
+      ],
+      "region": [
+        0,
+        42.55681818181818,
+        25.363636363636363,
+        62.55681818181818
+      ]
+    },
+    {
+      "at": "2026-10-04T16:19:35.466",
+      "kind": "swipe",
+      "x1": 277,
+      "y1": 492,
+      "x2": 217,
+      "y2": 387,
+      "duration": 1.0
+    },
+    {
+      "at": "2026-10-04T16:19:39.042",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesOffer/Click_ActivitiesLight.png",
+      "position": [
+        45,
+        368
+      ],
+      "region": [
+        0,
+        49.09090909090909,
+        25.363636363636363,
+        69.0909090909091
+      ]
+    },
+    {
+      "at": "2026-10-04T16:19:39.042",
+      "kind": "swipe",
+      "x1": 277,
+      "y1": 492,
+      "x2": 217,
+      "y2": 387,
+      "duration": 1.0
+    },
+    {
+      "at": "2026-10-04T16:19:42.695",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesOffer/Click_ActivitiesLight.png",
+      "position": [
+        45,
+        366
+      ],
+      "region": [
+        0,
+        42.27272727272727,
+        25.363636363636363,
+        62.27272727272727
+      ]
+    },
+    {
+      "at": "2026-10-04T16:19:42.695",
+      "kind": "swipe",
+      "x1": 277,
+      "y1": 492,
+      "x2": 217,
+      "y2": 387,
+      "duration": 1.0
+    },
+    {
+      "at": "2026-10-04T16:19:46.337",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesOffer/Click_ActivitiesLight.png",
+      "position": [
+        45,
+        421
+      ],
+      "region": [
+        0,
+        41.98863636363637,
+        25.363636363636363,
+        61.98863636363637
+      ]
+    },
+    {
+      "at": "2026-10-04T16:19:46.337",
+      "kind": "swipe",
+      "x1": 277,
+      "y1": 492,
+      "x2": 217,
+      "y2": 387,
+      "duration": 1.0
+    },
+    {
+      "at": "2026-10-04T16:19:49.929",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesOffer/Click_ActivitiesLight.png",
+      "position": [
+        45,
+        373
+      ],
+      "region": [
+        0,
+        49.80113636363637,
+        25.363636363636363,
+        69.80113636363637
+      ]
+    },
+    {
+      "at": "2026-10-04T16:19:49.929",
+      "kind": "swipe",
+      "x1": 277,
+      "y1": 492,
+      "x2": 217,
+      "y2": 387,
+      "duration": 1.0
+    },
+    {
+      "at": "2026-10-04T16:19:53.022",
+      "kind": "match",
+      "template": "DailyActivites/ActivitiesOffer/Offerdone.png",
+      "position": [
+        95,
+        473
+      ],
+      "region": null
+    }
+  ]
+}
