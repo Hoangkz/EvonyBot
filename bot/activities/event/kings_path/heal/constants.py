@@ -35,8 +35,9 @@ HOSPITAL_TITLE = f"{KP}/Heal/hospitalTitle.png"
 # 0,90 ở màn khác (march_after_refill.png) -> chỉ xét khi thấy HOSPITAL_TITLE.
 RESET = f"{KP}/Heal/reset.png"
 SELECT_ALL = f"{KP}/Heal/selectAll.png"
-# Sau Reset: cuộn danh sách lính xuống cuối (lính cấp thấp nhất ở dòng dưới cùng).
-LIST_SWIPE = (50, 70, 50, 30)   # % màn hình, ngón tay kéo lên = cuộn xuống
+# Sau Reset: cuộn danh sách lính xuống cuối (lính cấp thấp nhất ở dòng dưới cùng). Vuốt ở mép trái (x 5%,
+# cột hình lính): vuốt giữa màn có thể trúng thanh kéo số lượng của một dòng -> kéo thanh, không cuộn.
+LIST_SWIPE = (5, 70, 5, 30)     # % màn hình, ngón tay kéo lên = cuộn xuống
 LIST_SCROLLS = 5
 # Cuối danh sách: dưới dòng lính cuối có một khoảng trống nhỏ rồi tới khung tài nguyên (dải ngang (14, 512)
 # rộng 368 cao 50): ở cuối 0,99 .. 1,00 (heal_list_end.png, heal_screen_reset.png); chưa tới cuối / màn khác

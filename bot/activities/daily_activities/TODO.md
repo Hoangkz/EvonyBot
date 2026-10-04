@@ -38,8 +38,8 @@ Logic đã xong; còn thiếu **ảnh** (thêm ảnh là dùng được, không 
 4. **Thẻ đã 100% (bản cũ)**: icon thành hộp quà, bot nhận ra bằng chữ "100%" (`OLD_DONE_BADGE`) → bấm nhận, **chỉ
    khi chưa cuộn** (thẻ chưa nhận nằm đầu lưới; đã cuộn mà thấy "100%" là đã nhận). ~~Ảnh lưới sau khi nhận~~: đã
    có — thẻ xuống cuối lưới, icon cũ + tích xanh "Completed"; mỗi nhiệm vụ `<thư mục ảnh>/Done.png` → `TASK_DONE`.
-   Đã có Done.png: Resource Collecting, Offering, Resource Tax, Gold Levy, Troop Training (21943). Nhiệm vụ còn thiếu Done.png
-   ghi trong TODO.md của nhiệm vụ đó; flow test dùng ảnh `22..28_old_grid_*.png` (26: popup Congratulations sau khi nhận → Back).
+   Đã có Done.png: Resource Collecting, Offering, Resource Tax, Gold Levy, Troop Training, Troop Healing (21943). Nhiệm vụ còn thiếu Done.png
+   ghi trong TODO.md của nhiệm vụ đó; flow test dùng ảnh `22..29_old_grid_*.png` (26: popup Congratulations sau khi nhận → Back).
 5. **Claim All xám** (không có gì để nhận) khớp ảnh mẫu 0,86, sát ngưỡng 0,9 → nên cắt ảnh Claim All sáng chặt hơn
    hoặc kiểm tra màu, tránh bấm nhầm nút xám.
 6. **Thử thật trên máy**: cuộn trượt (`LIST_SWIPE`, `LIST_END_SAME`), tốc độ hiện popup, Back khi thử lại có về đúng

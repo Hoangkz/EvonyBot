@@ -18,3 +18,11 @@ ACTIONS = (
     ("Build.png", TAP),
     ("ActivitiesBuildTrap1.png", OPEN),
 )
+
+# ---- Luồng mới sau Go (run.after_go), giống Gather Troops Defense Force (xây bẫy) -------------------
+# Go -> về thành, Trap Factory ở giữa -> bấm -> menu "Build" (đang xây thì "Speed Up" -> Finish All trước)
+# -> màn Train bẫy -> KHÔNG chọn loại / cấp: bẫy đang hiện khi vào -> không nhập số (số mặc định của ô)
+# -> số mẻ = ceil(TRAP_GOAL / số mỗi mẻ) (mỗi mẻ >= 150 thì 1 mẻ, lớn hơn cũng được; nhỏ hơn thì nhiều mẻ)
+# -> mỗi mẻ: Build -> Trap Building Speedup -> (lần đầu Speedup Settings) Finish All -> xong hôm nay.
+# Code chung: ../train.py.
+TRAP_GOAL = 150         # nhiệm vụ "Build 150 traps"

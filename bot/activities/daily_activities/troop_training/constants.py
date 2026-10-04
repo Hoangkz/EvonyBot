@@ -26,6 +26,5 @@ ACTIONS = (
 # bấm công trình -> menu (Train; đang train thì Speed Up -> Finish All trước, không tính) -> màn Train ->
 # chọn cấp I -> KHÔNG nhập số: giữ số mặc định của ô (tối đa một lần train), số mẻ = ceil(TRAIN_GOAL /
 # số mỗi mẻ) (lớn hơn TRAIN_GOAL cũng được) -> mỗi mẻ: Train -> Training Speedup -> (lần đầu Speedup
-# Settings) Finish All. Ảnh / toạ độ màn Train dùng chung với event/gather_troops/train_troop.
+# Settings) Finish All. Code chung: ../train.py; ảnh / toạ độ màn Train: event/gather_troops/train_troop.
 TRAIN_GOAL = 300        # số lính tối thiểu cần train (nhiệm vụ "Train 300 troops in the Main City")
-MAX_STEPS = 60          # số vòng quét màn hình tối đa sau Go

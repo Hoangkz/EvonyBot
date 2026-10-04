@@ -5,6 +5,7 @@ Phần dùng chung (mở Quests → Activity, tìm dòng, bấm Go, state machin
 
 ## Luồng mới (`run.after_go`, sau khi `common.open_task` bấm Go)
 
+Code chung với Trap Building: [../train.py](../train.py) `train_after_go`.
 Giống King's Path Train Troop (`event/kings_path/train_troop`), dùng lại các bước của
 `event/gather_troops/train_troop` (ảnh màn Train, Training Speedup, Finish All).
 
