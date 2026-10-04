@@ -34,8 +34,8 @@ tab cấu hình). Bộ chọn lấy thẳng nhiệm vụ: ưu tiên cao làm tr�
 - [x] **Bước 1 — khung nhiệm vụ và bộ chọn** (2026-10-03): `tasks.py` (đọc `priority.json`, mỗi activity đã chọn trừ
   Join Boss = 1 nhiệm vụ nguyên khối, ưu tiên = cao nhất của nhóm), `scheduler.py` (ưu tiên cao trước, cùng ưu tiên xoay
   vòng, xong thì tới lượt lại sau mốc reset), `BotWorker._run_tasks` thay `_boss_priority` / chạy hết rồi dừng; mỗi vòng
-  1 lượt Join Boss + 1 nhiệm vụ tối đa 120 s; `priority.json` thêm vào `installer/build.ps1`. Test: `tests/test_scheduler.py`,
-  `tests/test_boss_notifications.py`. Chưa chạy thật trên giả lập.
+  1 lượt Join Boss + 1 nhiệm vụ tối đa 120 s; `priority.json` thêm vào `installer/build.ps1`. Test: `tests/worker/test_scheduler.py`,
+  `tests/worker/test_boss_notifications.py`. Chưa chạy thật trên giả lập.
 - [x] **Bước 1b — không có Join Boss vẫn giữ thread sống** (làm cùng bước 1): hết nhiệm vụ tới lượt thì nghỉ 5 s (vẫn lo
   bubble), qua mốc reset thì làm lại; chỉ Stop mới dừng.
 - [ ] **Chạy thật bước 1** trên giả lập (`venv\Scripts\poe dev`): có Join Boss + vài activity (log mỗi vòng: Join Boss rồi
@@ -73,5 +73,5 @@ tab cấu hình). Bộ chọn lấy thẳng nhiệm vụ: ưu tiên cao làm tr�
 
 - [x] Đã xoá `bot/common/get_server_time.py`, `bot/ocr/read_server_time.py`, `Images/Server/serverTime.png` (2026-10-03).
 
-- [ ] Commit các thay đổi đang chưa commit: bước 1 (`tasks.py`, `scheduler.py`, `_run_tasks`, `tests/test_scheduler.py`),
+- [ ] Commit các thay đổi đang chưa commit: bước 1 (`tasks.py`, `scheduler.py`, `_run_tasks`, `tests/worker/test_scheduler.py`),
   giờ reset chọn ở màn Home (`daily_reset.py`, `ServerClock`, ô "Reset Time", `database.py`), `installer/build.ps1`.

@@ -213,7 +213,7 @@ Nếu tất cả worker đều đang làm activity phụ, không có worker qué
 
 ## 9. Kiểm thử hiện có
 
-File [tests/test_boss_notifications.py](tests/test_boss_notifications.py) kiểm tra:
+File [tests/worker/test_boss_notifications.py](../../tests/worker/test_boss_notifications.py) kiểm tra:
 
 - Lọc đúng server, không báo lại worker nguồn, chống trùng, hết hạn và hủy đăng ký.
 - Chỉ ngắt activity phụ; Stop được ưu tiên.
