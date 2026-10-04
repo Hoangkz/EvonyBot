@@ -171,8 +171,10 @@ def run_task(bot, task: Task) -> bool:
 @lru_cache(maxsize=None)
 def task_targets(task: Task) -> tuple[tuple[str, str], ...]:
     folder = f"{ROOT}/{task.folder}"
-    result = [(f"{folder}/{name}", DONE) for name in task.done]
-    result.extend((f"{folder}/{name}", action) for name, action in task.actions)
+    # Tên có "/" là đường dẫn đầy đủ dưới Images/ (ảnh dùng chung, VD CityTax/), không thì trong thư mục task.
+    result = [(name if "/" in name else f"{folder}/{name}", DONE) for name in task.done]
+    result.extend((name if "/" in name else f"{folder}/{name}", action)
+                  for name, action in task.actions)
     # Initial Daily start can begin on either city/world layout. These are the
     # actual Quests/Daily buttons (including the exact crop supplied by the
     # user); without them the generic recovery path runs before a task has

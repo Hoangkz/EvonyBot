@@ -32,9 +32,9 @@ code dùng mốc 0 giờ máy làm fallback.
 
 | Cấu hình | Hành vi |
 | --- | --- |
-| `buy_stamina` | Mua một gói thể lực. |
-| `stamina_quantity` | Số lượng 10, 20 hoặc 30; mặc định 10. |
-| `buy_all_hammers` | Mua toàn bộ búa tìm thấy trong mục Special. |
+| `stamina_quantity` | UI: một ô chọn "Buy Stamina" 0, 10, 20 hoặc 30; 0 = không mua (mặc định). |
+| `buy_stamina` | Tự suy ra từ UI (`stamina_quantity > 0`); giữ để tương thích cấu hình cũ. |
+| `buy_all_hammers` | Checkbox "Buy Hammer": mua toàn bộ búa tìm thấy trong mục Special. |
 
 General chạy trước danh sách nhiệm vụ Daily. Kết quả được lưu độc lập bằng
 hai khóa `General: Buy Stamina` và `General: Buy All Hammers`.
@@ -228,9 +228,11 @@ Hai task này đứng liền nhau vì đều đưa bot về thành.
 ## 8. Resource Tax
 
 1. Tìm hàng `ActivitiesTaxResource.png`, bấm Go.
-2. `Tax.png`: mở thao tác thu thuế.
-3. `TaxRevenue.png`: bấm tọa độ `(300, 280)`.
-4. `TapTax1.png`: nhập `0`, xác nhận các dialog liên tiếp rồi kết thúc lượt.
+2. `CityTax/menuTax.png` (menu Chợ, ảnh dùng chung với King's Path City Tax): bấm Tax.
+3. `CityTax/taxScreen.png` (màn Tax, 4 dòng Lúa / Gỗ / Đá / Sắt): `resource_tax/run.py tax_all` theo group
+   "City Tax" của tab: loại tích Free trước, thu hết lượt free rồi cộng thêm số chọn ("+" từ số mặc
+   định của popup); rồi các loại khác đúng số chọn (OCR ô số popup, "+" / "−"). Xong thì Back về thành, coi như xong hôm nay.
+4. `CityTax/popupCost.png` (popup Tax còn mở): Back.
 5. Các ảnh `TaxFinish2.png`, `TaxFinish.png`, `TaxFinish1.png` báo hoàn thành.
 
 ## 9. Gold Levy
@@ -389,26 +391,18 @@ nhất; bản ghi cũ tự động không còn được coi là hoàn thành.
 
 Các test chính:
 
-- [test_daily_activities.py](../../../tests/test_daily_activities.py): state
+- [test_daily_activities.py](../../../tests/daily_activities/test_daily_activities.py): state
   machine, kiểm tra hàng/Go, Monster 2+3, Resource Collecting và nhận rương.
-- [test_daily_general.py](../../../tests/test_daily_general.py): mua thể lực và
+- [test_general.py](../../../tests/daily_activities/test_general.py): mua thể lực và
   búa.
-- [live_daily.py](../../../tests/live_daily.py): chạy task thật trên emulator và
-  ghi report dưới `test-results/daily-live/`.
 
 Chạy unit test:
 
 ```powershell
-.\venv\Scripts\python.exe -m unittest tests.test_daily_activities tests.test_daily_general
-```
-
-Chạy riêng một task trên emulator:
-
-```powershell
-.\venv\Scripts\python.exe -u -m tests.live_daily "Resource Collecting" --serial 127.0.0.1:21513 --timeout 120
+.\venv\Scripts\python.exe -m unittest tests.daily_activities.test_daily_activities tests.daily_activities.test_general
 ```
 
 Unit test xác nhận quyết định của code với màn hình/mocks đã biết; nó không tự
 chứng minh toàn bộ luồng thật trên mọi tài khoản hoặc mọi phiên bản Evony. Với
-thay đổi ảnh hay giao diện, cần chạy `live_daily.py`, xem `before.png`,
-`after.png` và `report.json` trước khi kết luận flow đã đúng hoàn toàn.
+thay đổi ảnh hay giao diện, cần chạy thật trên giả lập (`tests/real_run.py`, `poe test`)
+trước khi kết luận flow đã đúng hoàn toàn.

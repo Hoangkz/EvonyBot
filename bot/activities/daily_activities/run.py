@@ -29,7 +29,7 @@ from .troop_healing import TASK as TROOP_HEALING
 from .troop_training import TASK as TROOP_TRAINING
 from .wheel_of_fortune import TASK as WHEEL_OF_FORTUNE
 
-# Thứ tự chạy (= thứ tự bản C# = thứ tự ô tích ở ui/tabs/daily_activities_tab.py SUPPORTED_TASKS).
+# Thứ tự chạy (= thứ tự bản C#; tab UI SUPPORTED_TASKS chỉ khác ở chỗ đưa Offering lên đầu).
 # Resource Gathering phải ngay sau Offering: cả hai đưa về thành, bàn tay nổi thu mọi mỏ một lần.
 TASKS: tuple[Task, ...] = (
     MONSTER,
@@ -120,8 +120,8 @@ def run(bot, settings: dict):
 def _run_general(bot, settings):
     if not isinstance(settings, dict):
         return
-    if settings.get("buy_stamina") and not bot.is_daily_done(BUY_STAMINA):
-        quantity = int(settings.get("stamina_quantity", 10))
+    quantity = int(settings.get("stamina_quantity", 10))
+    if settings.get("buy_stamina") and quantity > 0 and not bot.is_daily_done(BUY_STAMINA):
         bot.log(f"Daily General: Buy Stamina x{quantity}")
         if buy_stamina(bot, quantity):
             bot.mark_daily_done(BUY_STAMINA)

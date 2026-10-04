@@ -114,7 +114,8 @@ flowchart TD
 ```
 
 Giá mỗi lượt Offer Gems: 1: 25, 2: 50, 3–4: 100, 5–6: 200, 7–8: 400, 9–10: 600, 11–15: 1.000, 16+: 1.500.
-Ô "Offer Gems" ở tab UI: 0 / 3 / 5 / 10 / 15 / 20 / 30 (mặc định 10; 0 = không làm — worker sẽ bỏ qua nhiệm vụ).
+Tab UI: "Offering" trong Selection Daily là ô chọn số lần Offer Gems 0 / 3 / 5 / 10 / 15 / 20 / 30 (thay checkbox;
+mặc định 0 = không làm, lưu `Offering = False`; > 0 lưu `Offering = True` + `Offer Gems = số lần`).
 
 ## 8. Thêm một nhiệm vụ mới
 

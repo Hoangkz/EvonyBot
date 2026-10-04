@@ -13,7 +13,9 @@ Bố cục giống Event: mỗi nhiệm vụ một thư mục (`constants.py` �
   - **cũ**: nút "•••" → bảng chức năng → Activity → lưới thẻ → lướt tìm thẻ → bấm thẻ → popup → Go.
 - Sau Go hai phiên bản giống nhau, làm như Event (`event/kings_path/building.py open_building`: nhận ra công
   trình theo ảnh mẫu civ / tự học → menu → icon chức năng). Mới có **Offering** (`offering/run.py after_go`,
-  tới màn Offer).
+  tới màn Offer) và **Resource Tax** (`resource_tax/run.py after_go`: Chợ → Tax → `tax_all`); cả hai đã chạy thật
+  bản cũ trên 21943. Resource Tax có `test_flow` phần sau Go (ảnh màn Tax chép từ
+  `tests/event/kings_path/screens/`).
 - Test: `tests/daily_activities/test_open_task.py` (phần chung), `offering/`, `resource_tax/`,
   `resource_collecting/`, `troop_training/` (bản mới), `troop_healing/` (bản cũ).
 

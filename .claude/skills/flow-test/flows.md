@@ -42,18 +42,18 @@ Nhánh phụ:
 Mỗi task là một flow riêng. Tối thiểu cần các test sau.
 
 1. **Đã xong hết** (không cần chụp nhiều ảnh):
-   - Settings: `{"Resource Tax": True}`.
+   - Settings: `{"Resource Tax": True, "Tax on resource": {"Food": 0, "Wood": 5, "Stone": 0, "Iron": 0, "free": "Food"}}`.
    - `daily_done`: task đó và `"Activity Rewards"` đều có mốc thời gian hiện tại.
    - Flow: `[Step("01_home.png", end())]`, tức activity không được chụp màn hình hay bấm gì.
-2. **Một task, ví dụ Resource Tax**. Settings: `{"Resource Tax": True}`
+2. **Một task, ví dụ Resource Tax**. Settings: `{"Resource Tax": True, "Tax on resource": {"Food": 0, "Wood": 5, "Stone": 0, "Iron": 0, "free": "Food"}}`
 
 | # | Màn hình | Action |
 | --- | --- | --- |
 | 01 | Màn hình chính, nút Activities | `tap("DailyActivites/ActivitiesTaxResource/Click_Activities.png")` (hoặc biến thể `1`/`2`) |
 | 02 | Danh sách activities, thấy dòng Resource Tax ở y ≤ 500 | `tap("DailyActivites/UseAllActivities/Go.png")`, `tap_pct(50, 50)` |
-| 03 | Màn hình thuế (`Tax.png`) | `tap("DailyActivites/ActivitiesTaxResource/Tax.png")` |
-| 04 | `TaxRevenue.png` | `tap_at(300, 280)` |
-| 05 | `TapTax1.png` | `tap_at(200, 300)`, `shell("KEYCODE_DEL")`, `shell("input text 0")`, `shell("KEYCODE_ENTER")`, `tap_at(200, 440)`, `tap_at(195, 415)` |
+| 03 | Menu Chợ (`CityTax/menuTax.png`) | `tap("CityTax/menuTax.png")` |
+| 04 | Màn Tax (`CityTax/taxScreen.png`) | `resource_tax/run.py tax_all` theo `settings["Tax on resource"]`: mỗi dòng bấm Tax → popup → OCR ô số → `+`/`−` → Tax |
+| 05 | Thu xong | `back()`, task đánh dấu xong |
 | 06 | Lượt sau: thấy `TaxFinish*.png` | (không action, task được đánh dấu xong) |
 | 07+ | Nhận thưởng `CollectionActivities`: `Click_Activities*`, `20`/`50`/`110`, `Claim_All` | `tap(...)` từng cái |
 | cuối | `CollectionActivities/80.png` | `tap("DailyActivites/CollectionActivities/80.png")`, `end()` |
