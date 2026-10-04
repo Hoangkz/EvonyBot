@@ -48,10 +48,11 @@ def _run(titles):
 
 class OpenTaskFlow(unittest.TestCase):
     def test_already_on_activity_list(self):
-        """Đang ở sẵn danh sách Activity: không bấm Quests / tab; cuộn lên đầu trước (có thể đang ở giữa danh
-        sách) rồi tìm."""
+        """Đang ở sẵn danh sách Activity (có thể đang ở giữa danh sách): Back đóng rồi mở lại từ màn chính
+        (không bao giờ cuộn lên), rồi tìm."""
         flow = [
-            Step("03_activity_top.png", swipe(55, 55, 70, 70)),
+            Step("03_activity_top.png", back()),
+            *TO_ACTIVITY,
             *CLAIM_ALL_ONCE,
             Step("03_activity_top.png", SCROLL),
             Step("04_activity_scrolled.png", tap(GO_BUTTON)),
@@ -61,12 +62,14 @@ class OpenTaskFlow(unittest.TestCase):
 
     def test_not_found_at_end_of_list(self):
         """Cuộn tới khi danh sách không đổi (hết), không thấy tiêu đề -> Back, mở lại bảng Activity từ màn
-        chính, tìm thêm 1 lần (LIST_RETRIES) -> TASK_NOT_FOUND. Claim All đã kẹt ở lượt đầu: không bấm lại."""
+        chính, tìm thêm 2 lần (LIST_RETRIES) -> TASK_NOT_FOUND. Claim All đã kẹt ở lượt đầu: không bấm lại."""
         search = [
             Step("03_activity_top.png", SCROLL),
             Step("04_activity_scrolled.png", SCROLL),
         ]
         flow = [*TO_ACTIVITY, *CLAIM_ALL_ONCE, *search,
+                Step("04_activity_scrolled.png", back()),
+                *TO_ACTIVITY, *search,
                 Step("04_activity_scrolled.png", back()),
                 *TO_ACTIVITY, *search,
                 Step("04_activity_scrolled.png", end(result=TASK_NOT_FOUND))]

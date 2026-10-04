@@ -27,7 +27,6 @@ from .constants import (
     LIST_MAX_SCROLLS,
     LIST_RETRIES,
     LIST_SWIPE,
-    LIST_SWIPE_UP,
     MAIN_MORE,
     OLD_ACTIVITY_TITLE,
     OLD_CARD,
@@ -431,14 +430,16 @@ def open_activity_list(bot) -> str | None:
     - MỚI: nút Quests góc dưới trái -> popup Quests -> tab Activity -> danh sách (NEW_UI);
     - CŨ: không có nút Quests -> nút "•••" -> bảng chức năng -> "Activity" -> lưới thẻ (OLD_UI).
     Ở màn khác: go_home (popup / màn khác về màn chính). None nếu không mở được.
-    Bảng đã mở sẵn ngay lần nhìn đầu (có thể đang ở giữa danh sách): cuộn lên đầu (_scroll_to_top)."""
+    Bảng đã mở sẵn ngay lần nhìn đầu (có thể đang ở giữa danh sách): Back đóng rồi mở lại từ đầu (không
+    bao giờ cuộn lên)."""
     for attempt in range(OPEN_ACTIVITY_TRIES):
         screen = bot.screenshot()
         ui = (NEW_UI if bot.find(ACTIVITY_LIST, screen=screen) is not None
               else OLD_UI if bot.find(OLD_ACTIVITY_TITLE, screen=screen) is not None else None)
         if ui is not None:
             if attempt == 0:
-                _scroll_to_top(bot)
+                bot.back(delay=1)
+                continue
             return ui
         tab = bot.find(ACTIVITY_TAB, screen=screen)
         if tab is not None:
@@ -601,17 +602,6 @@ def _row_button(bot, screen, title) -> str | None:
                     bot.tap(bx, by, delay=4)
                 return name
     return None
-
-
-def _scroll_to_top(bot, max_swipes: int = LIST_MAX_SCROLLS):
-    """Cuộn danh sách / lưới lên đầu: kéo xuống tới khi màn không đổi."""
-    previous = bot.screenshot()
-    for _ in range(max_swipes):
-        bot.swipe_percent(*LIST_SWIPE_UP, duration=1.0, delay=1)
-        screen = bot.screenshot()
-        if _same_list(previous, screen):
-            return
-        previous = screen
 
 
 def _same_list(before, after) -> bool:

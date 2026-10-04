@@ -20,8 +20,8 @@ flowchart TD
     R -->|bấm được Go| OK[TASK_OPENED → after_go của nhiệm vụ]
     R -->|thấy Claim / tích V| D[TASK_DONE → xong hôm nay, mục tiêu 0]
     R -->|thấy dòng mà không nhận ra nút| U[TASK_UNKNOWN → bỏ qua, không đánh dấu]
-    R -->|lướt hết không thấy| N{Đã thử lại?}
-    N -->|chưa| BK[Back → mở lại bảng Activity, tìm thêm 1 lần] --> B
+    R -->|lướt hết không thấy| N{Đã thử lại đủ 2 lần?}
+    N -->|chưa| BK[Back → mở lại bảng Activity, tìm lại] --> B
     N -->|rồi| NF[TASK_NOT_FOUND → bỏ qua, không đánh dấu]
 ```
 
@@ -36,6 +36,7 @@ Mỗi vòng chụp màn hình rồi làm **một** việc (tối đa `OPEN_ACTIV
 | --- | --- | --- |
 | Ngôi sao điểm Activity (`ACTIVITY_LIST`) | → **bản MỚI**, xong | đang ở danh sách |
 | Tiêu đề "Activity" của lưới thẻ (`OLD_ACTIVITY_TITLE`) | → **bản CŨ**, xong | đang ở lưới |
+| (một trong hai dòng trên) ngay **lần nhìn đầu** | **Back** đóng, mở lại từ đầu | có thể đang ở giữa danh sách; **không bao giờ cuộn lên** |
 | Chữ tab "Activity" (`ACTIVITY_TAB`) | bấm | popup Quests đang ở tab khác |
 | Mục "Activity" của bảng chức năng (`OLD_MENU_ACTIVITY`) | bấm | bản cũ, sau khi bấm "•••" |
 | Nút "•••" của màn chính (`MAIN_MORE`) | có nút Quests góc dưới trái → bấm Quests (bản mới); không có → bấm "•••" (bản cũ) | |
@@ -70,9 +71,9 @@ nhận khi **chưa cuộn**; đã cuộn xuống mà thấy "100%" là thẻ **�
 
 Thẻ **đã nhận** chuyển xuống **cuối lưới**, icon cũ có dấu tích xanh + chữ **"Completed"**. Mỗi nhiệm vụ một ảnh
 `<thư mục ảnh>/Done.png` (`task_done_cards`, cắt cùng chỗ với `Card.png`, ngưỡng `OLD_DONE_CARD_THRESHOLD` = 0,9):
-thấy → `TASK_DONE` (không bấm thẻ). Đã có: Resource Collecting, Offering (thẻ xong 1,00; cùng thẻ chưa nhận <= 0,77).
+thấy → `TASK_DONE` (không bấm thẻ). Đã có: Resource Collecting, Offering, Resource Tax (thẻ xong 1,00; cùng thẻ chưa nhận <= 0,77).
 Ảnh lưới: `tests/daily_activities/screens/22_old_grid_top_100.png`, `23_old_grid_end_completed.png`,
-`24_old_grid_end_offering_completed.png`.
+`24_old_grid_end_offering_completed.png`, `25_old_grid_end_tax_completed.png`.
 
 
 1. Tìm **ảnh thẻ** của nhiệm vụ (`<thư mục ảnh>/Card.png`, `task_cards`; ngưỡng `OLD_CARD_THRESHOLD` = 0,85).
@@ -82,10 +83,10 @@ thấy → `TASK_DONE` (không bấm thẻ). Đã có: Resource Collecting, Offe
    - không có → Back → `TASK_UNKNOWN` (chưa có ảnh popup "đã xong" nên không đoán).
 3. Không thấy → vuốt `LIST_SWIPE`; hết lưới → `TASK_NOT_FOUND`.
 
-## 5. Không thấy nhiệm vụ — thử lại 1 lần
+## 5. Không thấy nhiệm vụ — thử lại 2 lần (không bao giờ cuộn lên)
 
 `TASK_NOT_FOUND` lần đầu (có thể do cuộn trượt qua dòng) → **Back** đóng bảng Activity → mở lại từ đầu (mục 2) →
-tìm lại (`LIST_RETRIES` = 1). Vẫn không thấy → `TASK_NOT_FOUND`: bỏ qua, **không** đánh dấu xong.
+tìm lại (`LIST_RETRIES` = 2). Vẫn không thấy → `TASK_NOT_FOUND`: bỏ qua, **không** đánh dấu xong.
 
 ## 6. Đánh dấu xong — `mark_task_done`
 

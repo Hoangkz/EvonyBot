@@ -20,7 +20,7 @@ from bot.activities.daily_activities.offering.constants import (
 )
 from bot.activities.daily_activities.offering.run import after_go
 from bot.activities.daily_activities.common import open_task, task_cards, task_titles
-from tests.daily_activities import CLAIM_ALL_ONCE, SCROLL, TO_ACTIVITY, TO_TOP, open_task_of
+from tests.daily_activities import CLAIM_ALL_ONCE, SCROLL, TO_ACTIVITY, open_task_of, reopen
 from tests.flow import Step, back, end, run_flow, tap, tap_at
 
 SCREENS = Path(__file__).parent / "screens"
@@ -52,7 +52,8 @@ class OfferingFlow(unittest.TestCase):
         "Use the Offer feature in Shrine") -> bấm đúng Go dưới nó (y 491, không phải 398 / 584).
         Claim All đang xám (0,86 < ngưỡng 0,9): không bấm."""
         flow = [
-            Step("04b_activity_offer_second.png", TO_TOP, tap(GO_BUTTON)),
+            *reopen("04b_activity_offer_second.png"),
+            Step("04b_activity_offer_second.png", tap(GO_BUTTON)),
             Step("01_main.png", end(result=TASK_OPENED)),
         ]
         device = run_flow(self, open_task_of(offering.TASK), SCREENS, flow, {})
@@ -67,7 +68,7 @@ class OfferingFlow(unittest.TestCase):
         def hide_go(bgr):
             bgr[478:505, 290:385] = 30
             return bgr
-        flow = [Step("04b_activity_offer_second.png?no_go", TO_TOP),
+        flow = [*reopen("04b_activity_offer_second.png?no_go"),
                 Step("04b_activity_offer_second.png?no_go", end(result=False))]
         device = run_flow(self, lambda bot, _s: open_task_or_finish(bot, offering.TASK), SCREENS, flow,
                           {}, variants={"no_go": hide_go})

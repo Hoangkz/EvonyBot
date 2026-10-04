@@ -46,9 +46,8 @@ LIST_SWIPE = (70, 70, 55, 55)        # % màn hình: ngón tay kéo lên = cuộ
 LIST_MAX_SCROLLS = 12
 # Lướt hết danh sách không thấy nhiệm vụ: Back (đóng bảng Activity) rồi mở lại từ đầu, tìm thêm
 # LIST_RETRIES lần (lần cuộn trước có thể trượt qua dòng) rồi mới coi là không có (TASK_NOT_FOUND).
-LIST_RETRIES = 1
-# Bảng Activity đã mở sẵn (có thể đang ở giữa danh sách): cuộn lên đầu trước khi tìm (bot chỉ cuộn xuống).
-LIST_SWIPE_UP = (55, 55, 70, 70)     # % màn hình: kéo xuống = cuộn danh sách lên
+LIST_RETRIES = 2
+# Bảng Activity đã mở sẵn (có thể đang ở giữa danh sách): Back rồi mở lại từ đầu. Không bao giờ cuộn lên.
 LIST_END_SAME = 0.99                 # vùng danh sách trước / sau khi cuộn giống cỡ này = hết danh sách
 OPEN_ACTIVITY_TRIES = 8
 # ---- Mở nhiệm vụ, phiên bản giao diện CŨ (common.open_task) -----------------------------------
