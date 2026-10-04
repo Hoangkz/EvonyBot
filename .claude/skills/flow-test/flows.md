@@ -59,7 +59,11 @@ Mỗi task là một flow riêng. Tối thiểu cần các test sau.
 | cuối | `CollectionActivities/80.png` | `tap("DailyActivites/CollectionActivities/80.png")`, `end()` |
 
    Assert `"Resource Tax"` và `"Activity Rewards"` có trong dict daily_done sau khi chạy.
-3. Mỗi task còn lại (Monster Killing, Offering, Gold Levy, Troop Training, ...) cần một method `test_<task>`. Toạ độ tap cứng của từng handler nằm trong `run.py`, nên dùng `tap_at` với đúng các toạ độ đó.
+3. **Gold Levy** (`tests/daily_activities/gold_levy/test_flow.py`, luồng mới `after_go`): 01..04 (chung) → cuộn thêm
+   (`04b_activity_levy_row`) → Go → `05_after_go` `tap_at(222, 345)` (Thành chính khớp ảnh mẫu civ) → `06_keep_menu`
+   `tap(Levy.png)` → `07_levy_popup` `tap(FreeLevyAll.png)` → `08_levy_done` `back()` → `05_after_go` `end(result=True)`.
+   Nhánh nút đã xám: bỏ 07, `08_levy_done` `back()` luôn.
+4. Mỗi task còn lại (Monster Killing, Offering, Troop Training, ...) cần một method `test_<task>`. Toạ độ tap cứng của từng handler nằm trong `run.py`, nên dùng `tap_at` với đúng các toạ độ đó.
 
 ## Black Market (Market) — `tests/black_market/`
 Settings: `{"black_market_items": {"Resources": True}, "refresh": "1", "quantity_buy": "ALL"}`

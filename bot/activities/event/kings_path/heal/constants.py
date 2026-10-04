@@ -38,6 +38,10 @@ SELECT_ALL = f"{KP}/Heal/selectAll.png"
 # Sau Reset: cuộn danh sách lính xuống cuối (lính cấp thấp nhất ở dòng dưới cùng).
 LIST_SWIPE = (50, 70, 50, 30)   # % màn hình, ngón tay kéo lên = cuộn xuống
 LIST_SCROLLS = 5
+# Cuối danh sách: dưới dòng lính cuối có một khoảng trống nhỏ rồi tới khung tài nguyên (dải ngang (14, 512)
+# rộng 368 cao 50): ở cuối 0,99 .. 1,00 (heal_list_end.png, heal_screen_reset.png); chưa tới cuối / màn khác
+# <= 0,73. Thấy thì thôi cuộn (kể cả trước lần cuộn đầu: danh sách ngắn, không cần cuộn).
+LIST_END = f"{KP}/Heal/listEnd.png"
 LIST_SWIPE_WAIT = 3   # chờ sau mỗi lần cuộn
 # Mọi thao tác (bấm / Back / gõ số) trong nhiệm vụ Heal chờ thêm EXTRA_WAIT giây (máy chậm).
 EXTRA_WAIT = 2

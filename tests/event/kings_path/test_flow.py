@@ -632,7 +632,7 @@ class KingsPathFlow(unittest.TestCase):
 
     def test_heal_idle_hospital(self):
         """Heal: Go -> bấm giữa (Bệnh viện) -> menu có "Heal" -> màn Hospital (chọn hết) -> Reset ->
-        cuộn xuống cuối 5 lần -> ô số dòng cuối (285, 465) -> thanh nhập: gõ 50000 - 0 -> OK -> Heal
+        đã ở cuối danh sách (không cuộn) -> ô số dòng cuối (285, 465) -> thanh nhập: gõ 50000 - 0 -> OK -> Heal
         -> Speed Up -> Healing Speedup: Speedup Settings -> tích ô -> Confirm -> Finish All -> làm lại
         từ đầu (harness dừng bot)."""
         flow = [
@@ -640,7 +640,8 @@ class KingsPathFlow(unittest.TestCase):
             Step("heal_city.png", tap_pct(50, 50)),
             Step("heal_menu.png", tap(HEAL_MENU_HEAL)),
             Step("heal_screen.png", tap(HEAL_RESET)),
-            Step("heal_screen_reset.png", *[swipe(50, 70, 50, 30) for _ in range(5)], tap_at(285, 465)),
+            # Đã ở cuối danh sách (khoảng trống trên khung tài nguyên): không cuộn.
+            Step("heal_screen_reset.png", tap_at(285, 465)),
             Step("heal_input.png", tap(HEAL_INPUT_OK)),
             Step("heal_screen_reset.png", tap(HEAL_BUTTON)),
             Step("heal_healing.png", tap(HEAL_SPEED_UP)),

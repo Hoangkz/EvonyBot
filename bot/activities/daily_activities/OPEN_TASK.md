@@ -67,13 +67,15 @@ Nút Go chỉ nhận cái nằm **ngay dưới tiêu đề**, nên không bấm 
 Bản cũ không có Claim All. Thay vào đó, thẻ nhiệm vụ đã đủ **100%** đổi icon thành **hộp quà** (có hiệu ứng, không làm ảnh
 mẫu được): nhận ra bằng chữ **"100%"** ở góc trên trái thẻ (`OLD_DONE_BADGE`) → bấm giữa thẻ để nhận trước (bấm mà
 vẫn còn → bỏ qua tới hết lượt này), rồi mới tìm thẻ. Thẻ 100% **chưa nhận** luôn nằm ở **đầu lưới**, nên chỉ bấm
-nhận khi **chưa cuộn**; đã cuộn xuống mà thấy "100%" là thẻ **đã nhận** rồi → không bấm.
+nhận khi **chưa cuộn**; đã cuộn xuống mà thấy "100%" là thẻ **đã nhận** rồi → không bấm. Bấm nhận xong game hiện popup
+**"Congratulations!"** (phần thưởng; không tự tắt, bấm vào không đóng) → **Back** đóng (`OLD_CONGRATS`, vẫn ở lưới).
 
 Thẻ **đã nhận** chuyển xuống **cuối lưới**, icon cũ có dấu tích xanh + chữ **"Completed"**. Mỗi nhiệm vụ một ảnh
 `<thư mục ảnh>/Done.png` (`task_done_cards`, cắt cùng chỗ với `Card.png`, ngưỡng `OLD_DONE_CARD_THRESHOLD` = 0,9):
-thấy → `TASK_DONE` (không bấm thẻ). Đã có: Resource Collecting, Offering, Resource Tax (thẻ xong 1,00; cùng thẻ chưa nhận <= 0,77).
+thấy → `TASK_DONE` (không bấm thẻ). Đã có: Resource Collecting, Offering, Resource Tax, Gold Levy, Troop Training (thẻ xong 1,00; cùng thẻ chưa nhận <= 0,77).
 Ảnh lưới: `tests/daily_activities/screens/22_old_grid_top_100.png`, `23_old_grid_end_completed.png`,
-`24_old_grid_end_offering_completed.png`, `25_old_grid_end_tax_completed.png`.
+`24_old_grid_end_offering_completed.png`, `25_old_grid_end_tax_completed.png`, `27_old_grid_end_levy_completed.png`, `28_old_grid_end_train_completed.png`; popup sau khi nhận:
+`26_old_grid_claim_congrats.png`.
 
 
 1. Tìm **ảnh thẻ** của nhiệm vụ (`<thư mục ảnh>/Card.png`, `task_cards`; ngưỡng `OLD_CARD_THRESHOLD` = 0,85).

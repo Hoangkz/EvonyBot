@@ -72,6 +72,9 @@ OLD_DONE_BADGE = f"{USE_ALL}/Old100.png"
 OLD_DONE_THRESHOLD = 0.85
 OLD_DONE_TAP = (45, 53)
 OLD_DONE_WAIT = 2
+# Bấm nhận thẻ "100%" -> popup "Congratulations!" (danh sách phần thưởng) che lưới, không tự tắt, bấm vào
+# không đóng -> Back đóng (vẫn ở lưới). Chữ "Congratulations!" 0,999; màn khác <= 0,43.
+OLD_CONGRATS = f"{ROOT}/CollectionActivities/CongratulationsCurrent.png"
 # Thẻ đã nhận thưởng: chuyển xuống cuối lưới, icon cũ có dấu tích xanh + chữ "Completed". Mỗi nhiệm vụ một ảnh
 # <thư mục ảnh>/Done.png (icon + tích, cắt cùng chỗ với Card.png): thấy -> nhiệm vụ xong hôm nay, không bấm thẻ.
 # Resource Collecting: thẻ đã xong 1,00; cùng thẻ chưa nhận 0,76; màn khác <= 0,51.

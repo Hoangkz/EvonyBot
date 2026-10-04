@@ -31,6 +31,7 @@ from .constants import (
     OLD_ACTIVITY_TITLE,
     OLD_CARD,
     OLD_CARD_THRESHOLD,
+    OLD_CONGRATS,
     OLD_DONE_BADGE,
     OLD_DONE_CARD,
     OLD_DONE_CARD_THRESHOLD,
@@ -540,8 +541,8 @@ def _search_list(bot, titles, max_scrolls: int) -> str:
 
 
 def _search_grid(bot, cards, max_scrolls: int, done_cards=()) -> str:
-    """Lưới thẻ Activity (bản cũ): ở đầu lưới (chưa cuộn) thấy thẻ "100%" (OLD_DONE_BADGE) thì bấm giữa
-    thẻ nhận trước (bấm mà vẫn còn -> bỏ qua tới hết lượt này); thẻ chưa nhận luôn nằm đầu lưới, đã cuộn
+    """Lưới thẻ Activity (bản cũ): popup "Congratulations!" (OLD_CONGRATS) -> Back. Ở đầu lưới (chưa cuộn)
+    thấy thẻ "100%" (OLD_DONE_BADGE) thì bấm giữa thẻ nhận trước (bấm mà vẫn còn -> bỏ qua tới hết lượt này); thẻ chưa nhận luôn nằm đầu lưới, đã cuộn
     mà thấy "100%" là thẻ đã nhận rồi -> không bấm. Lướt tìm thẻ (OLD_CARD_THRESHOLD) -> bấm -> popup: chờ Go (tối đa
     OLD_POPUP_TIMEOUT giây) -> bấm, TASK_OPENED; không có Go -> Back, TASK_UNKNOWN (chưa có ảnh popup
     "đã xong" nên không đoán). Hết lưới không thấy -> TASK_NOT_FOUND."""
@@ -550,6 +551,12 @@ def _search_grid(bot, cards, max_scrolls: int, done_cards=()) -> str:
     done_stuck = False
     while True:
         screen = bot.screenshot()
+        if bot.find(OLD_CONGRATS, screen=screen) is not None:
+            # Popup "Congratulations!" sau khi nhận thẻ 100%: Back đóng (vẫn ở lưới).
+            bot.log("Daily Activities: Congratulations popup, back")
+            bot.back(delay=1)
+            previous = None
+            continue
         if not done_stuck and scrolls == 0:
             badge = bot.find(OLD_DONE_BADGE, threshold=OLD_DONE_THRESHOLD, screen=screen)
             if badge is not None:

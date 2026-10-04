@@ -7,7 +7,7 @@ Sau Go: bấm giữa màn hình (Bệnh viện) -> menu:
 1. Có "Speed Up" (đang chữa dở): bấm -> màn Healing Speedup -> Finish All (như train lính) ->
    trả AGAIN.
 2. Có "Heal" (rảnh): bấm -> màn Hospital: Reset (bỏ chọn hết, nút đổi thành Select All) -> cuộn
-   danh sách xuống cuối LIST_SCROLLS lần (lính cấp thấp nhất ở dưới cùng) -> chọn nhiều dòng một
+   danh sách xuống cuối (thấy khoảng trống cuối danh sách LIST_END thì thôi, tối đa LIST_SCROLLS lần) (lính cấp thấp nhất ở dưới cùng) -> chọn nhiều dòng một
    lần, từ dòng dưới cùng lên: OCR số lính bị thương mỗi dòng ("0 / 8,147", ocr/read_heal_count.py),
    bấm ô số -> thanh nhập: gõ min(còn thiếu, số lính) -> OK; đủ số cần heal (mục tiêu - số đã heal,
    OCR ở dòng Go) hoặc hết dòng đang thấy thì thôi -> Heal -> Speed Up -> Finish All -> trả AGAIN
@@ -50,6 +50,7 @@ from .constants import (
     INPUT_TRIES,
     INPUT_WAIT,
     KEY,
+    LIST_END,
     LIST_SCROLLS,
     LIST_SWIPE,
     LIST_SWIPE_WAIT,
@@ -115,12 +116,15 @@ def _no_wounded(bot, path):
 
 
 def _reset_and_scroll(bot):
-    """Màn Hospital: còn nút Reset (đang chọn hết) thì bấm; rồi cuộn xuống cuối danh sách."""
+    """Màn Hospital: còn nút Reset (đang chọn hết) thì bấm; rồi cuộn xuống cuối danh sách: thấy khoảng
+    trống cuối danh sách (LIST_END) thì thôi, tối đa LIST_SCROLLS lần."""
     reset = bot.find(RESET)
     if reset is not None:
         bot.log(f"{NAME}: Reset selection")
         bot.tap(*reset, delay=1 + EXTRA_WAIT)
     for _ in range(LIST_SCROLLS):
+        if bot.find(LIST_END) is not None:
+            break
         bot.swipe_percent(*LIST_SWIPE, duration=0.5, delay=LIST_SWIPE_WAIT)
 
 
