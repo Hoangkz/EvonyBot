@@ -132,200 +132,29 @@ Sau đó bot bấm tab Activity và xác nhận bằng `Click_ActivitiesLight.pn
 drawer tìm quái che nút Quests, bot dùng `BackToTerritoryCurrent.png` để về
 thành; không dùng Android Back vì Back mở hộp Quit trên giao diện hiện tại.
 
-## 5. Monster Killing
+## 5. Flow từng nhiệm vụ
 
-Monster Killing có hai mốc Daily liên tiếp: đánh 2 lần, sau đó đánh thêm 3 lần.
+Mỗi nhiệm vụ có file `FLOW.md` riêng trong thư mục của nó (thứ tự chạy ở [run.py](run.py)):
 
-```mermaid
-flowchart TD
-    A[Tìm hàng Attack Monsters 2 times] --> B{Hàng còn Go?}
-    B -->|Có| C[Mở Find Monster]
-    C --> D[Chọn tab Monster và Search]
-    D --> E[Bấm Attack]
-    E --> F[Gửi March]
-    F --> G{Đã gửi đủ 2 march?}
-    G -->|Chưa| C
-    G -->|Đủ| H[Về Activity]
-    H --> I[Hàng đầu không còn Go; claim để hiện hàng sau]
-    I --> J[Đặt trạng thái deferred]
-    J --> K[Làm 5 task khác; hoặc 4 nếu đã hết task khả dụng]
-    K --> L[Tìm hàng Attack Monsters 3 times]
-    L --> M[Đánh thêm 3 march]
-    M --> N[Về Activity]
-    N --> O{Hàng thứ hai còn Go?}
-    O -->|Không| P[Hoàn thành]
-    O -->|Có| L
-```
-
-Chi tiết thao tác:
-
-- `FindMonster.png` mở giao diện tìm kiếm.
-- `TapMonster.png` chọn tab Monster trước khi bấm Search.
-- Giao diện mới dùng nút xanh `AttackButtonCurrent.png`; giao diện cũ giữ
-  fallback `AttackMonster.png`.
-- Màn March ưu tiên `FullTiersCurrent.png`. Nếu nút này chỉ điền đội hình mà
-  chưa gửi, bot bấm `MarchButtonCurrent.png`.
-- Chỉ tăng bộ đếm march khi ảnh `March.png` biến mất sau thao tác gửi.
-- Nếu tìm quái chưa sẵn sàng ba lần, bot chờ 5 giây; không bấm Back.
-- Sau march 2 và march 5, bot quay lại Activity để kiểm tra trạng thái.
-
-## 6. Resource Collecting
-
-Đây là flow có **task chính** và **task trung gian**, phải phân biệt rõ:
-
-| Ảnh | Vai trò |
+| Nhiệm vụ | Flow |
 | --- | --- |
-| `ClaimCollecting.png` | Nhãn task Daily chính. Đây là hàng duy nhất dùng để xác nhận Resource Collecting đã xong. |
-| `ActivitiesSourceCollecting.png` | Hàng `Research technologies`; chỉ là đường đi gián tiếp để mở Academy. Không dùng làm bằng chứng hoàn thành. |
-| `Collection.png` | Nút Collection trong menu Academy; đây là hành động cần thực hiện. |
+| Monster Killing | [monster_killing/FLOW.md](monster_killing/FLOW.md) |
+| Resource Collecting | [resource_collecting/FLOW.md](resource_collecting/FLOW.md) |
+| Offering | [offering/FLOW.md](offering/FLOW.md) |
+| Resource Gathering | [resource_gathering/FLOW.md](resource_gathering/FLOW.md) |
+| Resource Tax | [resource_tax/FLOW.md](resource_tax/FLOW.md) |
+| Gold Levy | [gold_levy/FLOW.md](gold_levy/FLOW.md) |
+| Troop Training | [troop_training/FLOW.md](troop_training/FLOW.md) |
+| Troop Healing | [troop_healing/FLOW.md](troop_healing/FLOW.md) |
+| Trap Building | [trap_building/FLOW.md](trap_building/FLOW.md) |
+| Alliance Donation | [alliance_donation/FLOW.md](alliance_donation/FLOW.md) |
+| Black Market | [black_market/FLOW.md](black_market/FLOW.md) |
+| General Enhancing | [general_enhancing/FLOW.md](general_enhancing/FLOW.md) |
+| Wheel of Fortune | [wheel_of_fortune/FLOW.md](wheel_of_fortune/FLOW.md) |
+| Patrol | [patrol/FLOW.md](patrol/FLOW.md) |
+| Material Composing | [material_composing/FLOW.md](material_composing/FLOW.md) |
 
-```mermaid
-flowchart TD
-    A[Tìm ClaimCollecting] --> B{Trong đúng hàng còn Go?}
-    B -->|Không| Z[Resource Collecting hoàn thành]
-    B -->|Có| C[Không bấm Go của ClaimCollecting]
-    C --> D[Quay về đầu danh sách]
-    D --> E[Tìm Research technologies]
-    E --> F{Hàng Research còn Go?}
-    F -->|Có| G[Bấm Go của Research]
-    G --> H[Bấm giữa màn hình để mở menu Academy]
-    H --> I[Tìm và bấm Collection.png]
-    I --> J[Mở lại Quests → Activity]
-    J --> A
-    F -->|Không| D
-```
-
-Quy tắc hoàn thành:
-
-- Không dùng `Finish.png` hoặc `Finish1.png`. Trên client hiện tại,
-  `Finish1.png` khớp đúng biểu tượng **Skill Book Shop**, khiến code cũ thoát
-  trước khi bấm Collection.
-- Không dùng trạng thái của hàng Research technologies để kết luận.
-- Không dùng việc đã bấm Collection để kết luận.
-- Chỉ khi tìm lại đúng `ClaimCollecting.png` và trong hàng đó không còn Go thì
-  `common.run_task()` mới trả `True`.
-
-## 7. Offering và Resource Gathering
-
-Hai task này đứng liền nhau vì đều đưa bot về thành.
-
-### Offering
-
-1. Tìm hàng `Offer.png`, kiểm tra và bấm Go.
-2. Trong Shrine, xử lý `Offer1.png` hoặc `OfferGems.png`.
-3. Khi thấy `Offerfins.png`, tìm `Offer+.png`, bấm Plus hai lần rồi xác nhận.
-4. Ảnh `Offerdone.png` hoặc `Offerdone1.png` là tín hiệu hoàn thành.
-
-### Resource Gathering
-
-1. Chạy ngay sau Offering.
-2. Tìm hàng `GatherCityCurrent.png`, bấm Go nếu còn.
-3. Trong thành, tìm `HandCurrent.png` và bấm bàn tay để thu các tài nguyên sẵn
-   sàng.
-4. Mở lại Quests → Activity.
-5. Xác nhận từ đúng hàng task: không còn Go thì hoàn thành.
-
-## 8. Resource Tax
-
-1. Tìm hàng `ActivitiesTaxResource.png`, bấm Go.
-2. `CityTax/menuTax.png` (menu Chợ, ảnh dùng chung với King's Path City Tax): bấm Tax.
-3. `CityTax/taxScreen.png` (màn Tax, 4 dòng Lúa / Gỗ / Đá / Sắt): `resource_tax/run.py tax_all` theo group
-   "City Tax" của tab: loại tích Free trước, thu hết lượt free rồi cộng thêm số chọn ("+" từ số mặc
-   định của popup); rồi các loại khác đúng số chọn (OCR ô số popup, "+" / "−"). Xong thì Back về thành, coi như xong hôm nay.
-4. `CityTax/popupCost.png` (popup Tax còn mở): Back.
-5. Các ảnh `TaxFinish2.png`, `TaxFinish.png`, `TaxFinish1.png` báo hoàn thành.
-
-## 9. Gold Levy
-
-1. Tìm `LevyGoldActivityCurrent.png` hoặc `LevyGoldActivity1.png`, bấm Go.
-2. `Levy.png`: mở menu tròn của công trình, chọn Levy rồi bấm hai nút Free
-   Levy hiện tại.
-3. `Levy1.png`: dùng trực tiếp hai tọa độ nút Free Levy.
-4. `GemsLevyTimes.png`: nhập 5 và xác nhận.
-5. `LevyGoldFinish.png` hoặc `LevyGoldFinish1.png` báo hoàn thành.
-
-## 10. Troop Training
-
-1. Mở từ hàng `TrainTroop.png`.
-2. `Train.png`: bấm vào mục Train chung.
-3. `TrainInterface.png`: vuốt ngang carousel quân.
-4. `TrainSoldierCurrent.png`, `TrainSoldierSelectedCurrent.png` hoặc
-   `TrainSoldier1.png`: nhập số lượng 500 và xác nhận.
-5. `TroopSpeed.png`: dùng nút speedup hiện tại.
-6. `TroopFinish.png` hoặc `TroopFinish1.png` báo hoàn thành.
-
-## 11. Troop Healing
-
-1. Mở từ hàng `HealActivity.png`.
-2. `Heal.png`: vào chức năng Heal.
-3. `Heal-i.png`: mở thông tin và cuộn hai lần.
-4. `HealSelect.png`: nhập 150, xác nhận hai lần.
-5. `HealFinishAll.png`: bấm Finish All.
-6. `HealFinish.png` hoặc `HealFinish1.png` báo hoàn thành.
-
-## 12. Trap Building
-
-1. Mở từ `ActivitiesBuildTrap1.png` rồi `Build.png`.
-2. `BuildInterface.png`: chọn trap tier I hiện tại, nhập 150 và xây.
-3. `Trap-i.png`: trường hợp đã ở màn chọn trap, nhập 150 và xây trực tiếp.
-4. `TrapSpeed.png`: dùng speedup, sau đó Back.
-5. `TrapFinish.png` hoặc `TrapFinish1.png` báo hoàn thành.
-
-## 13. Alliance Donation
-
-1. Mở từ `ActivitiesDonateAlliance1.png`.
-2. Khi thấy `AllianceCapacity.png`, crop từ hàng đó xuống 390 px.
-3. Tìm nút `Donate.png` trong vùng crop và bấm.
-4. Không tìm thấy Donate thì kết thúc pass hiện tại nhưng chưa ghi hoàn thành.
-5. `AllianceDonateFinish.png` hoặc `AllianceDonateFinish1.png` báo hoàn thành.
-
-## 14. Black Market
-
-1. Mở từ `ActivitiesBlackMarket.png` rồi `BuyMarket.png`.
-2. Khi thấy `Market.png` hoặc `Market1.png`, tìm lần lượt các mặt hàng tài
-   nguyên: food, lumber, ore, stone.
-3. Mỗi lần mua bấm xác nhận tại `(190, 415)`.
-4. Tối đa ba lần mua trong lượt rồi Back.
-5. Không dùng tọa độ Instant Refresh cũ vì client hiện tại tính phí gem.
-6. `BlackMarketFinishCurrent.png` hoặc `BlackMarketFinish.png` báo hoàn thành.
-
-## 15. General Enhancing
-
-1. Mở từ `ActivitiesGeneralEnhancing.png`.
-2. `Cultivate.png`: vào Cultivate.
-3. `Cultivate1.png`: chạy tối đa năm lượt, chấp nhận cả `Agree.png` và
-   `Disagree.png` theo logic ảnh hiện có.
-4. Bấm nút dưới trái rồi Back.
-5. `CultivateFinishCurrent.png` hoặc `CultivateFinish.png` báo hoàn thành.
-
-## 16. Wheel of Fortune
-
-1. Mở từ `ActivitiesWheelofFortune.png`.
-2. `WheelofFortune.png`: tìm `SpinOnce.png` và quay một lần.
-3. Bấm đóng/phần thưởng tại `(170, 550)` rồi Back.
-4. `SpinFinishCurrent.png` hoặc `SpinFinish.png` báo hoàn thành.
-
-## 17. Patrol
-
-1. Mở từ `ActivitiesPatrol.png`.
-2. `Patrol.png`: vào màn Patrol.
-3. Với `Patrol1.png`, chạy ba lượt:
-   - Lượt đầu: Select All → Patrol.
-   - Lượt hai và ba: Refresh bằng gold → Select All → Patrol.
-4. Back sau ba lượt.
-5. `PatrolFinishCurrent.png` hoặc `PatrolFinish.png` báo hoàn thành.
-
-## 18. Material Composing
-
-1. Mở từ `ActivitiesComposeMaterials.png`.
-2. `Lv1Crystal.png`: chờ rồi chọn vật liệu cấp 1.
-3. `Crystal.png`: crop vùng 250 px từ hàng, tìm và bấm `Compose1.png`.
-4. `Compose.png`: tìm `Lv3Crystal.png`, chọn rồi bấm Compose ba lần, sau đó
-   Back.
-5. `ComposeMaterialsFinishCurrent.png` hoặc `ComposeMaterialsFinish.png` báo
-   hoàn thành.
-
-## 19. General: mua thể lực và mua búa
+## 6. General: mua thể lực và mua búa
 
 ### Buy Stamina
 
@@ -346,7 +175,7 @@ Hai task này đứng liền nhau vì đều đưa bot về thành.
 Mỗi flow General có giới hạn `MAX_STEPS = 100`; quá giới hạn sẽ log và dừng,
 không đánh dấu hoàn thành.
 
-## 20. Nhận thưởng Activity
+## 7. Nhận thưởng Activity
 
 Sau các pass, nếu `Activity Rewards` chưa được ghi hoàn thành:
 
@@ -359,7 +188,7 @@ Sau các pass, nếu `Activity Rewards` chưa được ghi hoàn thành:
 6. Chỉ ghi `Activity Rewards` vào database nếu tất cả task được chọn đã có
    `daily_done`.
 
-## 21. Ảnh, vùng tìm kiếm và cache
+## 8. Ảnh, vùng tìm kiếm và cache
 
 - Ảnh nằm dưới `Images/DailyActivites/<folder task>/`.
 - `find_first()` dùng cache vị trí riêng theo BotContext. Sau lần tìm thấy đầu,
@@ -371,7 +200,7 @@ Sau các pass, nếu `Activity Rewards` chưa được ghi hoàn thành:
   task sai nếu nó trùng với icon khác; Resource Collecting đã loại bỏ Finish vì
   lý do này.
 
-## 22. Database và reset ngày
+## 9. Database và reset ngày
 
 Các khóa hoàn thành được lưu trong trường `daily_done` của thiết bị:
 
@@ -387,7 +216,7 @@ Các khóa hoàn thành được lưu trong trường `daily_done` của thiết
 Code không xóa bản ghi mỗi ngày. `done_today()` so timestamp với mốc reset gần
 nhất; bản ghi cũ tự động không còn được coi là hoàn thành.
 
-## 23. Kiểm thử và giới hạn xác nhận
+## 10. Kiểm thử và giới hạn xác nhận
 
 Các test chính:
 
