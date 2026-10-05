@@ -91,6 +91,9 @@ def _run(testcase, flow, settings, **kw):
     return run_flow(testcase, event.run, SCREENS, flow, settings, variants=VARIANTS, **kw)
 
 
+# Tường thành trên patrol_city.png khớp ảnh mẫu civ có sẵn (Images/Event/Building/civ*/walls) -> bot bấm vào nó.
+WALLS_POS = (246, 345)
+
 class LoginRewardFlow(unittest.TestCase):
     """Rương Login Rewards hôm nay ở đầu danh sách event (event/common.py claim_login_reward)."""
 
@@ -261,7 +264,7 @@ class KingsPathFlow(unittest.TestCase):
         ]
         flow = [
             Step("day2_teamwork.png", tap_at(335, 344)),
-            Step("patrol_city.png", tap_pct(50, 50)),
+            Step("patrol_city.png", tap_at(*WALLS_POS)),
             Step("patrol_menu.png", tap(MENU_PATROL)),
             *rounds,
             Step("patrol_done.png", tap(PATROL_REFRESH)),
@@ -278,7 +281,7 @@ class KingsPathFlow(unittest.TestCase):
         nay (mục tiêu 200 chưa đủ, mai làm tiếp)."""
         flow = [
             Step("day2_teamwork.png", tap_at(335, 344)),
-            Step("patrol_city.png", tap_pct(50, 50)),
+            Step("patrol_city.png", tap_at(*WALLS_POS)),
             Step("patrol_menu.png", tap(MENU_PATROL)),
             Step("patrol_screen.png", tap(PATROL_SELECT_ALL_OFF)),
             Step("patrol_selected.png", tap(PATROL_BUTTON)),
@@ -293,7 +296,7 @@ class KingsPathFlow(unittest.TestCase):
         """Refresh mà phần thưởng vẫn là bộ đã patrol (hết lượt Refresh): Back, xong hôm nay."""
         flow = [
             Step("day2_teamwork.png", tap_at(335, 344)),
-            Step("patrol_city.png", tap_pct(50, 50)),
+            Step("patrol_city.png", tap_at(*WALLS_POS)),
             Step("patrol_menu.png", tap(MENU_PATROL)),
             Step("patrol_done.png", tap(PATROL_REFRESH)),
             Step("patrol_done.png", back(), end()),
@@ -306,7 +309,7 @@ class KingsPathFlow(unittest.TestCase):
         không cộng tiến độ, dừng (không đánh dấu xong)."""
         flow = [
             Step("day2_teamwork.png", tap_at(335, 344)),
-            Step("patrol_city.png", tap_pct(50, 50)),
+            Step("patrol_city.png", tap_at(*WALLS_POS)),
             Step("patrol_menu.png", tap(MENU_PATROL)),
             Step("patrol_selected.png", tap(PATROL_BUTTON)),
             Step("patrol_selected.png", end()),
@@ -327,7 +330,7 @@ class KingsPathFlow(unittest.TestCase):
         hôm nay — không bấm Refresh."""
         flow = [
             Step("day2_teamwork.png", tap_at(335, 344)),
-            Step("patrol_city.png", tap_pct(50, 50)),
+            Step("patrol_city.png", tap_at(*WALLS_POS)),
             Step("patrol_menu.png", tap(MENU_PATROL)),
             Step("patrol_no_refresh.png", back(), end()),
         ]

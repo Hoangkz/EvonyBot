@@ -32,21 +32,28 @@ NAME = "Wheel"
 
 def _spin(bot, path, done, target):
     """Sau Go: 100 Spins nếu có; không thì 10 Spins liên tục tới khi hết chip."""
+    spin_wheel(bot, lambda: bot.mark_daily_done(path.key))
+
+
+def spin_wheel(bot, done, name: str = NAME) -> bool:
+    """Màn Wheel of Fortune (vừa bấm Go): 100 Spins nếu có (-> Back), không thì 10 Spins liên tục tới khi game mở
+    màn Purchase Chips (hết chip -> Back); cả hai gọi done() rồi trả True. Không thấy màn Wheel / quá MAX_STEPS
+    -> False. Dùng chung với Daily Activities / Wheel of Fortune."""
     spins_10, misses = 0, 0
     for _ in range(MAX_STEPS):
         screen = bot.screenshot()
         spin_100 = bot.find(SPINS_100, screen=screen, region=SPINS_REGION)
         if spin_100 is not None:
-            bot.record(f"{NAME}: 100 Spins, back, done")
+            bot.record(f"{name}: 100 Spins, back, done")
             bot.tap(*spin_100, delay=SPIN_100_WAIT)
             bot.back(delay=BUTTON_WAIT)
-            bot.mark_daily_done(path.key)
-            return
+            done()
+            return True
         if bot.find(CHIPS_TITLE, screen=screen) is not None:
-            bot.record(f"{NAME}: out of chips after {spins_10} x 10 Spins, done for today")
+            bot.record(f"{name}: out of chips after {spins_10} x 10 Spins, done for today")
             bot.back(delay=BUTTON_WAIT)
-            bot.mark_daily_done(path.key)
-            return
+            done()
+            return True
         spin_10 = bot.find(SPINS_10, screen=screen, region=SPINS_REGION)
         if spin_10 is not None:
             misses = 0
@@ -55,10 +62,11 @@ def _spin(bot, path, done, target):
             continue
         misses += 1
         if misses > WHEEL_WAIT:
-            bot.record(f"{NAME}: Wheel of Fortune not shown")
-            return
+            bot.record(f"{name}: Wheel of Fortune not shown")
+            return False
         bot.sleep(1)
-    bot.record(f"{NAME}: too many steps ({spins_10} x 10 Spins), stop")
+    bot.record(f"{name}: too many steps ({spins_10} x 10 Spins), stop")
+    return False
 
 
 PATH = path_task.PathTask(

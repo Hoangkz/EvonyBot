@@ -237,8 +237,9 @@ class BotWorker(QThread):
             self.activity_changed.emit(self.serial, task.group)
             scheduler.started(task)
             self.record(f"Bắt đầu: {task.key}")
+            self.ctx.again_after = None
             self._run_activity(task.group, self.settings.get(task.group, {}))
-            scheduler.finished(task)
+            scheduler.finished(task, again_after=self.ctx.again_after)
             self.record(f"Xong: {task.key}")
             return True
         # Bị ngắt: lượt sau gọi lại từ đầu hàm run(); worker không lưu điểm thực thi.

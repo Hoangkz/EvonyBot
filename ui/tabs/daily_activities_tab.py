@@ -8,6 +8,7 @@ from PyQt5.QtCore import QSignalBlocker
 from PyQt5.QtWidgets import (QCheckBox, QComboBox, QGridLayout, QGroupBox, QHBoxLayout, QLabel,
                              QWidget)
 
+from bot.activities.daily_activities import alliance_donation, alliance_help
 from bot.activities.daily_activities.offering.constants import (
     OFFER_GEMS_CHOICES,
     OFFER_GEMS_DEFAULT,
@@ -38,6 +39,7 @@ SUPPORTED_TASKS = (
     ("Troop Heading", "Troop Healing"),
     ("Trap Buiding", "Trap Building"),
     ("Alliance Donation", "Alliance Donation"),
+    ("Alliance Help", "Alliance Help"),
     ("Black Market", "Black Market"),
     ("General Enhancing", "General Enhancing"),
     ("Wheel of Fortune", "Wheel of Fortune"),
@@ -46,7 +48,6 @@ SUPPORTED_TASKS = (
 )
 
 UNSUPPORTED_TASKS = (
-    ("Alliance Help", "Alliance Help"),
     ("Research", "Research"),
     ("Construction", "Construction"),
     ("PvP Battle", "PvP Battle"),
@@ -59,6 +60,17 @@ UNSUPPORTED_TASKS = (
 )
 
 GENERAL_KEY = "General"
+# Nhiệm vụ theo giờ: ô chọn giờ (0 / 1h .. 4h) thay cho checkbox; 0 = không làm. {key: (constants, tooltip)}.
+HOURLY_TASKS = {
+    alliance_donation.constants.INTERVAL_KEY: (
+        alliance_donation.constants,
+        "Donate lượt miễn phí ở Alliance Science, chưa xong thì làm lại sau chừng này giờ (không ưu tiên). "
+        "0 = không làm."),
+    alliance_help.constants.INTERVAL_KEY: (
+        alliance_help.constants,
+        "Help All ở Alliance Help, chưa xong thì làm lại sau chừng này giờ (không ưu tiên, sau Alliance "
+        "Donation). 0 = không làm."),
+}
 OFFERING_KEY = "Offering"
 
 
@@ -68,6 +80,7 @@ class DailyActivitiesTab(BaseTab):
 
         self.task_boxes: dict[str, QCheckBox] = {}
         self.unsupported_boxes: dict[str, QCheckBox] = {}
+        self.hourly_combos: dict[str, QComboBox] = {}
 
         general = QGroupBox("General")
         general_grid = QGridLayout(general)
@@ -96,6 +109,22 @@ class DailyActivitiesTab(BaseTab):
                 row.setContentsMargins(0, 0, 0, 0)
                 row.addWidget(QLabel(label))
                 row.addWidget(self.offer_gems)
+                row.addStretch(1)
+                selection_grid.addWidget(cell, index // 4, index % 4)
+                continue
+            if key in HOURLY_TASKS:
+                # Nhiệm vụ theo giờ: chu kỳ thử (giờ) thay cho checkbox; 0 = không làm.
+                consts, tip = HOURLY_TASKS[key]
+                combo = QComboBox()
+                combo.addItems(_hours_text(h) for h in consts.INTERVAL_CHOICES)
+                combo.setCurrentText(_hours_text(consts.INTERVAL_DEFAULT))
+                combo.setToolTip(tip)
+                self.hourly_combos[key] = combo
+                cell = QWidget()
+                row = QHBoxLayout(cell)
+                row.setContentsMargins(0, 0, 0, 0)
+                row.addWidget(QLabel(label))
+                row.addWidget(combo)
                 row.addStretch(1)
                 selection_grid.addWidget(cell, index // 4, index % 4)
                 continue
@@ -143,6 +172,8 @@ class DailyActivitiesTab(BaseTab):
         self.buy_hammers.clicked.connect(self.settings_changed)
         self.stamina_quantity.activated.connect(self.settings_changed)
         self.offer_gems.activated.connect(self.settings_changed)
+        for combo in self.hourly_combos.values():
+            combo.activated.connect(self.settings_changed)
         for count in self.tax_counts.values():
             count.activated.connect(self.settings_changed)
         for box in self.task_boxes.values():
@@ -163,6 +194,8 @@ class DailyActivitiesTab(BaseTab):
         offer = int(self.offer_gems.currentText())
         settings[OFFERING_KEY] = offer > 0
         settings[OFFER_GEMS_KEY] = offer
+        for key, combo in self.hourly_combos.items():
+            settings[key] = _hours_value(combo.currentText())
         tax = {name: int(box.currentText()) for name, box in self.tax_counts.items()}
         tax[TAX_FREE_KEY] = next((name for name, box in self.tax_free.items() if box.isChecked()), None)
         settings[TAX_KEY] = tax
@@ -176,7 +209,7 @@ class DailyActivitiesTab(BaseTab):
 
     def set_settings(self, data: dict):
         # Avoid writing partially restored state while loading a device.
-        widgets = [self.stamina_quantity, self.buy_hammers, self.offer_gems,
+        widgets = [self.stamina_quantity, self.buy_hammers, self.offer_gems, *self.hourly_combos.values(),
                    *self.task_boxes.values(), *self.tax_counts.values(), *self.tax_free.values()]
         blockers = [QSignalBlocker(widget) for widget in widgets]
         try:
@@ -200,6 +233,15 @@ class DailyActivitiesTab(BaseTab):
             offer = str(data.get(OFFER_GEMS_KEY, OFFER_GEMS_DEFAULT)) if data.get(OFFERING_KEY) else "0"
             if self.offer_gems.findText(offer) >= 0:
                 self.offer_gems.setCurrentText(offer)
+            # Nhiệm vụ theo giờ: số giờ; cấu hình cũ là ô tích (True -> mặc định, False -> 0).
+            for key, combo in self.hourly_combos.items():
+                consts = HOURLY_TASKS[key][0]
+                hours = data.get(key, consts.INTERVAL_DEFAULT)
+                if isinstance(hours, bool):
+                    hours = consts.INTERVAL_DEFAULT if hours else 0
+                if hours not in consts.INTERVAL_CHOICES:
+                    hours = consts.INTERVAL_DEFAULT
+                combo.setCurrentText(_hours_text(hours))
             tax = data.get(TAX_KEY, {})
             if not isinstance(tax, dict):
                 tax = {}
@@ -211,3 +253,13 @@ class DailyActivitiesTab(BaseTab):
         finally:
             # Keep blockers alive through every assignment, then release together.
             del blockers
+
+
+def _hours_text(hours) -> str:
+    """Chữ hiển thị của ô chọn giờ (nhiệm vụ theo giờ): 0 -> "0", 4 -> "4h"."""
+    return "0" if not hours else f"{int(hours)}h"
+
+
+def _hours_value(text: str) -> int:
+    """Ngược lại _hours_text: "4h" -> 4, "0" -> 0."""
+    return int(text.rstrip("h") or 0)

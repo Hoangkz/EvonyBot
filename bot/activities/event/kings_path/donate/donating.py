@@ -6,7 +6,7 @@ Mỗi bước chụp 1 ảnh: hộp "Spend N Gems on clearing the Cooldown?" -> 
 khoa học trên cùng -> bấm (+1); hết lượt (nút kim cương) -> mua lại lượt, tối đa MAX_GEM_BUYS lần.
 """
 from .constants import (
-    DONATE_BUTTON,
+    DONATE_BUTTONS,
     DONATE_WAIT,
     GEMS_BUTTON,
     GEMS_WAIT,
@@ -56,8 +56,8 @@ def read_screen(bot, screen):
     okay = bot.find(OKAY, screen=screen)
     if okay is not None:
         return "okay", okay
-    for action, template in (("donate", DONATE_BUTTON), ("gems", GEMS_BUTTON)):
-        points = bot.find_all(template, screen=screen)
+    for action, templates in (("donate", DONATE_BUTTONS), ("gems", (GEMS_BUTTON,))):
+        points = [p for template in templates for p in bot.find_all(template, screen=screen)]
         if points:
             return action, min(points, key=lambda p: p[1])
     return None, None

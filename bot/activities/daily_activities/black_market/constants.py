@@ -18,3 +18,8 @@ ACTIONS = (
     ("BuyMarket.png", "market"),
     ("ActivitiesBlackMarket.png", OPEN),
 )
+
+# ---- Luồng mới sau Go (run.after_go), giống hệt King's Path Black Market sau Go --------------------
+# Go -> về thành, Chợ ở giữa -> menu "Black Market" -> event/kings_path/black_market buy_items: mua các món không
+# trả bằng kim cương (mua hết bộ thì Instant Refresh) cho đủ BUY_GOAL lần.
+BUY_GOAL = 5

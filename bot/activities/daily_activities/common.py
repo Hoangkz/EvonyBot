@@ -62,11 +62,13 @@ from .constants import (
     SCROLL,
     TAP,
     TASK_DONE,
+    TASK_HAS_GO,
     TASK_NO_LIST,
     TASK_NOT_FOUND,
     TASK_OPENED,
     TASK_UNKNOWN,
     TICK_BUTTON,
+    TICK_DY,
     USE_ALL,
     VERIFY_COLLECTING,
 )
@@ -461,7 +463,8 @@ def open_activity_list(bot) -> str | None:
     return None
 
 
-def open_task(bot, titles, cards=(), max_scrolls: int = LIST_MAX_SCROLLS, done_cards=()) -> str:
+def open_task(bot, titles, cards=(), max_scrolls: int = LIST_MAX_SCROLLS, done_cards=(),
+              tap_go: bool = True) -> str:
     """Mở nhiệm vụ tới lúc bấm Go (sau Go hai phiên bản giống nhau, phần riêng của nhiệm vụ làm tiếp).
     `titles`: ảnh tiêu đề dòng (bản mới, task_titles); `cards`: ảnh thẻ (bản cũ, task_cards);
     `done_cards`: ảnh thẻ đã nhận thưởng (bản cũ, task_done_cards) -> TASK_DONE.
@@ -470,7 +473,9 @@ def open_task(bot, titles, cards=(), max_scrolls: int = LIST_MAX_SCROLLS, done_c
     Lướt hết không thấy: Back rồi mở lại bảng Activity, tìm thêm LIST_RETRIES lần.
     Trả TASK_OPENED (đã bấm Go), TASK_DONE (dòng / popup không còn Go), TASK_NOT_FOUND (lướt hết
     LIST_RETRIES + 1 lượt không thấy), TASK_UNKNOWN (thấy dòng mà không nhận ra nút / thiếu ảnh thẻ),
-    TASK_NO_LIST (không mở được bảng Activity)."""
+    TASK_NO_LIST (không mở được bảng Activity).
+    `tap_go=False`: chỉ kiểm tra nhiệm vụ xong chưa — dòng còn Go (bản mới) / thẻ chưa nhận (bản cũ) thì không
+    bấm gì, trả TASK_HAS_GO."""
     titles = (titles,) if isinstance(titles, str) else tuple(titles)
     cards = (cards,) if isinstance(cards, str) else tuple(cards)
     done_cards = (done_cards,) if isinstance(done_cards, str) else tuple(done_cards)
@@ -484,10 +489,13 @@ def open_task(bot, titles, cards=(), max_scrolls: int = LIST_MAX_SCROLLS, done_c
                 bot.record("Daily Activities: task has no card image for the old Activity screen")
                 return TASK_UNKNOWN
             wanted = cards
-            result = _search_grid(bot, cards, max_scrolls, done_cards)
+            result = _search_grid(bot, cards, max_scrolls, done_cards, tap_go)
         else:
+            if not titles:
+                bot.record("Daily Activities: task has no row title image for the Activity list")
+                return TASK_UNKNOWN
             wanted = titles
-            result = _search_list(bot, titles, max_scrolls)
+            result = _search_list(bot, titles, max_scrolls, tap_go)
         if result != TASK_NOT_FOUND:
             return result
         if attempt < LIST_RETRIES:
@@ -498,7 +506,7 @@ def open_task(bot, titles, cards=(), max_scrolls: int = LIST_MAX_SCROLLS, done_c
     return TASK_NOT_FOUND
 
 
-def _search_list(bot, titles, max_scrolls: int) -> str:
+def _search_list(bot, titles, max_scrolls: int, tap_go: bool = True) -> str:
     """Danh sách Activity (bản mới): mỗi màn thấy Claim All thì bấm trước (bấm mà vẫn còn = lỗi game,
     bỏ qua tới hết lượt này); tìm tiêu đề dòng; thấy (và trên ROW_TITLE_MAX_Y): nút ngay dưới
     (ROW_BUTTON_DY) là Go -> bấm, TASK_OPENED; Claim / tích V -> TASK_DONE; không nhận ra nút ->
@@ -523,9 +531,9 @@ def _search_list(bot, titles, max_scrolls: int) -> str:
         at_end = previous is not None and _same_list(previous, screen)
         # Tiêu đề sát đáy (nút có thể bị thanh Claim All che): cuộn tiếp; đã hết danh sách thì xét luôn.
         if title is not None and (title[1] <= ROW_TITLE_MAX_Y or at_end):
-            button = _row_button(bot, screen, title)
+            button = _row_button(bot, screen, title, tap_go)
             if button == "go":
-                return TASK_OPENED
+                return TASK_OPENED if tap_go else TASK_HAS_GO
             if button in ("claim", "tick"):
                 bot.log(f"Daily Activities: task row shows {button}; done")
                 return TASK_DONE
@@ -540,7 +548,7 @@ def _search_list(bot, titles, max_scrolls: int) -> str:
     return TASK_NOT_FOUND
 
 
-def _search_grid(bot, cards, max_scrolls: int, done_cards=()) -> str:
+def _search_grid(bot, cards, max_scrolls: int, done_cards=(), tap_go: bool = True) -> str:
     """Lưới thẻ Activity (bản cũ): popup "Congratulations!" (OLD_CONGRATS) -> Back. Ở đầu lưới (chưa cuộn)
     thấy thẻ "100%" (OLD_DONE_BADGE) thì bấm giữa thẻ nhận trước (bấm mà vẫn còn -> bỏ qua tới hết lượt này); thẻ chưa nhận luôn nằm đầu lưới, đã cuộn
     mà thấy "100%" là thẻ đã nhận rồi -> không bấm. Lướt tìm thẻ (OLD_CARD_THRESHOLD) -> bấm -> popup: chờ Go (tối đa
@@ -575,6 +583,9 @@ def _search_grid(bot, cards, max_scrolls: int, done_cards=()) -> str:
         card = next((pos for path in cards
                      if (pos := bot.find(path, threshold=OLD_CARD_THRESHOLD, screen=screen))
                      is not None), None)
+        if card is not None and not tap_go:
+            # Chỉ kiểm tra: thẻ chưa nhận (thẻ "Completed" đã xét ở trên) = chưa xong; không bấm thẻ / mở popup.
+            return TASK_HAS_GO
         if card is not None:
             bot.tap(*card, delay=OLD_POPUP_WAIT)
             go = bot.wait_for(OLD_POPUP_GO, timeout=OLD_POPUP_TIMEOUT)
@@ -594,18 +605,19 @@ def _search_grid(bot, cards, max_scrolls: int, done_cards=()) -> str:
     return TASK_NOT_FOUND
 
 
-def _row_button(bot, screen, title) -> str | None:
-    """Nút ngay dưới tiêu đề dòng: Go -> bấm, trả "go"; Claim -> "claim"; tích V -> "tick"; không
+def _row_button(bot, screen, title, tap_go: bool = True) -> str | None:
+    """Nút ngay dưới tiêu đề dòng: Go -> bấm (`tap_go`), trả "go"; Claim -> "claim"; tích V -> "tick"; không
     nhận ra -> None."""
     x, y = title
-    want = y + ROW_BUTTON_DY
-    buttons = [("go", GO_BUTTON), ("claim", CLAIM_BUTTON)]
+    # (tên, ảnh, khoảng cách dưới tâm tiêu đề): tích V nằm cao hơn nút Go / Claim.
+    buttons = [("go", GO_BUTTON, ROW_BUTTON_DY), ("claim", CLAIM_BUTTON, ROW_BUTTON_DY)]
     if (TEMPLATE_DIR / TICK_BUTTON).exists():
-        buttons.append(("tick", TICK_BUTTON))
-    for name, path in buttons:
+        buttons.append(("tick", TICK_BUTTON, TICK_DY))
+    for name, path, dy in buttons:
+        want = y + dy
         for bx, by in bot.find_all(path, screen=screen):
             if abs(by - want) <= ROW_BUTTON_TOLERANCE:
-                if name == "go":
+                if name == "go" and tap_go:
                     bot.tap(bx, by, delay=4)
                 return name
     return None

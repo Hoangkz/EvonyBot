@@ -52,7 +52,8 @@ Các nhiệm vụ được chạy theo đúng thứ tự sau, không theo thứ 
 7. Troop Training
 8. Troop Heading (hiển thị là Troop Healing)
 9. Trap Buiding (hiển thị là Trap Building)
-10. Alliance Donation
+10. ~~Alliance Donation~~ — không còn là ô tích: ô chọn giờ (0 / 1h / 2h / 3h / 4h, mặc định 4h), chạy **cuối
+    cùng** sau nhận thưởng, theo giờ (xem [alliance_donation/FLOW.md](alliance_donation/FLOW.md)).
 11. Black Market
 12. General Enhancing
 13. Wheel of Fortune
@@ -148,6 +149,7 @@ Mỗi nhiệm vụ có file `FLOW.md` riêng trong thư mục của nó (thứ t
 | Troop Healing | [troop_healing/FLOW.md](troop_healing/FLOW.md) |
 | Trap Building | [trap_building/FLOW.md](trap_building/FLOW.md) |
 | Alliance Donation | [alliance_donation/FLOW.md](alliance_donation/FLOW.md) |
+| Alliance Help | [alliance_help/FLOW.md](alliance_help/FLOW.md) |
 | Black Market | [black_market/FLOW.md](black_market/FLOW.md) |
 | General Enhancing | [general_enhancing/FLOW.md](general_enhancing/FLOW.md) |
 | Wheel of Fortune | [wheel_of_fortune/FLOW.md](wheel_of_fortune/FLOW.md) |

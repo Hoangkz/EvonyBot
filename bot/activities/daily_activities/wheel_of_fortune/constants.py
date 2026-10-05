@@ -16,3 +16,7 @@ ACTIONS = (
     ("ActivitiesWheelofFortune.png", OPEN),
 )
 AFTER_OPEN_TAP = None   # sau Go: không bấm thêm
+
+# ---- Luồng mới sau Go (run.after_go), giống hệt King's Path Wheel sau Go ---------------------------
+# Go -> game mở thẳng màn Wheel of Fortune -> event/kings_path/wheel spin_wheel: "100 Spins" nếu có (-> Back), không
+# thì "10 Spins" liên tục tới khi hết chip (game mở Purchase Chips -> Back) -> xong hôm nay.

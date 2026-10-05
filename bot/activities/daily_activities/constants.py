@@ -77,15 +77,21 @@ OLD_DONE_WAIT = 2
 OLD_CONGRATS = f"{ROOT}/CollectionActivities/CongratulationsCurrent.png"
 # Thẻ đã nhận thưởng: chuyển xuống cuối lưới, icon cũ có dấu tích xanh + chữ "Completed". Mỗi nhiệm vụ một ảnh
 # <thư mục ảnh>/Done.png (icon + tích, cắt cùng chỗ với Card.png): thấy -> nhiệm vụ xong hôm nay, không bấm thẻ.
-# Resource Collecting: thẻ đã xong 1,00; cùng thẻ chưa nhận 0,76; màn khác <= 0,51.
+# Đo trên tests/daily_activities/screens/23..30: thẻ đã xong của chính nhiệm vụ 0,89..1,00 (khác cột / bị header
+# che một chút còn 0,89); cùng thẻ chưa nhận <= 0,77; Done của nhiệm vụ khác <= 0,53 -> ngưỡng 0,85.
 OLD_DONE_CARD = "Done.png"
-OLD_DONE_CARD_THRESHOLD = 0.9
+OLD_DONE_CARD_THRESHOLD = 0.85
 # Kết quả open_task.
 TASK_OPENED, TASK_DONE, TASK_NOT_FOUND, TASK_NO_LIST = "opened", "done", "not_found", "no_list"
 # Thấy tiêu đề dòng mà không nhận ra nút nào (không Go / Claim / tích V): không đoán là xong.
 TASK_UNKNOWN = "unknown"
-# Dấu tích V của dòng đã nhận thưởng (TODO: ảnh thật từ danh sách Activity; chưa có thì bỏ qua).
+# open_task(tap_go=False): dòng / popup còn Go (nhiệm vụ chưa xong) nhưng không bấm (chỉ kiểm tra).
+TASK_HAS_GO = "has_go"
+# Dấu tích V của dòng đã nhận thưởng (cắt từ danh sách Activity máy 21913, dòng Tax / Levy / Offer đã xong): khớp
+# 1,00; tích V ở tab Chapter Quests 0,96 (chỉ tìm ngay dưới tiêu đề dòng nên không nhầm). Tích nằm dưới tâm tiêu đề
+# TICK_DY px (đo 32 .. 33), không phải ROW_BUTTON_DY như Go / Claim.
 TICK_BUTTON = f"{USE_ALL}/Tick.png"
+TICK_DY = 33
 
 REWARDS = "Activity Rewards"   # key trong daily_done cho bước nhận thưởng cuối
 REWARDS_KEY = "daily_rewards"   # key của bước nhận thưởng cuối trong bot/worker/priority.json

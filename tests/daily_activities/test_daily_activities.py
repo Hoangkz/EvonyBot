@@ -263,12 +263,10 @@ class DailyGoTests(unittest.TestCase):
                        const.TAP), targets)
 
     def test_gold_levy_opens_radial_menu_entry_before_buttons(self):
+        """Icon "Levy" trong menu tròn: chỉ bấm icon (popup Levy -> Free Levy All là action riêng "levy_all")."""
         bot = mock.Mock()
         gold_levy.handle(bot, "levy", (188, 172), None)
-        self.assertEqual(bot.tap.call_args_list, [
-            mock.call(188, 172, delay=3), mock.call(280, 545, delay=3),
-            mock.call(105, 545, delay=3),
-        ])
+        self.assertEqual(bot.tap.call_args_list, [mock.call(188, 172, delay=3)])
 
     def test_training_swipes_the_current_troop_carousel_height(self):
         bot = mock.Mock()

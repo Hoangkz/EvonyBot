@@ -50,65 +50,79 @@ from .constants import (
 NAME = "Patrol"
 
 
-def round_key(n: int) -> str:
-    """Key daily_done: đã patrol lượt thứ `n` hôm nay."""
-    return f"{KEY}_round_{n}"
+def round_key(n: int, key: str = KEY) -> str:
+    """Key daily_done: nhiệm vụ `key` đã patrol lượt thứ `n` hôm nay."""
+    return f"{key}_round_{n}"
 
 
-def rounds_today(bot) -> int:
-    return sum(1 for n in range(1, ROUNDS_PER_DAY + 1) if bot.is_daily_done(round_key(n)))
+def rounds_today(bot, key: str = KEY) -> int:
+    return sum(1 for n in range(1, ROUNDS_PER_DAY + 1) if bot.is_daily_done(round_key(n, key)))
 
 
 def _patrol(bot, path, done, target):
     """Sau Go: mở màn Patrol rồi patrol từng lượt (Select All -> Patrol -> Refresh)."""
     if not open_building(bot, NAME, WALLS, MENU_PATROL, PATROL_TITLE):
         return
-    progress = done or 0
+    patrol_rounds(bot, done or 0, target,
+                  lambda message, complete: _finish(bot, path, message, complete=complete))
+
+
+def patrol_rounds(bot, progress: int, target: int, finish, name: str = NAME, key: str = KEY) -> bool:
+    """Đang ở màn Patrol: patrol từng lượt (Select All -> Patrol -> Refresh) tới khi `progress` (+PER_ROUND mỗi
+    lượt) >= `target` -> finish(message, True); đủ ROUNDS_PER_DAY lượt hôm nay / hết Refresh ->
+    finish(message, False). True nếu đã gọi finish; False nếu dừng vì lỗi (không nhận ra màn / nút).
+    Dùng chung với Daily Activities / Patrol; mỗi nhiệm vụ đếm lượt hôm nay riêng theo `key` (round_key) — hết lượt
+    thật của game thì nút Refresh xám / không ra bộ mới, vòng lặp tự dừng."""
     refreshed = False   # vừa bấm Refresh, chưa thấy bộ phần thưởng mới
     select_taps = 0     # số lần bấm Select All liên tiếp mà ô vẫn chưa tích
     for _ in range(MAX_STEPS):
-        today = rounds_today(bot)
+        today = rounds_today(bot, key)
         if progress >= target:
-            return _finish(bot, path, f"progress {progress} / {target}, done", complete=True)
+            finish(f"progress {progress} / {target}, done", True)
+            return True
         if today >= ROUNDS_PER_DAY:
-            return _finish(bot, path, f"{today} rounds today, done for today")
+            finish(f"{today} rounds today, done for today", False)
+            return True
         screen = bot.screenshot()
         if bot.find(PATROL_TITLE, screen=screen) is None:
-            bot.record(f"{NAME}: not on Patrol screen, stop")
-            return
+            bot.record(f"{name}: not on Patrol screen, stop")
+            return False
         if _claimed(screen):
             if not _refresh_enabled(screen):
-                return _finish(bot, path, "Refresh disabled (out of refreshes), done for today")
+                finish("Refresh disabled (out of refreshes), done for today", False)
+                return True
             if refreshed:
-                return _finish(bot, path, "Refresh gave no new rewards (out of refreshes), done for today")
-            if not _tap(bot, screen, REFRESH_BUTTON, "round patrolled, Refresh"):
-                return
+                finish("Refresh gave no new rewards (out of refreshes), done for today", False)
+                return True
+            if not _tap(bot, screen, REFRESH_BUTTON, "round patrolled, Refresh", name):
+                return False
             refreshed = True
             continue
         refreshed = False
         off = bot.find(SELECT_ALL_OFF, threshold=SELECT_ALL_THRESHOLD, screen=screen, center=False)
         if off is not None:
             if select_taps >= SELECT_ALL_TRIES:
-                bot.record(f"{NAME}: Select All still unticked after {select_taps} taps, stop")
-                return
+                bot.record(f"{name}: Select All still unticked after {select_taps} taps, stop")
+                return False
             select_taps += 1
-            bot.log(f"{NAME}: tick Select All")
+            bot.log(f"{name}: tick Select All")
             bot.tap(off[0] + SELECT_ALL_BOX[0], off[1] + SELECT_ALL_BOX[1], delay=1)
             continue
         select_taps = 0
         if bot.find(SELECT_ALL_ON, threshold=SELECT_ALL_THRESHOLD, screen=screen) is None:
-            bot.record(f"{NAME}: Select All not found, stop")
-            return
-        if not _tap(bot, screen, PATROL_BUTTON, f"Patrol (round {today + 1} today)"):
-            return
+            bot.record(f"{name}: Select All not found, stop")
+            return False
+        if not _tap(bot, screen, PATROL_BUTTON, f"Patrol (round {today + 1} today)", name):
+            return False
         if not _wait_claimed(bot):
-            bot.record(f"{NAME}: patrol not confirmed after {PATROL_CONFIRM_WAIT} s, not counted, stop")
-            return
+            bot.record(f"{name}: patrol not confirmed after {PATROL_CONFIRM_WAIT} s, not counted, stop")
+            return False
         today += 1
         progress += PER_ROUND
-        bot.record(f"{NAME}: round {today} today done (progress {progress} / {target})")
-        bot.mark_daily_done(round_key(today))
-    bot.record(f"{NAME}: too many steps, stop")
+        bot.record(f"{name}: round {today} today done (progress {progress} / {target})")
+        bot.mark_daily_done(round_key(today, key))
+    bot.record(f"{name}: too many steps, stop")
+    return False
 
 
 def _finish(bot, path, message: str, complete: bool = False):
@@ -147,13 +161,13 @@ def _refresh_enabled(screen) -> bool:
     return float((box[..., 1] - box[..., 2]).mean()) > REFRESH_GREEN
 
 
-def _tap(bot, screen, template: str, message: str) -> bool:
+def _tap(bot, screen, template: str, message: str, name: str = NAME) -> bool:
     """Bấm nút `template` trên `screen` (ghi log `message`); không thấy nút -> log, False."""
     pos = bot.find(template, screen=screen)
     if pos is None:
-        bot.record(f"{NAME}: {template} not found, stop")
+        bot.record(f"{name}: {template} not found, stop")
         return False
-    bot.log(f"{NAME}: {message}")
+    bot.log(f"{name}: {message}")
     bot.tap(*pos, delay=BUTTON_WAIT)
     return True
 

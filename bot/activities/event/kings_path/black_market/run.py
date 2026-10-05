@@ -50,30 +50,44 @@ NAME = "Black Market"
 
 def _buy(bot, path, done, target):
     """Sau Go: mở Black Market rồi mua các món không trả bằng kim cương cho đủ mục tiêu."""
-    _, pos = open_menu(bot, NAME, MARKET, {"black_market": MENU_BLACK_MARKET})
+    if open_black_market(bot):
+        buy_items(bot, done or 0, target, lambda message: _finish(bot, path, message))
+    return None
+
+
+def open_black_market(bot, name: str = NAME) -> bool:
+    """Sau Go (Chợ ở giữa): menu Chợ -> icon "Black Market" -> chờ màn Black Market. True nếu tới nơi."""
+    _, pos = open_menu(bot, name, MARKET, {"black_market": MENU_BLACK_MARKET})
     if pos is None:
-        return None
+        return False
     bot.tap(*pos)
     if bot.wait_for(TITLE, timeout=SCREEN_WAIT) is None:
-        bot.record(f"{NAME}: Black Market screen not shown")
-        return None
-    progress = done or 0
+        bot.record(f"{name}: Black Market screen not shown")
+        return False
+    return True
+
+
+def buy_items(bot, progress: int, target: int, finish, name: str = NAME) -> bool:
+    """Đang ở màn Black Market: mua các món không trả bằng kim cương (Instant Refresh khi mua hết) tới khi
+    `progress` (+1 mỗi lần mua) >= `target` -> finish(message), True. Dừng giữa chừng (hết hàng / không thấy
+    Instant Refresh / kẹt) -> False, không gọi finish. Dùng chung với Daily Activities / Black Market."""
     tried = set()        # món đã thử trong bộ hàng hiện tại
     last = None          # "buy" (vừa bấm một món) / "refresh" (vừa bấm Instant Refresh) / None
     idle = 0             # số bước liên tiếp chưa mua được món nào
     while idle < MAX_IDLE_STEPS:
         idle += 1
         if progress >= target:
-            return _finish(bot, path, f"bought {progress} / {target}, done")
+            finish(f"bought {progress} / {target}, done")
+            return True
         screen = bot.screenshot()
         if bot.find(TITLE, screen=screen) is None:
-            bot.record(f"{NAME}: not on Black Market screen, stop")
-            return None
+            bot.record(f"{name}: not on Black Market screen, stop")
+            return False
         confirm = bot.find(CONFIRM, screen=screen)
         if confirm is not None and last == "buy":
             progress += 1
             idle = 0
-            bot.log(f"{NAME}: buy confirmed ({progress} / {target})")
+            bot.log(f"{name}: buy confirmed ({progress} / {target})")
             bot.tap(*confirm, delay=BUY_WAIT)
             last = None
             continue
@@ -86,20 +100,20 @@ def _buy(bot, path, done, target):
             continue
         if bot.find(INSTANT_REFRESH, screen=screen) is None:
             # Chưa mua đủ: không lưu done (kể cả hôm nay), lượt sau đọc lại tiến độ rồi thử lại.
-            bot.record(f"{NAME}: nothing to buy and no Instant Refresh ({progress} / {target}), stop")
+            bot.record(f"{name}: nothing to buy and no Instant Refresh ({progress} / {target}), stop")
             bot.back(delay=1)
-            return None
-        bot.record(f"{NAME}: all bought, Instant Refresh ({progress} / {target})")
-        if not _refresh(bot, screen):
-            bot.record(f"{NAME}: items did not change after {REFRESH_TRIES} refreshes, stop")
-            return None
+            return False
+        bot.record(f"{name}: all bought, Instant Refresh ({progress} / {target})")
+        if not _refresh(bot, screen, name):
+            bot.record(f"{name}: items did not change after {REFRESH_TRIES} refreshes, stop")
+            return False
         tried.clear()
         last = None
-    bot.record(f"{NAME}: nothing bought in {MAX_IDLE_STEPS} steps ({progress} / {target}), stop")
-    return None
+    bot.record(f"{name}: nothing bought in {MAX_IDLE_STEPS} steps ({progress} / {target}), stop")
+    return False
 
 
-def _refresh(bot, screen) -> bool:
+def _refresh(bot, screen, name: str = NAME) -> bool:
     """Bấm Instant Refresh và chờ tới khi ô vật phẩm 1 khác ảnh trước khi bấm (= đã ra hàng mới).
     Hộp xác nhận (refresh bằng kim cương) -> Confirm. True nếu đã ra hàng mới."""
     before = bot.crop(screen, *ITEM_BOX)
@@ -112,13 +126,13 @@ def _refresh(bot, screen) -> bool:
             now = bot.screenshot()
             confirm = bot.find(CONFIRM, screen=now)
             if confirm is not None:
-                bot.log(f"{NAME}: confirm paid refresh")
+                bot.log(f"{name}: confirm paid refresh")
                 bot.tap(*confirm, delay=REFRESH_FIRST_CHECK)
                 continue
             if bot.best_match(before, screen=bot.crop(now, *ITEM_BOX))[0] < SAME_ITEM:
                 return True
             bot.sleep(1)
-        bot.log(f"{NAME}: items unchanged after {REFRESH_CHECKS} checks, Refresh again")
+        bot.log(f"{name}: items unchanged after {REFRESH_CHECKS} checks, Refresh again")
     return False
 
 

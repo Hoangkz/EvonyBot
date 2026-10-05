@@ -31,6 +31,9 @@ class BotContext(FlowMixin, InputMixin, ScreenMixin):
         self.done_at = lambda task: None
         # Mọi key đang có trong daily_done (kể cả ngày cũ), VD tìm "<key>_reached_<mục tiêu>".
         self.daily_keys = lambda: []
+        # Activity vừa chạy xong muốn chạy lại sau chừng này giây (VD Daily Activities: Alliance Donation
+        # chờ lượt free hồi); worker đọc sau mỗi lượt rồi hẹn lại với độ ưu tiên thấp (scheduler.py).
+        self.again_after: float | None = None
         # Nền văn minh của tài khoản (1 .. 7, None = chưa biết), bot tự xếp từ ảnh công trình
         # (activities/event/city_building.py); worker gán set_civilization để lưu DB.
         self.civilization: int | None = None

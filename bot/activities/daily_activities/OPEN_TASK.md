@@ -71,10 +71,11 @@ nhận khi **chưa cuộn**; đã cuộn xuống mà thấy "100%" là thẻ **�
 **"Congratulations!"** (phần thưởng; không tự tắt, bấm vào không đóng) → **Back** đóng (`OLD_CONGRATS`, vẫn ở lưới).
 
 Thẻ **đã nhận** chuyển xuống **cuối lưới**, icon cũ có dấu tích xanh + chữ **"Completed"**. Mỗi nhiệm vụ một ảnh
-`<thư mục ảnh>/Done.png` (`task_done_cards`, cắt cùng chỗ với `Card.png`, ngưỡng `OLD_DONE_CARD_THRESHOLD` = 0,9):
-thấy → `TASK_DONE` (không bấm thẻ). Đã có: Resource Collecting, Offering, Resource Tax, Gold Levy, Troop Training, Troop Healing (thẻ xong 1,00; cùng thẻ chưa nhận <= 0,77).
+`<thư mục ảnh>/Done.png` (`task_done_cards`, cắt cùng chỗ với `Card.png`, ngưỡng `OLD_DONE_CARD_THRESHOLD` = 0,85):
+thấy → `TASK_DONE` (không bấm thẻ). Đã có: Resource Collecting, Offering, Resource Tax, Gold Levy, Troop Training, Troop Healing, Trap Building (thẻ xong 0,89..1,00; cùng thẻ chưa nhận <= 0,77;
+Done nhiệm vụ khác <= 0,53).
 Ảnh lưới: `tests/daily_activities/screens/22_old_grid_top_100.png`, `23_old_grid_end_completed.png`,
-`24_old_grid_end_offering_completed.png`, `25_old_grid_end_tax_completed.png`, `27_old_grid_end_levy_completed.png`, `28_old_grid_end_train_completed.png`, `29_old_grid_end_heal_completed.png`; popup sau khi nhận:
+`24_old_grid_end_offering_completed.png`, `25_old_grid_end_tax_completed.png`, `27_old_grid_end_levy_completed.png`, `28_old_grid_end_train_completed.png`, `29_old_grid_end_heal_completed.png`, `30_old_grid_end_trap_completed.png`; popup sau khi nhận:
 `26_old_grid_claim_congrats.png`.
 
 

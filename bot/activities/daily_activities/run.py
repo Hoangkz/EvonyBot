@@ -9,8 +9,18 @@ Vòng lặp chung của một nhiệm vụ: common.run_task. File này chỉ lo 
    Monster Killing: đánh 2 lần, nhận dòng đầu rồi hoãn; quay lại sau 5 nhiệm vụ khác xong (hoặc cuối
    lượt sau 4 nhiệm vụ / khi mọi nhiệm vụ khác đã xong) để đánh 3 lần còn lại.
 3. Nhận thưởng Activity (common.collect_activity_rewards); chỉ lưu "đã nhận" khi mọi nhiệm vụ xong.
+4. Nhiệm vụ theo giờ (không ưu tiên, cuối cùng; HOURLY): Alliance Donation, Alliance Help — ô chọn giờ ở tab UI
+   (0 = không làm). Chưa xong hôm nay và đã qua số giờ đó kể từ lần thử trước -> một lần thử (hourly.try_task).
+   Chưa xong -> hẹn worker chạy lại Daily Activities sau phần giờ còn lại ngắn nhất (bot.again_after, ưu tiên
+   thấp — bot/worker/scheduler.py).
 """
+from datetime import datetime
+
+from . import alliance_donation, alliance_help
 from .alliance_donation import TASK as ALLIANCE_DONATION
+from .alliance_donation.run import donate_free
+from .alliance_help import TASK as ALLIANCE_HELP
+from .alliance_help.run import help_all
 from .black_market import TASK as BLACK_MARKET
 from .common import MONSTER_KILLING, Task, collect_activity_rewards, run_task
 from .constants import BUY_HAMMERS, BUY_STAMINA, GENERAL, REWARDS
@@ -42,6 +52,7 @@ TASKS: tuple[Task, ...] = (
     TROOP_HEALING,
     TRAP_BUILDING,
     ALLIANCE_DONATION,
+    ALLIANCE_HELP,
     BLACK_MARKET,
     GENERAL_ENHANCING,
     WHEEL_OF_FORTUNE,
@@ -54,7 +65,9 @@ def run(bot, settings: dict):
     """Run enabled tasks in the exact order used by the C# implementation."""
     enabled = {name for name, value in settings.items()
                if name != GENERAL and isinstance(value, bool) and value}
-    selected = [task for task in TASKS if task.label in enabled]
+    # Nhiệm vụ theo giờ không phải ô tích: chạy ở _run_hourly (cấu hình cũ True vẫn bỏ qua ở đây).
+    hourly = {task.label for task, *_ in HOURLY}
+    selected = [task for task in TASKS if task.label in enabled and task.label not in hourly]
     unsupported = sorted(enabled - {task.label for task in TASKS})
     if unsupported:
         bot.log("Daily Activities not implemented by DailyActivities1234.cs: "
@@ -64,12 +77,15 @@ def run(bot, settings: dict):
 
     if not selected:
         bot.log("Daily Activities: no implemented daily task selected")
-        return
-
-    if all(bot.is_daily_done(task.label) for task in selected) and bot.is_daily_done(REWARDS):
+    elif all(bot.is_daily_done(task.label) for task in selected) and bot.is_daily_done(REWARDS):
         bot.log("Daily Activities: all done today")
-        return
+    else:
+        _run_selected(bot, selected)
+    _run_hourly(bot, settings)
 
+
+def _run_selected(bot, selected):
+    """Các nhiệm vụ được tích (5 lượt, Monster Killing hoãn), rồi nhận thưởng Activity."""
     # DailyActivities1234.DailyActivities made five passes. Completed tasks
     # return immediately when their Finish template is found; a task whose
     # Finish template was seen since the last server reset is skipped.
@@ -115,6 +131,60 @@ def run(bot, settings: dict):
         # Chỉ coi là nhận xong khi mọi task đã xong, để lần chạy sau trong ngày còn nhận tiếp.
         if all(bot.is_daily_done(task.label) for task in selected):
             bot.mark_daily_done(REWARDS)
+
+
+# (nhiệm vụ, module constants (INTERVAL_KEY / INTERVAL_DEFAULT / TRIED_KEY), hàm một lần thử) — theo thứ tự chạy.
+HOURLY = (
+    (ALLIANCE_DONATION, alliance_donation.constants, donate_free),
+    (ALLIANCE_HELP, alliance_help.constants, help_all),
+)
+
+
+def hourly_hours(settings: dict, consts) -> int:
+    """Số giờ giữa hai lần thử một nhiệm vụ theo giờ (ô chọn ở tab UI, luôn lưu khoá; thiếu khoá -> 0 = không làm,
+    mặc định 4h do UI đặt). Cấu hình cũ (ô tích): True -> INTERVAL_DEFAULT, False -> 0."""
+    value = settings.get(consts.INTERVAL_KEY, 0)
+    if isinstance(value, bool):
+        return consts.INTERVAL_DEFAULT if value else 0
+    try:
+        return max(0, int(value))
+    except (TypeError, ValueError):
+        return 0
+
+
+def donation_hours(settings: dict) -> int:
+    """Số giờ của Alliance Donation (giữ cho chỗ gọi cũ)."""
+    return hourly_hours(settings, alliance_donation.constants)
+
+
+def _run_hourly(bot, settings):
+    """Các nhiệm vụ theo giờ (không ưu tiên): tới giờ thì thử một lần; còn nhiệm vụ chưa xong hôm nay thì hẹn
+    worker chạy lại Daily Activities sau phần giờ còn lại ngắn nhất (bot.again_after, giây)."""
+    again = None
+    for task, consts, attempt in HOURLY:
+        hours = hourly_hours(settings, consts)
+        if hours <= 0 or bot.is_daily_done(task.label):
+            continue
+        wait = hours * 3600
+        tried = _parse_time(bot.done_at(consts.TRIED_KEY))
+        left = wait - (datetime.now() - tried).total_seconds() if tried else 0
+        if left <= 0:
+            bot.check()
+            bot.log(f"Daily Activities: {task.label} (every {hours}h)")
+            if attempt(bot):
+                continue
+            left = wait
+        bot.log(f"Daily Activities: {task.label} again in {left / 3600:.1f}h")
+        again = left if again is None else min(again, left)
+    if again is not None:
+        bot.again_after = again
+
+
+def _parse_time(value) -> datetime | None:
+    try:
+        return datetime.fromisoformat(value) if value else None
+    except (TypeError, ValueError):
+        return None
 
 
 def _run_general(bot, settings):

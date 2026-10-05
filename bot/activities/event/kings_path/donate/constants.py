@@ -24,6 +24,10 @@ SCIENCE_TITLE = f"{KP}/Donate/title.png"
 # Chữ "Donate" trên nút xanh của thẻ khoa học (317, 361 / 530): 1,00; màn khác <= 0,64. Dùng chung
 # với activity Alliance Capacity (ảnh cũ của nó chỉ khớp 0,84 ở thẻ đầu -> donate nhầm thẻ 2).
 DONATE_BUTTON = "Science/donate.png"
+# Mẫu thứ hai: máy 21943 (donate_science_21943.png) chữ "Donate" chỉ khớp DONATE_BUTTON 0,88 (< 0,9) ->
+# cắt lại (285, 401): 1,00 ở máy đó, 0,88 .. 0,92 ở ảnh cũ; màn khác <= 0,56. Thử cả hai.
+DONATE_BUTTON_2 = f"{KP}/Donate/donate2.png"
+DONATE_BUTTONS = (DONATE_BUTTON, DONATE_BUTTON_2)
 # Mép trái nút kim cương + icon (không lấy số vì giá đổi theo lần mua) (294, 361): 1,00;
 # khi hộp xác nhận che 0,72. Màn khác tới 0,91 (nút kim cương ở màn Bubble) -> chỉ xét khi
 # thấy SCIENCE_TITLE.
