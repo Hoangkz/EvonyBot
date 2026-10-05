@@ -23,6 +23,7 @@ from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import QApplication, QMainWindow, QStackedWidget, QWidget, QHBoxLayout
 
 from bot.common import GAME_PACKAGE
+
 from bot.worker import BotManager
 from database import Database
 from ui import DeviceView, HomeView, Sidebar
