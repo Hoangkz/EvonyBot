@@ -7,11 +7,16 @@ area (was `panelData`) that shows either the home/welcome screen or
 the selected device's tabbed control panel.
 """
 import ctypes
+import os
 import platform
 import sys
 import threading
 from datetime import datetime, timedelta
 from pathlib import Path
+
+# adb server do adbutils mở (adb 36.x) mặc định bật mDNS: mở UDP 5353 trên mọi mạng -> Windows Firewall hỏi quyền
+# adb.exe trên máy mới. Bot chỉ nối giả lập local (127.0.0.1:port) nên tắt mDNS; đặt trước khi adb server được mở.
+os.environ.setdefault("ADB_MDNS", "0")
 
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QIcon
