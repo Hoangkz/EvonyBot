@@ -11,11 +11,13 @@ Màn Black Market (6 món ở vị trí cố định, mỗi bước chụp 1 ả
    xác nhận thì Confirm) -> chờ 2 s -> ô 1 đã khác = refresh xong, mua tiếp bộ mới; còn giống thì
    chờ thêm 1 s (tối đa 10 lần), vẫn giống thì bấm Refresh lại.
 Dừng (Back): số đã mua (OCR dòng Go) + số mua lượt này >= mục tiêu -> xong cả vòng event
-(mark_target_reached). Chưa mua đủ mà dừng (hết hàng / không thấy Instant Refresh / kẹt) -> không lưu done,
+(mark_target_reached). Mỗi bước đọc số dư (OCR): vàng < 2.000.000 hoặc kim cương < 50 -> Back, dừng.
+Chưa mua đủ mà dừng (hết hàng / không thấy Instant Refresh / kẹt / thiếu vàng, kim cương) -> không lưu done,
 lượt sau đọc lại số đã mua ở dòng Go rồi mua tiếp; bị ngắt (120 s / boss) cũng vậy.
 """
 import numpy as np
 
+from .....ocr.read_balance import read_gems, read_gold
 from ...city_building import MARKET
 from ...common import EventState, mark_target_reached
 from .. import path_task
@@ -26,7 +28,9 @@ from .constants import (
     CONFIRM,
     DAY,
     GEM,
+    GEMS_MIN,
     GEM_THRESHOLD,
+    GOLD_MIN,
     INSTANT_REFRESH,
     ITEM_BOX,
     KEY,
@@ -70,7 +74,8 @@ def open_black_market(bot, name: str = NAME) -> bool:
 def buy_items(bot, progress: int, target: int, finish, name: str = NAME) -> bool:
     """Đang ở màn Black Market: mua các món không trả bằng kim cương (Instant Refresh khi mua hết) tới khi
     `progress` (+1 mỗi lần mua) >= `target` -> finish(message), True. Dừng giữa chừng (hết hàng / không thấy
-    Instant Refresh / kẹt) -> False, không gọi finish. Dùng chung với Daily Activities / Black Market."""
+    Instant Refresh / kẹt / vàng < GOLD_MIN hoặc kim cương < GEMS_MIN) -> False, không gọi finish. Dùng chung với
+    Daily Activities / Black Market."""
     tried = set()        # món đã thử trong bộ hàng hiện tại
     last = None          # "buy" (vừa bấm một món) / "refresh" (vừa bấm Instant Refresh) / None
     idle = 0             # số bước liên tiếp chưa mua được món nào
@@ -82,6 +87,11 @@ def buy_items(bot, progress: int, target: int, finish, name: str = NAME) -> bool
         screen = bot.screenshot()
         if bot.find(TITLE, screen=screen) is None:
             bot.record(f"{name}: not on Black Market screen, stop")
+            return False
+        low = _low_balance(bot, screen)
+        if low:
+            bot.record(f"{name}: {low} ({progress} / {target}), stop")
+            bot.back(delay=1)
             return False
         confirm = bot.find(CONFIRM, screen=screen)
         if confirm is not None and last == "buy":
@@ -111,6 +121,18 @@ def buy_items(bot, progress: int, target: int, finish, name: str = NAME) -> bool
         last = None
     bot.record(f"{name}: nothing bought in {MAX_IDLE_STEPS} steps ({progress} / {target}), stop")
     return False
+
+
+def _low_balance(bot, screen) -> str | None:
+    """Vàng < GOLD_MIN hoặc kim cương < GEMS_MIN (OCR số dư) -> lý do (chuỗi log), không thì None. Đọc lỗi -> không
+    coi là thiếu."""
+    gold = read_gold(screen)
+    gems = read_gems(screen)
+    if gold is not None and gold < GOLD_MIN:
+        return f"gold {gold:,} < {GOLD_MIN:,}"
+    if gems is not None and gems < GEMS_MIN:
+        return f"gems {gems:,} < {GEMS_MIN:,}"
+    return None
 
 
 def _refresh(bot, screen, name: str = NAME) -> bool:

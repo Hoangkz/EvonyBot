@@ -9,7 +9,9 @@ Black Market dùng chung với King's Path; bm_screen: 5 món mua được, ô 3
 tests/daily_activities/screens/ (33: thẻ Black Market "Completed", máy 21943; 05: danh sách Activity bản mới, Claim All
 xám, máy 21913).
 """
+import sys
 import unittest
+from unittest import mock
 
 from bot.activities.daily_activities.black_market.constants import BUY_GOAL, LABEL
 from bot.activities.daily_activities.black_market.run import TASK, after_go
@@ -25,6 +27,8 @@ from tests.daily_activities import DAILY, KP, TESTS_DIR, old_grid_completed
 from tests.flow import Step, back, end, run_flow, tap, tap_at, tap_pct
 
 SCREENS = TESTS_DIR
+# Module buy_items (package black_market có hàm `run` trùng tên module nên lấy qua sys.modules).
+KP_RUN = sys.modules["bot.activities.event.kings_path.black_market.run"]
 # Sau Go: Chợ ở giữa màn thành -> menu Chợ -> icon "Black Market".
 TO_MARKET = [
     Step(f"{KP}bm_city.png", tap_pct(50, 50)),
@@ -116,6 +120,34 @@ class BlackMarketFlow(unittest.TestCase):
         device = run_flow(self, lambda bot, _s: _search_list(bot, task_titles(TASK), 3), SCREENS, flow, {})
         self.assertNotIn("Daily Activities: Claim All", device.logs)
 
+    def _low_balance_flow(self, gold, gems, reason):
+        """Số dư thấp (giả OCR read_gold / read_gems) -> Back ngay ở màn Black Market, không mua, không đánh dấu xong."""
+        flow = [
+            *TO_MARKET,
+            Step(f"{KP}bm_screen.png", back()),
+            Step(f"{KP}bm_city.png", end(result=False)),
+        ]
+        with mock.patch.object(KP_RUN, "read_gold", return_value=gold),                 mock.patch.object(KP_RUN, "read_gems", return_value=gems):
+            device = run_flow(self, _after_go, SCREENS, flow, {})
+        self.assertIn(f"{LABEL}: {reason} (0 / 3), stop", device.logs)
+        self.assertNotIn(LABEL, device.daily_done)
+
+    def test_low_gold_stops(self):
+        """Vàng 1.999.999 < 2.000.000 -> dừng."""
+        self._low_balance_flow(1_999_999, 105_947, "gold 1,999,999 < 2,000,000")
+
+    def test_low_gems_stops(self):
+        """Kim cương 49 < 50 -> dừng."""
+        self._low_balance_flow(2_199_030, 49, "gems 49 < 50")
+
+    def test_balance_read_from_screen(self):
+        """OCR số dư thật (cắt sau icon vàng / kim cương): bm_screen_4 2.199.030 / 105.847; hộp xác nhận che tối -> None."""
+        import cv2
+        from bot.ocr.read_balance import read_gems, read_gold
+        screen = cv2.imread(str(SCREENS / KP / "bm_screen_4.png"))
+        self.assertEqual((read_gold(screen), read_gems(screen)), (2_199_030, 105_847))
+        screen = cv2.imread(str(SCREENS / KP / "bm_confirm.png"))
+        self.assertEqual((read_gold(screen), read_gems(screen)), (None, None))
 
 if __name__ == "__main__":
     unittest.main()

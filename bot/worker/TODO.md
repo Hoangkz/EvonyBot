@@ -52,8 +52,8 @@ tab cấu hình). Bộ chọn lấy thẳng nhiệm vụ: ưu tiên cao làm tr�
 ## 2b. Để sau
 
 - [ ] **UI cho chu kỳ Crazy Eggs**: ô chọn `0` / `1h` / `2h` / `3h` / `4h` (mặc định `2h`) — tab + nút Select Activity.
-- [ ] **Bước 4 — Black Market**: tách `black_market_market` / `black_market_auction_house` (hiện chọn theo ô
-  `auction_is_buy`); trước khi tách vẫn chạy nguyên khối.
+- [x] **Bước 4 — Black Market**: không còn tách — chế độ Auction House đã xoá (UI + code), chỉ còn
+  `black_market_market`.
 
 ## 3. Daily Activities (để sau, khi người dùng yêu cầu)
 

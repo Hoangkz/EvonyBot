@@ -1,0 +1,264 @@
+{
+  "source": "Máy 21913 (tài khoản VIP), 2026-10-05: 61 bộ hàng = 366 ô, 60 lần Instant Refresh. seen = số ô thấy món đó; pay = số ô theo loại tiền (gem / gold / resource). Giá không OCR. buy_with_gems: món chỉ bán bằng kim cương -> được mua bằng kim cương; Resource / Chips không bao giờ mua bằng kim cương (ô giá kim cương bị bỏ).",
+  "groups": {
+    "resource": "Resource",
+    "stamina_chips": "Stamina / Chips",
+    "stone": "Stones",
+    "other": "Other"
+  },
+  "resource_packs": [
+    {
+      "amount": "10k",
+      "label_templates": [
+        "Black Market/Items/Resource/10k.png"
+      ],
+      "seen_on_21913": []
+    },
+    {
+      "amount": "50k",
+      "label_templates": [
+        "Black Market/Items/Resource/50k.png",
+        "Black Market/Items/Resource/50k1.png"
+      ],
+      "seen_on_21913": [
+        "Gold 50k"
+      ]
+    },
+    {
+      "amount": "100k",
+      "label_templates": [
+        "Black Market/Items/Resource/100k.png",
+        "Black Market/Items/Resource/100k1.png"
+      ],
+      "seen_on_21913": [
+        "Gold 100k"
+      ]
+    },
+    {
+      "amount": "200k",
+      "label_templates": [
+        "Black Market/Items/Resource/200k.png",
+        "Black Market/Items/Resource/200k1.png"
+      ],
+      "seen_on_21913": []
+    },
+    {
+      "amount": "500k",
+      "label_templates": [
+        "Black Market/Items/Resource/500K.png",
+        "Black Market/Items/Resource/500k1.png",
+        "Black Market/Items/Resource/500k2.png",
+        "Black Market/Items/Resource/500k3.png"
+      ],
+      "seen_on_21913": []
+    },
+    {
+      "amount": "1M",
+      "label_templates": [
+        "Black Market/Items/Resource/1M.png",
+        "Black Market/Items/Resource/1m1.png"
+      ],
+      "seen_on_21913": []
+    },
+    {
+      "amount": "2M",
+      "label_templates": [
+        "Black Market/Items/Resource/2M.png",
+        "Black Market/Items/Resource/2m1.png",
+        "Black Market/Items/Resource/2M2.png"
+      ],
+      "seen_on_21913": []
+    },
+    {
+      "amount": "5M",
+      "label_templates": [
+        "Black Market/Items/Resource/5M.png",
+        "Black Market/Items/Resource/5M2.png",
+        "Black Market/Items/Resource/5M3.png"
+      ],
+      "seen_on_21913": [
+        "Food 5M",
+        "Lumber 5M",
+        "Ore 5M",
+        "Stone 5M"
+      ]
+    }
+  ],
+  "items": [
+    {
+      "id": "gold_50k",
+      "name": "Gold 50k",
+      "group": "resource",
+      "seen": 15,
+      "pay": {
+        "gem": 15
+      },
+      "icons": [
+        "Black Market/Items/gold_50k.png"
+      ],
+      "buy_with_gems": false
+    },
+    {
+      "id": "food_5m",
+      "name": "Food 5M",
+      "group": "resource",
+      "seen": 8,
+      "pay": {
+        "gold": 5,
+        "gem": 3
+      },
+      "icons": [
+        "Black Market/Items/food_5m.png"
+      ],
+      "buy_with_gems": false
+    },
+    {
+      "id": "ore_5m",
+      "name": "Ore 5M",
+      "group": "resource",
+      "seen": 8,
+      "pay": {
+        "gem": 5,
+        "gold": 3
+      },
+      "icons": [
+        "Black Market/Items/ore_5m.png"
+      ],
+      "buy_with_gems": false
+    },
+    {
+      "id": "stone_5m",
+      "name": "Stone 5M",
+      "group": "resource",
+      "seen": 7,
+      "pay": {
+        "gold": 5,
+        "gem": 2
+      },
+      "icons": [
+        "Black Market/Items/stone_5m.png"
+      ],
+      "buy_with_gems": false
+    },
+    {
+      "id": "lumber_5m",
+      "name": "Lumber 5M",
+      "group": "resource",
+      "seen": 6,
+      "pay": {
+        "gem": 4,
+        "gold": 2
+      },
+      "icons": [
+        "Black Market/Items/lumber_5m.png"
+      ],
+      "buy_with_gems": false
+    },
+    {
+      "id": "gold_100k",
+      "name": "Gold 100k",
+      "group": "resource",
+      "seen": 2,
+      "pay": {
+        "gem": 2
+      },
+      "icons": [
+        "Black Market/Items/gold_100k.png"
+      ],
+      "buy_with_gems": false
+    },
+    {
+      "id": "chips_100",
+      "name": "Chips 100",
+      "group": "stamina_chips",
+      "seen": 8,
+      "pay": {
+        "resource": 8
+      },
+      "icons": [
+        "Black Market/Items/chips_100.png"
+      ],
+      "default": true,
+      "buy_with_gems": false
+    },
+    {
+      "id": "stamina_50",
+      "name": "Stamina 50",
+      "group": "stamina_chips",
+      "seen": 8,
+      "pay": {
+        "gem": 8
+      },
+      "icons": [
+        "Black Market/Items/stamina_50.png"
+      ],
+      "buy_with_gems": true
+    },
+    {
+      "id": "refining_stone",
+      "name": "Refining Stone",
+      "group": "stone",
+      "seen": 8,
+      "pay": {
+        "gem": 8
+      },
+      "icons": [
+        "Black Market/Items/refining_stone.png"
+      ],
+      "buy_with_gems": true
+    },
+    {
+      "id": "research_stone",
+      "name": "Research Stone",
+      "group": "stone",
+      "seen": 6,
+      "pay": {
+        "gem": 6
+      },
+      "icons": [
+        "Black Market/Items/research_stone.png"
+      ],
+      "buy_with_gems": true
+    },
+    {
+      "id": "dragon_stone",
+      "name": "Dragon Stone",
+      "group": "stone",
+      "seen": 2,
+      "pay": {
+        "gem": 2
+      },
+      "icons": [
+        "Black Market/Items/dragon_stone.png"
+      ],
+      "buy_with_gems": true
+    },
+    {
+      "id": "tactic_scroll",
+      "name": "Tactic Scroll",
+      "group": "other",
+      "seen": 13,
+      "pay": {
+        "gem": 13
+      },
+      "icons": [
+        "Black Market/Items/tactic_scroll.png"
+      ],
+      "buy_with_gems": true
+    },
+    {
+      "id": "medal",
+      "name": "Medal",
+      "group": "other",
+      "seen": 5,
+      "pay": {
+        "gem": 5
+      },
+      "icons": [
+        "Black Market/Items/medal.png"
+      ],
+      "buy_with_gems": true
+    }
+  ],
+  "icon_crop": "icon = ô hình món, cắt hàng 2..28 / cột 4..58 của vùng (x-31..x+31, y-108..y-38) quanh tâm nút giá (x, y): bỏ chữ số lượng và số lượng góc"
+}

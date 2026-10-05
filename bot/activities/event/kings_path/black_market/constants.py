@@ -29,6 +29,12 @@ SLOT_HALF = (40, 8)
 # bm_*.png ô trả kim cương 0,85..1,00, ô khác <= 0,53 -> ngưỡng 0,7; bỏ qua món đó.
 GEM = f"{KP}/BlackMarket/gem.png"
 GEM_THRESHOLD = 0.7
+# Icon vàng trên nút giá (món trả bằng vàng; cắt từ bm_refresh_gems.png ô 3 "440,630"): ô trả vàng 0,90..1,00, ô
+# khác (tài nguyên / kim cương / đã mua) <= 0,49 -> ngưỡng 0,8. Giá dài ("1,763,000", 21913) đẩy icon sát mép trái
+# nút (x - 49) -> tìm trong GOLD_PRICE_AREA (dx, dy, w, h) quanh tâm nút giá.
+GOLD_PRICE = f"{KP}/BlackMarket/gold.png"
+GOLD_PRICE_THRESHOLD = 0.8
+GOLD_PRICE_AREA = (-56, -12, 104, 24)
 # Hộp "Are you sure you want to purchase ...?" -> "Confirm" (198, 414): 1,00. Chỉ bấm khi vừa bấm
 # một món (khớp cả popup khác 0,96).
 CONFIRM = f"{KP}/BlackMarket/confirm.png"
@@ -46,6 +52,10 @@ REFRESH_FIRST_CHECK = 2
 REFRESH_CHECKS = 10
 REFRESH_TRIES = 3
 BUY_WAIT = 2
+# Số dư (OCR bot/ocr/read_balance read_gold / read_gems, hàng dưới banner): vàng < GOLD_MIN hoặc kim cương
+# < GEMS_MIN (giá một lần Instant Refresh trả phí) -> dừng mua (Back, không đánh dấu xong). Đọc lỗi -> bỏ qua kiểm tra.
+GOLD_MIN = 2_000_000
+GEMS_MIN = 50
 # Dừng khi MAX_IDLE_STEPS bước liên tiếp không mua được món nào (kẹt / hàng toàn trả kim cương).
 # Không giới hạn tổng số bước: mục tiêu 100 lần mua cần ~300 bước (mua 2 bước + refresh).
 MAX_IDLE_STEPS = 30

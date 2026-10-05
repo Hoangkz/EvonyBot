@@ -57,8 +57,7 @@
         { "key": "daily_rewards", "label": "Activity Rewards (nhận thưởng cuối)", "priority": 300 }
     ],
     "Black Market": [
-        { "key": "black_market_market", "label": "Black Market: mua ở Market", "priority": 0 },
-        { "key": "black_market_auction_house", "label": "Black Market: đấu giá Auction House", "priority": -1 }
+        { "key": "black_market_market", "label": "Black Market: mua ở Market", "priority": 0 }
     ],
     "Battlefield Shop": [
         { "key": "battlefield_shop", "label": "Battlefield Shop", "priority": -1 }
