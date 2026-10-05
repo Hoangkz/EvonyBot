@@ -23,7 +23,8 @@ from bot.activities.join_monster_war.constants import (
     WAR_TICKED,
     WAR_UNTICK_TRIES,
 )
-from bot.activities.join_monster_war.run import MAX_MAP_COORD, _Boss, _near, _troops
+from bot.activities.join_monster_war.run import (MAX_MAP_COORD, POLL_INTERVAL, STEP_TIMEOUT,
+                                                 _Boss, _near, _troops)
 
 
 run_module = importlib.import_module("bot.activities.join_monster_war.run")
@@ -93,7 +94,7 @@ class JoinBossEdgeCaseTests(unittest.TestCase):
 
         bot.tap.assert_called_once()
         bot.back.assert_called_once()
-        self.assertEqual(bot.screenshot.call_count, 5)
+        self.assertEqual(bot.screenshot.call_count, int(STEP_TIMEOUT / POLL_INTERVAL))
         self.assertIsNone(boss.memory.status((500, 600)))
 
     def test_closed_march_without_war_list_is_not_remembered(self):
@@ -292,7 +293,7 @@ class JoinBossEdgeCaseTests(unittest.TestCase):
         boss = _Boss(bot, {"select_general": True})
 
         self.assertFalse(boss._choose_general(MAIN_GENERAL))
-        self.assertEqual(bot.screenshot.call_count, 6)
+        self.assertEqual(bot.screenshot.call_count, int(STEP_TIMEOUT / POLL_INTERVAL))
         self.assertIn("không mở được màn Select a General", bot.record.call_args.args[0])
         self.assertIsNone(boss.memory.status((500, 600)))
 

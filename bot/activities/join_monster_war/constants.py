@@ -75,7 +75,7 @@ PRESET_COUNT = 8
 # Popup dùng vật phẩm thể lực: điểm gần cuối thanh trượt số lượng (% màn hình; đo thanh
 # x 90-300, y 370 trên 396x704) -> dùng hết (use_stamina = ALL).
 STAMINA_SLIDER_END = (74.7, 52.6)
-STAMINA_REFILL_WAIT = 5             # giây chờ sau khi bấm Use, trước khi Back về màn March
+STAMINA_REFILL_WAIT = 2             # timeout chờ popup Use đóng; thường hoàn thành trong ~1 giây
 PRESET_X0, PRESET_DX, PRESET_Y = 10.4, 11.3, 11
 
 # Dải ngay trên nút Battle Logs / Auto-Join (% màn hình). Trống (chỉ nền tối,

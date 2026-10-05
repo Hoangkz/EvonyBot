@@ -21,7 +21,8 @@ from bot.activities.join_monster_war.constants import (CHOOSE_DEVELOPMENT, FAVOR
                                                      NOT_ENOUGH_STAMINA, PRESET_DX, PRESET_X0, PRESET_Y,
                                                      REGIONS, SELECT_GENERAL, STAMINA_SLIDER_END,
                                                      STAMINA_USE, WAR_TICKED)
-from bot.activities.join_monster_war.run import _Boss, _is_green_button
+from bot.activities.join_monster_war.run import (POLL_INTERVAL, STEP_TIMEOUT, _Boss,
+                                                 _is_green_button)
 from bot.context import TEMPLATE_DIR, BotContext
 from tests.flow import Step, back, end, run_flow, swipe, tap, tap_at, tap_pct
 
@@ -701,9 +702,10 @@ class JoinMonsterWarFlow(unittest.TestCase):
                 self.assertEqual(_Boss._join_text_is_red(checker, image, x, y, jh), red)
 
     def test_unknown_screen_retries_before_go_home(self):
-        # Màn hình không nhận ra: chụp lại 3 lần (mỗi lần 1 s) rồi mới go_home (Back).
+        # Màn hình không nhận ra: polling nhanh nhưng tổng thời gian không quá 2 giây.
         device = run_join(self, [Step("02_war_list_join.png?unknown", back())], IDLE_SETTINGS)
-        self.assertEqual(device.shots, 1 + 3)
+        self.assertGreater(device.shots, 1)
+        self.assertLessEqual(device.shots, 1 + int(STEP_TIMEOUT / POLL_INTERVAL))
         self.assertIn("Màn hình vẫn không nhận ra: go_home", device.logs)
 
     def test_join_again_after_cannot_send_more_troops(self):
