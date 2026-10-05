@@ -9,6 +9,12 @@ Ký hiệu: `→` là action mong đợi trên màn hình đó.
 ## Open Gift Box — `tests/open_gift_box/`
 Settings: `{"selection_gift_box": {"Gift Box Boss": True}}`
 
+Parity C# `OpenAllGiftBox`: ảnh hộp được gom từ 6 thư mục theo lựa chọn rồi sắp
+theo số tên file; `Open` chờ/đóng popup success, còn `Use` đặt `checkUsed` và
+không chờ popup đó. Hiện chưa có ảnh ADB thật của màn Items/popup hộp, nên
+`test_flow.py` dùng biến thể template trên khung 396x704; cần thay bằng ảnh thật
+khi thiết bị đang ở đúng màn hình.
+
 | # | Màn hình | Action |
 | --- | --- | --- |
 | 01 | Màn hình chính, thấy nút chức năng | `tap("OpenBox/Setup/chucnang.png")` |
@@ -24,6 +30,10 @@ Nhánh phụ:
 
 ## Alliance Capacity — `tests/alliance_capacity/`
 Settings: `{"times": "1"}` (1 lần donate bằng gems)
+
+Parity C# `ScienceNew`: flow chính dùng ảnh ADB thật tới thao tác giữ nút Donate
+thẻ trên cùng. Trạng thái nút donate bằng gem là màn tạm nên test `No`/giới hạn
+số lần hiện dùng biến thể chỉ chứa template `sciencekc.png`.
 
 | # | Màn hình | Action |
 | --- | --- | --- |
@@ -67,6 +77,11 @@ Mỗi task là một flow riêng. Tối thiểu cần các test sau.
 
 ## Black Market (Market) — `tests/black_market/`
 Settings: `{"black_market_items": {"Resources": True}, "refresh": "1", "quantity_buy": "ALL"}`
+
+OCR ví: định vị icon vàng/kim cương trong đúng hàng ví Black Market rồi mới cắt
+số tương đối với icon; không OCR crop tuyệt đối và không đọc thanh tài nguyên
+trên cùng. Flow thật phải kiểm tra cả giá 6 ô hàng hóa (vàng/kim cương), vàng
+dưới 2.000.000, kim cương bằng 0 và popup refresh không xác minh được kim cương.
 
 | # | Màn hình | Action |
 | --- | --- | --- |

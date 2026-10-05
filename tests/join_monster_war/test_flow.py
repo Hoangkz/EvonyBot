@@ -76,8 +76,12 @@ def unknown(screen):
 
 
 def run_join(testcase, flow, settings, **kwargs):
-    return run_flow(testcase, join_monster_war.run, SCREENS, flow, settings,
-                    variants={"war_off": war_off, "no_items": no_items, "unknown": unknown}, **kwargs)
+    # Bộ ảnh legacy ghép màn danh sách và March từ các lượt chơi khác nhau nên tọa độ
+    # không trùng. Kiểm tra tọa độ March thật nằm trong test_current_code_flow (bộ ảnh
+    # cùng một lượt); ở đây chỉ giữ phạm vi kiểm thử các nhánh cũ.
+    with mock.patch.object(_Boss, "_march_target_matches", return_value=True):
+        return run_flow(testcase, join_monster_war.run, SCREENS, flow, settings,
+                        variants={"war_off": war_off, "no_items": no_items, "unknown": unknown}, **kwargs)
 
 
 def remember(coords, status):
@@ -460,6 +464,9 @@ class JoinMonsterWarFlow(unittest.TestCase):
             def find(self, *_args, **_kwargs):
                 return None
 
+            def screenshot(self):
+                return np.zeros((704, 396, 3), dtype=np.uint8)
+
             def report_boss(self, coords):
                 self.reported.append(coords)
 
@@ -471,10 +478,11 @@ class JoinMonsterWarFlow(unittest.TestCase):
 
         bot = FakeBot()
         boss = _Boss(bot, SETTINGS)
-        boss._boss_is_wanted = mock.Mock(side_effect=[False, False, True])
+        boss._boss_is_wanted = mock.Mock(side_effect=[False, False, True, True])
         boss._join_text_is_red = mock.Mock(return_value=False)
 
-        self.assertTrue(boss._join(np.zeros((704, 396, 3), dtype=np.uint8)))
+        with mock.patch("bot.activities.join_monster_war.run.CAN_READ_COORDS", False):
+            self.assertTrue(boss._join(np.zeros((704, 396, 3), dtype=np.uint8)))
         self.assertEqual(boss.screen_blacklist, points[:2])
         self.assertEqual(bot.taps, [(329, 467)])
         self.assertEqual(bot.reported, [None])

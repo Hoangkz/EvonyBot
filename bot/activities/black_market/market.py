@@ -10,8 +10,10 @@ While on the market it alternates: scan the page for wanted items, buy
 them one by one, Refresh, scan again...
 """
 from ...common import click_images, delay, exit_images, find_first, go_home, images_in
-from ...ocr import read_number
-from .constants import BM, BUY, BUY_THRESHOLD, GEMS_MIN_Y, MARKET_REGION, MIN_GOLD
+from ...ocr import MarketBalance, read_market_balance
+from .constants import (BALANCE_RETRIES, BM, BUY, BUY_THRESHOLD, GEM_ICONS,
+                        GEM_ICON_THRESHOLD, GOLD_ICONS, GOLD_ICON_THRESHOLD, MARKET_REGION,
+                        MARKET_SLOTS, MIN_GOLD, PRICE_HALF)
 
 
 class Market:
@@ -32,7 +34,9 @@ class Market:
         self.need_scan = True
         self.refreshes = 0
         self.bought = 0
-        self.gold_misses = 0        # C# goldTemp
+        self.balance_misses = 0     # C# goldTemp, now covers both wallet values
+        self.balance = MarketBalance(None, None)
+        self.pending: str | None = None   # "buy" / "refresh"; confirmations are not equivalent
 
     def run(self):
         targets = self._targets()
@@ -68,15 +72,24 @@ class Market:
         self.done = True
 
     def on_confirm(self, screen, pos):
-        """Purchase confirmation: counts as one buy."""
+        """Confirm an item purchase. Refresh confirmations are handled in
+        ``_refresh`` so they can never increment the purchase counter."""
+        if self.pending != "buy":
+            self.bot.record("Black Market: unexpected confirmation, closing")
+            self.bot.back()
+            self.pending = None
+            delay(self.bot, 2)
+            return
         self.bot.tap(*pos)
         self.bought += 1
+        self.pending = None
         delay(self.bot, 3)
 
     def on_market(self, screen, refresh_pos):
         """Market is open: buy the next wanted slot, else scan or refresh."""
         if self.points:
             self.bot.tap(*self.points.pop(0))
+            self.pending = "buy"
             delay(self.bot, 2)
         elif self.need_scan:
             self._scan(screen)
@@ -120,8 +133,8 @@ class Market:
     def _scan(self, screen):
         """Collect the slots of every wanted item on this market page."""
         bot = self.bot
-        gem_slots = [_cell(p) for p in bot.find_all(f"{BM}/gems.png", screen=screen, center=False)
-                     if p[1] > GEMS_MIN_Y]
+        self._read_balance(screen)
+        gem_slots = _currency_slots(bot, screen, GEM_ICONS, GEM_ICON_THRESHOLD)
         found = []
         for path in self.buy_images:
             slots = [_cell(p) for p in
@@ -129,7 +142,13 @@ class Market:
             if slots and "Chips" not in path and "Stamina" not in path:
                 slots = self._drop_paid_slots(screen, slots, gem_slots)
             found += slots
-        self.points = list(dict.fromkeys(found))
+        points = list(dict.fromkeys(found))
+        # When gem purchases are enabled, an OCR value of zero is definitive:
+        # do not open a purchase popup that cannot succeed.  ``None`` remains
+        # compatible with the C# retry behaviour instead of assuming zero.
+        if self.balance.gems == 0:
+            points = [point for point in points if point not in gem_slots]
+        self.points = points
         self.need_scan = False
 
     def _drop_paid_slots(self, screen, slots, gem_slots):
@@ -138,8 +157,7 @@ class Market:
         if gem_slots and not self.buy_with_gems:
             slots = [s for s in slots if s not in gem_slots]
         if slots and not self.event:
-            gold_slots = [_cell(p) for p in
-                          self.bot.find_all(f"{BM}/buyVang.png", screen=screen, center=False)]
+            gold_slots = _currency_slots(self.bot, screen, GOLD_ICONS, GOLD_ICON_THRESHOLD)
             slots = [s for s in slots if s not in gold_slots]
         return slots
 
@@ -158,16 +176,32 @@ class Market:
                 self.done = True
                 return
 
-        self.gold_misses = 0
+        self.balance_misses = 0
         self.refreshes += 1
         before = bot.crop(screen, *MARKET_REGION)
         bot.tap(*refresh_pos)
+        self.pending = "refresh"
         delay(bot, 2)
         # Wait (up to 10 s) until the market slots change.
         for _ in range(10):
-            if bot.find(before) is None:
+            current = bot.screenshot()
+            confirm = bot.find(f"{BM}/xacnhan.png", screen=current)
+            if confirm is not None:
+                balance = self._read_balance(current)
+                if balance.gems is None or balance.gems <= 0:
+                    bot.record("Black Market: cannot verify gems for paid refresh, stopping")
+                    bot.back()
+                    self.done = True
+                    self.pending = None
+                    return
+                bot.tap(*confirm)
+                bot.record(f"Black Market: confirmed paid refresh ({balance.gems} gems available)")
+                delay(bot, 2)
+                continue
+            if bot.find(before, screen=current) is None:
                 break
             delay(bot)
+        self.pending = None
         self.need_scan = True
 
     def _limits_reached(self) -> bool:
@@ -175,20 +209,29 @@ class Market:
                 or (self.refresh_limit != -1 and self.refreshes >= self.refresh_limit))
 
     def _gold_too_low(self, screen) -> bool | None:
-        """CheckGold: True if gold < MIN_GOLD, False if enough (or check
-        skipped), None if the gold counter isn't visible yet."""
-        if self.gold_misses == 2:
-            self.gold_misses = 0
+        """CheckGold using OCR of the Black Market wallet row.
+
+        As in C#, two unreadable frames are tolerated before the check is
+        skipped for this refresh.  A real zero is never treated as an OCR
+        failure.
+        """
+        balance = self._read_balance(screen)
+        if balance.gold is not None:
+            self.balance_misses = 0
+            return balance.gold < MIN_GOLD
+        if self.balance_misses == BALANCE_RETRIES:
+            self.balance_misses = 0
             return False
-        bot = self.bot
-        pos = bot.find(f"{BM}/goldCheck.png", screen=screen, center=False)
-        if pos is None:
-            self.gold_misses += 1
-            delay(bot)
-            return None
-        w, h = bot.template_size(f"{BM}/goldCheck.png")
-        gold = read_number(bot.crop(screen, pos[0] + w + 5, pos[1], 120, h))
-        return gold < MIN_GOLD
+        self.balance_misses += 1
+        delay(self.bot)
+        return None
+
+    def _read_balance(self, screen) -> MarketBalance:
+        balance = read_market_balance(screen)
+        self.balance = balance
+        if balance != MarketBalance(None, None):
+            self.bot.log(f"Black Market: wallet gold={balance.gold}, gems={balance.gems}")
+        return balance
 
 
 def to_int(text, default: int) -> int:
@@ -232,3 +275,19 @@ def _cell(point: tuple[int, int]) -> tuple[int, int]:
     elif y > 400:
         y = 522
     return x, y
+
+
+def _currency_slots(bot, screen, icons: tuple[str, ...], threshold: float) -> list[tuple[int, int]]:
+    """Market slots whose price button contains one of ``icons``.
+
+    Looking only in the six price buttons avoids false positives from the
+    wallet row and from gold/gem artwork inside the item cards.
+    """
+    hw, hh = PRICE_HALF
+    found = []
+    for point in MARKET_SLOTS:
+        x, y = point
+        area = bot.crop(screen, x - hw, y - hh, 2 * hw, 2 * hh)
+        if any(bot.find(icon, threshold=threshold, screen=area) is not None for icon in icons):
+            found.append(point)
+    return found

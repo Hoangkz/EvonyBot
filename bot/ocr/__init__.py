@@ -15,6 +15,7 @@ per reader, each exposing `run(image)`:
 - read_train_count: số lính tối đa một lần train (ô bên phải nút "+") -> 20812
 - read_heal_count: số lính bị thương của một dòng ở màn Hospital "0 / 8,147" -> 8147
 - read_offer_cost: số kim cương ô "Cost" của popup Offer Gems "126,175" -> 126175
+- read_market_balance: số dư vàng / kim cương trên màn Black Market
 - read_tax_count: ô số lần của popup Tax (Chợ) "11" -> 11
 """
 from .read_boss_name import run as read_boss_name
@@ -22,6 +23,7 @@ from .read_bubble_time import run as read_bubble_time
 from .read_coords import run as read_coords
 from .read_heal_count import run as read_heal_count
 from .read_milestone import run as read_milestone
+from .read_market_balance import MarketBalance, run as read_market_balance
 from .read_number import run as read_number
 from .read_offer_cost import run as read_offer_cost
 from .read_power import run as read_power
@@ -30,5 +32,5 @@ from .read_server import run as read_server
 from .read_tax_count import run as read_tax_count
 from .read_train_count import run as read_train_count
 
-__all__ = ["read_boss_name", "read_bubble_time", "read_coords", "read_heal_count", "read_milestone", "read_number", "read_offer_cost", "read_power", "read_progress",
+__all__ = ["MarketBalance", "read_boss_name", "read_bubble_time", "read_coords", "read_heal_count", "read_market_balance", "read_milestone", "read_number", "read_offer_cost", "read_power", "read_progress",
            "read_server", "read_tax_count", "read_train_count"]
