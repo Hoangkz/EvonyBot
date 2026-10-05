@@ -23,10 +23,12 @@ RESOURCE_IDS = ("food_5m", "lumber_5m", "stone_5m", "ore_5m")
 GOLD_PACK_IDS = ("gold_50k", "gold_100k")
 LABEL_AREA = (-38, -92, 76, 42)
 LABEL_THRESHOLD = 0.85
-CHIPS_ID = "chips_100"
+RESOURCE_LABEL = "resource"   # id món của ô nhận ra theo chữ số lượng (không mua bằng kim cương)
 
 # ---- Điều kiện dừng ----------------------------------------------------------------------------------------
 GEMS_MIN = 50             # kim cương < 50 (giá một lần Instant Refresh trả phí): luôn dừng
 GOLD_MIN = 2_000_000      # vàng < 2.000.000: dừng khi tích CheckGold
 MAX_IDLE_STEPS = 30       # số bước liên tiếp không mua / refresh được gì -> dừng (kẹt)
 NO_LIMIT = -1             # ô Refresh / Quantity Buy = "ALL"
+# Icon "Black Market" trong menu Chợ (ảnh mẫu chỉ túi tiền): menu thật 0,90 .. 1,00, màn khác <= 0,53.
+MENU_THRESHOLD = 0.8

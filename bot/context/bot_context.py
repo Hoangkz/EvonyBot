@@ -38,6 +38,10 @@ class BotContext(FlowMixin, InputMixin, ScreenMixin):
         # (activities/event/city_building.py); worker gán set_civilization để lưu DB.
         self.civilization: int | None = None
         self.set_civilization = lambda civ: setattr(self, "civilization", civ)
+        # Bản đồ thành của thiết bị ({công trình: [x, y]}, activities/black_market/city_map.py); worker gán set_city_map
+        # để lưu DB.
+        self.city_map: dict = {}
+        self.set_city_map = lambda city_map: setattr(self, "city_map", dict(city_map))
         self._log = log
         # Sự kiện đáng lưu lịch sử (DB + tab Logs > History); worker gán BotWorker.record,
         # mặc định (test / chạy tay) chỉ là log thường.

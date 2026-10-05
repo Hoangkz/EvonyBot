@@ -65,24 +65,20 @@ Mỗi task là một flow riêng. Tối thiểu cần các test sau.
    Nhánh nút đã xám: bỏ 07, `08_levy_done` `back()` luôn.
 4. Mỗi task còn lại (Monster Killing, Offering, Troop Training, ...) cần một method `test_<task>`. Toạ độ tap cứng của từng handler nằm trong `run.py`, nên dùng `tap_at` với đúng các toạ độ đó.
 
-## Black Market (Market) — `tests/black_market/`
-Settings: `{"black_market_items": {"Resources": True}, "refresh": "1", "quantity_buy": "ALL"}`
+## Black Market — `tests/black_market/`
+Đã có ([test_flow.py](../../../tests/black_market/test_flow.py), flow: [FLOW.md](../../../bot/activities/black_market/FLOW.md)).
+Ảnh dùng chung `tests/event/kings_path/screens/bm_*` (SCREENS = tests/). Settings mặc định
+`{"check_gold": False, "refresh": "ALL", "quantity_buy": "ALL", "resources": True, "items": {"chips_100": True}}`.
 
 | # | Màn hình | Action |
 | --- | --- | --- |
-| 01 | Màn hình chính | `tap("Black Market/chucnang.png")` |
-| 02 | Menu | `tap("Black Market/activites.png")` |
-| 03 | Danh sách Daily Activities, chưa thấy Black Market | `swipe(50, 50, 50, 32)` |
-| 04 | Thấy dòng Black Market có `goto.png` | `tap("Black Market/goto.png")`, `tap_pct(50, 49)` |
-| 05 | `ChoDen.png` / `ResourcesTax.png` / `BlackMarketCheck.png` | `tap(...)` ảnh đó |
-| 06 | Chợ đen (`Refresh.png`) có ô Resources mua được | `tap_at(<ô sau _cell>)`. Lượt scan đầu không có input |
-| 07 | Xác nhận mua (`xacnhan.png`) | `tap("Black Market/xacnhan.png")` |
-| 08 | Chợ đã mua hết ô muốn mua | `tap("Black Market/Refresh.png")` |
-| 09 | Chợ sau Refresh (ô khác 08) | mua tiếp như 06–07, hoặc `end()` nếu không còn gì: refresh đã đạt giới hạn 1 |
+| 01 | `bm_city` (màn thành, Chợ ở giữa) — bỏ qua nếu đang ở màn Black Market | `tap_pct(50, 50)` |
+| 02 | `bm_menu` (menu Chợ) | `tap(MENU_BLACK_MARKET)` |
+| 03 | `bm_screen`: ô có món được tích, nút giá xanh | `tap_at(SLOTS[i])` |
+| 04 | `bm_confirm` | `tap(CONFIRM)` |
+| 05 | hết ô để mua | `tap(INSTANT_REFRESH)` hoặc dừng: `back()`, `end()` |
 
-Nhánh phụ:
-- Hết gems (`buyKc.png`): `back(2)`, `end()`.
-- Cuối danh sách không có Black Market (`DailyActivites/khoangden.png`): `back()`, `end()`.
+Nhánh phụ: Resource giá kim cương bị bỏ (`bm_screen_3`), giới hạn Refresh / Quantity Buy, kim cương < 50, CheckGold.
 
 ## Battlefield Shop — `tests/battlefield_shop/`
 Settings: `{"quantity_to_refresh": "0"}`, `open_box` / `black_market` để False. Code đang có `TODO: cần làm lại`, nên nếu viết test ngay thì phải xác nhận lại flow với người dùng.

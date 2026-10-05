@@ -16,7 +16,8 @@ TAB_INDEX = 0
 
 # ---- Sau khi bấm Go (ảnh tests/event/kings_path/screens/bm_*.png) -------------------------
 # Go -> về thành, Chợ ở giữa -> bấm giữa -> menu Chợ (../building.py) -> icon "Black Market"
-# (111, 254): 1,00 (cũng khớp menu Chợ ở tax_menu.png — cùng menu).
+# (111, 254): chỉ túi tiền (bỏ chữ "Auction" phía trên / nền hai bên, đổi theo tài khoản và chỗ menu hiện): bm_menu /
+# tax_menu 1,00; menu thật 21913 0,95, 21943 0,90 .. 0,93; màn khác <= 0,53.
 MENU_BLACK_MARKET = f"{KP}/BlackMarket/menuBlackMarket.png"
 # Tiêu đề "Black Market" (199, 23): 1,00; màn khác <= 0,44. Các ảnh dưới chỉ xét khi thấy tiêu đề.
 TITLE = f"{KP}/BlackMarket/title.png"

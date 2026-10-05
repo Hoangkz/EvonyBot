@@ -2,6 +2,8 @@
 
 Code: [city_building.py](city_building.py). Dùng bởi King's Path ([kings_path/building.py](kings_path/building.py))
 và Gather Troops ([gather_troops/train_troop/run.py](gather_troops/train_troop/run.py) `_open_building_menu`).
+Activity Black Market (không qua nút Go) dùng thêm bản đồ thành theo thiết bị:
+[../black_market/city_map.py](../black_market/city_map.py). Event / nhiệm vụ Daily vẫn đi bằng nút Go.
 Daily Activities chưa dùng.
 
 ## 1. Vấn đề

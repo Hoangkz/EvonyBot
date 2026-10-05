@@ -86,6 +86,7 @@ class MainWindow(QMainWindow):
         self.bots.daily_task_done.connect(self.db.mark_daily_task_done)
         self.bots.bubble_found.connect(self._on_bubble_found)
         self.bots.civilization_found.connect(self.db.set_civilization)
+        self.bots.city_map_found.connect(self.db.set_city_map)
         self.bots.bubble_disabled.connect(self._on_bubble_disabled)
         self.bots.log_message.connect(self._on_log_message)
         self.bots.history.connect(self._on_history)

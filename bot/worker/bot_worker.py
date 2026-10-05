@@ -16,6 +16,7 @@ Thứ tự ưu tiên: Bubble > Auto Times Out > Join Boss > nhiệm vụ (schedu
   nhiệm vụ đã xong lại tới lượt.
 - Chỉ chọn mỗi Join Boss: chạy Join Boss liên tục như trước.
 """
+import json
 import os
 import sys
 import threading
@@ -90,6 +91,7 @@ class BotWorker(QThread):
     daily_task_done = pyqtSignal(str, str)    # (serial, task Daily Activities vừa xong)
     bubble_found = pyqtSignal(str, int)       # (serial, giây bubble còn lại; 0 = không có)
     civilization_found = pyqtSignal(str, int) # (serial, nền văn minh bot tự xếp từ ảnh công trình)
+    city_map_found = pyqtSignal(str, str)     # (serial, bản đồ thành JSON bot quét được)
     bubble_disabled = pyqtSignal(str)         # (serial) không đủ kim cương -> bỏ tích Bubble
     log_message = pyqtSignal(str, str)        # (serial, dòng log) -> tab Logs > Info
     history = pyqtSignal(str, str)            # (serial, sự kiện) -> lưu DB + tab Logs > History
@@ -159,6 +161,9 @@ class BotWorker(QThread):
             # Nền văn minh đã lưu DB (None = chưa biết); bot tự xếp thì lưu lại qua signal.
             self.ctx.civilization = self.settings.get("Initialization", {}).get("civilization") or None
             self.ctx.set_civilization = self._set_civilization
+            # Bản đồ thành đã lưu DB ({công trình: [x, y]}, {} = chưa quét); bot quét xong thì lưu lại qua signal.
+            self.ctx.city_map = dict(self.settings.get("Initialization", {}).get("city_map") or {})
+            self.ctx.set_city_map = self._set_city_map
             self._register_boss_listener()
             self._run_tasks()
         # Ngắt có chủ đích (Stop/timeout truyền tới đây) không xem là lỗi.
@@ -387,6 +392,10 @@ class BotWorker(QThread):
     def _set_civilization(self, civ: int):
         self.ctx.civilization = civ
         self.civilization_found.emit(self.serial, int(civ))
+
+    def _set_city_map(self, city_map: dict):
+        self.ctx.city_map = dict(city_map)
+        self.city_map_found.emit(self.serial, json.dumps(city_map))
 
     def _mark_daily_done(self, task: str):
         self.daily_done[task] = datetime.now().isoformat(timespec="seconds")
