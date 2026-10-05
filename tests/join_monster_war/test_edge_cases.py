@@ -67,19 +67,17 @@ class JoinBossEdgeCaseTests(unittest.TestCase):
         bot.find.side_effect = lambda template, **_kwargs: None if template == BOSS_MONSTER else None
         boss = _Boss(bot, {"troop": ["Troop 1"]})
         boss.pending = (500, 600)
-        boss.pending_joined_count = 2
 
         boss._march(SCREEN, (300, 680))
 
         bot.back.assert_called_once()
         self.assertIsNone(boss.memory.status((500, 600)))
-        self.assertEqual(boss.pending_joined_count, 0)
 
     def test_press_march_does_nothing_when_button_is_missing(self):
         bot = fake_bot()
         boss = _Boss(bot, {})
 
-        boss._press_march((500, 600))
+        boss._press_march((500, 600), screen=SCREEN)
 
         bot.tap.assert_not_called()
         bot.back.assert_not_called()
@@ -89,48 +87,162 @@ class JoinBossEdgeCaseTests(unittest.TestCase):
         bot = fake_bot()
         bot.find.side_effect = lambda template, **_kwargs: (300, 680) if template == MARCH else None
         boss = _Boss(bot, {})
+        boss._march_target_matches = mock.Mock(return_value=True)
 
-        boss._press_march((500, 600))
+        boss._press_march((500, 600), screen=SCREEN)
 
         bot.tap.assert_called_once()
         bot.back.assert_called_once()
         self.assertEqual(bot.screenshot.call_count, 5)
         self.assertIsNone(boss.memory.status((500, 600)))
 
-    def test_closed_march_without_joined_confirmation_is_not_remembered(self):
+    def test_closed_march_without_war_list_is_not_remembered(self):
         bot = fake_bot()
-        march_lookups = iter([(300, 680), None])
 
-        def find(template, **_kwargs):
+        def find(template, **kwargs):
             if template == MARCH:
-                return next(march_lookups, None)
+                return (300, 680) if "screen" not in kwargs else None
             return None
 
         bot.find.side_effect = find
         boss = _Boss(bot, {})
-        boss.pending_joined_count = 1
-        boss._joined_rally_present = mock.Mock(return_value=False)
+        boss._march_target_matches = mock.Mock(return_value=True)
 
-        boss._press_march((500, 600))
+        boss._press_march((500, 600), (300, 680), SCREEN)
 
         bot.back.assert_not_called()
         self.assertIsNone(boss.memory.status((500, 600)))
-        self.assertEqual(boss.pending_joined_count, 0)
-        self.assertIn("chưa xác nhận được Joined", bot.record.call_args.args[0])
+        self.assertIn("chưa quay lại danh sách War", bot.record.call_args.args[0])
 
-    def test_same_joined_count_confirms_only_matching_boss_coordinates(self):
+    def test_returning_to_war_list_marks_joined_without_ocr(self):
         bot = fake_bot()
-        bot.find_all.return_value = [(319, 331)]
-        boss = _Boss(bot, {})
-        boss.pending_joined_count = 1
-        boss._read_card_coords = mock.Mock(return_value=(500, 600))
 
-        self.assertTrue(boss._joined_rally_present(SCREEN, (500, 600)))
-        self.assertFalse(boss._joined_rally_present(SCREEN, None))
-        bot.find_all.assert_called_with(
-            JOINED_BUTTON, screen=SCREEN, center=False,
-            region=run_module.REGIONS[JOINED_BUTTON],
+        def find(template, **kwargs):
+            if template == MARCH:
+                return (300, 680) if "screen" not in kwargs else None
+            if template == run_module.PVP_WAR:
+                return (200, 118)
+            return None
+
+        bot.find.side_effect = find
+        boss = _Boss(bot, {})
+        boss._read_card_coords = mock.Mock(side_effect=AssertionError("không được OCR sau March"))
+        boss._march_target_matches = mock.Mock(return_value=True)
+
+        boss._press_march((500, 600), (300, 680), SCREEN)
+
+        self.assertEqual(boss.memory.status((500, 600)), JOINED)
+        boss._read_card_coords.assert_not_called()
+        self.assertIn("đã hành quân tới boss", bot.record.call_args.args[0])
+
+    def test_stamina_popup_does_not_mark_joined_or_check_war_list(self):
+        bot = fake_bot()
+
+        def find(template, **kwargs):
+            if template == MARCH:
+                return (300, 680)
+            if template == run_module.NOT_ENOUGH_STAMINA:
+                return (200, 400)
+            if template == run_module.PVP_WAR:
+                raise AssertionError("popup thể lực phải được xử lý trước danh sách War")
+            return None
+
+        bot.find.side_effect = find
+        boss = _Boss(bot, {})
+        boss._march_target_matches = mock.Mock(return_value=True)
+
+        boss._press_march((500, 600), (300, 680), SCREEN)
+
+        self.assertEqual(boss.pending, (500, 600))
+        self.assertIsNone(boss.memory.status((500, 600)))
+
+    def test_join_tracks_same_boss_when_new_rally_moves_its_card(self):
+        initial = np.zeros((704, 396, 3), dtype=np.uint8)
+        fresh = np.ones((704, 396, 3), dtype=np.uint8)
+        bot = fake_bot()
+        bot.screenshot.return_value = fresh
+
+        def find_all(template, **kwargs):
+            screen = kwargs.get("screen")
+            if template == JOINED_BUTTON:
+                return []
+            if template != run_module.JOIN:
+                return []
+            if screen is initial:
+                return [(319, 300)]
+            # Một rally mới chiếm vị trí cũ; boss mục tiêu đã bị đẩy xuống.
+            return [(319, 300), (319, 420)]
+
+        bot.find_all.side_effect = find_all
+        boss = _Boss(bot, {})
+        boss._boss_is_wanted = mock.Mock(return_value=True)
+        boss._join_text_is_red = mock.Mock(return_value=False)
+
+        def read_card_coords(screen, _x, y):
+            if screen is initial:
+                return (500, 600)
+            return (111, 222) if y == 300 else (500, 600)
+
+        boss._read_card_coords = mock.Mock(side_effect=read_card_coords)
+
+        self.assertTrue(boss._join(initial))
+        bot.tap.assert_called_once_with(324, 425)
+        bot.report_boss.assert_called_once_with((500, 600))
+        self.assertEqual(boss.pending, (500, 600))
+
+    def test_join_aborts_when_target_disappears_before_tap(self):
+        initial = np.zeros((704, 396, 3), dtype=np.uint8)
+        fresh = np.ones((704, 396, 3), dtype=np.uint8)
+        bot = fake_bot()
+        bot.screenshot.return_value = fresh
+
+        def find_all(template, **kwargs):
+            screen = kwargs.get("screen")
+            if template == JOINED_BUTTON:
+                return []
+            if template != run_module.JOIN:
+                return []
+            if screen is initial:
+                return [(319, 300)]
+            return [(319, 420)]
+
+        bot.find_all.side_effect = find_all
+        boss = _Boss(bot, {})
+        boss._boss_is_wanted = mock.Mock(return_value=True)
+        boss._join_text_is_red = mock.Mock(return_value=False)
+        boss._read_card_coords = mock.Mock(
+            side_effect=lambda screen, _x, _y: (500, 600) if screen is initial else (111, 222)
         )
+
+        self.assertFalse(boss._join(initial))
+        bot.tap.assert_not_called()
+        bot.report_boss.assert_not_called()
+        self.assertIs(boss.next_screen, fresh)
+        self.assertIn("danh sách đã đổi", bot.log.call_args.args[0])
+
+    def test_march_target_mismatch_backs_out_without_tapping_march(self):
+        bot = fake_bot()
+        bot.find.return_value = (300, 680)
+        boss = _Boss(bot, {})
+        boss._read_march_target_coords = mock.Mock(return_value=(111, 222))
+
+        boss._press_march((500, 600), screen=SCREEN)
+
+        bot.tap.assert_not_called()
+        bot.back.assert_called_once()
+        self.assertIsNone(boss.memory.status((500, 600)))
+        self.assertIn("card đã đổi", bot.record.call_args.args[0])
+
+    def test_march_target_uses_right_side_location(self):
+        bot = fake_bot()
+        bot.find_all.return_value = [(31, 266), (274, 266)]
+        bot.template_size.return_value = (14, 14)
+        boss = _Boss(bot, {})
+
+        with mock.patch.object(run_module, "read_coords", return_value=(767, 811)):
+            self.assertEqual(boss._read_march_target_coords(SCREEN), (767, 811))
+
+        bot.crop.assert_called_once_with(SCREEN, 288, 266, 90, 18)
 
     def test_invalid_ocr_coordinates_are_rejected_and_logged(self):
         bot = fake_bot()
@@ -148,14 +260,12 @@ class JoinBossEdgeCaseTests(unittest.TestCase):
         bot.find.return_value = None
         boss = _Boss(bot, {"use_stamina": "100"})
         boss.pending = (500, 600)
-        boss.pending_joined_count = 2
 
         boss._use_stamina()
 
         bot.tap.assert_called_once_with(290, 360)
         bot.back.assert_called_once()
         self.assertIsNone(boss.pending)
-        self.assertEqual(boss.pending_joined_count, 0)
         self.assertIsNone(boss.memory.status((500, 600)))
 
     def test_war_checkbox_retry_limit_prevents_endless_tapping(self):
@@ -186,23 +296,24 @@ class JoinBossEdgeCaseTests(unittest.TestCase):
         self.assertIn("không mở được màn Select a General", bot.record.call_args.args[0])
         self.assertIsNone(boss.memory.status((500, 600)))
 
-    def test_joined_memory_is_only_written_after_positive_confirmation(self):
+    def test_joined_memory_is_written_after_returning_to_war_list(self):
         bot = fake_bot()
-        march_lookups = iter([(300, 680), None])
 
-        def find(template, **_kwargs):
+        def find(template, **kwargs):
             if template == MARCH:
-                return next(march_lookups, None)
+                return (300, 680) if "screen" not in kwargs else None
+            if template == run_module.PVP_WAR:
+                return (200, 118)
             return None
 
         bot.find.side_effect = find
         boss = _Boss(bot, {})
-        boss._joined_rally_present = mock.Mock(return_value=True)
+        boss._march_target_matches = mock.Mock(return_value=True)
 
-        boss._press_march((500, 600))
+        boss._press_march((500, 600), (300, 680), SCREEN)
 
         self.assertEqual(boss.memory.status((500, 600)), JOINED)
-        self.assertIn("đã tham gia boss", bot.record.call_args.args[0])
+        self.assertIn("đã hành quân tới boss", bot.record.call_args.args[0])
 
 
 if __name__ == "__main__":
