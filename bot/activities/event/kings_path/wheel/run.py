@@ -35,10 +35,11 @@ def _spin(bot, path, done, target):
     spin_wheel(bot, lambda: bot.mark_daily_done(path.key))
 
 
-def spin_wheel(bot, done, name: str = NAME) -> bool:
+def spin_wheel(bot, done, name: str = NAME, max_spins_10: int | None = None) -> bool:
     """Màn Wheel of Fortune (vừa bấm Go): 100 Spins nếu có (-> Back), không thì 10 Spins liên tục tới khi game mở
-    màn Purchase Chips (hết chip -> Back); cả hai gọi done() rồi trả True. Không thấy màn Wheel / quá MAX_STEPS
-    -> False. Dùng chung với Daily Activities / Wheel of Fortune."""
+    màn Purchase Chips (hết chip -> Back); cả hai gọi done() rồi trả True. `max_spins_10`: bấm 10 Spins tối đa chừng
+    ấy lần rồi Back, done() (không quay tới hết chip, không vào Purchase Chips). Không thấy màn Wheel / quá
+    MAX_STEPS -> False. Dùng chung với Daily Activities / Wheel of Fortune (max_spins_10=1)."""
     spins_10, misses = 0, 0
     for _ in range(MAX_STEPS):
         screen = bot.screenshot()
@@ -51,6 +52,11 @@ def spin_wheel(bot, done, name: str = NAME) -> bool:
             return True
         if bot.find(CHIPS_TITLE, screen=screen) is not None:
             bot.record(f"{name}: out of chips after {spins_10} x 10 Spins, done for today")
+            bot.back(delay=BUTTON_WAIT)
+            done()
+            return True
+        if max_spins_10 is not None and spins_10 >= max_spins_10:
+            bot.record(f"{name}: {spins_10} x 10 Spins, back, done")
             bot.back(delay=BUTTON_WAIT)
             done()
             return True

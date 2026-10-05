@@ -30,6 +30,10 @@ ACTIVITY_LIST = f"{USE_ALL}/Click_ActivitiesLight.png"   # ngôi sao điểm Act
 GO_BUTTON = f"{USE_ALL}/Go.png"
 CLAIM_BUTTON = f"{ROOT}/ActivitiesSourceCollecting/Claim.png"   # dòng đã xong, chưa nhận
 CLAIM_ALL = f"{ROOT}/CollectionActivities/Claim_All.png"
+# Claim All xám (không có gì để nhận) vẫn khớp ảnh mẫu 0,86 (sáng 0,99), sát ngưỡng -> xét thêm màu: độ bão hoà (HSV S)
+# trung bình trong khung nút (CLAIM_ALL_SIZE, quanh tâm) sáng ~205, xám ~14 -> dưới CLAIM_ALL_MIN_SATURATION là xám, bỏ qua.
+CLAIM_ALL_SIZE = (124, 35)
+CLAIM_ALL_MIN_SATURATION = 100
 # Ảnh tiêu đề dòng cắt từ danh sách thật (396x704) trong thư mục ảnh của nhiệm vụ: chỉ phần chữ cố
 # định, bỏ số lượng / "for N time(s)" (khác theo tài khoản, lần). Dòng đúng 1,00; dòng khác <= 0,78.
 # Resource Gathering = dòng "Gather ... resources from resource fields in the City" (thu mỏ trong thành).
@@ -38,6 +42,9 @@ ROW_TITLE = "Title.png"
 # Research 356 -> Claim 399), lệch tối đa ROW_BUTTON_TOLERANCE.
 ROW_BUTTON_DY = 42
 ROW_BUTTON_TOLERANCE = 10
+# Thấy tiêu đề mà không nhận ra nút: danh sách có thể còn trôi sau khi cuộn (21913: tiêu đề y 451 lúc chụp, đứng yên
+# ở 446, Go không khớp) -> chờ ROW_SETTLE_WAIT giây, chụp lại, xét lại một lần.
+ROW_SETTLE_WAIT = 1
 # Nút của dòng phải nằm trên thanh Claim All (y ~638, che nút Go của dòng sát đáy, VD Levy tiêu đề
 # y 621): tiêu đề thấp hơn ROW_TITLE_MAX_Y thì coi như chưa thấy, cuộn tiếp (LIST_SWIPE ~105 px) để
 # cả dòng lên trên thanh.

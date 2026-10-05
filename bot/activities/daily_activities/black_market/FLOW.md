@@ -14,7 +14,8 @@ Giống hệt King's Path Black Market sau Go: dùng chung `event/kings_path/bla
    - bỏ các món trả bằng **kim cương**; món còn mua được (nút giá xanh) → bấm, mỗi món 1 lần mỗi bộ hàng;
    - mua hết bộ → **Instant Refresh** (hết lượt miễn phí thì bằng kim cương, có hộp xác nhận thì Confirm) → chờ ô
      vật phẩm 1 đổi → mua tiếp bộ mới.
-3. Đủ **5 lần mua** (`BUY_GOAL`) → Back, đánh dấu xong hôm nay.
+3. Đủ **3 lần mua** (`BUY_GOAL`) → Back, đánh dấu xong hôm nay. Luôn mua 3, không theo số trên dòng: nhiệm vụ có
+   nhiều mốc ("for 1 time(s)" xong thì ra "for 3 time(s)", tối đa 3 lần) nên mua 3 luôn một lượt.
 4. Dừng giữa chừng (hết hàng / không thấy Instant Refresh / kẹt) → không đánh dấu, lần sau thử lại từ 0.
 
 ## Luồng cũ C# (`common.run_task` + `run.handle`, `run.py` chung vẫn đang dùng)

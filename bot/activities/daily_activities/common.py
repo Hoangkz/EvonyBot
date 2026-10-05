@@ -20,6 +20,8 @@ from .constants import (
     ACTIVITY_TAB,
     BACK,
     CLAIM_ALL,
+    CLAIM_ALL_MIN_SATURATION,
+    CLAIM_ALL_SIZE,
     CLAIM_BUTTON,
     DONE,
     GO_BUTTON,
@@ -54,6 +56,7 @@ from .constants import (
     ROOT,
     ROW_BUTTON_DY,
     ROW_BUTTON_TOLERANCE,
+    ROW_SETTLE_WAIT,
     ROW_ANCHORS,
     ROW_COMPLETE,
     ROW_MOVED,
@@ -515,15 +518,16 @@ def _search_list(bot, titles, max_scrolls: int, tap_go: bool = True) -> str:
     claim_all_stuck = getattr(bot, "_daily_claim_all_stuck", False)
     previous = None
     scrolls = 0
+    settled = False   # đã chờ danh sách đứng yên rồi xét lại dòng (khi không nhận ra nút)
     while True:
         screen = bot.screenshot()
         if not claim_all_stuck:
-            claim_all = bot.find(CLAIM_ALL, screen=screen)
+            claim_all = _active_claim_all(bot, screen)
             if claim_all is not None:
                 bot.log("Daily Activities: Claim All")
                 bot.tap(*claim_all, delay=2)
                 screen = bot.screenshot()   # bấm Claim All không hiện popup
-                if bot.find(CLAIM_ALL, screen=screen) is not None:
+                if _active_claim_all(bot, screen) is not None:
                     bot.log("Daily Activities: Claim All still there, ignoring it")
                     claim_all_stuck = bot._daily_claim_all_stuck = True
         title = next((pos for path in titles
@@ -537,6 +541,11 @@ def _search_list(bot, titles, max_scrolls: int, tap_go: bool = True) -> str:
             if button in ("claim", "tick"):
                 bot.log(f"Daily Activities: task row shows {button}; done")
                 return TASK_DONE
+            if not settled:
+                # Danh sách có thể còn trôi sau khi cuộn (ảnh nhoè, nút không khớp): chờ rồi xét lại một lần.
+                settled = True
+                bot.sleep(ROW_SETTLE_WAIT)
+                continue
             bot.record(f"Daily Activities: task row {title} has no Go / Claim / tick, not marking done")
             return TASK_UNKNOWN
         if scrolls >= max_scrolls or at_end:
@@ -603,6 +612,19 @@ def _search_grid(bot, cards, max_scrolls: int, done_cards=(), tap_go: bool = Tru
         scrolls += 1
     bot.log(f"Daily Activities: {cards[0]} not found in Activity grid")
     return TASK_NOT_FOUND
+
+
+def _active_claim_all(bot, screen):
+    """Tâm nút Claim All còn sáng (có thưởng để nhận), hoặc None. Nút xám cũng khớp ảnh mẫu (0,86) nên xét thêm độ
+    bão hoà màu trong khung nút: xám -> None."""
+    pos = bot.find(CLAIM_ALL, screen=screen)
+    if pos is None:
+        return None
+    w, h = CLAIM_ALL_SIZE
+    box = bot.crop(screen, pos[0] - w // 2, pos[1] - h // 2, w, h)
+    if float(cv2.cvtColor(box, cv2.COLOR_BGR2HSV)[..., 1].mean()) < CLAIM_ALL_MIN_SATURATION:
+        return None
+    return pos
 
 
 def _row_button(bot, screen, title, tap_go: bool = True) -> str | None:

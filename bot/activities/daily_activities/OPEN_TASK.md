@@ -46,7 +46,8 @@ Mỗi vòng chụp màn hình rồi làm **một** việc (tối đa `OPEN_ACTIV
 
 Lặp, mỗi vòng một ảnh chụp (tối đa `LIST_MAX_SCROLLS` = 12 lần cuộn):
 
-1. **Claim All** (`CLAIM_ALL`) có → bấm (không hiện popup). Bấm mà Claim All vẫn còn (lỗi game) → bỏ qua Claim
+1. **Claim All** (`CLAIM_ALL`) còn sáng (`_active_claim_all`: nút xám cũng khớp ảnh mẫu 0,86 nên xét thêm độ bão hoà
+   màu ≥ `CLAIM_ALL_MIN_SATURATION`) → bấm (không hiện popup). Bấm mà Claim All vẫn còn (lỗi game) → bỏ qua Claim
    All tới hết lượt mở nhiệm vụ này.
 2. Tìm **tiêu đề dòng** của nhiệm vụ (`task_titles`: ảnh trong `ACTIONS` có action OPEN…, VD
    `ActivitiesOffer/Offer.png` = "Use the Offer feature in Shrine" — chỉ phần chữ, không lấy "for N time(s)"
@@ -56,7 +57,8 @@ Lặp, mỗi vòng một ảnh chụp (tối đa `LIST_MAX_SCROLLS` = 12 lần c
    - còn lại: xét **nút ngay dưới tiêu đề** (`_row_button`): cách tâm tiêu đề `ROW_BUTTON_DY` = 42 px (±10):
      - **Go** → bấm → `TASK_OPENED`;
      - **Claim** / **tích V** → `TASK_DONE`;
-     - không nhận ra → `TASK_UNKNOWN`.
+     - không nhận ra → chờ `ROW_SETTLE_WAIT` = 1 s (danh sách có thể còn trôi sau khi cuộn), chụp lại, xét lại một
+       lần; vẫn không nhận ra → `TASK_UNKNOWN`.
 4. Không thấy → vuốt `LIST_SWIPE` (cuộn ~105 px). Danh sách không đổi sau khi vuốt (`_same_list`, vùng y
    340–600 giống ≥ 0,99) = **hết danh sách** → `TASK_NOT_FOUND`.
 

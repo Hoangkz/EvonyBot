@@ -22,4 +22,6 @@ ACTIONS = (
 # ---- Luồng mới sau Go (run.after_go), giống hệt King's Path Black Market sau Go --------------------
 # Go -> về thành, Chợ ở giữa -> menu "Black Market" -> event/kings_path/black_market buy_items: mua các món không
 # trả bằng kim cương (mua hết bộ thì Instant Refresh) cho đủ BUY_GOAL lần.
-BUY_GOAL = 5
+# Nhiệm vụ có nhiều mốc: "Buy ... for 1 time(s)" xong thì ra "for 3 time(s)" (tối đa 3 lần) -> mua luôn 3 lần trong một
+# lượt, không theo số đang ghi trên dòng.
+BUY_GOAL = 3
