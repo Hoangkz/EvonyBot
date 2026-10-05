@@ -25,6 +25,7 @@ from PyQt5.QtWidgets import QApplication, QMainWindow, QStackedWidget, QWidget, 
 from bot.common import GAME_PACKAGE
 
 from bot.worker import BotManager
+
 from database import Database
 from ui import DeviceView, HomeView, Sidebar
 from ui import theme
