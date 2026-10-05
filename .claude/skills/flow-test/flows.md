@@ -99,18 +99,6 @@ Nhánh phụ:
 - Hết gems (`buyKc.png`): `back(2)`, `end()`.
 - Cuối danh sách không có Black Market (`DailyActivites/khoangden.png`): `back()`, `end()`.
 
-## Black Market (Auction House) — `tests/black_market/` (method riêng)
-Settings: `{"auction_is_buy": True, "auction_max_price": "100000"}`. Flow chạy vô hạn nên không có `end()`: harness bật Stop sau bước cuối.
-
-| # | Màn hình | Action |
-| --- | --- | --- |
-| 01 | Màn hình chính | `tap("Black Market/AuctionHouse/Event.png")` |
-| 02 | Event Center chưa thấy đấu giá | `swipe(70, 70, 50, 50)` |
-| 03 | Thấy `daugia.png` | `tap("Black Market/AuctionHouse/daugia.png")` |
-| 04 | `ragegoodsTemp.png` | `tap(...)` |
-| 05 | Lô VIP 5000, giá hiện tại + 5000 ≤ max | `tap("Black Market/AuctionHouse/bid.png")` |
-| 06 | `comfirm.png` | `tap(...)` |
-
 ## Battlefield Shop — `tests/battlefield_shop/`
 Settings: `{"quantity_to_refresh": "0"}`, `open_box` / `black_market` để False. Code đang có `TODO: cần làm lại`, nên nếu viết test ngay thì phải xác nhận lại flow với người dùng.
 

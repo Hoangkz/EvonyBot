@@ -71,7 +71,7 @@ Mỗi `Step(screen, *actions)` nghĩa là: khi thiết bị đang hiển thị `
 | `end(result=...)` | activity phải `return` ở bước này, và nếu có `result` thì giá trị trả về phải bằng nó (VD `IDLE`) |
 
 - Bước cuối là `end()` với activity tự kết thúc.
-- Với activity chạy vô hạn (Join Boss khi `exit_when_idle=False`, Auction House), bước cuối không có `end()`: làm xong bước cuối thì harness bật Stop, và test pass khi activity ném `StopRequested`.
+- Với activity chạy vô hạn (Join Boss khi `exit_when_idle=False`), bước cuối không có `end()`: làm xong bước cuối thì harness bật Stop, và test pass khi activity ném `StopRequested`.
 
 ## Harness `tests/flow.py`: hành vi bắt buộc
 
