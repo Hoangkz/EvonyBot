@@ -12,6 +12,8 @@ import numpy as np
 
 from ._digits import _normalize, _samples
 
+SKIP_LABEL = "skip"  # mảnh rời của cùng một glyph, không tạo ký tự riêng
+
 
 def split(bw: np.ndarray, soft: np.ndarray, space_gap: int | None = None,
           dot_ratio: float | None = None) -> list:
@@ -49,7 +51,10 @@ def read(pieces: list, font: str, min_score: float) -> str | None:
             continue
         scores = samples @ _normalize(piece)
         best = int(scores.argmax())
-        text += labels[best] if scores[best] >= min_score else "?"
+        if scores[best] < min_score:
+            text += "?"
+        elif labels[best] != SKIP_LABEL:
+            text += labels[best]
     return text
 
 
