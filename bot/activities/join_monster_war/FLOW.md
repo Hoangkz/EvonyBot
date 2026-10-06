@@ -103,14 +103,16 @@ flowchart TD
     G -->|Có| H[Thêm vị trí nút vào screen_blacklist]
     G -->|Không| I{OCR tên: boss không được tích, hoặc chữ Join đỏ?}
     I -->|Có| J[Chỉ thêm vị trí nút vào screen_blacklist]
-    I -->|Không| K[report_boss: báo boss cho worker cùng server]
-    K --> L[Tap Join; pending = tọa độ; reset idle_scrolls]
-    L --> M[Dừng duyệt nút trong lượt này]
+    I -->|Không| K[Chụp lại và tìm card có cùng tọa độ]
+    K --> L{Cùng tọa độ còn ổn định qua ảnh xác nhận?}
+    L -->|Không| P[Không tap; quét lại ảnh mới nhất]
+    L -->|Có| Q[report_boss rồi Tap Join; pending = tọa độ]
+    Q --> M[Reset idle_scrolls]
+    M --> O
     H --> N{Còn nút để duyệt?}
     J --> N
     N -->|Có| E
     N -->|Không| O[return]
-    M --> O
 ```
 
 Chi tiết bộ lọc:
@@ -124,7 +126,8 @@ Chi tiết bộ lọc:
 - Cấp của boss có `levels` trong boss.json: có chữ tier trong tên (Junior, Senior...) thì tra bảng tier **của chính boss đó**; không có tier thì OCR lực của boss tại `(x - 10, y - 180)`, `65 × 20` ([read_power.py](../../ocr/read_power.py), mẫu trong `Images/OCR/Power/`) và chọn cấp có `power` gần nhất (lệch tối đa ×1,3). Boss thường, và boss mà boss.json không cho tier lẫn power ở cấp nào (VD Aglaope), chỉ cần kiểm tra tên.
 - Tên không nhận ra, boss không được tích, cấp đọc được mà không được tích, hoặc boss có dữ liệu cấp mà không xác định được cấp = không tham gia. Riêng tên có cả bản không cấp (Nian ở Boss Standard) thì không xác định được cấp vẫn Join nếu bản không cấp được tích. Mỗi thẻ được ghi log `Boss (x, y): '<chữ OCR>' [power N] -> <tên> [lv N]: join / không tham gia`.
 - Nhận diện chữ đỏ bằng dòng chữ thời gian bên trong nút Join (vùng `x - 6`, `y + chiều cao chữ Join`, rộng 46, cao 12): có hơn 5 pixel thỏa `R > 160`, `G < 110`, `B < 110` thì **bỏ qua lần này** (không lưu vào BossMemory, lần quét sau kiểm tra lại; không reset bộ đếm cuộn), log `Boss (…): thời gian đỏ, bỏ qua lần này`. Vùng cũ (rộng 60, cao 20) chạm viền đỏ của thẻ bên dưới khi nút ở vị trí lệch sau khi cuộn, nên nhận nhầm thời gian trắng là đỏ.
-- Nút Join vừa bấm **không** đưa vào `screen_blacklist`. Bấm mà không vào được màn March (VD thông báo "You cannot send more troops.", bot không đọc thông báo này) thì lượt sau xét lại chính nút đó: thời gian đỏ thì bỏ qua, không đỏ thì bấm Join lại. Sau mỗi lần bấm Join bot chờ cố định `JOIN_TAP_WAIT = 5` giây rồi chụp lại, **không** gọi `wait_gone` (nút Join còn nguyên khi Join không được nên `wait_gone` sẽ chờ hết 10 giây).
+- Trước khi tap, bot chụp một ảnh mới và tìm lại card bằng **tọa độ map** thay vì dùng vị trí nút cũ. Các card được thử theo khoảng cách tới vị trí cũ và dừng OCR ngay khi tìm thấy tọa độ cần tìm. Nếu card lại đổi sau ảnh này, bước xác nhận tọa độ đích trên màn March sẽ chặn cú hành quân nhầm.
+- Nút Join vừa bấm **không** đưa vào `screen_blacklist`. Bấm mà không vào được màn March (VD thông báo "You cannot send more troops.", bot không đọc thông báo này) thì lượt sau xét lại chính nút đó: thời gian đỏ thì bỏ qua, không đỏ thì bấm Join lại. Sau mỗi lần bấm Join bot chờ cố định `JOIN_TAP_WAIT = 3` giây rồi chụp lại, **không** gọi `wait_gone` (nút Join còn nguyên khi Join không được nên `wait_gone` sẽ chờ hết 10 giây).
 
 Mỗi lần `_join()` chỉ tap tối đa một nút Join. Nếu các nút đều bị bỏ qua, hàm trở về vòng quét; các nút bị loại chỉ bị lọc trong màn hình hiện tại. Sau khi cuộn hoặc mở lại flow, chúng được OCR và xét lại.
 
@@ -135,7 +138,7 @@ Mỗi lần `_join()` chỉ tap tối đa một nút Join. Nếu các nút đề
 | Trạng thái | Khi nào được ghi |
 | --- | --- |
 | `SKIPPED` | Chỉ giữ để tương thích code/test cũ; flow hiện tại không dùng trạng thái này để chặn boss. |
-| `JOINED` | Trong `_march()`, chỉ sau khi quay về danh sách War và xác nhận có thêm nút `Joined`, hoặc tìm thấy đúng tọa độ boss trên thẻ `Joined`. Tap Join chỉ đặt `pending`; nút March biến mất nhưng chưa thấy bằng chứng `Joined` thì không ghi nhớ. |
+| `JOINED` | Trong `_march()`, sau khi tap March đủ thể lực và game đã quay về màn danh sách War (nhận diện bằng tab PvP War). Không OCR các hàng `Joined`. Popup hết thể lực không ghi nhớ; sau khi dùng vật phẩm, cú March mới được kiểm tra lại. |
 
 - Mỗi tọa độ hết hạn sau 6 phút (`TTL`), sau đó boss ở tọa độ đó được xét lại như mới.
 - Chỉ tọa độ có trạng thái `JOINED` còn hạn mới được bỏ qua trước khi OCR tên.
@@ -196,13 +199,14 @@ Chi tiết triển khai nằm ở [boss_board.py](../../worker/boss_board.py) v�
 - Trái tim lọc tướng yêu thích chưa tích (`favoriteOff.png`, không thấy `favoriteOn.png`) thì bấm tích.
 - Bấm nút "Select" **màu xanh** trên cùng. Tướng đang là tướng chính có nút Select xám (không chọn được làm tướng phụ) và bị bỏ qua, dù nút xám vẫn khớp ảnh mẫu tới 0,88.
 - Chờ về màn March, thấy kính lúp trong ô thì đã chọn xong.
-5. Tìm lại MARCH; tap vị trí mới nếu có, nếu không dùng vị trí MARCH đã nhận diện ở vòng chính.
-6. Tối đa 5 lần, mỗi lần chờ 0,8 giây và kiểm tra:
+5. Trước khi tap MARCH, tìm các icon LOCATION trên màn March và OCR tọa độ bên phải (tọa độ bên trái là người gọi rally). Tọa độ đích phải trùng `pending`; khác hoặc không đọc được thì Back, không March. Kiểm tra này chạy lại cả sau khi dùng vật phẩm thể lực.
+6. Tìm lại MARCH; tap vị trí mới nếu có, nếu không dùng vị trí MARCH đã nhận diện ở vòng chính.
+7. Tối đa 5 lần, mỗi lần chờ 0,8 giây và kiểm tra:
    - Popup **không đủ thể lực** ("Get more now?", nút Confirm `hettheluc.png`): trả màn này cho vòng lặp chính (giữ tọa độ boss). Vòng lặp chính gặp `OUT_OF_STAMINA`: `use_stamina = No` thì **dừng hẳn Join Boss**; `ALL` / `100` thì bấm Confirm rồi `_use_stamina()`. Popup đè lên màn March nhưng nút March mờ vẫn khớp ảnh mẫu (0,99), nên phải kiểm tra popup trước.
-   - Nút MARCH biến mất: chờ danh sách War xác nhận có hàng `Joined`. Xác nhận bằng đúng tọa độ đọc lại trên hàng Joined, hoặc số hàng Joined tăng so với trước khi tap Join; lúc đó mới ghi `JOINED`.
-7. Nếu nút MARCH vẫn còn sau các lần chờ, Back.
+   - Thấy tab PvP War của màn danh sách: coi hành quân thành công và ghi `JOINED` cho tọa độ pending. Điều kiện này chỉ dùng nhận diện ảnh mẫu của tab, không OCR tọa độ trên các hàng Joined.
+8. Nếu nút MARCH vẫn còn sau các lần chờ, Back.
 
-Nếu màn March đã đóng nhưng chưa tìm được xác nhận Joined, bot ghi log `chưa xác nhận được Joined` và không lưu tọa độ. Ảnh hiện tại được trả cho vòng chính tự nhận diện, tránh coi popup/lag/chuyển màn tạm là đã tham gia.
+Nếu màn March đã đóng nhưng chưa quay lại danh sách War, bot ghi log `chưa quay lại danh sách War` và không lưu tọa độ. Ảnh hiện tại được trả cho vòng chính tự nhận diện. Popup hết thể lực luôn được xét trước điều kiện danh sách War; sau khi dùng thể lực và quay lại March, `_press_march()` được gọi lại từ đầu.
 
 ### Chọn tướng: `_select_general()`
 
@@ -224,7 +228,7 @@ Hàm không trả cờ thành công/thất bại. Khi nó trả về, `_march()`
 2. **Popup số lượng** (nút Use lớn `staminaUse.png`):
    - `100`: bấm Use luôn (số lượng mặc định);
    - `ALL`: bấm gần cuối thanh trượt (`STAMINA_SLIDER_END`, dùng hết), rồi bấm Use.
-3. Chờ 5 giây (`STAMINA_REFILL_WAIT`), Back về màn March, rồi **bấm March lại** (`_press_march`, giữ nguyên đội đã chọn). Chỉ khi danh sách War xác nhận Joined thì boss mới được nhớ là đã tham gia.
+3. Chờ 5 giây (`STAMINA_REFILL_WAIT`), Back về màn March, xác nhận lại tọa độ đích rồi **bấm March lại** (`_press_march`, giữ nguyên đội đã chọn). Chỉ khi game quay về danh sách War thì boss mới được nhớ là đã tham gia.
 
 `use_stamina = No` (hoặc đã hết vật phẩm): gặp popup không đủ thể lực thì Join Boss dừng hẳn (trả `None`).
 
