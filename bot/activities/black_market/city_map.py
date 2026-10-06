@@ -22,19 +22,34 @@ from ..daily_activities.constants import MAIN_MORE
 from ..event.city_building import (
     ACADEMY,
     ARCHER_CAMP,
+    ARCHER_TOWER,
     ART_HALL,
     BARRACKS,
     BATTLEFIELD,
     BUILDING_THRESHOLD,
     DEFENSE_FORCE,
+    DRAGON_CLIFF,
+    EMBASSY,
     FORGE,
+    HOLY_PALACE,
     HOSPITAL,
+    ICE_LAND,
     KEEP,
     MARKET,
     PASTURE,
+    PRISON,
+    RALLY_SPOT,
+    RESEARCH_FACTORY,
     SHRINE,
     STABLES,
+    SUBORDINATE_CITY,
+    TAVERN,
+    TRIUMPHAL_ARCH,
+    VICTORY_COLUMN,
     WALLS,
+    WAR_HALL,
+    WATCHTOWER,
+    WONDER,
     WORKSHOP,
     _candidates,
 )
@@ -42,7 +57,9 @@ from ..event.city_building import (
 TOUR = json.loads(Path(__file__).with_name("city_tour.json").read_text(encoding="utf-8"))
 # Công trình nhận ra khi quét / đi (có ảnh mẫu trong Images/Event/Building/civ<N>/ hoặc ảnh tự học).
 BUILDINGS = (KEEP, MARKET, HOSPITAL, FORGE, BARRACKS, STABLES, ARCHER_CAMP, WORKSHOP, DEFENSE_FORCE, ACADEMY, SHRINE,
-             ART_HALL, BATTLEFIELD, PASTURE, WALLS)
+             ART_HALL, BATTLEFIELD, PASTURE, WALLS, EMBASSY, PRISON, TAVERN, RESEARCH_FACTORY, HOLY_PALACE, ICE_LAND,
+             RALLY_SPOT, VICTORY_COLUMN, TRIUMPHAL_ARCH, WATCHTOWER, ARCHER_TOWER, DRAGON_CLIFF, SUBORDINATE_CITY,
+             WONDER, WAR_HALL)
 CENTER = (197, 345)          # giữa màn: chỗ công trình đứng sau Go (đo ảnh mẫu civ1 keep 1,00)
 SWIPE_CENTER = (190, 340)    # cú vuốt tách nhỏ đối xứng quanh đây (không chạm nút UI)
 MAX_SWIPE = (240, 260)       # một cú tách nhỏ dài tối đa (điểm đầu / cuối trong x 70 .. 310, y 210 .. 470)

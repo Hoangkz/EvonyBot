@@ -81,7 +81,7 @@ class CityMapTest(unittest.TestCase):
     def test_scan_records_every_plot(self):
         """Thành giả có công trình đúng ở toạ độ các ô của city_tour.json: quét từ Thành chính ghi đủ, đúng toạ độ."""
         names = ["academy", "defense_force", "barracks", "archer_camp", "workshop", "stables", "hospital", "market",
-                 "war_hall", "embassy", "warehouse", "prison", "forge"]
+                 "war_hall", "embassy", "tavern", "prison", "forge"]
         world = {"keep": (0, 0)}
         for name, plot in zip(names, city_map.TOUR):
             world[name] = tuple(plot["view"])

@@ -52,6 +52,23 @@ KEEP = "keep"                    # Thành chính (Daily: Gold Levy)
 PASTURE = "pasture"              # Pasture
 ART_HALL = "art_hall"            # Art Hall
 BATTLEFIELD = "battlefield"      # Battlefield
+# Ảnh mẫu civ 1 .. 7 cắt từ ảnh chụp người dùng (giữa màn, x 117 .. 277, y 290 .. 400; Rally Spot y 335 .. 425 để
+# bỏ cờ); chưa nối vào nhiệm vụ nào, dùng làm mốc nhận ra công trình (VD bản đồ thành của Black Market).
+ARCHER_TOWER = "archer_tower"          # Tháp cung (2 tháp)
+DRAGON_CLIFF = "dragon_cliff"          # Dragon Cliff
+EMBASSY = "embassy"                    # Đại sứ quán
+HOLY_PALACE = "holy_palace"            # Holy Palace (tượng)
+ICE_LAND = "ice_land"                  # Ice Land (vườn)
+PRISON = "prison"                      # Nhà tù
+RALLY_SPOT = "rally_spot"              # Rally Spot (bệ cờ)
+RESEARCH_FACTORY = "research_factory"  # Research Factory
+SUBORDINATE_CITY = "subordinate_city"  # Subordinate City
+TAVERN = "tavern"                      # Quán rượu
+TRIUMPHAL_ARCH = "triumphal_arch"      # Triumphal Arch (thiếu civ 4)
+VICTORY_COLUMN = "victory_column"      # Victory Column
+WATCHTOWER = "watchtower"              # Tháp canh
+WONDER = "wonder"                      # Kỳ quan
+WAR_HALL = "war_hall"                  # War Hall (gothic, nhiều vòm; mới có civ 1)
 # King's Path Train Troop: game kéo tới công trình lính nào cũng được -> học vào TROOP, tìm
 # trong mọi công trình lính (ảnh Gather Troops đã học cũng dùng được).
 TROOP = "troop"
