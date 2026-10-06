@@ -188,7 +188,10 @@ class BotWorker(QThread):
         for activity in activities:
             if self._stop.is_set():
                 break
-            self._ensure_server()
+            # Server chỉ cần cho cơ chế chia sẻ boss. Daily và activity khác
+            # không được mở Settings chỉ để dò server trước khi bắt đầu.
+            if activity == JOIN_BOSS:
+                self._ensure_server()
             self.activity_changed.emit(self.serial, activity)
             self._run_activity(activity, self.settings.get(activity, {}))
 
@@ -202,8 +205,8 @@ class BotWorker(QThread):
         scheduler = Scheduler(tasks, lambda: last_reset(self.server_time))
         resume = None   # nhiệm vụ bị ngắt giữa chừng: làm lại đầu tiên ở vòng sau
         while not self._stop.is_set():
-            self._ensure_server()
             if boss:
+                self._ensure_server()
                 boss = self._check_boss()
             task = resume if resume is not None and scheduler.is_due(resume) else scheduler.pick()
             resume = None

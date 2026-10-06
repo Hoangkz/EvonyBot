@@ -846,6 +846,10 @@
                     ]
                 },
                 {
+                    "name": "Elite Temple Guard",
+                    "active": true
+                },
+                {
                     "name": "Fenrir",
                     "levels": [
                         {

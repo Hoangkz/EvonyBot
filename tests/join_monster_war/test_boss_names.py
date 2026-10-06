@@ -35,7 +35,9 @@ CARDS = [("02_war_list_join.png", 331, "Peryton", None, 6_500_000),
          # cục thẻ như mọi thẻ trên. Thẻ dưới "Legendary Bayar" / "Knight": chân g/y của dòng
          # trên chạm K/h của dòng dưới, không có hàng trống giữa hai dòng.
          ("war_legendary_cerberus_bayar.png", 331, "Cerberus", "legendary", 694_900_000),
-         ("war_legendary_cerberus_bayar.png", 562, "Knight Bayard", "legendary", 668_100_000)]
+         ("war_legendary_cerberus_bayar.png", 562, "Knight Bayard", "legendary", 668_100_000),
+         # Boss mới không có lực cố định trong catalog; ảnh thật bảo vệ phần OCR tên.
+         ("war_elite_temple_guard.png", 278, "Elite Temple Guard", None, None)]
 X = 319   # x góc trên nút Join trên mọi ảnh
 
 
@@ -61,6 +63,8 @@ class CardOcrTests(unittest.TestCase):
     def test_reads_power_on_every_card(self):
         # Lực đọc được khớp "power" của boss thường trong boss.json.
         for screen, y, _, _, power, image in self._cards():
+            if power is None:
+                continue
             crop = image[y + POWER_DY:y + POWER_DY + POWER_DH, X + POWER_DX:X + POWER_DX + POWER_W]
             with self.subTest(screen=screen, y=y):
                 self.assertEqual(read_power(crop), power)
@@ -99,6 +103,19 @@ class BossLevelTests(unittest.TestCase):
     def test_standard_boss_has_no_level(self):
         self.assertEqual(level(boss("Peryton"), None, lambda: self.fail("không cần lực")),
                          (None, None))
+
+    def test_elite_temple_guard_is_a_separate_name_only_boss(self):
+        elite, tier = parse("elite temple guard")
+
+        self.assertEqual((elite.name, tier), ("Elite Temple Guard", None))
+        self.assertFalse(elite.has_level_data)
+        selected = selection({"selected_bosses": [{
+            "category_key": "mythical_and_elite_bosses",
+            "name": "Elite Temple Guard",
+            "levels": [],
+        }]})
+        self.assertTrue(wanted(selected, elite, None))
+        self.assertFalse(wanted(selection({"selected_bosses": []}), elite, None))
 
     def test_wanted(self):
         selected = selection({"selected_bosses": [
