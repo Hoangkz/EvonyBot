@@ -77,9 +77,9 @@ class FixedGiftFlowTests(unittest.TestCase):
 
     def test_red_dot_detector_separates_bottom_then_right(self):
         screen = np.zeros((704, 396, 3), dtype=np.uint8)
-        cv2.circle(screen, (60, 520), 10, (0, 40, 190), thickness=-1)
+        cv2.circle(screen, (60, 530), 10, (0, 40, 190), thickness=-1)
         cv2.circle(screen, (380, 200), 10, (0, 40, 190), thickness=-1)
-        self.assertEqual([(60, 520)], lobby.red_dots(screen, lobby.BOTTOM))
+        self.assertEqual([(60, 530)], lobby.red_dots(screen, lobby.BOTTOM))
         self.assertEqual([(380, 200)], lobby.red_dots(screen, lobby.RIGHT))
 
     def test_valuable_event_has_one_standard_spec_per_child_module(self):
@@ -137,9 +137,9 @@ class FixedGiftFlowTests(unittest.TestCase):
                                              GiftScreen.VALUABLE_EVENT,
                                              None, None)),
               mock.patch.object(super_value_return, "run_opened",
-                                return_value=super_result) as run_super,
+                                return_value=(super_result, True)) as run_super,
               mock.patch.object(valuable_event, "run_opened",
-                                return_value=valuable_result) as run_valuable):
+                                return_value=(valuable_result, True)) as run_valuable):
             gift_claims.run(bot)
 
         run_super.assert_called_once_with(bot, {empire_depot.KEY})
@@ -156,11 +156,25 @@ class FixedGiftFlowTests(unittest.TestCase):
                                              None, None)),
               mock.patch.object(gift_claims, "return_home") as return_home,
               mock.patch.object(valuable_event, "run_opened",
-                                return_value={limited_offer.KEY: "no_dot"}) as run):
+                                return_value=({limited_offer.KEY: "no_dot"}, True)) as run):
             gift_claims.run(bot)
 
         return_home.assert_called_once_with(bot)
         run.assert_called_once_with(bot, {limited_offer.KEY})
+
+    def test_parent_is_not_done_while_an_inner_red_dot_remains(self):
+        bot = mock.Mock()
+        bot.is_daily_done.return_value = False
+        with (mock.patch.object(gift_claims, "TASKS", (empire_depot.TASK,)),
+              mock.patch.object(lobby, "open_next",
+                                side_effect=(GiftScreen.SUPER_VALUE_RETURN,
+                                             None, None)),
+              mock.patch.object(super_value_return, "run_opened",
+                                return_value=({empire_depot.KEY: "remaining"},
+                                              False))):
+            gift_claims.run(bot)
+
+        bot.mark_daily_done.assert_not_called()
 
 
 if __name__ == "__main__":

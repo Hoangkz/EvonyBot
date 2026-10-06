@@ -46,6 +46,10 @@ def run(bot):
     due_super_value = {key for key in super_value_return.KEYS & task_keys
                        if not bot.is_daily_done(key)}
     group_results = {key: "no_dot" for key in due_valuable | due_super_value}
+    parent_clean = {
+        GiftScreen.VALUABLE_EVENT: None,
+        GiftScreen.SUPER_VALUE_RETURN: None,
+    }
 
     # Lobby icons are intentionally unnamed and may change artwork. Open each
     # fixed slot, identify the fixed inner title, then dispatch that flow.
@@ -62,12 +66,20 @@ def run(bot):
             if (screen_name == GiftScreen.VALUABLE_EVENT
                     and due_valuable
                     and screen_name not in opened_groups):
-                group_results.update(valuable_event.run_opened(bot, due_valuable))
+                states, clean = valuable_event.run_opened(bot, due_valuable)
+                group_results.update(states)
+                parent_clean[screen_name] = clean
+                if not clean:
+                    bot.log("Gift Claims: Valuable Event chưa được đánh dấu DONE")
                 opened_groups.add(screen_name)
             elif (screen_name == GiftScreen.SUPER_VALUE_RETURN
                     and due_super_value
                     and screen_name not in opened_groups):
-                group_results.update(super_value_return.run_opened(bot, due_super_value))
+                states, clean = super_value_return.run_opened(bot, due_super_value)
+                group_results.update(states)
+                parent_clean[screen_name] = clean
+                if not clean:
+                    bot.log("Gift Claims: Super Value Return chưa được đánh dấu DONE")
                 opened_groups.add(screen_name)
             elif (screen_name == GiftScreen.EVENT_CENTER
                   and not bot.is_daily_done(event_center.KEY)):
@@ -82,6 +94,13 @@ def run(bot):
         if bot.is_daily_done(task.key):
             continue
         if task.key in group_keys:
+            parent = (GiftScreen.VALUABLE_EVENT
+                      if task.key in valuable_event.KEYS
+                      else GiftScreen.SUPER_VALUE_RETURN)
+            if parent_clean[parent] is False:
+                bot.record(f"Gift Claims: {task.label} - giữ pending vì "
+                           f"{parent.value} vẫn còn dấu đỏ")
+                continue
             bot.mark_daily_done(task.key)
             state = group_results.get(task.key, "no_dot")
             result = {

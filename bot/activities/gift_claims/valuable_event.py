@@ -43,7 +43,21 @@ def _near_tab(dot, tab) -> bool:
 
 
 def _dots(bot, screen):
-    return find_all(bot, DOT, screen, threshold=0.84, region=(0, 7, 100, 18))
+    return find_all(bot, DOT, screen, threshold=0.65, region=(0, 7, 100, 18))
+
+
+def _verify_clean(bot) -> bool:
+    """Verify that no red tab remains anywhere in the parent carousel."""
+    for direction in (-1, 1):
+        for step in range(MAX_SWIPES + 1):
+            if _dots(bot, bot.screenshot()):
+                return False
+            if step < MAX_SWIPES:
+                if direction < 0:
+                    bot.swipe_percent(85, 14, 20, 14, duration=0.5, delay=1)
+                else:
+                    bot.swipe_percent(20, 14, 85, 14, duration=0.5, delay=1)
+    return True
 
 
 def _close_known_popup(bot):
@@ -53,7 +67,7 @@ def _close_known_popup(bot):
         bot.back(delay=0.7)
 
 
-def run_opened(bot, due_keys: set[str]) -> dict[str, str]:
+def run_opened(bot, due_keys: set[str]) -> tuple[dict[str, str], bool]:
     """Sweep the carousel once and process only known tabs with a real red dot.
 
     Result values are ``no_dot``, ``cleared`` or ``remaining``. A complete
@@ -64,7 +78,7 @@ def run_opened(bot, due_keys: set[str]) -> dict[str, str]:
     screen = bot.screenshot()
     if find(bot, PAGE, screen, threshold=0.72, region=(0, 0, 100, 13)) is None:
         return_home(bot)
-        return results
+        return results, False
 
     handled = set()
     for direction in (-1, 1):
@@ -108,8 +122,12 @@ def run_opened(bot, due_keys: set[str]) -> dict[str, str]:
             else:
                 bot.swipe_percent(20, 14, 85, 14, duration=0.5, delay=1)
 
+    clean = _verify_clean(bot)
+    bot.record("Gift Claims: Valuable Event - "
+               + ("DONE, đã hết dấu đỏ bên trong" if clean
+                  else "chưa DONE, vẫn còn dấu đỏ bên trong"))
     return_home(bot)
-    return results
+    return results, clean
 
 
 KEYS = {spec.task.key for spec in SPECS}

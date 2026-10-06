@@ -27,15 +27,42 @@ def _red_mask(screen):
                             np.ones((3, 3), np.uint8))
 
 
+def _bottom_circle_dots(screen, bounds, scale):
+    """Use circle geometry to separate badges from red/orange icon artwork."""
+    left, top, right, bottom = bounds
+    gray = cv2.cvtColor(screen, cv2.COLOR_BGR2GRAY)
+    gray = cv2.GaussianBlur(gray, (5, 5), 1)
+    circles = cv2.HoughCircles(
+        gray[top:bottom, left:right], cv2.HOUGH_GRADIENT, dp=1,
+        minDist=max(8, round(18 * scale)), param1=80, param2=14,
+        minRadius=max(4, round(7 * scale)), maxRadius=max(8, round(16 * scale)))
+    if circles is None:
+        return []
+    hsv = cv2.cvtColor(screen, cv2.COLOR_BGR2HSV)
+    low_y = top + (bottom - top) * 0.20
+    high_y = top + (bottom - top) * 0.55
+    points = []
+    for x, y, _ in circles[0]:
+        center = (round(left + x), round(top + y))
+        hue, saturation, _ = hsv[center[1], center[0]]
+        if (low_y <= center[1] <= high_y
+                and saturation >= 220
+                and (hue <= 12 or hue >= 170)):
+            points.append(center)
+    return sorted(points, key=lambda point: point[0])
+
+
 def red_dots(screen, boundary: str) -> list[tuple[int, int]]:
     """Find round red notification fills inside one user-defined boundary."""
     height, width = screen.shape[:2]
     x0, y0, x1, y1 = REGIONS[boundary]
     left, top = int(width * x0 / 100), int(height * y0 / 100)
     right, bottom = int(width * x1 / 100), int(height * y1 / 100)
+    scale = width / REFERENCE_WIDTH
+    if boundary == BOTTOM:
+        return _bottom_circle_dots(screen, (left, top, right, bottom), scale)
     area = _red_mask(screen)[top:bottom, left:right]
     _, _, stats, _ = cv2.connectedComponentsWithStats(area)
-    scale = width / REFERENCE_WIDTH
     points = []
     for x, y, box_width, box_height, pixels in stats[1:]:
         if not (6 * scale <= box_width <= 30 * scale
@@ -44,18 +71,12 @@ def red_dots(screen, boundary: str) -> list[tuple[int, int]]:
                 and 0.55 <= box_width / box_height <= 1.8):
             continue
         center = (left + x + box_width // 2, top + y + box_height // 2)
-        if boundary == BOTTOM:
-            # Dots sit at the upper-right of each bottom icon. This excludes
-            # red letters/artwork lower in the same strip.
-            if center[1] > top + (bottom - top) * 0.48 or pixels < 80 * scale * scale:
-                continue
-        else:
-            on_right_rail = center[0] >= width * 0.90 and pixels >= 90 * scale * scale
-            on_top_row = (center[0] >= width * 0.72
-                          and center[1] <= height * 0.15
-                          and pixels >= 90 * scale * scale)
-            if not (on_right_rail or on_top_row):
-                continue
+        on_right_rail = center[0] >= width * 0.90 and pixels >= 90 * scale * scale
+        on_top_row = (center[0] >= width * 0.72
+                      and center[1] <= height * 0.15
+                      and pixels >= 90 * scale * scale)
+        if not (on_right_rail or on_top_row):
+            continue
         points.append(center)
     return sorted(points, key=lambda point: (point[1], point[0]))
 
