@@ -9,6 +9,7 @@ Vòng lặp chung của một nhiệm vụ: common.run_task. File này chỉ lo 
    Monster Killing: đánh 2 lần, nhận dòng đầu rồi hoãn; quay lại sau 5 nhiệm vụ khác xong (hoặc cuối
    lượt sau 4 nhiệm vụ / khi mọi nhiệm vụ khác đã xong) để đánh 3 lần còn lại.
 3. Nhận thưởng Activity (common.collect_activity_rewards); chỉ lưu "đã nhận" khi mọi nhiệm vụ xong.
+4. Chạy từng flow nhận quà gift_claims sau cùng; mỗi flow có key daily_done riêng.
 """
 from .alliance_donation import TASK as ALLIANCE_DONATION
 from .black_market import TASK as BLACK_MARKET
@@ -28,6 +29,7 @@ from .trap_building import TASK as TRAP_BUILDING
 from .troop_healing import TASK as TROOP_HEALING
 from .troop_training import TASK as TROOP_TRAINING
 from .wheel_of_fortune import TASK as WHEEL_OF_FORTUNE
+from .. import gift_claims
 
 # Thứ tự chạy (= thứ tự bản C#; tab UI SUPPORTED_TASKS chỉ khác ở chỗ đưa Offering lên đầu).
 # Resource Gathering phải ngay sau Offering: cả hai đưa về thành, bàn tay nổi thu mọi mỏ một lần.
@@ -68,6 +70,7 @@ def run(bot, settings: dict):
 
     if all(bot.is_daily_done(task.label) for task in selected) and bot.is_daily_done(REWARDS):
         bot.log("Daily Activities: all done today")
+        _run_gift_claims(bot)
         return
 
     # DailyActivities1234.DailyActivities made five passes. Completed tasks
@@ -115,6 +118,17 @@ def run(bot, settings: dict):
         # Chỉ coi là nhận xong khi mọi task đã xong, để lần chạy sau trong ngày còn nhận tiếp.
         if all(bot.is_daily_done(task.label) for task in selected):
             bot.mark_daily_done(REWARDS)
+    # Gift flows are intentionally last: never leave Daily Activities to claim an
+    # event reward while a selected daily task or Activity Rewards is unfinished.
+    if (all(bot.is_daily_done(task.label) for task in selected)
+            and bot.is_daily_done(REWARDS)):
+        _run_gift_claims(bot)
+
+
+def _run_gift_claims(bot):
+    """Worker-only post phase; flow tests opt in explicitly when needed."""
+    if getattr(bot, "post_daily_gifts_enabled", False) is True:
+        gift_claims.run(bot)
 
 
 def _run_general(bot, settings):

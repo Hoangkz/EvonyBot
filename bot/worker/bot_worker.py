@@ -150,6 +150,7 @@ class BotWorker(QThread):
             # Truyền cờ Stop, deadline None (không giới hạn) và hàm log.
             self.ctx = BotContext(device, self._stop, None, self.log)
             self.ctx.settings = self.settings
+            self.ctx.post_daily_gifts_enabled = True
             self.ctx.report_boss = self._report_boss
             self.ctx.is_daily_done = self._is_daily_done
             self.ctx.mark_daily_done = self._mark_daily_done
@@ -183,7 +184,10 @@ class BotWorker(QThread):
         for activity in activities:
             if self._stop.is_set():
                 break
-            self._ensure_server()
+            # Số server chỉ dùng để chia sẻ thông báo boss giữa các giả lập.
+            # Daily không được mở Settings để dò server trước khi vào Quests.
+            if activity == JOIN_BOSS:
+                self._ensure_server()
             self.activity_changed.emit(self.serial, activity)
             self._run_activity(activity, self.settings.get(activity, {}))
 
@@ -197,8 +201,8 @@ class BotWorker(QThread):
         scheduler = Scheduler(tasks, lambda: last_reset(self.server_time))
         resume = None   # nhiệm vụ bị ngắt giữa chừng: làm lại đầu tiên ở vòng sau
         while not self._stop.is_set():
-            self._ensure_server()
             if boss:
+                self._ensure_server()
                 boss = self._check_boss()
             task = resume if resume is not None and scheduler.is_due(resume) else scheduler.pick()
             resume = None
