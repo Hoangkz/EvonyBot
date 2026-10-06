@@ -38,6 +38,7 @@ from .trap_building import TASK as TRAP_BUILDING
 from .troop_healing import TASK as TROOP_HEALING
 from .troop_training import TASK as TROOP_TRAINING
 from .wheel_of_fortune import TASK as WHEEL_OF_FORTUNE
+from .. import gift_claims
 
 # Thứ tự chạy (= thứ tự bản C#; tab UI SUPPORTED_TASKS chỉ khác ở chỗ đưa Offering lên đầu).
 # Resource Gathering phải ngay sau Offering: cả hai đưa về thành, bàn tay nổi thu mọi mỏ một lần.
@@ -131,6 +132,17 @@ def _run_selected(bot, selected):
         # Chỉ coi là nhận xong khi mọi task đã xong, để lần chạy sau trong ngày còn nhận tiếp.
         if all(bot.is_daily_done(task.label) for task in selected):
             bot.mark_daily_done(REWARDS)
+    # Gift flows are intentionally last: never leave Daily Activities to claim an
+    # event reward while a selected daily task or Activity Rewards is unfinished.
+    if (all(bot.is_daily_done(task.label) for task in selected)
+            and bot.is_daily_done(REWARDS)):
+        _run_gift_claims(bot)
+
+
+def _run_gift_claims(bot):
+    """Worker-only post phase; flow tests opt in explicitly when needed."""
+    if getattr(bot, "post_daily_gifts_enabled", False) is True:
+        gift_claims.run(bot)
 
 
 # (nhiệm vụ, module constants (INTERVAL_KEY / INTERVAL_DEFAULT / TRIED_KEY), hàm một lần thử) — theo thứ tự chạy.

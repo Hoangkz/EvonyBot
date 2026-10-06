@@ -152,6 +152,7 @@ class BotWorker(QThread):
             # Truyền cờ Stop, deadline None (không giới hạn) và hàm log.
             self.ctx = BotContext(device, self._stop, None, self.log)
             self.ctx.settings = self.settings
+            self.ctx.post_daily_gifts_enabled = True
             self.ctx.report_boss = self._report_boss
             self.ctx.is_daily_done = self._is_daily_done
             self.ctx.mark_daily_done = self._mark_daily_done
