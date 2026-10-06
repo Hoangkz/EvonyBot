@@ -4,7 +4,7 @@ black_market_tab.py — tab "Black Market", dựng từ danh mục vật phẩm 
 - Group "Setting": CheckGold (vàng < 2.000.000 thì dừng), Refresh (số lần Instant Refresh), Quantity Buy (số lần mua).
 - Group "Resource": một ô tích "Resource" (mặc định tích) — mua mọi gói tài nguyên của 4 loại (lương thực / gỗ / đá /
   quặng), mọi mức số lượng trong `resource_packs` của items.json (10k .. 5M).
-- Các group còn lại (`groups` trong items.json, trừ "resource"): một ô tích mỗi món (kèm icon); món có
+- Các group còn lại (`groups` trong items.json, trừ "resource"): một ô tích mỗi món; món có
   `"default": true` (Chips 100) mặc định tích.
 Vị trí control tính tự động (ô tích xếp _COLS cột mỗi hàng).
 
@@ -15,11 +15,6 @@ Cấu hình cũ: "black_market_items": {"CheckGold": true, ...} -> check_gold; "
 """
 import json
 from pathlib import Path
-
-from PyQt5.QtCore import QSize
-from PyQt5.QtGui import QIcon
-
-from bot.context.templates import TEMPLATE_DIR
 
 from .tab_placeholder import DesignerTab
 
@@ -33,7 +28,6 @@ _COLS = 4
 _COL_W = 252
 _ROW_H = 35
 _GROUP_TOP, _GROUP_GAP = 65, 8
-_ICON = 24
 
 
 def _build(catalog):
@@ -102,11 +96,6 @@ COMBO_ITEMS = {"comboBoxRefreshMarket": LIMITS, "comboBoxBuyMarket": LIMITS}
 class BlackMarketTab(DesignerTab):
     def __init__(self, parent=None):
         super().__init__("tabPage6", DESIGNER_DATA, COMBO_ITEMS, PAGE_SIZE, parent=parent)
-        for name, item in _ITEMS.values():
-            icon = TEMPLATE_DIR / item["icons"][0]
-            if icon.exists():
-                self.controls[name].setIcon(QIcon(str(icon)))
-                self.controls[name].setIconSize(QSize(_ICON, _ICON))
 
     def get_settings(self) -> dict:
         c = self.controls
