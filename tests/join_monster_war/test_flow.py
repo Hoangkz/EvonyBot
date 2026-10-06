@@ -78,9 +78,14 @@ def unknown(screen):
 
 def run_join(testcase, flow, settings, **kwargs):
     # Bộ ảnh legacy ghép màn danh sách và March từ các lượt chơi khác nhau nên tọa độ
-    # không trùng. Kiểm tra tọa độ March thật nằm trong test_current_code_flow (bộ ảnh
-    # cùng một lượt); ở đây chỉ giữ phạm vi kiểm thử các nhánh cũ.
-    with mock.patch.object(_Boss, "_march_target_matches", return_value=True):
+    # không trùng. Cho March dùng tọa độ vừa báo và coi ảnh Joined là đã xác nhận;
+    # kiểm tra OCR/Joined thật nằm trong test_current_code_flow và test_edge_cases.
+    def reported_target(boss, _screen):
+        reported = boss.bot.device.reported
+        return reported[-1] if reported else PERYTON
+
+    with mock.patch.object(_Boss, "_read_march_target_coords", reported_target), \
+            mock.patch.object(_Boss, "_joined_target_visible", return_value=True):
         return run_flow(testcase, join_monster_war.run, SCREENS, flow, settings,
                         variants={"war_off": war_off, "no_items": no_items, "unknown": unknown}, **kwargs)
 

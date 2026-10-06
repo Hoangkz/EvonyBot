@@ -63,11 +63,10 @@ class JoinBossEdgeCaseTests(unittest.TestCase):
         self.assertTrue(_near((108, 108), [(100, 100)]))
         self.assertFalse(_near((110, 100), [(100, 100)]))
 
-    def test_wrong_march_target_backs_out_without_marking_joined(self):
+    def test_non_boss_march_screen_backs_out_without_marking_joined(self):
         bot = fake_bot()
         bot.find.side_effect = lambda template, **_kwargs: None if template == BOSS_MONSTER else None
         boss = _Boss(bot, {"troop": ["Troop 1"]})
-        boss.pending = (500, 600)
 
         boss._march(SCREEN, (300, 680))
 
@@ -88,7 +87,6 @@ class JoinBossEdgeCaseTests(unittest.TestCase):
         bot = fake_bot()
         bot.find.side_effect = lambda template, **_kwargs: (300, 680) if template == MARCH else None
         boss = _Boss(bot, {})
-        boss._march_target_matches = mock.Mock(return_value=True)
 
         boss._press_march((500, 600), screen=SCREEN)
 
@@ -107,7 +105,6 @@ class JoinBossEdgeCaseTests(unittest.TestCase):
 
         bot.find.side_effect = find
         boss = _Boss(bot, {})
-        boss._march_target_matches = mock.Mock(return_value=True)
 
         boss._press_march((500, 600), (300, 680), SCREEN)
 
@@ -115,7 +112,7 @@ class JoinBossEdgeCaseTests(unittest.TestCase):
         self.assertIsNone(boss.memory.status((500, 600)))
         self.assertIn("chưa quay lại danh sách War", bot.record.call_args.args[0])
 
-    def test_returning_to_war_list_marks_joined_without_ocr(self):
+    def test_returning_to_war_list_marks_joined_after_coordinate_confirmation(self):
         bot = fake_bot()
 
         def find(template, **kwargs):
@@ -127,13 +124,12 @@ class JoinBossEdgeCaseTests(unittest.TestCase):
 
         bot.find.side_effect = find
         boss = _Boss(bot, {})
-        boss._read_card_coords = mock.Mock(side_effect=AssertionError("không được OCR sau March"))
-        boss._march_target_matches = mock.Mock(return_value=True)
+        boss._joined_target_visible = mock.Mock(return_value=True)
 
         boss._press_march((500, 600), (300, 680), SCREEN)
 
         self.assertEqual(boss.memory.status((500, 600)), JOINED)
-        boss._read_card_coords.assert_not_called()
+        boss._joined_target_visible.assert_called_with(SCREEN, (500, 600))
         self.assertIn("đã hành quân tới boss", bot.record.call_args.args[0])
 
     def test_stamina_popup_does_not_mark_joined_or_check_war_list(self):
@@ -150,11 +146,9 @@ class JoinBossEdgeCaseTests(unittest.TestCase):
 
         bot.find.side_effect = find
         boss = _Boss(bot, {})
-        boss._march_target_matches = mock.Mock(return_value=True)
 
         boss._press_march((500, 600), (300, 680), SCREEN)
 
-        self.assertEqual(boss.pending, (500, 600))
         self.assertIsNone(boss.memory.status((500, 600)))
 
     def test_join_tracks_same_boss_when_new_rally_moves_its_card(self):
@@ -189,7 +183,6 @@ class JoinBossEdgeCaseTests(unittest.TestCase):
         self.assertTrue(boss._join(initial))
         bot.tap.assert_called_once_with(324, 425)
         bot.report_boss.assert_called_once_with((500, 600))
-        self.assertEqual(boss.pending, (500, 600))
 
     def test_join_aborts_when_target_disappears_before_tap(self):
         initial = np.zeros((704, 396, 3), dtype=np.uint8)
@@ -221,18 +214,46 @@ class JoinBossEdgeCaseTests(unittest.TestCase):
         self.assertIs(boss.next_screen, fresh)
         self.assertIn("danh sách đã đổi", bot.log.call_args.args[0])
 
-    def test_march_target_mismatch_backs_out_without_tapping_march(self):
+    def test_unreadable_card_coordinates_are_blacklisted_for_current_screen(self):
         bot = fake_bot()
-        bot.find.return_value = (300, 680)
+        bot.find_all.side_effect = lambda template, **_kwargs: ([(319, 300)]
+                                                                 if template == run_module.JOIN else [])
+        boss = _Boss(bot, {})
+        boss._read_card_coords = mock.Mock(return_value=None)
+
+        self.assertFalse(boss._join(SCREEN))
+
+        self.assertEqual(boss.screen_blacklist, [(319, 300)])
+        bot.tap.assert_not_called()
+        bot.report_boss.assert_not_called()
+        self.assertIn("Không đọc được tọa độ card", bot.log.call_args.args[0])
+
+    def test_march_uses_actual_target_instead_of_list_target(self):
+        bot = fake_bot()
+        bot.find.side_effect = lambda template, **_kwargs: ((200, 250) if template == BOSS_MONSTER
+                                                            else (300, 680) if template == MARCH else None)
         boss = _Boss(bot, {})
         boss._read_march_target_coords = mock.Mock(return_value=(111, 222))
+        boss._pick_troop = mock.Mock(return_value=1)
+        boss._press_march = mock.Mock()
 
-        boss._press_march((500, 600), screen=SCREEN)
+        boss._march(SCREEN, (300, 680))
 
-        bot.tap.assert_not_called()
+        boss._press_march.assert_called_once_with((111, 222), (300, 680), SCREEN)
+        bot.back.assert_not_called()
+
+    def test_march_without_readable_target_backs_out(self):
+        bot = fake_bot()
+        bot.find.side_effect = lambda template, **_kwargs: ((200, 250) if template == BOSS_MONSTER
+                                                            else (300, 680) if template == MARCH else None)
+        boss = _Boss(bot, {})
+        boss._read_march_target_coords = mock.Mock(return_value=None)
+
+        boss._march(SCREEN, (300, 680))
+
         bot.back.assert_called_once()
-        self.assertIsNone(boss.memory.status((500, 600)))
-        self.assertIn("card đã đổi", bot.record.call_args.args[0])
+        bot.tap.assert_not_called()
+        self.assertIn("không đọc được tọa độ đích", bot.record.call_args.args[0])
 
     def test_march_target_uses_right_side_location(self):
         bot = fake_bot()
@@ -245,6 +266,26 @@ class JoinBossEdgeCaseTests(unittest.TestCase):
 
         bot.crop.assert_called_once_with(SCREEN, 288, 266, 90, 18)
 
+    def test_pvp_war_without_matching_joined_row_is_not_remembered(self):
+        bot = fake_bot()
+
+        def find(template, **_kwargs):
+            if template == MARCH:
+                return (300, 680)
+            if template == run_module.PVP_WAR:
+                return (200, 118)
+            return None
+
+        bot.find.side_effect = find
+        boss = _Boss(bot, {})
+        boss._joined_target_visible = mock.Mock(return_value=False)
+
+        boss._press_march((500, 600), (300, 680), SCREEN)
+
+        self.assertIsNone(boss.memory.status((500, 600)))
+        bot.back.assert_not_called()
+        self.assertIn("chưa thấy Joined đúng boss", bot.record.call_args.args[0])
+
     def test_invalid_ocr_coordinates_are_rejected_and_logged(self):
         bot = fake_bot()
         bot.find.return_value = (2, 3)
@@ -255,18 +296,15 @@ class JoinBossEdgeCaseTests(unittest.TestCase):
 
         self.assertIn("Bỏ tọa độ OCR không hợp lệ", bot.log.call_args.args[0])
 
-    def test_missing_stamina_quantity_popup_clears_pending_join(self):
+    def test_missing_stamina_quantity_popup_does_not_remember_boss(self):
         bot = fake_bot()
         bot.find_all.return_value = [(290, 360)]
         bot.find.return_value = None
         boss = _Boss(bot, {"use_stamina": "100"})
-        boss.pending = (500, 600)
-
         boss._use_stamina()
 
         bot.tap.assert_called_once_with(290, 360)
         bot.back.assert_called_once()
-        self.assertIsNone(boss.pending)
         self.assertIsNone(boss.memory.status((500, 600)))
 
     def test_war_checkbox_retry_limit_prevents_endless_tapping(self):
@@ -309,7 +347,7 @@ class JoinBossEdgeCaseTests(unittest.TestCase):
 
         bot.find.side_effect = find
         boss = _Boss(bot, {})
-        boss._march_target_matches = mock.Mock(return_value=True)
+        boss._joined_target_visible = mock.Mock(return_value=True)
 
         boss._press_march((500, 600), (300, 680), SCREEN)
 

@@ -47,7 +47,6 @@ class _Boss:
         self.use_stamina = settings.get("use_stamina")     # "ALL" / "100" / "No"
         self.selected = boss_names.selection(settings)         # Boss được tích ở tab: {tên: cấp được tích}
         self.memory: BossMemory = bot.boss_memory           # Tọa độ boss đã xác nhận tham gia (X, Y in-game)
-        self.pending = None                                 # Tọa độ boss vừa tap Join, chờ hành quân xong
         self.screen_blacklist: list[tuple[int, int]] = []   # Tọa độ nút Join đã qua xử lý trên screen hiện tại
         self.swipe = 0                                      # Vị trí trong chu kỳ cuộn (0-2: xuống; 3-5: lên)
         self.previous = None                                # Action của vòng lặp trước
@@ -302,7 +301,6 @@ class _Boss:
             bot.record("Join Monster War: hết vật phẩm thể lực")
             bot.back(delay=1)
             bot.back(delay=1)
-            self.pending = None
             self.idle_scrolls = IDLE_SCROLLS
             return
         bot.tap(*buttons[0])
@@ -314,7 +312,6 @@ class _Boss:
         )
         if use is None:
             bot.back()
-            self.pending = None
             return
         if self.use_stamina == "ALL":
             bot.tap_percent(*STAMINA_SLIDER_END)
@@ -335,7 +332,11 @@ class _Boss:
             lambda image: bot.find(MARCH, screen=image, region=REGIONS[MARCH]),
         )
         if march is not None:
-            coords, self.pending = self.pending, None
+            coords = self._read_march_target_coords(shot) if CAN_READ_COORDS else None
+            if CAN_READ_COORDS and coords is None:
+                bot.record("Join Monster War: sau khi dùng thể lực không đọc được tọa độ đích; không March")
+                bot.back()
+                return
             self._press_march(coords, march, shot)
 
     def _march(self, screen, march_pos):
@@ -343,8 +344,15 @@ class _Boss:
         sau khi tap hành quân thì boss vừa Join mới được nhớ là đã tham gia;
         mọi nhánh Back (thất bại) để boss đó được thử lại lần sau."""
         bot = self.bot
-        coords, self.pending = self.pending, None
         if bot.find(BOSS_MONSTER, screen=screen, region=REGIONS[BOSS_MONSTER]) is None:
+            bot.back()
+            return
+
+        # Tọa độ trên màn March là mục tiêu thật. Không so với tọa độ đọc ở danh sách:
+        # nếu card dịch chuyển và bot mở một rally khác thì xử lý rally thực tế đang mở.
+        coords = self._read_march_target_coords(screen) if CAN_READ_COORDS else None
+        if CAN_READ_COORDS and coords is None:
+            bot.record("Join Monster War: không đọc được tọa độ đích trên March; không March")
             bot.back()
             return
 
@@ -381,29 +389,25 @@ class _Boss:
         if pos is None:
             return
 
-        # Card có thể nhảy sau khi bot chọn tọa độ A và làm cú tap Join mở màn March của
-        # boss B. Tọa độ bên phải màn March là mục tiêu thật; lệch A thì Back, không March.
-        if not self._march_target_matches(screen, coords):
-            bot.back()
-            return
         bot.tap(*pos)
 
         def march_result(shot):
             # Không đủ thể lực: popup "Get more now?" đè lên màn March (nút March mờ vẫn khớp
-            # ảnh mẫu) -> trả màn này cho vòng lặp chính xử lý OUT_OF_STAMINA; giữ tọa độ
-            # boss để nếu hành quân được sau khi dùng thể lực thì vẫn nhớ là đã tham gia.
+            # ảnh mẫu) -> trả màn này cho vòng lặp chính xử lý OUT_OF_STAMINA.
+            # Không giữ tọa độ cũ; sau khi dùng thể lực `_use_stamina()` sẽ OCR lại
+            # mục tiêu đang hiện trên màn March trước khi bấm March lần nữa.
             if bot.find(NOT_ENOUGH_STAMINA, screen=shot) is not None:
                 return OUT_OF_STAMINA
 
-            # Đủ thể lực và game đã đóng màn March, quay về đúng danh sách War: coi lần
-            # hành quân thành công. Chỉ tìm template tab, không OCR các hàng Joined.
+            # Chỉ coi thành công khi về danh sách War và thấy hàng Joined đúng tọa độ
+            # mục tiêu thật đã đọc trên March. Thấy mỗi tab PvP War là chưa đủ.
             if bot.find(PVP_WAR, screen=shot, region=REGIONS[PVP_WAR]) is not None:
-                return JOINED
+                if coords is not None and self._joined_target_visible(shot, coords):
+                    return JOINED
             return None
 
         last_shot, result = self._poll_screen("march_to_result", march_result)
         if result == OUT_OF_STAMINA:
-            self.pending = coords
             self.next_screen = last_shot
             return
         if result == JOINED:
@@ -414,24 +418,22 @@ class _Boss:
 
         # Chỉ Back khi vẫn còn ở màn March. Nếu chuyển sang màn khác nhưng chưa về danh sách
         # War, giữ ảnh hiện tại cho vòng chính tự nhận diện và không ghi nhớ tọa độ.
-        if last_shot is not None and bot.find(MARCH, screen=last_shot, region=REGIONS[MARCH]) is not None:
+        if (last_shot is not None
+                and bot.find(PVP_WAR, screen=last_shot, region=REGIONS[PVP_WAR]) is not None):
+            self.next_screen = last_shot
+            bot.record(f"Join Monster War: đã về danh sách nhưng chưa thấy Joined đúng boss {coords}; không ghi nhớ")
+        elif last_shot is not None and bot.find(MARCH, screen=last_shot, region=REGIONS[MARCH]) is not None:
             bot.back()
         else:
             self.next_screen = last_shot
             bot.record(f"Join Monster War: chưa quay lại danh sách War cho boss {coords}; không ghi nhớ")
 
-    def _march_target_matches(self, screen, expected) -> bool:
-        """Xác nhận tọa độ boss đích trên March trước khi cho phép hành quân."""
-        if not CAN_READ_COORDS or expected is None:
-            return True
-        actual = self._read_march_target_coords(screen)
-        if actual is None:
-            self.bot.record(f"Join Monster War: không đọc được tọa độ đích trên March; bỏ {expected}")
-            return False
-        if actual != expected:
-            self.bot.record(f"Join Monster War: card đã đổi từ {expected} sang {actual}; không March")
-            return False
-        return True
+    def _joined_target_visible(self, screen, coords) -> bool:
+        """Danh sách War có hàng Joined mang đúng tọa độ mục tiêu vừa hành quân."""
+        points = self.bot.find_all(JOINED_BUTTON, screen=screen, center=False,
+                                   region=REGIONS[JOINED_BUTTON])
+        return any(JOIN_MIN_Y < y < JOIN_MAX_Y
+                   and self._read_card_coords(screen, x, y) == coords for x, y in points)
 
     def _read_march_target_coords(self, screen):
         """Đọc tọa độ mục tiêu bên phải màn March (bên trái là tọa độ người gọi rally)."""
@@ -592,6 +594,13 @@ class _Boss:
             if CAN_READ_COORDS:
                 coords = self._read_card_coords(screen, x, y)
 
+                # Không có danh tính ổn định để tìm lại card. Bỏ nút này trong màn hiện tại
+                # thay vì xóa blacklist và lặp vô hạn trên cùng một thẻ OCR lỗi.
+                if coords is None:
+                    bot.log(f"Không đọc được tọa độ card tại ({x}, {y}); bỏ qua trong màn hiện tại")
+                    self.screen_blacklist.append((x, y))
+                    continue
+
                 # Chỉ JOINED dài hạn mới được chặn theo tọa độ. Không dùng SKIPPED dài hạn:
                 # một lần OCR sai không được phép khóa nhầm boss hợp lệ trong 6 phút.
                 if coords and self.memory.status(coords) == MEMORY_JOINED:
@@ -612,9 +621,8 @@ class _Boss:
                 self.screen_blacklist.append((x, y))
                 continue
 
-            # 6. OCR phía trên có thể mất vài giây. Trong lúc đó rally mới xuất hiện làm các
-            #    thẻ cũ nhảy vị trí. Chụp lại và tìm đúng tọa độ boss, sau đó kiểm tra thêm
-            #    một ảnh ngay trước cú tap; tuyệt đối không bấm lại vị trí (x, y) đã cũ.
+            # 6. OCR phía trên có thể mất vài giây. Chụp một ảnh mới và tìm lại card đúng
+            #    tọa độ trước khi tap. Nếu vẫn có race sau đó, màn March dùng tọa độ thật.
             target = self._stable_join_target(coords, (x, y), jh)
             if target is None:
                 return False
@@ -626,7 +634,6 @@ class _Boss:
             #    (thời gian đỏ -> bỏ qua, không đỏ -> bấm Join lại), không bỏ sang Join khác.
             bot.report_boss(coords)
             bot.tap(x + jw // 2, y + jh // 2)
-            self.pending = coords
             self.idle_scrolls = 0   # cả khi không đọc được tọa độ
             return True
         return False
