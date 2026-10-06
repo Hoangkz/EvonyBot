@@ -15,7 +15,10 @@ DESIGNER_DATA = {
     "ButtonOpenGiftBox": {"loc": [85, 117], "size": [230, 40], "text": "Open Gift Box", "type": "Button"},
     "button10": {"loc": [85, 180], "size": [230, 40], "text": "Event", "type": "Button"},
     "button7": {"loc": [740, 117], "size": [230, 40], "text": "Battlefield Shop", "type": "Button"},
-    "button9": {"loc": [935, 372], "size": [140, 50], "text": "Start All", "type": "Button"},
+    # button9 (Start All) nằm cạnh buttonStopAll (Stop All) dưới GroupBox; 2 nút
+    # 125x40 (nhỏ lại so với 140x50 gốc) căn phải theo mép phải GroupBox (x=1075).
+    "button9": {"loc": [815, 377], "size": [125, 40], "text": "Start All", "type": "Button"},
+    "buttonStopAll": {"loc": [950, 377], "size": [125, 40], "text": "Stop All", "type": "Button"},
     "buttonAllianceCapacity": {"loc": [409, 53], "size": [230, 40], "text": "Alliance Capacity", "type": "Button"},
     "buttonBlackMarket": {"loc": [409, 117], "size": [230, 40], "text": "Black Market", "type": "Button"},
     "buttonDailyActivities": {"loc": [740, 53], "size": [230, 40], "text": "Daily Activities", "type": "Button"},
@@ -33,7 +36,8 @@ DESIGNER_DATA = {
     "labelServer": {"loc": [13, 22], "size": [60, 28], "text": "Server:", "type": "Label"},
     "textBoxServer": {"loc": [75, 22], "size": [200, 28], "type": "TextBox"},
     "tabPage1": {
-        "children": ["button9", "buttonInitializationApplyAll", "buttonStart", "labelID",
+        "children": ["button9", "buttonStopAll", "buttonInitializationApplyAll", "buttonStart",
+                     "labelID",
                      "labelServer", "textBoxServer", "checkBoxBubble", "labelBubbleTime",
                      "comboBoxBubbleType",
                      "groupBox2"],
@@ -95,6 +99,7 @@ QPushButton:checked:hover {{
 class InitializationTab(DesignerTab):
     start_clicked = pyqtSignal()
     start_all_clicked = pyqtSignal()
+    stop_all_clicked = pyqtSignal()      # Stop All: dừng mọi bot đang chạy
     server_changed = pyqtSignal(str)   # server mới sau khi nhập xong
     settings_changed = pyqtSignal()    # bật/tắt bubble hoặc đổi loại bubble
 
@@ -127,7 +132,16 @@ class InitializationTab(DesignerTab):
 
         c["buttonStart"].setStyleSheet("font-size: 13.8pt;")
         c["buttonStart"].clicked.connect(self.start_clicked.emit)
+        # 2 nút riêng biệt (không còn toggle Start All <-> Stop All trên cùng 1 nút).
         c["button9"].clicked.connect(self.start_all_clicked.emit)
+        c["buttonStopAll"].clicked.connect(self.stop_all_clicked.emit)
+        # 2 nút gọn lại (125x40 thay vì 140x50): giảm padding ngang để chữ
+        # "Start All(10)" vẫn vừa vẹn, không bị cắt.
+        for key in ("button9", "buttonStopAll"):
+            c[key].setStyleSheet("padding: 6px 8px;")
+        # Chưa có số liệu -> tắt cả 2; main sẽ set_run_counts() ngay khi đăng ký thiết bị.
+        c["button9"].setEnabled(False)
+        c["buttonStopAll"].setEnabled(False)
 
         # Activity buttons are toggles: they pick which activities the bot
         # runs (shown green when selected) instead of jumping to the tab.
@@ -141,10 +155,19 @@ class InitializationTab(DesignerTab):
         self.controls["buttonStart"].setText("Stop" if running else "Start")
         self.controls["buttonStart"].setStyleSheet("background-color: #d9534f; color: white;" if running else "")
 
-    def set_all_running(self, running: bool):
-        button = self.controls["button9"]
-        button.setText("Stop All" if running else "Start All")
-        button.setStyleSheet("background-color: #d9534f; color: white;" if running else "")
+    def set_run_counts(self, running: int, total: int):
+        """Cập nhật 2 nút Start All / Stop All theo (số bot đang chạy, tổng số thiết bị).
+
+        Cùng nguyên tắc màn Home: Start All bật khi còn thiết bị chưa chạy,
+        Stop All bật khi có ít nhất 1 thiết bị đang chạy; nhãn kèm số lượng.
+        """
+        idle = max(total - running, 0)
+        start = self.controls["button9"]
+        stop = self.controls["buttonStopAll"]
+        start.setText(f"Start All({idle})")
+        start.setEnabled(idle > 0)
+        stop.setText(f"Stop All({running})")
+        stop.setEnabled(running > 0)
 
     def set_device_id(self, device_id: str):
         self.controls["labelID"].setText(device_id)

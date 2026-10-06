@@ -31,6 +31,7 @@ TIMEOUT_OPTIONS = ["30", "60", "90", "120", "180", "240", "300", "360"]
 class HomeView(QWidget):
     devices_loaded = pyqtSignal(list)
     start_all_requested = pyqtSignal()
+    stop_all_requested = pyqtSignal()      # dừng mọi bot đang chạy
     exit_all_requested = pyqtSignal()       # đóng game trên mọi thiết bị
     reset_time_changed = pyqtSignal(str)   # giờ reset server "HH:MM" người dùng vừa chọn
     auto_timeout_changed = pyqtSignal(str)  # số phút "Auto Times Out" người dùng vừa chọn
@@ -40,7 +41,7 @@ class HomeView(QWidget):
         self.setObjectName("HomeView")
         self._worker: AdbScanWorker | None = None
         self._device_count = 0
-        self._all_running = False
+        self._running_count = 0
         self._update_worker: QThread | None = None
         self._progress: QProgressDialog | None = None
 
@@ -101,7 +102,16 @@ class HomeView(QWidget):
         self.start_all_button = QPushButton("Start All(0)")
         self.start_all_button.setMinimumSize(100, 36)
         self.start_all_button.clicked.connect(self.start_all_requested.emit)
+        self.start_all_button.setEnabled(False)
         toolbar.addWidget(self.start_all_button)
+
+        # Nút riêng biệt (không còn toggle Start All <-> Stop All): Start All chỉ bật
+        # khi còn thiết bị chưa chạy, Stop All chỉ bật khi có thiết bị đang chạy.
+        self.stop_all_button = QPushButton("Stop All(0)")
+        self.stop_all_button.setMinimumSize(100, 36)
+        self.stop_all_button.clicked.connect(self.stop_all_requested.emit)
+        self.stop_all_button.setEnabled(False)
+        toolbar.addWidget(self.stop_all_button)
         layout.addLayout(toolbar)
 
         # ---- Device table ----
@@ -217,17 +227,21 @@ class HomeView(QWidget):
         self.table.setRowCount(0)
         for serial in serials:
             self.add_device_row(serial)
-        self._device_count = len(serials)
-        self._refresh_start_all_text()
+        self.set_run_counts(0, len(serials))
 
-    def set_all_running(self, running: bool):
-        """Start All becomes Stop All once every device's bot is running."""
-        self._all_running = running
-        self._refresh_start_all_text()
+    def set_run_counts(self, running: int, total: int):
+        """Cập nhật 2 nút Start All / Stop All theo (số bot đang chạy, tổng số thiết bị).
 
-    def _refresh_start_all_text(self):
-        label = "Stop All" if self._all_running else "Start All"
-        self.start_all_button.setText(f"{label}({self._device_count})")
+        - Start All: bật khi còn thiết bị chưa hoạt động; nhãn là số thiết bị sẽ chạy.
+        - Stop All: bật khi có ít nhất 1 thiết bị đang chạy; nhãn là số sẽ dừng.
+        """
+        self._running_count = running
+        self._device_count = total
+        idle = max(total - running, 0)
+        self.start_all_button.setText(f"Start All({idle})")
+        self.start_all_button.setEnabled(idle > 0)
+        self.stop_all_button.setText(f"Stop All({running})")
+        self.stop_all_button.setEnabled(running > 0)
 
     def add_device_row(self, serial: str, activity: str = "None", status: str = "InActive",
                        server: str = ""):

@@ -26,6 +26,7 @@ from .tabs import (
 class DeviceView(QWidget):
     start_requested = pyqtSignal(str)       # device_id
     start_all_requested = pyqtSignal()
+    stop_all_requested = pyqtSignal()       # Stop All: dừng mọi bot đang chạy
     # (device_id, settings) — settings keyed by tab title, to be copied
     # onto every other device.
     apply_all_requested = pyqtSignal(str, dict)
@@ -69,6 +70,7 @@ class DeviceView(QWidget):
             lambda: self.start_requested.emit(self.device_id)
         )
         self.initialization_tab.start_all_clicked.connect(self.start_all_requested.emit)
+        self.initialization_tab.stop_all_clicked.connect(self.stop_all_requested.emit)
         self.initialization_tab.server_changed.connect(
             lambda server: self.server_changed.emit(self.device_id, server)
         )
@@ -101,8 +103,9 @@ class DeviceView(QWidget):
     def set_running(self, running: bool):
         self.initialization_tab.set_running(running)
 
-    def set_all_running(self, running: bool):
-        self.initialization_tab.set_all_running(running)
+    def set_run_counts(self, running: int, total: int):
+        """Hai nút Start All / Stop All trong tab Initialization."""
+        self.initialization_tab.set_run_counts(running, total)
 
     def get_settings(self) -> dict:
         """Collect settings from every tab into one dict, keyed by tab title."""

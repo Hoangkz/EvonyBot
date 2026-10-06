@@ -27,6 +27,11 @@ COLORS = {
     "success": "#2fb170",
     "danger": "#e5484d",
     "warning": "#e8a33d",
+    # Nút bị disable: nền/biên/chữ xám nhạt ("hơi xám") để phân biệt với nút đang bật
+    # mà không bị tối quá.
+    "disabled_bg": "#f2f4f7",
+    "disabled_border": "#d0d5dd",
+    "disabled_text": "#343a40",
 }
 
 STYLESHEET = f"""
@@ -127,6 +132,22 @@ QPushButton#ApplyAllButton {{
     border: 1px solid {COLORS['accent']};
     color: {COLORS['accent']};
     font-weight: 600;
+}}
+
+/* ---- Disabled: nền xám -> dễ nhận biết nút đang tắt ----
+   Phải liệt kê rõ biến thể có id/attr (PrimaryButton, ApplyAllButton) vì
+   bộ chọn có id luôn thắng bộ chọn chỉ có :disabled; #Sidebar nằm sau cùng. */
+QPushButton:disabled,
+QPushButton#PrimaryButton:disabled,
+QPushButton[primary="true"]:disabled,
+QPushButton#ApplyAllButton:disabled {{
+    background: {COLORS['disabled_bg']};
+    border: 1px solid {COLORS['disabled_border']};
+    color: {COLORS['disabled_text']};
+}}
+#Sidebar QPushButton:disabled {{
+    background: {COLORS['disabled_bg']};
+    color: {COLORS['disabled_text']};
 }}
 
 /* ---- Inputs ---- */

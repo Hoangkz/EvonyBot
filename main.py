@@ -98,6 +98,7 @@ class MainWindow(QMainWindow):
         self.sidebar.device_selected.connect(self._show_device)
         self.home_view.devices_loaded.connect(self._on_devices_loaded)
         self.home_view.start_all_requested.connect(self._on_start_all_requested)
+        self.home_view.stop_all_requested.connect(self._on_stop_all_requested)
         self.home_view.exit_all_requested.connect(self._on_exit_all_requested)
 
     def _center_on_screen(self):
@@ -114,14 +115,16 @@ class MainWindow(QMainWindow):
         self._pending_devices = list(serials)
         if self._pending_devices:
             self._register_timer.start()
-        self.home_view.set_all_running(self._all_running())
+        self._refresh_run_counts()
 
     def _register_next_device(self):
         if self._pending_devices:
             self._register_device(self._pending_devices.pop(0))
+        # Làm mới số liệu sau mỗi thiết bị đăng ký để 2 nút Start/Stop All
+        # (màn Home và tab Initialization) phản ánh đúng số máy đã thấy.
+        self._refresh_run_counts()
         if not self._pending_devices:
             self._register_timer.stop()
-            self.home_view.set_all_running(self._all_running())
 
     def _unregister_device(self, device_id: str):
         self.sidebar.remove_device(device_id)
@@ -140,6 +143,7 @@ class MainWindow(QMainWindow):
         view = DeviceView(device_id)
         view.start_requested.connect(self._on_start_requested)
         view.start_all_requested.connect(self._on_start_all_requested)
+        view.stop_all_requested.connect(self._on_stop_all_requested)
         view.apply_all_requested.connect(self._on_apply_all_requested)
         view.server_changed.connect(self._on_server_changed)
         view.tab_settings_changed.connect(self.db.save_settings)
@@ -162,7 +166,7 @@ class MainWindow(QMainWindow):
             view.append_history(created_at, message)
 
         self.device_views[device_id] = view
-        view.set_all_running(self._all_running())
+        view.set_run_counts(*self._run_counts())
         self.stack.addWidget(view)
         self.sidebar.add_device(device_id)
 
@@ -201,14 +205,15 @@ class MainWindow(QMainWindow):
             self._start_bot(device_id)
 
     def _on_start_all_requested(self):
-        """Start All toggles: stops every bot once all are running,
-        otherwise starts the ones that aren't running yet."""
-        if self._all_running():
-            self.bots.stop_all()
-            return
+        """Start All (màn Home): chạy những thiết bị chưa hoạt động;
+        thiết bị đang chạy được giữ nguyên."""
         for device_id in self.device_views:
             if not self.bots.is_running(device_id):
                 self._start_bot(device_id)
+
+    def _on_stop_all_requested(self):
+        """Stop All (màn Home và tab Initialization): dừng mọi bot đang chạy."""
+        self.bots.stop_all()
 
     def _on_reset_time_changed(self, server_time: str):
         self.db.set_server_time(server_time)
@@ -218,10 +223,19 @@ class MainWindow(QMainWindow):
         self.db.set_auto_timeout(minutes)
         self.bots.auto_timeout_minutes = int(minutes)
 
-    def _all_running(self) -> bool:
-        return bool(self.device_views) and all(
-            self.bots.is_running(d) for d in self.device_views
-        )
+    def _run_counts(self) -> tuple[int, int]:
+        """(số bot đang chạy, tổng số thiết bị đã đăng ký)."""
+        total = len(self.device_views)
+        running = sum(1 for d in self.device_views if self.bots.is_running(d))
+        return running, total
+
+    def _refresh_run_counts(self):
+        """Cập nhật số liệu (đang chạy, tổng thiết bị) cho màn Home và tab
+        Initialization của mọi thiết bị -> 2 nút Start All / Stop All tự bật/tắt."""
+        counts = self._run_counts()
+        self.home_view.set_run_counts(*counts)
+        for view in self.device_views.values():
+            view.set_run_counts(*counts)
 
     def _start_bot(self, device_id: str):
         view = self.device_views.get(device_id)
@@ -246,10 +260,7 @@ class MainWindow(QMainWindow):
         view = self.device_views.get(device_id)
         if view is not None:
             view.set_running(running)
-        all_running = self._all_running()
-        self.home_view.set_all_running(all_running)
-        for v in self.device_views.values():
-            v.set_all_running(all_running)
+        self._refresh_run_counts()
 
     def _on_server_changed(self, device_id: str, server: str):
         """Server của thiết bị đổi -> lưu DB và cập nhật cột Server ở Home."""
