@@ -79,6 +79,8 @@ def parse(text: str | None) -> tuple[Boss | None, str | None]:
     if not text:
         return None, None
     text = re.sub(r"^\s*\([^)]*\)", "", text)        # bỏ "(Boss)" ở đầu
+    # Boss Special (Viking...) ghi nhãn "Lv.1 Viking" thay vì "(Boss) ...": bỏ "Lv.N" ở đầu ("?" = glyph chưa có mẫu).
+    text = re.sub(r"^\s*[l?][v?]\.?\s*\d+\s+", "", text)
     # Bỏ loại quân trong ngoặc ở cuối, VD Pan có 3 loại: "Pan (Ranged Troop)" (OCR đọc
     # "pan (panged ?roop)"); ngoặc có thể bị cắt mất ở mép vùng đọc.
     text = re.sub(r"\([^)]*\)?\s*$", "", text).strip()

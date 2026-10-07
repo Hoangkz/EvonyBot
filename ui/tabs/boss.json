@@ -5,117 +5,117 @@
             "label": "Boss Standard",
             "list": [
                 {
-                    "levels": [],
+                    "levels": [ ],
                     "name": "Zombie",
                     "active": false
                 },
                 {
-                    "levels": [],
+                    "levels": [ ],
                     "name": "Redcap",
                     "active": false
                 },
                 {
-                    "levels": [],
+                    "levels": [ ],
                     "name": "Centaur",
                     "active": false
                 },
                 {
-                    "levels": [],
+                    "levels": [ ],
                     "name": "Skeleton Dragon",
                     "active": false
                 },
                 {
-                    "levels": [],
+                    "levels": [ ],
                     "name": "Werewolf",
                     "active": false
                 },
                 {
-                    "levels": [],
+                    "levels": [ ],
                     "name": "Manticore",
                     "active": false
                 },
                 {
-                    "levels": [],
+                    "levels": [ ],
                     "name": "Yasha",
                     "active": false
                 },
                 {
-                    "levels": [],
+                    "levels": [ ],
                     "name": "Peryton",
                     "active": false
                 },
                 {
-                    "levels": [],
+                    "levels": [ ],
                     "name": "Minotaur",
                     "active": false
                 },
                 {
-                    "levels": [],
+                    "levels": [ ],
                     "name": "Griffin",
                     "active": false
                 },
                 {
-                    "levels": [],
+                    "levels": [ ],
                     "name": "Ifrit",
                     "active": false
                 },
                 {
-                    "levels": [],
+                    "levels": [ ],
                     "name": "Kamaitachi",
                     "active": false
                 },
                 {
-                    "levels": [],
+                    "levels": [ ],
                     "name": "Fafnir",
                     "active": true
                 },
                 {
-                    "levels": [],
+                    "levels": [ ],
                     "name": "Behemoth",
                     "active": true
                 },
                 {
-                    "levels": [],
+                    "levels": [ ],
                     "name": "Phoenix",
                     "active": true
                 },
                 {
-                    "levels": [],
+                    "levels": [ ],
                     "name": "Jormungandr",
                     "active": true
                 },
                 {
-                    "levels": [],
+                    "levels": [ ],
                     "name": "Typhon",
                     "active": true
                 },
                 {
-                    "levels": [],
+                    "levels": [ ],
                     "name": "Ammit",
                     "active": true
                 },
                 {
-                    "levels": [],
+                    "levels": [ ],
                     "name": "Stymphalian Bird",
                     "active": true
                 },
                 {
-                    "levels": [],
+                    "levels": [ ],
                     "name": "Lernean Hydra",
                     "active": true
                 },
                 {
-                    "levels": [],
+                    "levels": [ ],
                     "name": "Azazel",
                     "active": true
                 },
                 {
-                    "levels": [],
+                    "levels": [ ],
                     "name": "Leviathan",
                     "active": true
                 },
                 {
-                    "levels": [],
+                    "levels": [ ],
                     "name": "Garmr",
                     "active": true
                 }
@@ -132,31 +132,31 @@
                             "level": 1,
                             "tier": "Junior",
                             "power": "68.2M",
-                            "active": true
+                            "active": false
                         },
                         {
                             "level": 2,
                             "tier": "Medium",
                             "power": "153.4M",
-                            "active": true
+                            "active": false
                         },
                         {
                             "level": 3,
                             "tier": "Senior",
                             "power": "234.2M",
-                            "active": true
+                            "active": false
                         },
                         {
                             "level": 4,
                             "tier": "Legendary",
                             "power": "694.9M",
-                            "active": true
+                            "active": false
                         },
                         {
                             "level": 5,
                             "tier": "Epic",
                             "power": "1.5B",
-                            "active": true
+                            "active": false
                         }
                     ]
                 },
@@ -171,7 +171,7 @@
                         {
                             "level": 2,
                             "power": "70.8M",
-                            "active": true
+                            "active": false
                         },
                         {
                             "level": 3,
@@ -211,7 +211,7 @@
                         {
                             "level": 2,
                             "power": "22.3M",
-                            "active": true
+                            "active": false
                         },
                         {
                             "level": 3,
@@ -252,13 +252,13 @@
                             "level": 1,
                             "tier": "Junior",
                             "power": "65.5M",
-                            "active": true
+                            "active": false
                         },
                         {
                             "level": 2,
                             "tier": "Senior",
                             "power": "147.5M",
-                            "active": true
+                            "active": false
                         },
                         {
                             "level": 3,
@@ -291,7 +291,7 @@
                         {
                             "level": 2,
                             "power": "24.6M",
-                            "active": true
+                            "active": false
                         },
                         {
                             "level": 3,
@@ -331,7 +331,7 @@
                         {
                             "level": 2,
                             "power": "22.3M",
-                            "active": true
+                            "active": false
                         },
                         {
                             "level": 3,
@@ -371,7 +371,7 @@
                         {
                             "level": 2,
                             "power": "24.6M",
-                            "active": true
+                            "active": false
                         },
                         {
                             "level": 3,
@@ -407,13 +407,13 @@
                             "level": 1,
                             "tier": "Junior",
                             "power": "84.9M",
-                            "active": true
+                            "active": false
                         },
                         {
                             "level": 2,
                             "tier": "Medium",
                             "power": "120.6M",
-                            "active": true
+                            "active": false
                         },
                         {
                             "level": 3,
@@ -452,7 +452,7 @@
                         {
                             "level": 2,
                             "power": "22.3M",
-                            "active": true
+                            "active": false
                         },
                         {
                             "level": 3,
@@ -487,12 +487,12 @@
                         {
                             "level": 1,
                             "power": "22.3M",
-                            "active": true
+                            "active": false
                         },
                         {
                             "level": 2,
                             "power": "42.8M",
-                            "active": true
+                            "active": false
                         },
                         {
                             "level": 3,
@@ -532,7 +532,7 @@
                         {
                             "level": 2,
                             "power": "1.9M",
-                            "active": true
+                            "active": false
                         },
                         {
                             "level": 3,
@@ -573,13 +573,13 @@
                             "level": 1,
                             "tier": "Junior",
                             "power": "59.6M",
-                            "active": true
+                            "active": false
                         },
                         {
                             "level": 2,
                             "tier": "Medium",
                             "power": "71.5M",
-                            "active": true
+                            "active": false
                         },
                         {
                             "level": 3,
@@ -615,7 +615,7 @@
             "list": [
                 {
                     "name": "Viking",
-                    "levels": []
+                    "levels": [ ]
                 },
                 {
                     "name": "Aglaope",
@@ -633,13 +633,13 @@
                             "level": 1,
                             "tier": "Junior",
                             "power": "1.3M",
-                            "active": true
+                            "active": false
                         },
                         {
                             "level": 2,
                             "tier": "Senior",
                             "power": "1.7M",
-                            "active": true
+                            "active": false
                         },
                         {
                             "level": 3,
@@ -656,7 +656,7 @@
                             "level": 1,
                             "tier": "Junior",
                             "power": "85.6M",
-                            "active": true
+                            "active": false
                         },
                         {
                             "level": 2,
@@ -678,7 +678,7 @@
                         {
                             "level": 1,
                             "power": "124.6M",
-                            "active": true
+                            "active": false
                         },
                         {
                             "level": 2,
@@ -699,7 +699,7 @@
                             "level": 1,
                             "tier": "Junior",
                             "power": "85.6M",
-                            "active": true
+                            "active": false
                         },
                         {
                             "level": 2,
@@ -716,7 +716,7 @@
                             "level": 1,
                             "tier": "Junior",
                             "power": "85.6M",
-                            "active": true
+                            "active": false
                         },
                         {
                             "level": 2,
@@ -733,7 +733,7 @@
                             "level": 1,
                             "tier": "Junior",
                             "power": "85.6M",
-                            "active": true
+                            "active": false
                         },
                         {
                             "level": 2,
@@ -750,7 +750,7 @@
                             "level": 1,
                             "tier": "Junior",
                             "power": "85.6M",
-                            "active": true
+                            "active": false
                         },
                         {
                             "level": 2,
@@ -767,7 +767,7 @@
                             "level": 1,
                             "tier": "Junior",
                             "power": "85.6M",
-                            "active": true
+                            "active": false
                         },
                         {
                             "level": 2,
@@ -784,7 +784,7 @@
                             "level": 1,
                             "tier": "Junior",
                             "power": "85.6M",
-                            "active": true
+                            "active": false
                         },
                         {
                             "level": 2,
@@ -801,7 +801,7 @@
                             "level": 1,
                             "tier": "Junior",
                             "power": "85.6M",
-                            "active": true
+                            "active": false
                         },
                         {
                             "level": 2,
@@ -818,7 +818,7 @@
                             "level": 1,
                             "tier": "Junior",
                             "power": "85.6M",
-                            "active": true
+                            "active": false
                         },
                         {
                             "level": 2,
@@ -835,7 +835,7 @@
                             "level": 1,
                             "tier": "Junior",
                             "power": "85.6M",
-                            "active": true
+                            "active": false
                         },
                         {
                             "level": 2,
@@ -847,7 +847,12 @@
                 },
                 {
                     "name": "Elite Temple Guard",
-                    "active": true
+                    "levels": [
+                        {
+                            "level": 1,
+                            "active": true
+                        }
+                    ]
                 },
                 {
                     "name": "Fenrir",

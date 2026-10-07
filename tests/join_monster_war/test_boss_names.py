@@ -37,7 +37,9 @@ CARDS = [("02_war_list_join.png", 331, "Peryton", None, 6_500_000),
          ("war_legendary_cerberus_bayar.png", 331, "Cerberus", "legendary", 694_900_000),
          ("war_legendary_cerberus_bayar.png", 562, "Knight Bayard", "legendary", 668_100_000),
          # Boss mới không có lực cố định trong catalog; ảnh thật bảo vệ phần OCR tên.
-         ("war_elite_temple_guard.png", 278, "Elite Temple Guard", None, None)]
+         ("war_elite_temple_guard.png", 278, "Elite Temple Guard", None, None),
+         # Boss Special ghi nhãn "Lv.1 Viking" (không có "(Boss)"): bỏ tiền tố "Lv.N".
+         ("war_viking_lv1.png", 331, "Viking", None, None)]
 X = 319   # x góc trên nút Join trên mọi ảnh
 
 
@@ -81,6 +83,9 @@ class BossLevelTests(unittest.TestCase):
         self.assertEqual(parse("pan (ground troop)"), (boss("Pan"), None))
         self.assertEqual(parse("pan (mounted tr"), (boss("Pan"), None))   # ngoặc bị cắt
         self.assertEqual(parse(None), (None, None))
+        # Boss Special: "Lv.1 Viking" (OCR cũ đọc ra "?i? ?iking" nên không nhận ra).
+        self.assertEqual(parse("lv.1 viking"), (boss("Viking"), None))
+        self.assertEqual(parse("?v.1 viking"), (boss("Viking"), None))
 
     def test_tier_gives_level_of_that_boss(self):
         no_power = lambda: self.fail("có tier thì không đọc lực")
