@@ -1,6 +1,8 @@
 """
 run.py — Activity "Join Monster War" (Optimized for Multi-threading & Low CPU).
 """
+import time
+
 from ...common import click_images, delay, exit_images, find_first, go_home, wait_gone
 from ...context import TEMPLATE_DIR
 from ...ocr import read_boss_name, read_coords, read_power
@@ -45,7 +47,6 @@ class _Boss:
         self.use_stamina = settings.get("use_stamina")     # "ALL" / "100" / "No"
         self.selected = boss_names.selection(settings)         # Boss được tích ở tab: {tên: cấp được tích}
         self.memory: BossMemory = bot.boss_memory           # Tọa độ boss đã xác nhận tham gia (X, Y in-game)
-        self.pending = None                                 # Tọa độ boss vừa tap Join, chờ hành quân xong
         self.screen_blacklist: list[tuple[int, int]] = []   # Tọa độ nút Join đã qua xử lý trên screen hiện tại
         self.swipe = 0                                      # Vị trí trong chu kỳ cuộn (0-2: xuống; 3-5: lên)
         self.previous = None                                # Action của vòng lặp trước
@@ -53,6 +54,71 @@ class _Boss:
         self.idle_scrolls = 0                               # Số lần cuộn liên tiếp mà không thấy boss mới
         self.next_screen = None                             # Ảnh mới nhất (sau khi cuộn / wait_gone), dùng cho vòng lặp kế tiếp
         self.war_taps = 0                                   # Số lần đã bấm bỏ tích ô "War" trong lượt chạy này
+        if getattr(bot, "join_boss_perf", None) is None:
+            bot.join_boss_perf = {}
+        self.performance = bot.join_boss_perf               # giữ số liệu qua nhiều lượt worker gọi Join Boss
+
+    def _perf(self, step: str, started: float, ok: bool) -> None:
+        """Ghi thời gian thật của một bước để đo p50/p95/max trên MEmu."""
+        elapsed = time.perf_counter() - started
+        status = "OK" if ok else "TIMEOUT"
+        if elapsed > STEP_TARGET:
+            status = f"SLOW/{status}"
+        elapsed_ms = elapsed * 1000
+        self.bot.log(f"[PERF] {step}: {elapsed_ms:.0f} ms {status}")
+
+        samples = self.performance.setdefault(step, [])
+        samples.append(elapsed_ms)
+        del samples[:-200]  # đủ cho thống kê gần đây nhưng không tăng bộ nhớ vô hạn
+        if len(samples) % PERF_SUMMARY_EVERY == 0:
+            ordered = sorted(samples)
+            p50 = ordered[(len(ordered) - 1) // 2]
+            p95 = ordered[min(len(ordered) - 1, int(len(ordered) * 0.95))]
+            self.bot.log(
+                f"[PERF SUMMARY] {step}: n={len(samples)} p50={p50:.0f} ms "
+                f"p95={p95:.0f} ms max={max(samples):.0f} ms"
+            )
+
+    def _poll_screen(self, step: str, predicate, timeout: float | None = None,
+                     interval: float | None = None):
+        """Chụp lại tới khi predicate đúng; thường xong <1 s, không quá 2 s.
+
+        Trả ``(ảnh cuối, kết quả predicate)``. Dùng số lượt cố định để test có
+        đồng hồ giả vẫn kiểm tra đúng timeout như khi chạy thật.
+        """
+        timeout = STEP_TIMEOUT if timeout is None else timeout
+        interval = POLL_INTERVAL if interval is None else interval
+        started = time.perf_counter()
+        deadline = started + timeout
+        shot = result = None
+        attempts = max(1, int(timeout / interval + 0.999))
+        for _ in range(attempts):
+            delay(self.bot, interval)
+            shot = self.bot.screenshot()
+            result = predicate(shot)
+            if result:
+                self._perf(step, started, True)
+                return shot, result
+            if time.perf_counter() >= deadline:
+                break
+        self._perf(step, started, False)
+        return shot, result
+
+    def _wait_gone(self, targets, action, pos, step: str):
+        started = time.perf_counter()
+        screen = wait_gone(self.bot, targets, action, pos, **_WAIT)
+        self._perf(step, started, screen is not None)
+        return screen
+
+    def _wait_after_join(self, targets) -> None:
+        """Chờ Join mở màn kế tiếp; nếu vẫn ở list sau 2 s thì cho phép thử lại."""
+        def changed(screen):
+            action = find_first(self.bot, screen, targets,
+                                top_left={LEAVE_ALLIANCE_POPUP}, regions=REGIONS)[0]
+            return action if action not in (None, JOIN_LIST) else None
+
+        shot, _ = self._poll_screen("join_to_next_screen", changed)
+        self.next_screen = shot
 
     def run(self):
         bot = self.bot
@@ -69,7 +135,9 @@ class _Boss:
                 screen = bot.screenshot()
             
             # Popup rời liên minh tap theo offset từ góc trên-trái
+            detect_started = time.perf_counter()
             action, pos = find_first(bot, screen, targets, top_left={LEAVE_ALLIANCE_POPUP}, regions=REGIONS)
+            self._perf("detect_screen", detect_started, True)
             
             # Reset blacklist nút khi vừa chuyển trạng thái quay lại JOIN_LIST
             if action == JOIN_LIST and self.previous != JOIN_LIST:
@@ -107,11 +175,10 @@ class _Boss:
                 self._march(screen, pos)
 
             elif action == JOIN_LIST:
-                # Đã tap Join: chờ cố định JOIN_TAP_WAIT giây rồi chụp lại (không wait_gone: nếu
-                # không Join được thì nút Join vẫn còn, wait_gone sẽ chờ hết 10 giây).
-                # Không tap (bỏ qua hết / đã cuộn): quét lại ngay.
+                # Không ngủ cố định: sau khi tap Join, kiểm tra trạng thái mới mỗi 0,2 s.
+                # Nếu sau 2 s vẫn ở danh sách thì vòng sau được phép thử lại nút đó.
                 if self._join(screen):
-                    delay(bot, JOIN_TAP_WAIT)
+                    self._wait_after_join(targets)
                 continue
 
             elif action in (SCROLL, JOINED):
@@ -126,20 +193,21 @@ class _Boss:
 
             elif action == LEAVE_ALLIANCE_POPUP:
                 bot.tap(pos[0] + 40, pos[1] + 40)
-                wait_gone(bot, targets, action, pos, **_WAIT)
+                self._wait_gone(targets, action, pos, "close_leave_alliance_popup")
                 bot.back()
 
             else:
                 # Không nhận diện được màn hình: thường là hiệu ứng tạm (màn tối / thông báo sau
-                # khi bấm Join) -> chụp lại vài lần; nhận ra được thì đi tiếp, không thì go_home
+                # khi bấm Join) -> polling tối đa 2 giây; nhận ra được thì đi tiếp, không thì go_home
                 # (go_home nhấn Back, có thể thoát khỏi danh sách War).
-                for _ in range(UNKNOWN_RETRIES):
-                    delay(bot, 1)
-                    shot = bot.screenshot()
-                    if find_first(bot, shot, targets, top_left={LEAVE_ALLIANCE_POPUP},
-                                  regions=REGIONS)[0] is not None:
-                        self.next_screen = shot
-                        break
+                shot, recognized = self._poll_screen(
+                    "recognize_unknown_screen",
+                    lambda image: find_first(bot, image, targets,
+                                             top_left={LEAVE_ALLIANCE_POPUP},
+                                             regions=REGIONS)[0],
+                )
+                if recognized is not None:
+                    self.next_screen = shot
                 else:
                     bot.record("Màn hình vẫn không nhận ra: go_home")
                     go_home(bot, shot)
@@ -147,7 +215,7 @@ class _Boss:
 
             # Chờ hành động cũ biến mất; ảnh xác nhận đã chuyển màn được dùng luôn cho
             # vòng lặp mới (None = hết giờ mà màn hình chưa đổi -> vòng lặp tự chụp lại)
-            self.next_screen = wait_gone(bot, targets, action, pos, **_WAIT)
+            self.next_screen = self._wait_gone(targets, action, pos, f"{action}_to_next_screen")
 
     def _on_war_list(self, screen, action) -> bool:
         """Đang ở màn danh sách War (tab PvP War). NO_BOSS có thể là màn hình
@@ -169,12 +237,13 @@ class _Boss:
         self.war_taps += 1
         bot.log("Bỏ tích ô War (chỉ giữ rally đánh boss)")
         bot.tap(*pos)
-        for _ in range(6):
-            delay(bot, 0.5)
-            shot = bot.screenshot()
-            if bot.find(WAR_TICKED, screen=shot, region=REGIONS[WAR_TICKED]) is None:
-                self.next_screen = shot
-                break
+        shot, gone = self._poll_screen(
+            "untick_war",
+            lambda image: bot.find(WAR_TICKED, screen=image,
+                                   region=REGIONS[WAR_TICKED]) is None,
+        )
+        if gone:
+            self.next_screen = shot
         return True
 
     def _idle(self) -> bool:
@@ -220,59 +289,70 @@ class _Boss:
         tiên (vật phẩm trên cùng) -> popup số lượng -> Use -> chờ, Back về màn March, March lại."""
         bot = self.bot
         buttons = []
-        for _ in range(6):
-            delay(bot, 0.5)
-            buttons = sorted(bot.find_all(STAMINA_ITEM_USE, region=REGIONS[STAMINA_ITEM_USE]),
-                             key=lambda p: p[1])
-            if buttons:
-                break
+        _, buttons = self._poll_screen(
+            "open_stamina_items",
+            lambda image: sorted(bot.find_all(STAMINA_ITEM_USE, screen=image,
+                                              region=REGIONS[STAMINA_ITEM_USE]),
+                                 key=lambda p: p[1]),
+        )
         if not buttons:
             # Hết vật phẩm: Back 2 lần. Boss chưa được tham gia nên tuyệt đối không ghi JOINED;
             # lượt Join Boss sau có thể thử lại khi thể lực đã hồi.
             bot.record("Join Monster War: hết vật phẩm thể lực")
             bot.back(delay=1)
             bot.back(delay=1)
-            self.pending = None
             self.idle_scrolls = IDLE_SCROLLS
             return
         bot.tap(*buttons[0])
 
         # Popup số lượng: 100 -> Use luôn; ALL -> bấm cuối thanh trượt (dùng hết) rồi Use
-        use = None
-        for _ in range(6):
-            delay(bot, 0.5)
-            use = bot.find(STAMINA_USE, region=REGIONS[STAMINA_USE])
-            if use is not None:
-                break
+        _, use = self._poll_screen(
+            "open_stamina_amount",
+            lambda image: bot.find(STAMINA_USE, screen=image, region=REGIONS[STAMINA_USE]),
+        )
         if use is None:
             bot.back()
-            self.pending = None
             return
         if self.use_stamina == "ALL":
             bot.tap_percent(*STAMINA_SLIDER_END)
-            delay(bot, 0.5)
+            delay(bot, POLL_INTERVAL)
         bot.tap(*use)
         bot.record(f"Join Monster War: dùng vật phẩm thể lực ({self.use_stamina})")
 
-        # Chờ 5 giây, Back về màn March rồi bấm March lại (đội đã chọn giữ nguyên)
-        delay(bot, STAMINA_REFILL_WAIT)
+        # Popup đóng là tín hiệu vật phẩm đã được dùng; không chờ cố định 5 giây.
+        self._poll_screen(
+            "apply_stamina",
+            lambda image: bot.find(STAMINA_USE, screen=image,
+                                   region=REGIONS[STAMINA_USE]) is None,
+            timeout=STAMINA_REFILL_WAIT,
+        )
         bot.back()
-        for _ in range(6):
-            delay(bot, 0.5)
-            shot = bot.screenshot()
-            march = bot.find(MARCH, screen=shot, region=REGIONS[MARCH])
-            if march is not None:
-                coords, self.pending = self.pending, None
-                self._press_march(coords, march, shot)
+        shot, march = self._poll_screen(
+            "stamina_back_to_march",
+            lambda image: bot.find(MARCH, screen=image, region=REGIONS[MARCH]),
+        )
+        if march is not None:
+            coords = self._read_march_target_coords(shot) if CAN_READ_COORDS else None
+            if CAN_READ_COORDS and coords is None:
+                bot.record("Join Monster War: sau khi dùng thể lực không đọc được tọa độ đích; không March")
+                bot.back()
                 return
+            self._press_march(coords, march, shot)
 
     def _march(self, screen, march_pos):
         """Màn hình March: chọn quân, hành quân. Chỉ khi quay lại danh sách War
         sau khi tap hành quân thì boss vừa Join mới được nhớ là đã tham gia;
         mọi nhánh Back (thất bại) để boss đó được thử lại lần sau."""
         bot = self.bot
-        coords, self.pending = self.pending, None
         if bot.find(BOSS_MONSTER, screen=screen, region=REGIONS[BOSS_MONSTER]) is None:
+            bot.back()
+            return
+
+        # Tọa độ trên màn March là mục tiêu thật. Không so với tọa độ đọc ở danh sách:
+        # nếu card dịch chuyển và bot mở một rally khác thì xử lý rally thực tế đang mở.
+        coords = self._read_march_target_coords(screen) if CAN_READ_COORDS else None
+        if CAN_READ_COORDS and coords is None:
+            bot.record("Join Monster War: không đọc được tọa độ đích trên March; không March")
             bot.back()
             return
 
@@ -309,56 +389,51 @@ class _Boss:
         if pos is None:
             return
 
-        # Card có thể nhảy sau khi bot chọn tọa độ A và làm cú tap Join mở màn March của
-        # boss B. Tọa độ bên phải màn March là mục tiêu thật; lệch A thì Back, không March.
-        if not self._march_target_matches(screen, coords):
-            bot.back()
-            return
-        bot.tap(*pos, delay=MARCH_TAP_DELAY)
+        bot.tap(*pos)
 
-        last_shot = None
-        for _ in range(5):
-            delay(bot, 0.8)
-            shot = bot.screenshot()
-            last_shot = shot
+        def march_result(shot):
             # Không đủ thể lực: popup "Get more now?" đè lên màn March (nút March mờ vẫn khớp
-            # ảnh mẫu) -> trả màn này cho vòng lặp chính xử lý OUT_OF_STAMINA; giữ tọa độ
-            # boss để nếu hành quân được sau khi dùng thể lực thì vẫn nhớ là đã tham gia.
+            # ảnh mẫu) -> trả màn này cho vòng lặp chính xử lý OUT_OF_STAMINA.
+            # Không giữ tọa độ cũ; sau khi dùng thể lực `_use_stamina()` sẽ OCR lại
+            # mục tiêu đang hiện trên màn March trước khi bấm March lần nữa.
             if bot.find(NOT_ENOUGH_STAMINA, screen=shot) is not None:
-                self.pending = coords
-                self.next_screen = shot
-                return
+                return OUT_OF_STAMINA
 
-            # Đủ thể lực và game đã đóng màn March, quay về đúng danh sách War: coi lần
-            # hành quân thành công. Chỉ tìm template tab, không OCR các hàng Joined.
+            # Chỉ coi thành công khi về danh sách War và thấy hàng Joined đúng tọa độ
+            # mục tiêu thật đã đọc trên March. Thấy mỗi tab PvP War là chưa đủ.
             if bot.find(PVP_WAR, screen=shot, region=REGIONS[PVP_WAR]) is not None:
-                self.next_screen = shot
-                self.memory.mark(coords, MEMORY_JOINED)
-                bot.record(f"Join Monster War: đã hành quân tới boss {coords}")
-                return
-            if bot.find(MARCH, screen=shot, region=REGIONS[MARCH]) is not None:
-                continue
+                if coords is not None and self._joined_target_visible(shot, coords):
+                    return JOINED
+            return None
+
+        last_shot, result = self._poll_screen("march_to_result", march_result)
+        if result == OUT_OF_STAMINA:
+            self.next_screen = last_shot
+            return
+        if result == JOINED:
+            self.next_screen = last_shot
+            self.memory.mark(coords, MEMORY_JOINED)
+            bot.record(f"Join Monster War: đã hành quân tới boss {coords}")
+            return
 
         # Chỉ Back khi vẫn còn ở màn March. Nếu chuyển sang màn khác nhưng chưa về danh sách
         # War, giữ ảnh hiện tại cho vòng chính tự nhận diện và không ghi nhớ tọa độ.
-        if last_shot is not None and bot.find(MARCH, screen=last_shot, region=REGIONS[MARCH]) is not None:
+        if (last_shot is not None
+                and bot.find(PVP_WAR, screen=last_shot, region=REGIONS[PVP_WAR]) is not None):
+            self.next_screen = last_shot
+            bot.record(f"Join Monster War: đã về danh sách nhưng chưa thấy Joined đúng boss {coords}; không ghi nhớ")
+        elif last_shot is not None and bot.find(MARCH, screen=last_shot, region=REGIONS[MARCH]) is not None:
             bot.back()
         else:
             self.next_screen = last_shot
             bot.record(f"Join Monster War: chưa quay lại danh sách War cho boss {coords}; không ghi nhớ")
 
-    def _march_target_matches(self, screen, expected) -> bool:
-        """Xác nhận tọa độ boss đích trên March trước khi cho phép hành quân."""
-        if not CAN_READ_COORDS or expected is None:
-            return True
-        actual = self._read_march_target_coords(screen)
-        if actual is None:
-            self.bot.record(f"Join Monster War: không đọc được tọa độ đích trên March; bỏ {expected}")
-            return False
-        if actual != expected:
-            self.bot.record(f"Join Monster War: card đã đổi từ {expected} sang {actual}; không March")
-            return False
-        return True
+    def _joined_target_visible(self, screen, coords) -> bool:
+        """Danh sách War có hàng Joined mang đúng tọa độ mục tiêu vừa hành quân."""
+        points = self.bot.find_all(JOINED_BUTTON, screen=screen, center=False,
+                                   region=REGIONS[JOINED_BUTTON])
+        return any(JOIN_MIN_Y < y < JOIN_MAX_Y
+                   and self._read_card_coords(screen, x, y) == coords for x, y in points)
 
     def _read_march_target_coords(self, screen):
         """Đọc tọa độ mục tiêu bên phải màn March (bên trái là tọa độ người gọi rally)."""
@@ -409,11 +484,14 @@ class _Boss:
         for troop in usable:
             self.last_troop = troop   # đội đang được chọn trên màn March (nếu cần chọn tướng cho nó)
             bot.tap_percent(PRESET_X0 + (troop - 1) * PRESET_DX, PRESET_Y)
-            for _ in range(3):
-                delay(bot, 0.5)
-                if bot.find(GENERAL_SEARCH, region=REGIONS[GENERAL_SEARCH]) is not None:
-                    bot.log(f"Chọn đội quân {troop}")
-                    return troop
+            _, found = self._poll_screen(
+                f"select_troop_{troop}",
+                lambda image: bot.find(GENERAL_SEARCH, screen=image,
+                                       region=REGIONS[GENERAL_SEARCH]),
+            )
+            if found is not None:
+                bot.log(f"Chọn đội quân {troop}")
+                return troop
         return None
 
     def _choose_general(self, slot) -> bool:
@@ -429,17 +507,16 @@ class _Boss:
         plus = bot.find(SELECT_GENERAL, region=slot)
         if plus is None:
             return bot.find(GENERAL_SEARCH, region=slot) is not None
-        bot.tap(*plus, delay=GENERAL_TAP_DELAY)
+        bot.tap(*plus)
 
         # Chờ màn "Select a General": nhận bằng trái tim lọc (luôn có, kể cả khi danh sách
         # trống "No favorite General" thì không có nút Select nào)
-        for _ in range(6):
-            delay(bot, 0.5)
-            screen = bot.screenshot()
-            if (bot.find(FAVORITE_ON, screen=screen, region=REGIONS[FAVORITE_ON]) is not None
-                    or bot.find(FAVORITE_OFF, screen=screen, region=REGIONS[FAVORITE_OFF]) is not None):
-                break
-        else:
+        screen, opened = self._poll_screen(
+            f"open_{name}",
+            lambda image: (bot.find(FAVORITE_ON, screen=image, region=REGIONS[FAVORITE_ON])
+                           or bot.find(FAVORITE_OFF, screen=image, region=REGIONS[FAVORITE_OFF])),
+        )
+        if not opened:
             bot.record(f"Chọn {name}: không mở được màn Select a General")
             return False
 
@@ -448,16 +525,22 @@ class _Boss:
             hammer = bot.find(CHOOSE_DEVELOPMENT, screen=screen, region=REGIONS[CHOOSE_DEVELOPMENT])
             if hammer is not None:
                 bot.tap(*hammer)
-                delay(bot, 1 + GENERAL_TAP_DELAY)
-                screen = bot.screenshot()
+                screen, _ = self._poll_screen(
+                    f"select_development_{name}",
+                    lambda image: bot.find(CHOOSE_DEVELOPMENT, screen=image,
+                                           region=REGIONS[CHOOSE_DEVELOPMENT]) is None,
+                )
 
         # Chỉ hiện tướng yêu thích: trái tim lọc chưa tích thì bấm tích
         if bot.find(FAVORITE_ON, screen=screen, region=REGIONS[FAVORITE_ON]) is None:
             heart = bot.find(FAVORITE_OFF, screen=screen, region=REGIONS[FAVORITE_OFF])
             if heart is not None:
                 bot.tap(*heart)
-                delay(bot, 1 + GENERAL_TAP_DELAY)
-                screen = bot.screenshot()
+                screen, _ = self._poll_screen(
+                    f"favorite_filter_{name}",
+                    lambda image: bot.find(FAVORITE_ON, screen=image,
+                                           region=REGIONS[FAVORITE_ON]),
+                )
 
         # Chỉ nút Select màu xanh: tướng đang là tướng chính có nút xám (không chọn được làm
         # tướng phụ), nút xám vẫn khớp ảnh mẫu tới 0,88.
@@ -467,20 +550,22 @@ class _Boss:
             # Không có tướng yêu thích nào ("No favorite General"), hoặc chỉ còn tướng đang là
             # tướng chính (nút xám) -> quay về màn March
             bot.record(f"Chọn {name}: không có tướng nào để chọn")
-            bot.back(delay=GENERAL_TAP_DELAY)
-            for _ in range(6):
-                delay(bot, 0.5)
-                if bot.find(MARCH, region=REGIONS[MARCH]) is not None:
-                    break
+            bot.back()
+            self._poll_screen(
+                f"back_from_{name}",
+                lambda image: bot.find(MARCH, screen=image, region=REGIONS[MARCH]),
+            )
             return False
-        bot.tap(*buttons[0], delay=GENERAL_TAP_DELAY)
+        bot.tap(*buttons[0])
 
         # Quay về màn March, ô đã có tướng
-        for _ in range(6):
-            delay(bot, 0.5)
-            if bot.find(GENERAL_SEARCH, region=slot) is not None:
-                bot.log(f"Đã chọn {name}")
-                return True
+        _, selected = self._poll_screen(
+            f"confirm_{name}",
+            lambda image: bot.find(GENERAL_SEARCH, screen=image, region=slot),
+        )
+        if selected is not None:
+            bot.log(f"Đã chọn {name}")
+            return True
         bot.record(f"Chọn {name}: chưa thấy tướng trong ô sau khi Select")
         return False
 
@@ -509,6 +594,13 @@ class _Boss:
             if CAN_READ_COORDS:
                 coords = self._read_card_coords(screen, x, y)
 
+                # Không có danh tính ổn định để tìm lại card. Bỏ nút này trong màn hiện tại
+                # thay vì xóa blacklist và lặp vô hạn trên cùng một thẻ OCR lỗi.
+                if coords is None:
+                    bot.log(f"Không đọc được tọa độ card tại ({x}, {y}); bỏ qua trong màn hiện tại")
+                    self.screen_blacklist.append((x, y))
+                    continue
+
                 # Chỉ JOINED dài hạn mới được chặn theo tọa độ. Không dùng SKIPPED dài hạn:
                 # một lần OCR sai không được phép khóa nhầm boss hợp lệ trong 6 phút.
                 if coords and self.memory.status(coords) == MEMORY_JOINED:
@@ -529,9 +621,8 @@ class _Boss:
                 self.screen_blacklist.append((x, y))
                 continue
 
-            # 6. OCR phía trên có thể mất vài giây. Trong lúc đó rally mới xuất hiện làm các
-            #    thẻ cũ nhảy vị trí. Chụp lại và tìm đúng tọa độ boss, sau đó kiểm tra thêm
-            #    một ảnh ngay trước cú tap; tuyệt đối không bấm lại vị trí (x, y) đã cũ.
+            # 6. OCR phía trên có thể mất vài giây. Chụp một ảnh mới và tìm lại card đúng
+            #    tọa độ trước khi tap. Nếu vẫn có race sau đó, màn March dùng tọa độ thật.
             target = self._stable_join_target(coords, (x, y), jh)
             if target is None:
                 return False
@@ -543,7 +634,6 @@ class _Boss:
             #    (thời gian đỏ -> bỏ qua, không đỏ -> bấm Join lại), không bỏ sang Join khác.
             bot.report_boss(coords)
             bot.tap(x + jw // 2, y + jh // 2)
-            self.pending = coords
             self.idle_scrolls = 0   # cả khi không đọc được tọa độ
             return True
         return False
@@ -647,14 +737,15 @@ POWER_DX, POWER_DY, POWER_W, POWER_DH = -18, -180, 75, 20   # số dài (147.5M)
 
 SCROLLS_EACH_WAY = 3                  # mỗi chu kỳ: 3 lần cuộn xuống rồi 3 lần cuộn lên
 IDLE_SCROLLS = 2 * SCROLLS_EACH_WAY   # cuộn hết 1 chu kỳ (6 lần) mà không thấy boss mới -> rảnh
-IDLE_WAIT = 5      # giây chờ khi rảnh mà chỉ chạy Join Boss
+IDLE_WAIT = 2      # polling khi rảnh; không phải độ trễ của một thao tác UI
 SCROLL_SETTLE = 0.5   # giây chờ danh sách dừng trôi sau khi vuốt, trước khi chụp
-GENERAL_TAP_DELAY = 2   # giây chờ thêm sau mỗi lần bấm khi chọn tướng ("+", trái tim, Select, Back)
-MARCH_TAP_DELAY = 2     # giây chờ sau khi bấm March, trước khi kiểm tra màn March đã đóng / popup thể lực
-UNKNOWN_RETRIES = 3     # màn hình không nhận ra: chụp lại tối đa bấy nhiêu lần (mỗi lần 1 s) trước khi go_home
-JOIN_TAP_WAIT = 3       # giây chờ sau khi tap Join (vào màn March, hoặc không Join được thì tap lại)
+POLL_INTERVAL = 0.2     # kiểm tra sớm để đa số bước hoàn thành gần 1 giây
+STEP_TARGET = 1.0       # quá mức này ghi SLOW trong log performance
+STEP_TIMEOUT = 2.0      # không bước UI nào chờ lâu hơn 2 giây
+PERF_SUMMARY_EVERY = 10 # mỗi 10 mẫu in p50/p95/max của bước đó
 MAX_MAP_COORD = 2000    # chặn kết quả OCR tọa độ hỏng rõ ràng; cố ý rộng hơn mọi map đang dùng
-_WAIT = {"top_left": {LEAVE_ALLIANCE_POPUP}, "tolerance": SAME_SPOT}
+_WAIT = {"top_left": {LEAVE_ALLIANCE_POPUP}, "tolerance": SAME_SPOT,
+         "timeout": STEP_TIMEOUT, "interval": POLL_INTERVAL}
 
 
 def _is_green_button(screen, center) -> bool:

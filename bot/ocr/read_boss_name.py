@@ -7,6 +7,8 @@ the card behind is busy), split at empty columns, and a gap of SPACE_GAP px
 or more is a space. Each piece is matched against samples in
 Images/OCR/Name/, named "<text>_<n>.png" in lower case; <text> may be more
 than one letter for letters the font draws touching (e.g. "ot_1.png").
+A sample named ``skip_<n>.png`` represents a disconnected fragment of the
+same printed glyph and emits no extra character.
 A piece that matches no sample well enough reads as "?", so the caller can
 still fuzzy-match the text against the known boss names.
 """

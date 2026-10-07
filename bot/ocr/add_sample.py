@@ -16,6 +16,10 @@ lower-cased. Example for "(Boss) Peryton" where "ryt" touch:
 
     python -m bot.ocr.add_sample Name name.png "(|b|o|s|s|)| |p|e|ryt|o|n"
 
+If one printed glyph is split into disconnected pieces, label the extra
+piece ``skip``. It is saved as a sample but emits no text at runtime. ``_``
+is different: it does not save a sample at all.
+
 The boss power font ("Power", read_power.py) works the same way; "." is
 the decimal point (recognised by height, not saved). Example for "6.5M":
 
