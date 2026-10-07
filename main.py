@@ -328,7 +328,7 @@ def main():
     QApplication.setHighDpiScaleFactorRoundingPolicy(
         Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
     )
-    # The installed app runs as pythonw.exe; give it its own taskbar
+    # The installed app runs as EvonyBot.exe (renamed pythonw.exe); give it its own taskbar
     # identity (matches the shortcut's AppUserModelID) and icon instead
     # of Python's.
     if sys.platform == "win32":

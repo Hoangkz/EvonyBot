@@ -2,7 +2,8 @@
 build.ps1 — build the EvonyBot installer (replaces the PyInstaller build).
 
 Stages everything the installer ships into build\app:
-  python\                  Python embeddable runtime + Lib\site-packages
+  app\                     Python embeddable runtime + Lib\site-packages;
+                           pythonw.exe is renamed EvonyBot.exe (the app's process name)
   main.cp312-win_amd64.pyd all app code (main, database, version, updater,
                            bot\, ui\) compiled by Nuitka into this one file
   EvonyBot.pyw             launcher stub (from main import main)
@@ -31,7 +32,7 @@ Write-Host "Building EvonyBot $Version"
 $PyVersion = "3.12.10"   # must match the venv's major.minor so its packages fit
 $Build = Join-Path $Root "build"
 $App = Join-Path $Build "app"
-$PyDir = Join-Path $App "python"
+$PyDir = Join-Path $App "app"
 $SitePackages = Join-Path $PyDir "Lib\site-packages"
 $EmbedZip = Join-Path $Build "python-$PyVersion-embed-amd64.zip"
 $HostPy = Join-Path $Root "venv\Scripts\python.exe"
@@ -81,9 +82,12 @@ if (-not (Test-Path $EmbedZip)) {
     Invoke-WebRequest "https://www.python.org/ftp/python/$PyVersion/python-$PyVersion-embed-amd64.zip" -OutFile $EmbedZip
 }
 Expand-Archive $EmbedZip -DestinationPath $PyDir -Force
+# The windowed interpreter becomes the app's own executable (Task Manager shows EvonyBot.exe).
+# python.exe stays for running the app with a console when debugging.
+Move-Item (Join-Path $PyDir "pythonw.exe") (Join-Path $PyDir "EvonyBot.exe") -Force
 
 # The ._pth file fixes sys.path for the embedded runtime: add
-# site-packages and the app folder (parent of python\) so main.py's
+# site-packages and the app folder (parent of app\) so main.py's
 # imports of bot/ui/database resolve.
 $pth = Get-ChildItem $PyDir -Filter "python*._pth" | Select-Object -First 1
 Set-Content $pth.FullName -Encoding ascii -Value @(
@@ -116,7 +120,7 @@ if ($LASTEXITCODE -ge 8) { throw "copying site-packages failed (robocopy exit $L
 # ---- app code -> one .pyd (no readable .py shipped) ------------------
 # Nuitka module mode compiles main.py plus every included module/package
 # into a single extension; third-party libraries are not followed and
-# load from python\Lib\site-packages as usual. Compiled modules keep
+# load from app\Lib\site-packages as usual. Compiled modules keep
 # their __file__ (e.g. <app>\bot\context\templates.py), so paths built from it
 # (Images\, ui\assets\) still resolve.
 Write-Host "Compiling app code with Nuitka..."
@@ -137,11 +141,18 @@ Copy-Item (Join-Path $NuitkaOut "main*.pyd") $App
 # ---- data files ------------------------------------------------------
 New-Item -ItemType Directory -Force (Join-Path $App "ui") | Out-Null
 Copy-Item (Join-Path $Root "ui\assets") (Join-Path $App "ui\assets") -Recurse
-New-Item -ItemType Directory -Force (Join-Path $App "ui\tabs") | Out-Null
-Copy-Item (Join-Path $Root "ui\tabs\boss.json") (Join-Path $App "ui\tabs\boss.json")
-Copy-Item (Join-Path $Root "ui\tabs\event.json") (Join-Path $App "ui\tabs\event.json")
-New-Item -ItemType Directory -Force (Join-Path $App "bot\worker") | Out-Null
-Copy-Item (Join-Path $Root "bot\worker\priority.json") (Join-Path $App "bot\worker\priority.json")
+# Every .json under bot\ and ui\ (boss, event, priority, black_market items / city_tour, ...) is read at
+# runtime relative to its module, so ship them all at the same relative path.
+foreach ($dir in "bot", "ui") {
+    Get-ChildItem (Join-Path $Root $dir) -Filter "*.json" -Recurse |
+        Where-Object { $_.FullName -notmatch '\\__pycache__\\' } |
+        ForEach-Object {
+            $rel = $_.FullName.Substring($Root.Length).TrimStart('\')
+            $dest = Join-Path $App $rel
+            New-Item -ItemType Directory -Force (Split-Path $dest) | Out-Null
+            Copy-Item $_.FullName $dest
+        }
+}
 Copy-Item (Join-Path $Root "Images") (Join-Path $App "Images") -Recurse
 
 # A .pyd can't be run as a script, so the shortcut starts this stub.
