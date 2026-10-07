@@ -38,11 +38,14 @@ SELECT_ALL = f"{KP}/Heal/selectAll.png"
 # Sau Reset: cuộn danh sách lính xuống cuối (lính cấp thấp nhất ở dòng dưới cùng). Vuốt ở mép trái (x 5%,
 # cột hình lính): vuốt giữa màn có thể trúng thanh kéo số lượng của một dòng -> kéo thanh, không cuộn.
 LIST_SWIPE = (5, 70, 5, 30)     # % màn hình, ngón tay kéo lên = cuộn xuống
-LIST_SCROLLS = 5
+LIST_SCROLLS = 12   # số lần cuộn tối đa tới khi thấy ảnh cuối danh sách
 # Cuối danh sách: dưới dòng lính cuối có một khoảng trống nhỏ rồi tới khung tài nguyên (dải ngang (14, 512)
 # rộng 368 cao 50): ở cuối 0,99 .. 1,00 (heal_list_end.png, heal_screen_reset.png); chưa tới cuối / màn khác
 # <= 0,73. Thấy thì thôi cuộn (kể cả trước lần cuộn đầu: danh sách ngắn, không cần cuộn).
 LIST_END = f"{KP}/Heal/listEnd.png"
+# Ảnh cuối danh sách: dải tối 206x35 có viền cam ở đáy (người dùng cắt từ màn thật). Thấy thì thôi cuộn;
+# chưa thấy thì cuộn tiếp tới LIST_SCROLLS lần. Ngưỡng 0,8 (người dùng chốt); chỉ tìm ở màn Hospital.
+LIST_END_THRESHOLD = 0.8
 LIST_SWIPE_WAIT = 3   # chờ sau mỗi lần cuộn
 # Mọi thao tác (bấm / Back / gõ số) trong nhiệm vụ Heal chờ thêm EXTRA_WAIT giây (máy chậm).
 EXTRA_WAIT = 2
@@ -57,6 +60,12 @@ INPUT_DELETES = 7   # xoá số cũ trong ô (tối đa 7 chữ số) trước k
 # Nút "Heal" góc dưới phải (319, 666): 1,00 khi chưa chọn lính (xám) / 0,86 khi đã chọn.
 HEAL_BUTTON = f"{KP}/Heal/healButton.png"
 HEAL_BUTTON_THRESHOLD = 0.8
+HEAL_BUTTON_POS = (319, 666)   # tâm nút Heal (đo trên màn Hospital 396x704)
+# Nút Heal sáng (cam) hay xám: ảnh mẫu là nút xám nên nút cam cũng khớp 0,86 -> đo màu (R - B của vùng nút):
+# cam ~122 (heal_screen.png), xám ~7 (heal_screen_reset.png) -> sáng khi >= 60. Chưa sáng thì làm lại từ màn
+# Hospital (Reset, cuộn, chọn lính), tối đa HEAL_ATTEMPTS lần.
+HEAL_LIT_DIFF = 60
+HEAL_ATTEMPTS = 3
 HEAL_WAIT = 3   # sau khi bấm Heal
 
 # ---- Nhập số lượng (bấm ô số -> thanh nhập ở đáy màn, heal_input.png) ----------------------

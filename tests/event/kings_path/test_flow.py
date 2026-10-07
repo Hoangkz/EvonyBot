@@ -179,8 +179,8 @@ class VoyageFlow(unittest.TestCase):
         self.assertIn(VOYAGE_KEY, device.daily_done)
 
     def test_no_free(self):
-        """Đã tích Skip animation, không thấy Free: không bấm gì, KHÔNG lưu VOYAGE_KEY (lần sau vào kiểm
-        lại), Back."""
+        """Đã tích Skip animation, không thấy Free: không bấm gì, Back. VOYAGE_KEY lưu ngay khi vào (mỗi ngày
+        chỉ vào Voyage 1 lần, có Free hay không)."""
         flow = [
             Step("03_main.png?main_claimed", tap_at(*EVENT_BUTTON)),
             Step("event_list_voyage_dot.png", tap(VOYAGE_ICON)),
@@ -190,8 +190,8 @@ class VoyageFlow(unittest.TestCase):
             Step("wheel_of_fortune.png", tap(SPINS_100), back(), end()),
         ]
         device = self._run(flow)
-        self.assertIn("Event: Voyage: no Free, check again next time", device.logs)
-        self.assertNotIn(VOYAGE_KEY, device.daily_done)
+        self.assertIn("Event: Voyage: no Free today", device.logs)
+        self.assertIn(VOYAGE_KEY, device.daily_done)
 
     def test_done_today_not_entered(self):
         """Hôm nay đã bấm Free (DB có VOYAGE_KEY): không vào Voyage. Ảnh không có icon King's Path: cuộn hết,
@@ -340,14 +340,16 @@ class KingsPathFlow(unittest.TestCase):
 
     def test_donate(self):
         """Tab Teamwork: dòng "Donate to the Alliance" (0 / 10) -> Go -> Alliance Science:
-        Donate 2 lần -> hết lượt (nút kim cương) -> Okay -> Donate lần 3 -> xong (mục tiêu 3)."""
+        Donate 2 lần -> hết lượt (nút kim cương) -> Okay -> Donate lần 3 (đủ mục tiêu 3) -> vẫn bấm tới khi ra
+        nút kim cương rồi mới xong."""
         flow = [
             Step("day2_teamwork.png", tap_at(335, 567)),
             Step("donate_science.png", tap(DONATE_BUTTON)),
             Step("donate_science.png", tap(DONATE_BUTTON)),
             Step("donate_gems.png", tap(GEMS_BUTTON)),
             Step("donate_confirm_gems.png", tap(OKAY)),
-            Step("donate_science.png", tap(DONATE_BUTTON), end()),
+            Step("donate_science.png", tap(DONATE_BUTTON)),
+            Step("donate_gems.png", end()),   # đủ mục tiêu nhưng vẫn bấm tới khi ra nút kim cương (không mua thêm)
         ]
         device = _run(self, flow, {donate.KEY: {"value": 3, "day": 2}})
         self.assertIn("Donate: done 0, target 3", device.logs)
@@ -360,7 +362,7 @@ class KingsPathFlow(unittest.TestCase):
         flow = [
             Step("donate_science.png", tap(DONATE_BUTTON)),
             Step("donate_science.png", tap(DONATE_BUTTON)),
-            Step("donate_science.png", back(), end()),
+            Step("donate_gems.png", back(), end()),   # đủ 2 lần, ra nút kim cương -> Back
         ]
         device = _run(self, flow, settings, ctx_settings={"Event": settings})
         self.assertIn(donate_alliance_key(1), device.daily_done)
@@ -377,7 +379,7 @@ class KingsPathFlow(unittest.TestCase):
             Step("alliance_screen.png", swipe(50, 87, 50, 54), swipe(50, 87, 50, 54)),
             Step("alliance_scrolled.png", tap("Science/scienceclick.png")),
             Step("alliance_science.png", tap(DONATE_BUTTON)),
-            Step("alliance_science.png", back(), end()),
+            Step("donate_gems.png", back(), end()),   # hết lượt miễn phí (nút kim cương) -> Back
         ]
         device = _run(self, flow, settings, ctx_settings={"Event": settings})
         self.assertIn(donate.KEY, device.daily_done)
@@ -387,7 +389,7 @@ class KingsPathFlow(unittest.TestCase):
         settings = {patrol.KEY: {"value": 0, "day": 2}, donate.KEY: {"value": 3, "day": 2}}
         flow = [
             Step("donate_science.png", tap(DONATE_BUTTON)),
-            Step("donate_science.png", back(), end()),
+            Step("donate_gems.png", back(), end()),
         ]
         done = {donate_alliance_key(n): "2026-10-02T08:00:00" for n in (1, 2)}
         device = _run(self, flow, settings, ctx_settings={"Event": settings}, daily_done=done)
@@ -430,13 +432,14 @@ class KingsPathFlow(unittest.TestCase):
 
     def test_train_troop(self):
         """Day 3 -> tab Strong Troops (ảnh thật, tiến độ xuống 2 dòng "23,530 / 50,000") -> Go ->
-        doanh trại -> menu Train -> màn Train: bấm vòng cấp I (sát mép trái) -> Train."""
+        doanh trại -> menu Train -> màn Train (đang chọn cấp I) -> Train."""
         flow = [
             Step("day3_healing_heart.png", tap(f"{KP}/Tab/strongTroops.png")),
             Step("day3_strong_troops_go.png", tap_at(335, 344)),
-            Step("train_after_go.png", tap_at(198, 352)),
+            # Doanh trại đã có ảnh học sẵn (Images/Event/Building): bấm đúng chỗ nhận ra, không bấm giữa màn.
+            Step("train_after_go.png", tap_at(181, 333, tol=5)),
             Step("train_menu.png", tap("Event/GatherTroops/Train/train.png")),
-            Step("train_t01.png", tap("Event/GatherTroops/GroundTroop/Tier/1.png")),
+            # Vòng đang chọn đã là cấp I và train được: không bấm vòng nào, bấm Train luôn.
             Step("train_t01.png", tap("Event/GatherTroops/Train/trainButton.png")),
         ]
         device = _run(self, flow, {train_troop.KEY: {"value": 50000, "day": 3}})
@@ -454,27 +457,26 @@ class KingsPathFlow(unittest.TestCase):
         self.assertIn("City Tax: done 93, target 110", device.logs)
 
     def test_train_first_tier_walks_down(self):
-        """Công trình mở ở cấp cao (ảnh lính bộ cấp XIII .. V của test Ground Troop): chưa thấy cấp I
-        của loại nào -> vuốt hàng cấp sang trái, mỗi lần vuốt kiểm tra lại; thấy vòng cấp I (train_t01,
-        I sát mép trái) thì bấm I, có nút "+" -> chọn cấp 1, thôi vuốt."""
+        """Công trình mở ở cấp cao (ảnh lính bộ cấp XIII .. V của test Ground Troop): đọc huy hiệu cấp của vòng đang
+        chọn rồi bấm vòng cách nó 2 ô về phía cấp I (x giảm dần theo vị trí vòng đang chọn), đọc lại; tới khi vòng
+        đang chọn là cấp I và train được (train_t01) thì xong."""
         g = "../../gather_troops/ground_troop/screens/"
         flow = [
-            Step(g + "train_t13.png", swipe(15, 64, 90, 64)),
-            Step(g + "train_t11.png", swipe(15, 64, 90, 64)),
-            Step(g + "train_t09.png", swipe(15, 64, 90, 64)),
-            Step(g + "train_t07.png", swipe(15, 64, 90, 64)),
-            Step(g + "train_t05.png", swipe(15, 64, 90, 64)),
-            Step("train_t01.png", tap("Event/GatherTroops/GroundTroop/Tier/1.png")),
+            Step(g + "train_t13.png", tap_at(111, 452, tol=3)),
+            Step(g + "train_t11.png", tap_at(109, 452, tol=3)),
+            Step(g + "train_t09.png", tap_at(106, 452, tol=3)),
+            Step(g + "train_t07.png", tap_at(104, 452, tol=3)),
+            Step(g + "train_t05.png", tap_at(102, 452, tol=3)),
             Step("train_t01.png", end(1)),
         ]
         run_flow(self, lambda bot, _: choose_first_tier(bot, TRAIN_TIERS), SCREENS, flow, {})
 
     def test_train_first_tier_other_kind(self):
-        """Game mở chuồng ngựa (lính kỵ, ảnh có cấp I ngay): nhận cấp I của loại khác lính bộ, không vuốt."""
+        """Game mở chuồng ngựa (lính kỵ, đang chọn cấp II): đọc huy hiệu rồi bấm vòng cấp I bên trái (38, 452); thấy
+        cấp I được chọn và train được thì xong (ảnh sau khi bấm lấy từ test Train Troop)."""
         flow = [
-            Step("../../gather_troops/mounted_troop/screens/train_t02.png",
-                 tap("Event/GatherTroops/MountedTroop/Tier/1.png")),
-            Step("../../gather_troops/mounted_troop/screens/train_t02.png", end(1)),
+            Step("../../gather_troops/mounted_troop/screens/train_t02.png", tap_at(38, 452, tol=3)),
+            Step("train_t01.png", end(1)),
         ]
         run_flow(self, lambda bot, _: choose_first_tier(bot, TRAIN_TIERS), SCREENS, flow, {})
 
@@ -630,7 +632,7 @@ class KingsPathFlow(unittest.TestCase):
         """Không chạy theo lịch ưu tiên boss: nhiệm vụ xong thì làm tiếp bình thường."""
         flow = [Step("day2_teamwork.png", end())]
         device = _run(self, flow, {patrol.KEY: {"value": 100, "day": 2}})
-        self.assertIn("Event: task kings_path_patrol done", device.logs)
+        self.assertIn("Event: xong kings_path_patrol", device.logs)
         self.assertIn(patrol.KEY, device.daily_done)
 
     def test_heal_idle_hospital(self):
@@ -646,7 +648,8 @@ class KingsPathFlow(unittest.TestCase):
             # Đã ở cuối danh sách (khoảng trống trên khung tài nguyên): không cuộn.
             Step("heal_screen_reset.png", tap_at(285, 465)),
             Step("heal_input.png", tap(HEAL_INPUT_OK)),
-            Step("heal_screen_reset.png", tap(HEAL_BUTTON)),
+            # Nút Heal phải SÁNG (cam, heal_screen.png) mới bấm; xám (heal_screen_reset.png) thì làm lại.
+            Step("heal_screen.png", tap(HEAL_BUTTON)),
             Step("heal_healing.png", tap(HEAL_SPEED_UP)),
             Step("heal_speedup.png", tap(TRAIN_SPEEDUP_SETTINGS)),
             Step("heal_finish_all.png", tap(TRAIN_CHECKBOX_OFF)),
@@ -656,6 +659,47 @@ class KingsPathFlow(unittest.TestCase):
         device = _run(self, flow, {heal.KEY: {"value": 50000, "day": 3}})
         self.assertIn("Heal: hospital idle, Heal (done 0, target 50000)", device.logs)
         self.assertIn("input text 50000", device.shells)
+
+    def test_heal_button_not_lit_redo_from_hospital(self):
+        """Nút Heal còn xám (không chọn được lính) -> không bấm, làm lại từ màn Hospital (ở sẵn màn, ô số dòng
+        cuối) -> lần 2 nút sáng -> bấm Heal."""
+        flow = [
+            Step("day3_healing_heart.png", tap_at(335, 344)),
+            Step("heal_city.png", tap_pct(50, 50)),
+            Step("heal_menu.png", tap(HEAL_MENU_HEAL)),
+            Step("heal_screen.png", tap(HEAL_RESET)),
+            Step("heal_screen_reset.png", tap_at(285, 465)),
+            Step("heal_input.png", tap(HEAL_INPUT_OK)),
+            Step("heal_screen_reset.png", tap_at(285, 465)),   # nút Heal xám: làm lại bước chọn lính
+            Step("heal_input.png", tap(HEAL_INPUT_OK)),
+            Step("heal_screen.png", tap(HEAL_BUTTON)),
+            Step("heal_healing.png", tap(HEAL_SPEED_UP)),
+            Step("heal_speedup.png", tap(TRAIN_SPEEDUP_SETTINGS)),
+            Step("heal_finish_all.png", tap(TRAIN_CHECKBOX_OFF)),
+            Step("heal_finish_all_ticked.png", tap(TRAIN_CONFIRM)),
+            Step("heal_speedup.png", tap(TRAIN_FINISH_ALL)),
+        ]
+        device = _run(self, flow, {heal.KEY: {"value": 50000, "day": 3}})
+        self.assertTrue(any("Heal button not lit" in log for log in device.logs))
+
+    def test_heal_already_started_goes_to_speed_up(self):
+        """Sau khi nhập số đã thấy hộp "Healing ... Speed Up" (lần bấm OK trúng nút Heal): coi như đã bắt đầu hồi, đi
+        tiếp tới Speed Up, không báo thiếu nút Heal."""
+        flow = [
+            Step("day3_healing_heart.png", tap_at(335, 344)),
+            Step("heal_city.png", tap_pct(50, 50)),
+            Step("heal_menu.png", tap(HEAL_MENU_HEAL)),
+            Step("heal_screen.png", tap(HEAL_RESET)),
+            Step("heal_screen_reset.png", tap_at(285, 465)),
+            Step("heal_input.png", tap(HEAL_INPUT_OK)),
+            Step("heal_healing.png", tap(HEAL_SPEED_UP)),
+            Step("heal_speedup.png", tap(TRAIN_SPEEDUP_SETTINGS)),
+            Step("heal_finish_all.png", tap(TRAIN_CHECKBOX_OFF)),
+            Step("heal_finish_all_ticked.png", tap(TRAIN_CONFIRM)),
+            Step("heal_speedup.png", tap(TRAIN_FINISH_ALL)),
+        ]
+        device = _run(self, flow, {heal.KEY: {"value": 50000, "day": 3}})
+        self.assertTrue(any("heal already started" in log for log in device.logs))
 
     def test_heal_no_wounded(self):
         """Hospital không còn lính bị thương ("Wounded Troops 0/0", không có dòng lính): Back, xong

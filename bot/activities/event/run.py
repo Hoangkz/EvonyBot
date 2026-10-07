@@ -1,7 +1,8 @@
 """
 run.py — "Event" activity.
 
-Chạy lần lượt từng event trong EVENTS (Gather Troops rồi King's Path). Mỗi event: làm lần lượt
+Chạy lần lượt từng event trong EVENTS (Gather Troops rồi King's Path), cuối cùng là event 3 ngày
+của Event Center (event_center/three_day). Group nào bỏ tích "active" ở tab Event thì bỏ qua. Mỗi event: làm lần lượt
 các nhiệm vụ được bật ở tab Event, xong hết thì nhận thưởng của event đó theo chấm đỏ
 (claim.py — chỉ khi event có nhiệm vụ đã xong hôm nay, mỗi khi số nhiệm vụ xong tăng lên),
 rồi mới sang event kế tiếp.
@@ -18,6 +19,7 @@ from . import claim
 from .common import EventState, is_complete
 from .constants import GATHER_TROOPS_ICON, KINGS_PATH_ICON
 from .gather_troops import cultivate_generals, ground_troop, mounted_troop, ranged_troop, siege_machine, defense_force
+from ..event_center import three_day
 from .kings_path import black_market, city_tax, donate, heal, patrol, refine, train_troop, wheel
 
 # (key event, tên log, icon trong danh sách event, [(key nhiệm vụ trong settings / event.json,
@@ -51,6 +53,9 @@ def run(bot, settings: dict):
     {key: {"enabled", "day"}} (ô tích) / {key: {"value", "level"?, "day"}} (ô chọn)."""
     state = EventState()
     for event, name, icon, tasks in EVENTS:
+        if not _group_active(settings, event):
+            bot.log(f"Event: {name} not active, skipped")
+            continue
         for key, run_task in tasks:
             task = settings.get(key)
             if not _enabled(task):
@@ -67,6 +72,15 @@ def run(bot, settings: dict):
                 bot.yield_to_boss()
         bot.check()
         claim.maybe_claim(bot, state, event, name, icon, [key for key, _ in tasks])
+    # Event 3 ngày (Event Center > Limited): tự kiểm group bật và "đã xong hôm nay".
+    bot.check()
+    three_day.run(bot, settings)
+
+
+def _group_active(settings: dict, event: str) -> bool:
+    """Ô tích ở tiêu đề group (settings "<event>_active"); thiếu = bật."""
+    group = settings.get(f"{event}_active")
+    return True if group is None else bool(group.get("enabled") if isinstance(group, dict) else group)
 
 
 def _enabled(task) -> bool:

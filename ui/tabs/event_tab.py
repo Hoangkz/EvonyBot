@@ -11,6 +11,10 @@ event.json liệt kê từng group (Gather Troops, King's Path, ...): các ô t�
   với cấp lính. Có level thì ô chọn hiện "500 (Lv 5)".
 Vị trí control được tính tự động (ô tích bên trái, ô chọn xếp 3 cột mỗi hàng).
 
+Mỗi group có `key`; ô tích ở tiêu đề group = group đang bật (settings "<key>_active").
+Group có `redeem` (danh sách quà đổi): ô danh sách kéo / nút Up Down để xếp thứ tự ưu tiên
+(settings {redeem.key: {"order": [id, ...]}}).
+
 Settings (lưu ở cột `event` của DB) giữ đủ thông tin mỗi nhiệm vụ:
 {"gather_troops_ground_troop": {"value": 500, "level": 7, "day": 1},
  "gather_troops_cultivate_generals": {"enabled": true, "day": 1}, ...}
@@ -18,7 +22,8 @@ Settings (lưu ở cột `event` của DB) giữ đủ thông tin mỗi nhiệm 
 import json
 from pathlib import Path
 
-from PyQt5.QtCore import pyqtSignal
+from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtWidgets import QAbstractItemView, QListWidget, QListWidgetItem, QPushButton
 
 from .tab_placeholder import DesignerTab
 
@@ -28,6 +33,7 @@ GROUPS = json.loads(EVENT_JSON.read_text(encoding="utf-8-sig"))["groups"]
 _COMBO_X = [220, 490, 760]   # cột nhãn; combo nằm ngay sau nhãn
 _ROW_H = 35
 _GROUP_TOP, _GROUP_GAP = 65, 8
+_REDEEM_H = 190   # chiều cao ô danh sách quà (nhóm có "redeem")
 
 
 def _option(raw) -> dict:
@@ -44,7 +50,7 @@ def _build(groups):
     """DESIGNER_DATA, {key: (tên checkbox, spec)}, {key: (tên combo, spec)}, PAGE_SIZE."""
     data = {"buttonEventApplyALL": {"loc": [935, 16], "size": [132, 43], "text": "Apply ALL",
                                     "type": "Button"}}
-    checkboxes, combos = {}, {}
+    checkboxes, combos, redeems = {}, {}, {}
     roots, y = [], _GROUP_TOP
     for g, group in enumerate(groups):
         children = []
@@ -65,6 +71,9 @@ def _build(groups):
         rows = max(len(group.get("checkboxes", [])),
                    (len(group.get("combos", [])) + 2) // 3, 1)
         panel_h = 10 + rows * _ROW_H
+        if group.get("redeem"):
+            redeems[f"panelEvent{g}"] = (10 + rows * _ROW_H, group["redeem"])
+            panel_h += _REDEEM_H
         data[f"panelEvent{g}"] = {"children": children, "loc": [21, 25], "size": [1010, panel_h],
                                   "type": "Panel"}
         data[f"groupBoxEvent{g}"] = {"children": [f"panelEvent{g}"], "loc": [20, y],
@@ -75,10 +84,10 @@ def _build(groups):
     page_size = (1088, max(609, y))
     data["Event"] = {"children": roots + ["buttonEventApplyALL"], "loc": [4, 31],
                      "size": list(page_size), "text": "Event", "type": "TabPage"}
-    return data, checkboxes, combos, page_size
+    return data, checkboxes, combos, redeems, page_size
 
 
-DESIGNER_DATA, _CHECKBOXES, _COMBOS, PAGE_SIZE = _build(GROUPS)
+DESIGNER_DATA, _CHECKBOXES, _COMBOS, _REDEEMS, PAGE_SIZE = _build(GROUPS)
 
 
 class EventTab(DesignerTab):
@@ -100,6 +109,44 @@ class EventTab(DesignerTab):
             if "default" in spec:
                 self._select(combo, {"value": spec["default"]})
             combo.activated.connect(self.settings_changed)
+        for g, group in enumerate(GROUPS):
+            box = c[f"groupBoxEvent{g}"]
+            box.setCheckable(True)
+            box.setChecked(bool(group.get("active", True)))
+            box.clicked.connect(self.settings_changed)
+        self._lists = {}
+        for panel, (y, spec) in _REDEEMS.items():
+            self._lists[spec["key"]] = self._build_redeem(c[panel], y, spec)
+
+    def _build_redeem(self, panel, y, spec) -> QListWidget:
+        """Danh sách quà xếp thứ tự ưu tiên (kéo thả hoặc nút Up / Down) dưới các ô chọn."""
+        from PyQt5.QtWidgets import QLabel
+        QLabel(spec["label"], panel).setGeometry(10, y, 700, 22)
+        lst = QListWidget(panel)
+        lst.setGeometry(10, y + 24, 520, _REDEEM_H - 34)
+        lst.setDragDropMode(QAbstractItemView.InternalMove)
+        for item in spec["items"]:
+            row = QListWidgetItem(item["label"])
+            row.setData(Qt.UserRole, item["id"])
+            lst.addItem(row)
+        lst.model().rowsMoved.connect(self.settings_changed)
+        for i, (text, step) in enumerate((("▲", -1), ("▼", 1))):
+            button = QPushButton(text, panel)
+            button.setGeometry(540, y + 24 + i * 36, 34, 30)
+            button.setToolTip("Up" if step < 0 else "Down")
+            button.clicked.connect(lambda _=False, l=lst, d=step: self._move(l, d))
+        lst.setCurrentRow(0)
+        lst.show()
+        return lst
+
+    def _move(self, lst: QListWidget, step: int):
+        row = lst.currentRow()
+        target = row + step
+        if row < 0 or not 0 <= target < lst.count():
+            return
+        lst.insertItem(target, lst.takeItem(row))
+        lst.setCurrentRow(target)
+        self.settings_changed.emit()
 
     @staticmethod
     def _set_day_tip(spec, *widgets):
@@ -126,6 +173,10 @@ class EventTab(DesignerTab):
             settings[key] = {"enabled": c[name].isChecked(), "day": spec.get("day")}
         for key, (name, spec) in _COMBOS.items():
             settings[key] = {**(c[name].currentData() or {}), "day": spec.get("day")}
+        for g, group in enumerate(GROUPS):
+            settings[f"{group['key']}_active"] = {"enabled": c[f"groupBoxEvent{g}"].isChecked()}
+        for key, lst in self._lists.items():
+            settings[key] = {"order": [lst.item(i).data(Qt.UserRole) for i in range(lst.count())]}
         return settings
 
     def set_settings(self, data: dict):
@@ -147,3 +198,15 @@ class EventTab(DesignerTab):
                 if f"{key}_level" in data:
                     wanted["level"] = data[f"{key}_level"]
             self._select(c[name], wanted)
+        for g, group in enumerate(GROUPS):
+            saved = data.get(f"{group['key']}_active")
+            if saved is not None:
+                c[f"groupBoxEvent{g}"].setChecked(bool(saved.get("enabled") if isinstance(saved, dict) else saved))
+        for key, lst in self._lists.items():
+            saved = (data.get(key) or {}).get("order") if isinstance(data.get(key), dict) else None
+            for position, item_id in enumerate(i for i in (saved or []) if self._row_of(lst, i) >= 0):
+                lst.insertItem(position, lst.takeItem(self._row_of(lst, item_id)))
+
+    @staticmethod
+    def _row_of(lst: QListWidget, item_id) -> int:
+        return next((i for i in range(lst.count()) if lst.item(i).data(Qt.UserRole) == item_id), -1)

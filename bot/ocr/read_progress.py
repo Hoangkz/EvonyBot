@@ -121,8 +121,8 @@ def run(image: np.ndarray) -> int | None:
     if len(slashes) != 1:
         return None
     left = chars[:slashes[0]]
-    while left and isinstance(left[0], str):   # "," lạc ở đầu
-        left = left[1:]
+    # "," lạc ở đầu hoặc dấu phân cách hàng nghìn giữa số ("12,941 / 30,000"): bỏ hết, chỉ đọc các chữ số.
+    left = [piece for piece in left if not (isinstance(piece, str) and piece == ",")]
     text = read_chars(left, FONT)
     digits = re.sub(r"\D", "", text or "")
     return int(digits) if digits else None

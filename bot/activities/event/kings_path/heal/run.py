@@ -7,10 +7,10 @@ Sau Go: bấm giữa màn hình (Bệnh viện) -> menu:
 1. Có "Speed Up" (đang chữa dở): bấm -> màn Healing Speedup -> Finish All (như train lính) ->
    trả AGAIN.
 2. Có "Heal" (rảnh): bấm -> màn Hospital: Reset (bỏ chọn hết, nút đổi thành Select All) -> cuộn
-   danh sách xuống cuối (thấy khoảng trống cuối danh sách LIST_END thì thôi, tối đa LIST_SCROLLS lần) (lính cấp thấp nhất ở dưới cùng) -> chọn nhiều dòng một
+   danh sách xuống cuối (chưa thấy ảnh cuối danh sách LIST_END thì cuộn tiếp, thấy thì thôi, tối đa LIST_SCROLLS lần) (lính cấp thấp nhất ở dưới cùng) -> chọn nhiều dòng một
    lần, từ dòng dưới cùng lên: OCR số lính bị thương mỗi dòng ("0 / 8,147", ocr/read_heal_count.py),
    bấm ô số -> thanh nhập: gõ min(còn thiếu, số lính) -> OK; đủ số cần heal (mục tiêu - số đã heal,
-   OCR ở dòng Go) hoặc hết dòng đang thấy thì thôi -> Heal -> Speed Up -> Finish All -> trả AGAIN
+   OCR ở dòng Go) hoặc hết dòng đang thấy thì thôi -> Heal (phải sáng mới bấm; chưa sáng thì làm lại từ màn Hospital, tối đa HEAL_ATTEMPTS lần) -> Speed Up -> Finish All -> trả AGAIN
    (thiếu thì lượt sau heal tiếp).
 AGAIN: không bấm giữa lại, đi lại từ màn chính -> Event Center -> King's Path -> Day 3 -> Healing
 Heart -> OCR lại số đã heal -> đủ mục tiêu thì xong, chưa thì Go lần nữa (lặp tới khi đủ).
@@ -42,7 +42,10 @@ from .constants import (
     DISMISS_TO_AMOUNT,
     EXTRA_WAIT,
     HEAL_BUTTON,
+    HEAL_BUTTON_POS,
     HEAL_BUTTON_THRESHOLD,
+    HEAL_ATTEMPTS,
+    HEAL_LIT_DIFF,
     HEAL_WAIT,
     HOSPITAL_TITLE,
     INPUT_DELETES,
@@ -51,6 +54,7 @@ from .constants import (
     INPUT_WAIT,
     KEY,
     LIST_END,
+    LIST_END_THRESHOLD,
     LIST_SCROLLS,
     LIST_SWIPE,
     LIST_SWIPE_WAIT,
@@ -70,6 +74,7 @@ from .constants import (
 
 NAME = "Heal"
 _SPEED_UP, _HEAL, _EMPTY = "speed_up", "heal", "empty"
+_RETRY = "retry"   # _heal_rows: nút Heal chưa sáng, làm lại từ màn Hospital
 
 
 def _heal(bot, path, done, target):
@@ -95,8 +100,13 @@ def _heal(bot, path, done, target):
         return None
     if not bot.find_all(DISMISS):
         return _no_wounded(bot, path)
-    _reset_and_scroll(bot)
-    if not _heal_rows(bot, target - done):
+    for attempt in range(1, HEAL_ATTEMPTS + 1):
+        _reset_and_scroll(bot)
+        result = _heal_rows(bot, target - done)
+        if result != _RETRY:
+            break
+        bot.log(f"{NAME}: Heal button not lit, redo from the Hospital screen ({attempt}/{HEAL_ATTEMPTS})")
+    if result is not True:
         return None
     speed_up = bot.wait_for(SPEED_UP, timeout=SCREEN_WAIT)
     if speed_up is None:
@@ -123,7 +133,8 @@ def _reset_and_scroll(bot):
         bot.log(f"{NAME}: Reset selection")
         bot.tap(*reset, delay=1 + EXTRA_WAIT)
     for _ in range(LIST_SCROLLS):
-        if bot.find(LIST_END) is not None:
+        screen = bot.screenshot()
+        if bot.find(LIST_END, threshold=LIST_END_THRESHOLD, screen=screen) is not None:
             break
         bot.swipe_percent(*LIST_SWIPE, duration=0.5, delay=LIST_SWIPE_WAIT)
 
@@ -158,15 +169,32 @@ def _heal_rows(bot, need: int) -> bool:
         remaining -= amount
         if remaining <= 0:
             break
+    screen = bot.screenshot()
+    if bot.find(SPEED_UP, screen=screen) is not None:
+        # Hộp "Healing ... Speed Up" đã hiện = đã bắt đầu hồi (VD lần bấm OK trúng nút Heal): đi tiếp tới Speed Up.
+        bot.record(f"{NAME}: heal already started ({picked} row(s) picked), go to Speed Up")
+        return True
     if not picked:
         return False
     bot.record(f"{NAME}: heal {need - remaining} / {need} troops in {picked} row(s)")
-    heal = bot.find(HEAL_BUTTON, threshold=HEAL_BUTTON_THRESHOLD)
+    heal = bot.find(HEAL_BUTTON, threshold=HEAL_BUTTON_THRESHOLD, screen=screen)
     if heal is None:
-        bot.record(f"{NAME}: Heal button not found")
-        return False
+        # Nút Heal sáng có thêm chữ thời gian ("4d 01:21") làm ảnh mẫu (nút xám) khớp thấp: dùng vị trí đo sẵn.
+        heal = HEAL_BUTTON_POS
+        bot.log(f"{NAME}: Heal button image not matched, using fixed position {heal}")
+    if not _heal_button_lit(bot, screen, heal):
+        return _RETRY
     bot.tap(*heal, delay=HEAL_WAIT + EXTRA_WAIT)
     return True
+
+
+def _heal_button_lit(bot, screen, pos) -> bool:
+    """Nút Heal đã sáng (cam) mới bấm được; xám = chưa chọn được lính (gõ số trượt...). Ảnh mẫu là
+    nút xám (khớp cả nút cam 0,86), nên phân biệt bằng màu: cam đỏ - xanh >= HEAL_LIT_DIFF (đo cam
+    ~122, xám ~7)."""
+    w, h = bot.template_size(HEAL_BUTTON)
+    area = bot.crop(screen, pos[0] - w // 2, pos[1] - h // 2, w, h).reshape(-1, 3).mean(axis=0)
+    return float(area[2] - area[0]) >= HEAL_LIT_DIFF
 
 
 def _enter_amount(bot, x: int, y: int, amount: int) -> bool:

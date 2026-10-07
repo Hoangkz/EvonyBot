@@ -40,7 +40,8 @@ OKAY = f"{KP}/Donate/okay.png"
 # số đã làm, OCR ở dòng Go) là dừng nên chỉ mua đúng số lần cần (VD 13 miễn phí + 4 lần mua).
 MAX_GEM_BUYS = 5
 SCIENCE_WAIT = 10   # sau Go: chờ màn Alliance Science (giây)
-DONATE_WAIT = 1     # sau mỗi lần bấm Donate
+DONATE_WAIT = 0.2   # sau mỗi lần bấm Donate (người dùng chốt: chỉ cần 0,2 giây)
+MAX_DONATES = 200   # an toàn: số lần bấm Donate tối đa một lượt (lượt miễn phí thật chỉ cỡ vài chục)
 GEMS_WAIT = 2       # sau khi bấm nút kim cương / Okay
 MAX_MISSES = 5      # số lần chụp liên tiếp không nhận ra màn nào -> bỏ, lượt sau làm tiếp
 
