@@ -51,3 +51,6 @@ class BotContext(FlowMixin, InputMixin, ScreenMixin):
         # Every tab's config ({tab title: settings}), for activities that
         # chain into another one (e.g. Battlefield Shop -> Black Market).
         self.settings: dict = {}
+        # The real worker enables automatic low-priority gifts. Flow/unit tests
+        # keep it off unless they explicitly exercise that post-daily phase.
+        self.post_daily_gifts_enabled = False
