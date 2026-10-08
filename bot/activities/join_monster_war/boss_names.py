@@ -20,6 +20,7 @@ import re
 from ...ocr.read_power import parse as parse_power
 
 MATCH_CUTOFF = 0.75     # difflib ratio needed to accept a name / tier
+MAX_UNKNOWN = 0.5       # more than this share of "?" in a read: too unsure, not checked
 POWER_TOLERANCE = 1.3   # the power read may be at most this factor off a level's power
 
 _catalog: dict | None = None
@@ -29,6 +30,7 @@ class Boss:
     def __init__(self, name: str):
         self.name = name
         self.levels: dict[int, tuple[str | None, int | None]] = {}   # level -> (tier, power)
+        self.power_texts: dict[int, str] = {}                        # level -> "120.2m"
 
     @property
     def has_level_data(self) -> bool:
@@ -41,6 +43,17 @@ class Boss:
             if level_tier and level_tier.lower() == tier:
                 return level
         return None
+
+    def level_of_power_text(self, text: str | None) -> int | None:
+        """Level whose power text ("120.2m") fits the OCR `text` ("12?.2?"): a "?"
+        (glyph without a sample) is a position to skip, matching any 1-2 characters.
+        Only a single fitting level counts."""
+        if not text or "?" not in text or _too_unknown(text):
+            return None
+        pattern = re.compile("".join(".{1,2}" if ch == "?" else re.escape(ch)
+                                     for ch in text.lower()))
+        fits = [level for level, raw in self.power_texts.items() if pattern.fullmatch(raw)]
+        return fits[0] if len(fits) == 1 else None
 
     def level_of_power(self, power: int | None) -> int | None:
         """Level whose power is closest (by ratio) to `power`, if close enough."""
@@ -65,6 +78,8 @@ def catalog() -> dict:
                     if isinstance(level, dict):
                         boss.levels[level["level"]] = (level.get("tier"),
                                                        parse_power(level.get("power")))
+                        if level.get("power"):
+                            boss.power_texts[level["level"]] = str(level["power"]).lower()
         tiers = {tier.lower() for boss in bosses.values()
                  for tier, _ in boss.levels.values() if tier}
         _catalog = {"bosses": bosses, "tiers": tiers}
@@ -94,13 +109,17 @@ def parse(text: str | None) -> tuple[Boss | None, str | None]:
 
 def level(boss: Boss | None, tier: str | None, read_power) -> tuple[int | None, int | None]:
     """(level, power read) of `boss`: from its tier word if there is one,
-    else from `read_power()` (called only then) for a boss with levels."""
+    else from `read_power()` (the power text, called only then) for a boss with levels."""
     if boss is None or not boss.has_level_data:
         return None, None
     if tier:
         return boss.level_of_tier(tier), None
-    power = read_power()
-    return boss.level_of_power(power), power
+    text = read_power()
+    found = boss.level_of_power_text(text)
+    if found is not None:
+        return found, text
+    power = parse_power(text)
+    return boss.level_of_power(power), text
 
 
 def selection(settings: dict) -> dict[str, tuple[set[int], bool]] | None:
@@ -135,16 +154,24 @@ def wanted(selected: dict[str, tuple[set[int], bool]] | None, boss: Boss | None,
     return level in levels
 
 
+def _too_unknown(text: str) -> bool:
+    return text.count("?") > len(text) * MAX_UNKNOWN
+
+
 def _match(text: str, choices) -> str | None:
     """The choice (lower case) `text` reads as. A "?" (glyph without a sample,
     maybe letters touching) stands for 1-3 letters: if exactly one choice fits,
     that's it. Otherwise the closest choice by difflib, if close enough."""
     choices = list(choices)
+    if _too_unknown(text):
+        return None
     if "?" in text:
         pattern = re.compile("".join(".{1,3}" if ch == "?" else re.escape(ch) for ch in text))
         fits = [choice for choice in choices if pattern.fullmatch(choice)]
         if len(fits) == 1:
             return fits[0]
+        if fits:    # nhiều lựa chọn cùng khớp phần đọc được: lấy cái giống nhất
+            return difflib.get_close_matches(text.replace("?", ""), fits, n=1, cutoff=0)[0]
     match = difflib.get_close_matches(text, choices, n=1, cutoff=MATCH_CUTOFF)
     if match:
         return match[0]

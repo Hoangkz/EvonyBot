@@ -5,7 +5,8 @@ import time
 
 from ...common import click_images, delay, exit_images, find_first, go_home, wait_gone
 from ...context import TEMPLATE_DIR
-from ...ocr import read_boss_name, read_coords, read_power
+from ...ocr import read_boss_name, read_coords
+from ...ocr.read_power import text as read_power_text
 from . import boss_names
 from .boss_memory import JOINED as MEMORY_JOINED
 from .boss_memory import BossMemory
@@ -718,10 +719,10 @@ class _Boss:
         text = read_boss_name(bot.crop(screen, x + NAME_DX, y + NAME_DY, NAME_W, NAME_DH))
         boss, tier = boss_names.parse(text)
         level, power = boss_names.level(
-            boss, tier, lambda: read_power(bot.crop(screen, x + POWER_DX, y + POWER_DY, POWER_W, POWER_DH)))
+            boss, tier, lambda: read_power_text(bot.crop(screen, x + POWER_DX, y + POWER_DY, POWER_W, POWER_DH)))
         wanted = boss_names.wanted(self.selected, boss, level)
         bot.log(f"Boss {coords}: {text!r}"
-                f"{f' power {power:,}' if power else ''}"
+                f"{f' power {power}' if power else ''}"
                 f" -> {boss.name if boss else 'không nhận ra'}"
                 f"{f' lv {level}' if level else ''}: {'join' if wanted else 'không tham gia'}")
         return wanted
