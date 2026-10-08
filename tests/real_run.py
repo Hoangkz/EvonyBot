@@ -88,12 +88,10 @@ def test_crazy_eggs(bot):
     return crazy_eggs.run(bot, {})
 
 def test_three_day(bot):
-    """Event 3 ngày: mốc đầy đủ (Alliance 60, Heal 30000), quà theo thứ tự ưu tiên trong event.json."""
-    import json
-    from pathlib import Path
+    """Event 3 ngày: mốc đầy đủ (Alliance 60, Heal 30000), quà theo thứ tự ưu tiên trong event.py."""
     from bot.activities.event_center import three_day
-    data = json.loads((Path(__file__).parents[1] / "ui/tabs/event.json").read_text(encoding="utf-8-sig"))
-    group = next(g for g in data["groups"] if g.get("key") == "three_day")
+    from ui.tabs.event import DATA
+    group = next(g for g in DATA["groups"] if g.get("key") == "three_day")
     settings = {"three_day_alliance": {"value": 60}, "three_day_heal": {"value": 30000},
                 "three_day_redeem": {"order": [i["id"] for i in group["redeem"]["items"]]}}
     bot.settings = {"Event": settings}
@@ -102,13 +100,11 @@ def test_three_day(bot):
 
 def test_three_day_redeem(bot):
     """Chỉ phần đổi quà của event 3 ngày: đang ở sẵn màn event, bấm sang tab Redeem rồi đổi theo thứ tự ưu tiên trong
-    event.json."""
+    event.py."""
     import importlib
-    import json
-    from pathlib import Path
     run_module = importlib.import_module("bot.activities.event_center.three_day.run")
-    data = json.loads((Path(__file__).parents[1] / "ui/tabs/event.json").read_text(encoding="utf-8-sig"))
-    group = next(g for g in data["groups"] if g.get("key") == "three_day")
+    from ui.tabs.event import DATA
+    group = next(g for g in DATA["groups"] if g.get("key") == "three_day")
     return run_module._claim_and_redeem(bot, [i["id"] for i in group["redeem"]["items"]])
 
 

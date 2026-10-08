@@ -1,4 +1,11 @@
-{
+"""priority.py — độ ưu tiên từng nhiệm vụ cho bộ chọn nhiệm vụ của worker (dữ liệu tĩnh).
+
+DATA: {nhóm (tên activity): [{key, label, priority, note?, must_finish?}]}; `_doc` giữ
+ghi chú luật riêng (Bubble, Join Boss, gift_*). Số lớn hơn làm trước. Trước đây là file
+.json cùng tên; đổi sang .py để Nuitka compile cùng code, không cần ship file riêng lúc
+build.
+"""
+DATA ={
     "_doc": "Độ ưu tiên của từng nhiệm vụ cho bộ chọn nhiệm vụ của worker (chưa dùng). Nhóm = activity (nút Select Activity / tab UI). key = key nhiệm vụ trong settings / daily_done. Ưu tiên cao hơn làm trước; cùng ưu tiên thì xoay vòng. Mặc định 1. Bubble và Join Boss cũng là nhiệm vụ nhưng có luật riêng (bot/worker/TODO.md mục 1): bubble luôn cao nhất, Join Boss chạy giữa mỗi 2 nhiệm vụ thường. Các key gift_* có ưu tiên -100 thấp nhất và hiện được Daily Activities gọi sau khi mọi nhiệm vụ đã chọn cùng Activity Rewards hoàn tất. Thêm \"must_finish\": true vào nhiệm vụ cần làm tới xong: đã bắt đầu thì không bị Bubble / Join Boss / giới hạn 120 giây ngắt (chỉ Stop), xong rồi mới tới Bubble và Join Boss; khi cả activity còn chạy nguyên khối thì mọi nhiệm vụ của nhóm phải có cờ này.",
     "Bubble": [
         { "key": "bubble", "label": "Bubble (giữ khiên)", "priority": 99999, "note": "Luật riêng: luôn cao nhất, tới hạn khi còn <= 2 giờ, ngắt được mọi nhiệm vụ kể cả Join Boss" }
@@ -49,9 +56,9 @@
         { "key": "daily_black_market", "label": "Black Market", "priority": 390 },
         { "key": "daily_general_enhancing", "label": "General Enhancing", "priority": 389, "note": "Cần làm thêm" },
         { "key": "daily_wheel_of_fortune", "label": "Wheel of Fortune", "priority": 388 },
-        { "key": "daily_patrol", "label": "Patrol", "priority": 387, "must_finish": true },
+        { "key": "daily_patrol", "label": "Patrol", "priority": 387, "must_finish": True },
         { "key": "daily_material_composing", "label": "Material Composing", "priority": 386 },
-        { "key": "daily_greet_champion", "label": "Greet Champion", "priority": 385, "must_finish": true },
+        { "key": "daily_greet_champion", "label": "Greet Champion", "priority": 385, "must_finish": True },
         { "key": "daily_monster_killing", "label": "Monster Killing", "priority": 384 },
         { "key": "daily_resource_collecting", "label": "Resource Collecting", "priority": 383 },
         { "key": "daily_rewards", "label": "Activity Rewards (nhận thưởng cuối)", "priority": 300 },

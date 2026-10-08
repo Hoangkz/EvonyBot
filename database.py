@@ -106,7 +106,7 @@ def _reset_old_layout(conn: sqlite3.Connection):
             conn.execute(f"DROP TABLE IF EXISTS {table}")
 
 
-# Key nhiệm vụ đã đổi tên (bot/worker/priority.json): key cũ -> key mới. Đổi trong cột `event`
+# Key nhiệm vụ đã đổi tên (bot/worker/priority.py): key cũ -> key mới. Đổi trong cột `event`
 # (cấu hình tab Event) và `daily_done` (kể cả "<key>_locked") của DB cũ, để không mất cấu hình / tiến độ.
 KEY_RENAMES = {old: f"gather_troops_{old}" for old in
                ("ground_troop", "mounted_troop", "ranged_troop", "siege_machine", "defense_force")}

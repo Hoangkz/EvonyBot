@@ -232,7 +232,7 @@ class GroundTroopFlow(unittest.TestCase):
         self.assertIn("Ground Troop: train tier 7 (chosen 7), goal 500, count 500", device.logs)
 
     def test_chosen_tier_locked_uses_highest_open(self):
-        """Chọn 13 nhưng XII, XIII khoá: train cấp 11, mục tiêu theo event.json (10000)."""
+        """Chọn 13 nhưng XII, XIII khoá: train cấp 11, mục tiêu theo event.py (10000)."""
         device = self._train_flow(SETTINGS, Step("train_t11.png?locked_12", tap(TRAIN_BUTTON)))
         self.assertIn("Ground Troop: train tier 11 (chosen 13), goal 10000, count 10000",
                       device.logs)

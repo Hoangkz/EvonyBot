@@ -3,7 +3,7 @@ constants.py — ảnh của nhiệm vụ Daily Activities "Gold Levy" (thư m�
 """
 from ..constants import ROOT, OPEN
 
-KEY = "daily_gold_levy"   # key nhiệm vụ trong bot/worker/priority.json
+KEY = "daily_gold_levy"   # key nhiệm vụ trong bot/worker/priority.py
 LABEL = "Gold Levy"   # ô tích ở tab Daily Activities, key daily_done
 FOLDER = "ActivitiesLevyGold"
 FOLDER_PATH = f"{ROOT}/{FOLDER}"

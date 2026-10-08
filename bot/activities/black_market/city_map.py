@@ -7,16 +7,14 @@ Battlefield / Art Hall / Defense Force đứng yên). Toạ độ bản đồ = 
 (CENTER): công trình b ở toạ độ V_b nghĩa là từ Thành chính ở giữa, vuốt tổng cộng V_b (ngón tay, px) thì b vào giữa.
 Vuốt chậm (SWIPE_TIME) thì nội dung dịch gần đúng bằng cú vuốt.
 
-- scan(bot, name): đang ở Thành chính (VD sau Go nhiệm vụ Gold Levy) -> đi vòng các ô theo city_tour.json, mỗi ô kéo
+- scan(bot, name): đang ở Thành chính (VD sau Go nhiệm vụ Gold Levy) -> đi vòng các ô theo city_tour.py, mỗi ô kéo
   bù công trình giữa màn vào giữa; ghi mọi công trình nhận ra được (ảnh mẫu civ / ảnh tự học của event/city_building) với toạ
   độ bản đồ; công trình đã ghi thấy lại thì dùng để chỉnh vị trí camera (không dồn sai số). Trả {công trình: [x, y]}.
 - goto(bot, name, building, city_map): tìm trên màn một công trình đã có trong bản đồ -> biết camera đang ở đâu ->
   vuốt thẳng (chia đều thành vài cú) tới `building` -> kéo bù vào giữa. Trả vị trí `building` trên màn, hoặc None.
 Mỗi bước kiểm tra còn ở màn thành (city_screen: hộp thoát game -> Cancel, popup khác -> Back). Đo trên 21913 / 21943.
 """
-import json
 import math
-from pathlib import Path
 
 from ..daily_activities.constants import MAIN_MORE
 from ..event.city_building import (
@@ -54,7 +52,7 @@ from ..event.city_building import (
     _candidates,
 )
 
-TOUR = json.loads(Path(__file__).with_name("city_tour.json").read_text(encoding="utf-8"))
+from .city_tour import DATA as TOUR
 # Công trình nhận ra khi quét / đi (có ảnh mẫu trong Images/Event/Building/civ<N>/ hoặc ảnh tự học).
 BUILDINGS = (KEEP, MARKET, HOSPITAL, FORGE, BARRACKS, STABLES, ARCHER_CAMP, WORKSHOP, DEFENSE_FORCE, ACADEMY, SHRINE,
              ART_HALL, BATTLEFIELD, PASTURE, WALLS, EMBASSY, PRISON, TAVERN, RESEARCH_FACTORY, HOLY_PALACE, ICE_LAND,
@@ -130,7 +128,7 @@ def swipe(bot, finger):
 
 
 def swipe_from_to(bot, start, end):
-    """Một cú vuốt chậm đúng điểm đầu / cuối (cú đo sẵn trong city_tour.json)."""
+    """Một cú vuốt chậm đúng điểm đầu / cuối (cú đo sẵn trong city_tour.py)."""
     city_screen(bot)
     bot.swipe(*start, *end, duration=SWIPE_TIME, delay=SWIPE_WAIT)
 
@@ -158,7 +156,7 @@ def centre(bot, building: str, pos):
 
 
 def scan(bot, name: str) -> dict:
-    """Đang ở Thành chính (giữa màn): đi vòng các ô (city_tour.json), ghi toạ độ bản đồ mọi công trình nhận ra được.
+    """Đang ở Thành chính (giữa màn): đi vòng các ô (city_tour.py), ghi toạ độ bản đồ mọi công trình nhận ra được.
     Trả {công trình: [x, y]} ({} nếu không thấy Thành chính lúc bắt đầu)."""
     screen = city_screen(bot)
     score, keep = locate(bot, screen, KEEP)

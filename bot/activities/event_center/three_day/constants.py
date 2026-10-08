@@ -3,7 +3,6 @@ constants.py — event 3 ngày (Event Center, tab Limited): ảnh, toạ độ, 
 
 Toạ độ đo trên màn 396x704. Ảnh mẫu cắt từ ảnh chụp "Precious Vegetation" (tests/event_center/three_day).
 """
-import json
 from pathlib import Path
 
 from ....common import images_in
@@ -164,9 +163,10 @@ STOP = "stop"
 
 
 def reward_rows() -> dict[str, int]:
-    """{id quà: hàng trong danh sách Redeem của game} (trường "row" trong event.json, group
+    """{id quà: hàng trong danh sách Redeem của game} (trường "row" trong event.py, group
     "three_day"; 0 = hàng đầu): bot nhớ vị trí mặc định của từng quà. Thứ tự trong json là thứ tự
     ưu tiên mặc định ở UI, không liên quan tới hàng. Quà mới: thêm "row" đúng hàng của nó."""
-    data = json.loads((TEMPLATE_DIR.parent / "ui/tabs/event.json").read_text(encoding="utf-8-sig"))
-    group = next(g for g in data["groups"] if g.get("key") == GROUP_KEY)
+    # import trong hàm: bot không import ui ở mức module (tránh import vòng ui <-> bot).
+    from ui.tabs.event import DATA
+    group = next(g for g in DATA["groups"] if g.get("key") == GROUP_KEY)
     return {i["id"]: int(i["row"]) for i in group["redeem"]["items"]}

@@ -1,4 +1,10 @@
-{
+"""boss.py — danh mục boss cho tab Join Monster War và nhận diện OCR (dữ liệu tĩnh).
+
+DATA: `boss_categories` -> `list` boss: `name`, `active` (mặc định tích), `levels`
+(level / tier / power). Trước đây là file .json cùng tên; đổi sang .py để Nuitka compile
+cùng code, không cần ship file riêng lúc build.
+"""
+DATA ={
     "boss_categories": [
         {
             "category_key": "standard_bosses",
@@ -7,117 +13,117 @@
                 {
                     "levels": [ ],
                     "name": "Zombie",
-                    "active": false
+                    "active": False
                 },
                 {
                     "levels": [ ],
                     "name": "Redcap",
-                    "active": false
+                    "active": False
                 },
                 {
                     "levels": [ ],
                     "name": "Centaur",
-                    "active": false
+                    "active": False
                 },
                 {
                     "levels": [ ],
                     "name": "Skeleton Dragon",
-                    "active": false
+                    "active": False
                 },
                 {
                     "levels": [ ],
                     "name": "Werewolf",
-                    "active": false
+                    "active": False
                 },
                 {
                     "levels": [ ],
                     "name": "Manticore",
-                    "active": false
+                    "active": False
                 },
                 {
                     "levels": [ ],
                     "name": "Yasha",
-                    "active": false
+                    "active": False
                 },
                 {
                     "levels": [ ],
                     "name": "Peryton",
-                    "active": false
+                    "active": False
                 },
                 {
                     "levels": [ ],
                     "name": "Minotaur",
-                    "active": false
+                    "active": False
                 },
                 {
                     "levels": [ ],
                     "name": "Griffin",
-                    "active": false
+                    "active": False
                 },
                 {
                     "levels": [ ],
                     "name": "Ifrit",
-                    "active": false
+                    "active": False
                 },
                 {
                     "levels": [ ],
                     "name": "Kamaitachi",
-                    "active": false
+                    "active": False
                 },
                 {
                     "levels": [ ],
                     "name": "Fafnir",
-                    "active": true
+                    "active": True
                 },
                 {
                     "levels": [ ],
                     "name": "Behemoth",
-                    "active": true
+                    "active": True
                 },
                 {
                     "levels": [ ],
                     "name": "Phoenix",
-                    "active": true
+                    "active": True
                 },
                 {
                     "levels": [ ],
                     "name": "Jormungandr",
-                    "active": true
+                    "active": True
                 },
                 {
                     "levels": [ ],
                     "name": "Typhon",
-                    "active": true
+                    "active": True
                 },
                 {
                     "levels": [ ],
                     "name": "Ammit",
-                    "active": true
+                    "active": True
                 },
                 {
                     "levels": [ ],
                     "name": "Stymphalian Bird",
-                    "active": true
+                    "active": True
                 },
                 {
                     "levels": [ ],
                     "name": "Lernean Hydra",
-                    "active": true
+                    "active": True
                 },
                 {
                     "levels": [ ],
                     "name": "Azazel",
-                    "active": true
+                    "active": True
                 },
                 {
                     "levels": [ ],
                     "name": "Leviathan",
-                    "active": true
+                    "active": True
                 },
                 {
                     "levels": [ ],
                     "name": "Garmr",
-                    "active": true
+                    "active": True
                 }
             ]
         },
@@ -132,31 +138,31 @@
                             "level": 1,
                             "tier": "Junior",
                             "power": "68.2M",
-                            "active": false
+                            "active": False
                         },
                         {
                             "level": 2,
                             "tier": "Medium",
                             "power": "153.4M",
-                            "active": false
+                            "active": False
                         },
                         {
                             "level": 3,
                             "tier": "Senior",
                             "power": "234.2M",
-                            "active": false
+                            "active": False
                         },
                         {
                             "level": 4,
                             "tier": "Legendary",
                             "power": "694.9M",
-                            "active": false
+                            "active": False
                         },
                         {
                             "level": 5,
                             "tier": "Epic",
                             "power": "1.5B",
-                            "active": false
+                            "active": False
                         }
                     ]
                 },
@@ -166,37 +172,37 @@
                         {
                             "level": 1,
                             "power": "23.4M",
-                            "active": false
+                            "active": False
                         },
                         {
                             "level": 2,
                             "power": "70.8M",
-                            "active": false
+                            "active": False
                         },
                         {
                             "level": 3,
                             "power": "120.2M",
-                            "active": true
+                            "active": True
                         },
                         {
                             "level": 4,
                             "power": "206.4M",
-                            "active": true
+                            "active": True
                         },
                         {
                             "level": 5,
                             "power": "361.3M",
-                            "active": true
+                            "active": True
                         },
                         {
                             "level": 6,
                             "power": "722.6M",
-                            "active": true
+                            "active": True
                         },
                         {
                             "level": 7,
                             "power": "1.8B",
-                            "active": true
+                            "active": True
                         }
                     ]
                 },
@@ -206,42 +212,42 @@
                         {
                             "level": 1,
                             "power": "12.4M",
-                            "active": false
+                            "active": False
                         },
                         {
                             "level": 2,
                             "power": "22.3M",
-                            "active": false
+                            "active": False
                         },
                         {
                             "level": 3,
                             "power": "74.5M",
-                            "active": true
+                            "active": True
                         },
                         {
                             "level": 4,
                             "power": "147.5M",
-                            "active": true
+                            "active": True
                         },
                         {
                             "level": 5,
                             "power": "225.2M",
-                            "active": true
+                            "active": True
                         },
                         {
                             "level": 6,
                             "power": "472.9M",
-                            "active": true
+                            "active": True
                         },
                         {
                             "level": 7,
                             "power": "914.4M",
-                            "active": true
+                            "active": True
                         },
                         {
                             "level": 8,
                             "power": "2B",
-                            "active": true
+                            "active": True
                         }
                     ]
                 },
@@ -252,31 +258,31 @@
                             "level": 1,
                             "tier": "Junior",
                             "power": "65.5M",
-                            "active": false
+                            "active": False
                         },
                         {
                             "level": 2,
                             "tier": "Senior",
                             "power": "147.5M",
-                            "active": false
+                            "active": False
                         },
                         {
                             "level": 3,
                             "tier": "Excellent",
                             "power": "225.2M",
-                            "active": true
+                            "active": True
                         },
                         {
                             "level": 4,
                             "tier": "Legendary",
                             "power": "668.1M",
-                            "active": true
+                            "active": True
                         },
                         {
                             "level": 5,
                             "tier": "Epic",
                             "power": "1.5B",
-                            "active": true
+                            "active": True
                         }
                     ]
                 },
@@ -286,37 +292,37 @@
                         {
                             "level": 1,
                             "power": "13M",
-                            "active": false
+                            "active": False
                         },
                         {
                             "level": 2,
                             "power": "24.6M",
-                            "active": false
+                            "active": False
                         },
                         {
                             "level": 3,
                             "power": "85.6M",
-                            "active": true
+                            "active": True
                         },
                         {
                             "level": 4,
                             "power": "154.8M",
-                            "active": true
+                            "active": True
                         },
                         {
                             "level": 5,
                             "power": "225.2M",
-                            "active": true
+                            "active": True
                         },
                         {
                             "level": 6,
                             "power": "668.1M",
-                            "active": true
+                            "active": True
                         },
                         {
                             "level": 7,
                             "power": "1.5B",
-                            "active": true
+                            "active": True
                         }
                     ]
                 },
@@ -326,37 +332,37 @@
                         {
                             "level": 1,
                             "power": "12.4M",
-                            "active": false
+                            "active": False
                         },
                         {
                             "level": 2,
                             "power": "22.3M",
-                            "active": false
+                            "active": False
                         },
                         {
                             "level": 3,
                             "power": "74.5M",
-                            "active": true
+                            "active": True
                         },
                         {
                             "level": 4,
                             "power": "147.5M",
-                            "active": true
+                            "active": True
                         },
                         {
                             "level": 5,
                             "power": "225.2M",
-                            "active": true
+                            "active": True
                         },
                         {
                             "level": 6,
                             "power": "668.1M",
-                            "active": true
+                            "active": True
                         },
                         {
                             "level": 7,
                             "power": "1.5B",
-                            "active": true
+                            "active": True
                         }
                     ]
                 },
@@ -366,37 +372,37 @@
                         {
                             "level": 1,
                             "power": "13M",
-                            "active": false
+                            "active": False
                         },
                         {
                             "level": 2,
                             "power": "24.6M",
-                            "active": false
+                            "active": False
                         },
                         {
                             "level": 3,
                             "power": "85.6M",
-                            "active": true
+                            "active": True
                         },
                         {
                             "level": 4,
                             "power": "154.8M",
-                            "active": true
+                            "active": True
                         },
                         {
                             "level": 5,
                             "power": "225.2M",
-                            "active": true
+                            "active": True
                         },
                         {
                             "level": 6,
                             "power": "668.1M",
-                            "active": true
+                            "active": True
                         },
                         {
                             "level": 7,
                             "power": "1.5B",
-                            "active": true
+                            "active": True
                         }
                     ]
                 },
@@ -407,37 +413,37 @@
                             "level": 1,
                             "tier": "Junior",
                             "power": "84.9M",
-                            "active": false
+                            "active": False
                         },
                         {
                             "level": 2,
                             "tier": "Medium",
                             "power": "120.6M",
-                            "active": false
+                            "active": False
                         },
                         {
                             "level": 3,
                             "tier": "Senior",
                             "power": "198.9M",
-                            "active": true
+                            "active": True
                         },
                         {
                             "level": 4,
                             "tier": "Legendary",
                             "power": "328.4M",
-                            "active": true
+                            "active": True
                         },
                         {
                             "level": 5,
                             "tier": "Epic",
                             "power": "678.8M",
-                            "active": true
+                            "active": True
                         },
                         {
                             "level": 6,
                             "tier": "Mythical",
                             "power": "1.5B",
-                            "active": true
+                            "active": True
                         }
                     ]
                 },
@@ -447,37 +453,37 @@
                         {
                             "level": 1,
                             "power": "12.4M",
-                            "active": false
+                            "active": False
                         },
                         {
                             "level": 2,
                             "power": "22.3M",
-                            "active": false
+                            "active": False
                         },
                         {
                             "level": 3,
                             "power": "74.5M",
-                            "active": true
+                            "active": True
                         },
                         {
                             "level": 4,
                             "power": "147.5M",
-                            "active": true
+                            "active": True
                         },
                         {
                             "level": 5,
                             "power": "225.2M",
-                            "active": true
+                            "active": True
                         },
                         {
                             "level": 6,
                             "power": "668.1M",
-                            "active": true
+                            "active": True
                         },
                         {
                             "level": 7,
                             "power": "1.5B",
-                            "active": true
+                            "active": True
                         }
                     ]
                 },
@@ -487,37 +493,37 @@
                         {
                             "level": 1,
                             "power": "22.3M",
-                            "active": false
+                            "active": False
                         },
                         {
                             "level": 2,
                             "power": "42.8M",
-                            "active": false
+                            "active": False
                         },
                         {
                             "level": 3,
                             "power": "122.9M",
-                            "active": true
+                            "active": True
                         },
                         {
                             "level": 4,
                             "power": "206.4M",
-                            "active": true
+                            "active": True
                         },
                         {
                             "level": 5,
                             "power": "361.3M",
-                            "active": true
+                            "active": True
                         },
                         {
                             "level": 6,
                             "power": "711.7M",
-                            "active": true
+                            "active": True
                         },
                         {
                             "level": 7,
                             "power": "1.8B",
-                            "active": true
+                            "active": True
                         }
                     ]
                 },
@@ -527,42 +533,42 @@
                         {
                             "level": 1,
                             "power": "708.5K",
-                            "active": false
+                            "active": False
                         },
                         {
                             "level": 2,
                             "power": "1.9M",
-                            "active": false
+                            "active": False
                         },
                         {
                             "level": 3,
                             "power": "5.9M",
-                            "active": true
+                            "active": True
                         },
                         {
                             "level": 4,
                             "power": "16.1M",
-                            "active": true
+                            "active": True
                         },
                         {
                             "level": 5,
                             "power": "53.6M",
-                            "active": true
+                            "active": True
                         },
                         {
                             "level": 6,
                             "power": "80.4M",
-                            "active": true
+                            "active": True
                         },
                         {
                             "level": 7,
                             "power": "134.1M",
-                            "active": true
+                            "active": True
                         },
                         {
                             "level": 8,
                             "power": "268.1M",
-                            "active": true
+                            "active": True
                         }
                     ]
                 },
@@ -573,37 +579,37 @@
                             "level": 1,
                             "tier": "Junior",
                             "power": "59.6M",
-                            "active": false
+                            "active": False
                         },
                         {
                             "level": 2,
                             "tier": "Medium",
                             "power": "71.5M",
-                            "active": false
+                            "active": False
                         },
                         {
                             "level": 3,
                             "tier": "Senior",
                             "power": "89.4M",
-                            "active": true
+                            "active": True
                         },
                         {
                             "level": 4,
                             "tier": "Grand",
                             "power": "134.1M",
-                            "active": true
+                            "active": True
                         },
                         {
                             "level": 5,
                             "tier": "Epic",
                             "power": "236.5M",
-                            "active": true
+                            "active": True
                         },
                         {
                             "level": 6,
                             "tier": "Legendary",
                             "power": "472.9M",
-                            "active": true
+                            "active": True
                         }
                     ]
                 }
@@ -622,7 +628,7 @@
                     "levels": [
                         {
                             "level": 1,
-                            "active": true
+                            "active": True
                         }
                     ]
                 },
@@ -633,19 +639,19 @@
                             "level": 1,
                             "tier": "Junior",
                             "power": "1.3M",
-                            "active": false
+                            "active": False
                         },
                         {
                             "level": 2,
                             "tier": "Senior",
                             "power": "1.7M",
-                            "active": false
+                            "active": False
                         },
                         {
                             "level": 3,
                             "tier": "Master",
                             "power": "125M",
-                            "active": true
+                            "active": True
                         }
                     ]
                 },
@@ -656,19 +662,19 @@
                             "level": 1,
                             "tier": "Junior",
                             "power": "85.6M",
-                            "active": false
+                            "active": False
                         },
                         {
                             "level": 2,
                             "tier": "Medium",
                             "power": "154.8M",
-                            "active": true
+                            "active": True
                         },
                         {
                             "level": 3,
                             "tier": "Senior",
                             "power": "225.2M",
-                            "active": true
+                            "active": True
                         }
                     ]
                 },
@@ -678,17 +684,17 @@
                         {
                             "level": 1,
                             "power": "124.6M",
-                            "active": false
+                            "active": False
                         },
                         {
                             "level": 2,
                             "power": "398.1M",
-                            "active": true
+                            "active": True
                         },
                         {
                             "level": 3,
                             "power": "805.1M",
-                            "active": true
+                            "active": True
                         }
                     ]
                 },
@@ -699,13 +705,13 @@
                             "level": 1,
                             "tier": "Junior",
                             "power": "85.6M",
-                            "active": false
+                            "active": False
                         },
                         {
                             "level": 2,
                             "tier": "Senior",
                             "power": "154.8M",
-                            "active": true
+                            "active": True
                         }
                     ]
                 },
@@ -716,13 +722,13 @@
                             "level": 1,
                             "tier": "Junior",
                             "power": "85.6M",
-                            "active": false
+                            "active": False
                         },
                         {
                             "level": 2,
                             "tier": "Senior",
                             "power": "154.8M",
-                            "active": true
+                            "active": True
                         }
                     ]
                 },
@@ -733,13 +739,13 @@
                             "level": 1,
                             "tier": "Junior",
                             "power": "85.6M",
-                            "active": false
+                            "active": False
                         },
                         {
                             "level": 2,
                             "tier": "Senior",
                             "power": "154.8M",
-                            "active": true
+                            "active": True
                         }
                     ]
                 },
@@ -750,13 +756,13 @@
                             "level": 1,
                             "tier": "Junior",
                             "power": "85.6M",
-                            "active": false
+                            "active": False
                         },
                         {
                             "level": 2,
                             "tier": "Senior",
                             "power": "154.8M",
-                            "active": true
+                            "active": True
                         }
                     ]
                 },
@@ -767,13 +773,13 @@
                             "level": 1,
                             "tier": "Junior",
                             "power": "85.6M",
-                            "active": false
+                            "active": False
                         },
                         {
                             "level": 2,
                             "tier": "Senior",
                             "power": "154.8M",
-                            "active": true
+                            "active": True
                         }
                     ]
                 },
@@ -784,13 +790,13 @@
                             "level": 1,
                             "tier": "Junior",
                             "power": "85.6M",
-                            "active": false
+                            "active": False
                         },
                         {
                             "level": 2,
                             "tier": "Senior",
                             "power": "154.8M",
-                            "active": true
+                            "active": True
                         }
                     ]
                 },
@@ -801,13 +807,13 @@
                             "level": 1,
                             "tier": "Junior",
                             "power": "85.6M",
-                            "active": false
+                            "active": False
                         },
                         {
                             "level": 2,
                             "tier": "Senior",
                             "power": "154.8M",
-                            "active": true
+                            "active": True
                         }
                     ]
                 },
@@ -818,13 +824,13 @@
                             "level": 1,
                             "tier": "Junior",
                             "power": "85.6M",
-                            "active": false
+                            "active": False
                         },
                         {
                             "level": 2,
                             "tier": "Senior",
                             "power": "154.8M",
-                            "active": true
+                            "active": True
                         }
                     ]
                 },
@@ -835,13 +841,13 @@
                             "level": 1,
                             "tier": "Junior",
                             "power": "85.6M",
-                            "active": false
+                            "active": False
                         },
                         {
                             "level": 2,
                             "tier": "Senior",
                             "power": "154.8M",
-                            "active": true
+                            "active": True
                         }
                     ]
                 },
@@ -850,7 +856,7 @@
                     "levels": [
                         {
                             "level": 1,
-                            "active": true
+                            "active": True
                         }
                     ]
                 },
@@ -861,19 +867,19 @@
                             "level": 1,
                             "tier": "Weak",
                             "power": "27.4K",
-                            "active": false
+                            "active": False
                         },
                         {
                             "level": 2,
                             "tier": "Common",
                             "power": "186.1K",
-                            "active": false
+                            "active": False
                         },
                         {
                             "level": 3,
                             "tier": "Fierce",
                             "power": "492.7K",
-                            "active": false
+                            "active": False
                         }
                     ]
                 }

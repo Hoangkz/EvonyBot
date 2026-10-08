@@ -1,4 +1,3 @@
-import json
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -10,7 +9,7 @@ import numpy as np
 from bot.activities import gift_claims
 from bot.activities.gift_claims import common
 from bot.activities.daily_activities.run import _run_gift_claims
-from bot.worker.tasks import PRIORITY_FILE
+from bot.worker.priority import DATA
 
 
 class GiftClaimRegistryTests(unittest.TestCase):
@@ -48,8 +47,7 @@ class GiftClaimRegistryTests(unittest.TestCase):
                             for name in expected))
 
     def test_every_module_has_unique_lowest_priority(self):
-        data = json.loads(PRIORITY_FILE.read_text(encoding="utf-8"))
-        daily = {item["key"]: item["priority"] for item in data["Daily Activities"]}
+        daily = {item["key"]: item["priority"] for item in DATA["Daily Activities"]}
         keys = [task.key for task in gift_claims.TASKS]
 
         self.assertEqual(len(keys), len(set(keys)))

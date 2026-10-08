@@ -10,5 +10,5 @@ KHÔNG làm (không có ô chọn, bot không bấm Go ở các dòng đó).
 - [x] Flow test: tests/event_center/three_day/test_flow.py (nhận Claim + đổi quà, Go dòng Alliance 60, group tắt, đã xong hôm nay).
 - [ ] Flow test chưa có: nhánh Heal, đổi nhiều quà liên tiếp, tab Limited chưa chọn khi vào Event Center (cần chụp thêm).
 - [ ] Chạy thử trên máy thật.
-- [ ] Đổi quà nhớ vị trí hàng (event.json giữ đúng thứ tự hàng của game; ROW_PITCH / DRAG_* trong constants.py): chưa đo thật xem vuốt 1 px màn = bao nhiêu px danh sách; bot tự dò thêm quanh hàng nếu lệch, nhưng cần đo để dò ít nhất. Không dùng OCR số vé.
+- [ ] Đổi quà nhớ vị trí hàng (event.py giữ đúng thứ tự hàng của game; ROW_PITCH / DRAG_* trong constants.py): chưa đo thật xem vuốt 1 px màn = bao nhiêu px danh sách; bot tự dò thêm quanh hàng nếu lệch, nhưng cần đo để dò ít nhất. Không dùng OCR số vé.
 - [ ] Donate hết kim cương (mua lại lượt): hiện chỉ đánh dấu xong hôm nay khi không đạt mục tiêu; người dùng sẽ sửa case hết kim cương chung sau.

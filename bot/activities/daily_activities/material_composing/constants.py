@@ -3,7 +3,7 @@ constants.py — ảnh của nhiệm vụ Daily Activities "Material Composing" 
 """
 from ..constants import ROOT, OPEN
 
-KEY = "daily_material_composing"   # key nhiệm vụ trong bot/worker/priority.json
+KEY = "daily_material_composing"   # key nhiệm vụ trong bot/worker/priority.py
 LABEL = "Material Composing"   # ô tích ở tab Daily Activities, key daily_done
 FOLDER = "ActivitiesComposeMaterials"
 FOLDER_PATH = f"{ROOT}/{FOLDER}"

@@ -1,10 +1,10 @@
 """
-black_market_tab.py — tab "Black Market", dựng từ danh mục vật phẩm bot/activities/black_market/items.json.
+black_market_tab.py — tab "Black Market", dựng từ danh mục vật phẩm bot/activities/black_market/items.py.
 
 - Group "Setting": CheckGold (vàng < 2.000.000 thì dừng), Refresh (số lần Instant Refresh), Quantity Buy (số lần mua).
 - Group "Resource": một ô tích "Resource" (mặc định tích) — mua mọi gói tài nguyên của 4 loại (lương thực / gỗ / đá /
-  quặng), mọi mức số lượng trong `resource_packs` của items.json (10k .. 5M).
-- Các group còn lại (`groups` trong items.json, trừ "resource"): một ô tích mỗi món; món có
+  quặng), mọi mức số lượng trong `resource_packs` của items.py (10k .. 5M).
+- Các group còn lại (`groups` trong items.py, trừ "resource"): một ô tích mỗi món; món có
   `"default": true` (Chips 100) mặc định tích.
 Vị trí control tính tự động (ô tích xếp _COLS cột mỗi hàng).
 
@@ -13,13 +13,10 @@ Settings (cột `black_market` của DB):
  "resources": true, "items": {"chips_100": true, "medal": false, ...}}
 Cấu hình cũ: "black_market_items": {"CheckGold": true, ...} -> check_gold; "resource_packs" có ô nào tích -> resources.
 """
-import json
-from pathlib import Path
+from bot.activities.black_market.items import DATA as CATALOG
 
 from .tab_placeholder import DesignerTab
 
-ITEMS_JSON = Path(__file__).resolve().parents[2] / "bot" / "activities" / "black_market" / "items.json"
-CATALOG = json.loads(ITEMS_JSON.read_text(encoding="utf-8"))
 RESOURCE_GROUP = "resource"
 RESOURCES_BOX = "checkBoxMarketResources"
 

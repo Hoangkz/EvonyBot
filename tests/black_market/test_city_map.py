@@ -1,7 +1,7 @@
 """
 Unit test black_market/city_map.py bằng thành giả: các công trình ở toạ độ bản đồ cố định, camera dịch đúng bằng cú vuốt;
 locate trả vị trí công trình trên màn theo camera. Kiểm: chia cú thẳng hàng (split), quét thành ghi đúng toạ độ (scan),
-đi tới công trình từ một công trình đã biết (goto), toạ độ ô trong city_tour.json.
+đi tới công trình từ một công trình đã biết (goto), toạ độ ô trong city_tour.py.
 """
 import unittest
 from unittest import mock
@@ -79,7 +79,7 @@ class CityMapTest(unittest.TestCase):
         self.assertEqual(city.swipes, [])
 
     def test_scan_records_every_plot(self):
-        """Thành giả có công trình đúng ở toạ độ các ô của city_tour.json: quét từ Thành chính ghi đủ, đúng toạ độ."""
+        """Thành giả có công trình đúng ở toạ độ các ô của city_tour.py: quét từ Thành chính ghi đủ, đúng toạ độ."""
         names = ["academy", "defense_force", "barracks", "archer_camp", "workshop", "stables", "hospital", "market",
                  "war_hall", "embassy", "tavern", "prison", "forge"]
         world = {"keep": (0, 0)}
@@ -94,7 +94,7 @@ class CityMapTest(unittest.TestCase):
             self.assertLessEqual(abs(found[name][0] - view[0]) + abs(found[name][1] - view[1]), 4, name)
 
     def test_tour_swipes_safe(self):
-        """Mỗi cú trong city_tour.json có điểm đầu / cuối trong màn 396x704."""
+        """Mỗi cú trong city_tour.py có điểm đầu / cuối trong màn 396x704."""
         for plot in city_map.TOUR:
             for start, end in plot["swipes"]:
                 for x, y in (start, end):

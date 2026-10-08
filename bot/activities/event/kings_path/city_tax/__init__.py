@@ -1,6 +1,6 @@
 """
 city_tax — King's Path: City Tax (Day 1, tab phụ "City Tax")
-(key `kings_path_city_tax`, ô chọn ở group King's Path trong ui/tabs/event.json).
+(key `kings_path_city_tax`, ô chọn ở group King's Path trong ui/tabs/event.py).
 
 - run.py:       `run(bot, task, state)` — flow của nhiệm vụ
 - constants.py: ảnh riêng của nhiệm vụ

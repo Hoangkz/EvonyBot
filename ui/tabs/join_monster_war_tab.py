@@ -1,12 +1,10 @@
 """Compact Join Monster War settings with responsive boss groups."""
-import json
-from pathlib import Path
-
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
     QCheckBox, QComboBox, QGridLayout, QGroupBox, QHBoxLayout, QLabel, QPushButton,
     QScrollArea, QVBoxLayout, QWidget,
 )
+from .boss import DATA
 from .tab_placeholder import BaseTab
 
 TROOP_RADIOS = [f"troop_{i}" for i in range(1, 9)]
@@ -85,14 +83,8 @@ class JoinMonsterWarTab(BaseTab):
         self._build_boss_selector()
 
     def _build_boss_selector(self):
-        try:
-            catalog = json.loads(Path(__file__).with_name("boss.json").read_text(encoding="utf-8-sig"))
-        except (OSError, ValueError) as exc:
-            error = QLabel(f"Cannot load boss.json: {exc}")
-            error.setWordWrap(True)
-            self.add_row(error)
-            return
-        actives = []   # (checkbox, "active" in boss.json): ticked by default
+        catalog = DATA
+        actives = []   # (checkbox, "active" in boss.py): ticked by default
         for category in catalog["boss_categories"]:
             standard = category["category_key"] == "standard_bosses"
             group = QGroupBox(category["label"])
@@ -176,7 +168,7 @@ class JoinMonsterWarTab(BaseTab):
                 grid.addWidget(select_all, len(cards) - 1, 0, Qt.AlignTop)
             self._boss_grids.append((grid, cards, standard))
             self.add_row(group)
-        # "active" in boss.json (on a plain boss, or on each level) = ticked by
+        # "active" in boss.py (on a plain boss, or on each level) = ticked by
         # default. Set after the "All" boxes are wired so they follow.
         for box, active in actives:
             box.setChecked(active)

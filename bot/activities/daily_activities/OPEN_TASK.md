@@ -101,7 +101,7 @@ tìm lại (`LIST_RETRIES` = 2). Vẫn không thấy → `TASK_NOT_FOUND`: bỏ 
 | nhiệm vụ làm xong theo số lượng (VD Offering) | `"<nhãn>"` + `"<key>_reached_<N>"` | xong với số lượng N; người dùng tăng số lượng → chạy lại |
 | `TASK_NOT_FOUND` / `TASK_UNKNOWN` / `TASK_NO_LIST` | (không lưu) | lần chạy sau thử lại |
 
-`<key>` = key trong `bot/worker/priority.json` (VD `daily_offering`). daily_done tính tới lần reset server: sang
+`<key>` = key trong `bot/worker/priority.py` (VD `daily_offering`). daily_done tính tới lần reset server: sang
 ngày mới chạy lại bình thường.
 
 ## 7. Sau Go — ví dụ Offering ([offering/run.py](offering/run.py))
@@ -125,7 +125,7 @@ mặc định 0 = không làm, lưu `Offering = False`; > 0 lưu `Offering = Tru
 
 ## 8. Thêm một nhiệm vụ mới
 
-1. `constants.py` của nhiệm vụ: `KEY` (theo `priority.json`), `LABEL`, ảnh tiêu đề dòng trong `ACTIONS` (action OPEN),
+1. `constants.py` của nhiệm vụ: `KEY` (theo `priority.py`), `LABEL`, ảnh tiêu đề dòng trong `ACTIONS` (action OPEN),
    ảnh thẻ bản cũ `Card.png` trong thư mục ảnh.
 2. `run.py`: `after_go(bot)` cho phần sau Go (thường `event/kings_path/building.py open_building` + icon chức năng),
    cuối cùng `mark_task_done` / đánh dấu theo số lượng.

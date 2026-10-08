@@ -31,7 +31,7 @@ Flow:
    nền văn minh): chọn cấp (troop_tier.choose_tier): đọc cấp vòng đang chọn ở huy hiệu số La Mã
    cạnh tên lính, bấm vòng cách giữa 1 .. 2 ô về phía cấp người dùng chọn rồi đọc lại; cấp chọn
    bị khoá (không có nút "+") thì lấy cấp mở cao nhất dưới nó, mục tiêu đổi theo cấp đó (bảng
-   trong event.json). Cấp 7 cũng khoá -> lưu "chưa thể thực hiện" (locked_key) và dừng.
+   trong event.py). Cấp 7 cũng khoá -> lưu "chưa thể thực hiện" (locked_key) và dừng.
 9. Đọc số lính tối đa một lần train (ô bên phải nút "+"), tính số lần bấm Train
    (VD 10000 / 1500 -> 7 lần).
     Vừa vào màn Train đã có mẻ đang train sẵn (nút là "Training Speedup"): Finish All mẻ đó
@@ -106,7 +106,7 @@ from .constants import (
 @dataclass(frozen=True)
 class TroopTask:
     """Phần riêng của một nhiệm vụ train lính."""
-    key: str                      # key trong settings / event.json (VD "gather_troops_ground_troop")
+    key: str                      # key trong settings / event.py (VD "gather_troops_ground_troop")
     name: str                     # tên trong log (VD "Ground Troop")
     day: int                      # ngày mở nhiệm vụ (dùng khi settings thiếu "day")
     day_tab: str                  # ảnh tab "Day N" khi CHƯA chọn

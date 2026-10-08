@@ -1,6 +1,6 @@
 """
 wheel — King's Path: Wheel (Day 4, tab phụ "Fortune Wheel")
-(key `kings_path_wheel`, ô chọn ở group King's Path trong ui/tabs/event.json).
+(key `kings_path_wheel`, ô chọn ở group King's Path trong ui/tabs/event.py).
 
 - run.py:       `run(bot, task, state)` — flow của nhiệm vụ
 - constants.py: ảnh riêng của nhiệm vụ

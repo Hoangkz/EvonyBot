@@ -3,7 +3,7 @@ constants.py — ảnh của nhiệm vụ Daily Activities "Wheel of Fortune" (t
 """
 from ..constants import ROOT, OPEN
 
-KEY = "daily_wheel_of_fortune"   # key nhiệm vụ trong bot/worker/priority.json
+KEY = "daily_wheel_of_fortune"   # key nhiệm vụ trong bot/worker/priority.py
 LABEL = "Wheel of Fortune"   # ô tích ở tab Daily Activities, key daily_done
 FOLDER = "ActivitiesWheelofFortune"
 FOLDER_PATH = f"{ROOT}/{FOLDER}"

@@ -139,20 +139,10 @@ try {
 Copy-Item (Join-Path $NuitkaOut "main*.pyd") $App
 
 # ---- data files ------------------------------------------------------
+# Dữ liệu trước đây ship riêng dạng .json (boss, event, priority, black_market items /
+# city_tour, ...) giờ là .py, được Nuitka compile cùng code -> không copy gì thêm.
 New-Item -ItemType Directory -Force (Join-Path $App "ui") | Out-Null
 Copy-Item (Join-Path $Root "ui\assets") (Join-Path $App "ui\assets") -Recurse
-# Every .json under bot\ and ui\ (boss, event, priority, black_market items / city_tour, ...) is read at
-# runtime relative to its module, so ship them all at the same relative path.
-foreach ($dir in "bot", "ui") {
-    Get-ChildItem (Join-Path $Root $dir) -Filter "*.json" -Recurse |
-        Where-Object { $_.FullName -notmatch '\\__pycache__\\' } |
-        ForEach-Object {
-            $rel = $_.FullName.Substring($Root.Length).TrimStart('\')
-            $dest = Join-Path $App $rel
-            New-Item -ItemType Directory -Force (Split-Path $dest) | Out-Null
-            Copy-Item $_.FullName $dest
-        }
-}
 Copy-Item (Join-Path $Root "Images") (Join-Path $App "Images") -Recurse
 
 # A .pyd can't be run as a script, so the shortcut starts this stub.

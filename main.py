@@ -154,7 +154,7 @@ class MainWindow(QMainWindow):
             self.db.save_settings(device_id, view.get_settings())
         else:
             view.set_settings(self.db.load_settings(device_id))
-            # Ghi lại tab Event theo event.json hiện tại (thêm nhiệm vụ mới,
+            # Ghi lại tab Event theo event.py hiện tại (thêm nhiệm vụ mới,
             # cập nhật level / day khi file được sửa).
             self.db.save_settings(device_id, {"Event": view.event_tab.get_settings()})
         self.home_view.update_device(

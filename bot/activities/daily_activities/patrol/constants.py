@@ -4,7 +4,7 @@ constants.py — ảnh của nhiệm vụ Daily Activities "Patrol" (thư mục 
 from ...event.kings_path.patrol.constants import PER_ROUND, ROUNDS_PER_DAY
 from ..constants import ROOT, OPEN
 
-KEY = "daily_patrol"   # key nhiệm vụ trong bot/worker/priority.json
+KEY = "daily_patrol"   # key nhiệm vụ trong bot/worker/priority.py
 LABEL = "Patrol"   # ô tích ở tab Daily Activities, key daily_done
 FOLDER = "ActivitiesPatrol"
 FOLDER_PATH = f"{ROOT}/{FOLDER}"

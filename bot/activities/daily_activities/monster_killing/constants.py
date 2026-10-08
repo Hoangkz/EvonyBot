@@ -3,7 +3,7 @@ constants.py — ảnh của nhiệm vụ Daily Activities "Monster Killing" (th
 """
 from ..constants import ROOT, OPEN_MONSTER_FIRST, OPEN_MONSTER_SECOND, TAP
 
-KEY = "daily_monster_killing"   # key nhiệm vụ trong bot/worker/priority.json
+KEY = "daily_monster_killing"   # key nhiệm vụ trong bot/worker/priority.py
 LABEL = "Monster Killing"   # ô tích ở tab Daily Activities, key daily_done
 FOLDER = "ActivitiesAttackMonster"
 FOLDER_PATH = f"{ROOT}/{FOLDER}"

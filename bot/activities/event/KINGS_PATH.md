@@ -84,7 +84,7 @@ Mẹo "đem lính T1 đánh quái mạnh để có lính bị thương rồi ch�
 
 ## 4. Cấu hình (tab Event)
 
-Nhiệm vụ, lựa chọn, level lính, ngày mở và mặc định khai báo ở [ui/tabs/event.json](../../../ui/tabs/event.json); tab [event_tab.py](../../../ui/tabs/event_tab.py) dựng UI từ file này.
+Nhiệm vụ, lựa chọn, level lính, ngày mở và mặc định khai báo ở [ui/tabs/event.py](../../../ui/tabs/event.py); tab [event_tab.py](../../../ui/tabs/event_tab.py) dựng UI từ file này.
 
 Settings (cột `event` trong DB, cũng là `settings` mà `run(bot, settings)` nhận) có dạng:
 
@@ -100,7 +100,7 @@ Settings (cột `event` trong DB, cũng là `settings` mà `run(bot, settings)` 
 - `level`: cấp lính gắn với lựa chọn (chỉ có ở ô lính).
 - `day`: ngày event mở nhiệm vụ — bot bỏ qua nhiệm vụ khi event chưa tới ngày đó.
 
-Lưu DB: máy mới lưu mặc định; mỗi lần mở app ghi lại tab Event theo event.json hiện tại; người dùng đổi ô nào là lưu ngay.
+Lưu DB: máy mới lưu mặc định; mỗi lần mở app ghi lại tab Event theo event.py hiện tại; người dùng đổi ô nào là lưu ngay.
 
 ## 5. Các bước làm
 

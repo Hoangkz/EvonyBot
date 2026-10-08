@@ -4,7 +4,7 @@ constants.py — ảnh của nhiệm vụ Daily Activities "Resource Tax" (thư 
 from ...event.kings_path.city_tax.constants import POPUP, TAX_MENU, TAX_SCREEN
 from ..constants import ROOT, OPEN
 
-KEY = "daily_resource_tax"   # key nhiệm vụ trong bot/worker/priority.json
+KEY = "daily_resource_tax"   # key nhiệm vụ trong bot/worker/priority.py
 LABEL = "Resource Tax"   # ô tích ở tab Daily Activities, key daily_done
 FOLDER = "ActivitiesTaxResource"
 FOLDER_PATH = f"{ROOT}/{FOLDER}"

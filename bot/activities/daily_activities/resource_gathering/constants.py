@@ -3,7 +3,7 @@ constants.py — ảnh của nhiệm vụ Daily Activities "Resource Gathering" 
 """
 from ..constants import ROOT, OPEN
 
-KEY = "daily_resource_gathering"   # key nhiệm vụ trong bot/worker/priority.json
+KEY = "daily_resource_gathering"   # key nhiệm vụ trong bot/worker/priority.py
 LABEL = "Resource Gathering"   # ô tích ở tab Daily Activities, key daily_done
 FOLDER = "ActivitiesSourceGathering"
 FOLDER_PATH = f"{ROOT}/{FOLDER}"

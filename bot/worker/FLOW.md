@@ -45,7 +45,7 @@ Server ban đầu lấy từ `settings["Initialization"]["server"]`. Nếu chưa
 
 Worker chạy theo **nhiệm vụ** (bot/worker/TODO.md). Bước 1: mỗi activity đã chọn (trừ Join Boss) là 1 nhiệm vụ chạy
 nguyên khối ([tasks.py](tasks.py)); độ ưu tiên = cao nhất trong các nhiệm vụ của nhóm đó trong
-[priority.json](priority.json) (số lớn hơn làm trước). Bộ chọn [scheduler.py](scheduler.py) lấy nhiệm vụ tới lượt có ưu
+[priority.py](priority.py) (số lớn hơn làm trước). Bộ chọn [scheduler.py](scheduler.py) lấy nhiệm vụ tới lượt có ưu
 tiên cao nhất; cùng ưu tiên thì xoay vòng (nhiệm vụ lâu chưa được bắt đầu nhất đi trước).
 
 **Giờ reset server** (mốc làm lại nhiệm vụ đã xong): người dùng chọn ở màn Home (ô "Reset Time", "HH:MM", mặc định 14:00), lưu bảng `settings` của DB, dùng chung mọi thiết bị qua `ServerClock`; đổi là các worker đang chạy dùng ngay. Bot không vào game đọc giờ reset nữa (đã xoá `get_server_time` / OCR `read_server_time`).

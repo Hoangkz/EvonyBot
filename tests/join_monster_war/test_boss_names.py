@@ -63,7 +63,7 @@ class CardOcrTests(unittest.TestCase):
                 self.assertEqual((found and found.name, found_tier), (name, tier))
 
     def test_reads_power_on_every_card(self):
-        # Lực đọc được khớp "power" của boss thường trong boss.json.
+        # Lực đọc được khớp "power" của boss thường trong boss.py.
         for screen, y, _, _, power, image in self._cards():
             if power is None:
                 continue

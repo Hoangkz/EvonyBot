@@ -427,7 +427,7 @@ _GREY, _REDEEMED = "grey", "redeemed"   # kết quả _redeem_item (không thấ
 def _redeem(bot, order):
     """Đổi lần lượt theo `order`. Vừa sang tab Redeem chưa biết đang đứng ở đâu (game giữ vị trí cuộn cũ): tìm
     ảnh quà theo thứ tự ưu tiên tới hết danh sách quà, thấy ảnh nào thì biết đang ở hàng nào (_measure). Sau đó
-    mỗi quà cuộn THẲNG tới hàng của nó (hàng nhớ trong event.json, lên hoặc xuống tuỳ vị trí đang đứng) rồi
+    mỗi quà cuộn THẲNG tới hàng của nó (hàng nhớ trong event.py, lên hoặc xuống tuỳ vị trí đang đứng) rồi
     đổi hết; nút xám (hết vé hoặc hết lượt) thì bỏ qua sang quà kế; GREY_STOP quà xám liên tiếp thì dừng."""
     rows = c.reward_rows()
     order = [i for i in order if i in rows]

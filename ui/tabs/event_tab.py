@@ -1,7 +1,7 @@
 """
-event_tab.py — "Event" TabPage built from event.json.
+event_tab.py — "Event" TabPage built from event.py.
 
-event.json liệt kê từng group (Gather Troops, King's Path, ...): các ô tích
+event.py liệt kê từng group (Gather Troops, King's Path, ...): các ô tích
 (`checkboxes`) và ô chọn (`combos`). Mỗi nhiệm vụ có:
 - `key`: tên trong settings.
 - `day`: ngày của event mở nhiệm vụ này (hiện khi rê chuột vào nhiệm vụ).
@@ -19,16 +19,13 @@ Settings (lưu ở cột `event` của DB) giữ đủ thông tin mỗi nhiệm 
 {"gather_troops_ground_troop": {"value": 500, "level": 7, "day": 1},
  "gather_troops_cultivate_generals": {"enabled": true, "day": 1}, ...}
 """
-import json
-from pathlib import Path
-
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtWidgets import QAbstractItemView, QListWidget, QListWidgetItem, QPushButton
 
+from .event import DATA
 from .tab_placeholder import DesignerTab
 
-EVENT_JSON = Path(__file__).with_name("event.json")
-GROUPS = json.loads(EVENT_JSON.read_text(encoding="utf-8-sig"))["groups"]
+GROUPS = DATA["groups"]
 
 _COMBO_X = [220, 490, 760]   # cột nhãn; combo nằm ngay sau nhãn
 _ROW_H = 35
@@ -181,7 +178,7 @@ class EventTab(DesignerTab):
 
     def set_settings(self, data: dict):
         # Nhận cả cấu hình cũ dạng phẳng ({key: "500", key_level: 7} / {key: true}).
-        # `day` luôn lấy theo event.json, không lấy từ dữ liệu đã lưu.
+        # `day` luôn lấy theo event.py, không lấy từ dữ liệu đã lưu.
         c = self.controls
         for key, (name, _) in _CHECKBOXES.items():
             if key in data:

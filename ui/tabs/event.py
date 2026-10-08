@@ -1,16 +1,23 @@
-{
+"""event.py — mô tả tab Event (dữ liệu tĩnh): groups với checkboxes / combos / redeem.
+
+Mỗi nhiệm vụ có `key` (tên settings), `day`, `default`, `values` (chọn: số hoặc
+{value, level}); tab dựng controls từ đây, bot lấy giá trị (mục tiêu train, hàng
+Redeem...). Trước đây là file .json cùng tên; đổi sang .py để Nuitka compile cùng code,
+không cần ship file riêng lúc build.
+"""
+DATA ={
     "groups": [
         {
             "key": "gather_troops",
             "title": "Gather Troops",
             "checkboxes": [
-                { "key": "gather_troops_cultivate_generals", "label": "Cultivate Generals", "day": 1, "default": true }
+                { "key": "gather_troops_cultivate_generals", "label": "Cultivate Generals", "day": 1, "default": True }
             ],
             "combos": [
                 {
                     "key": "gather_troops_ground_troop", "label": "Ground Troop:", "day": 2, "default": 20000,
                     "values": [
-                        { "value": 0, "level": null },
+                        { "value": 0, "level": None },
                         { "value": 500, "level": 7 },
                         { "value": 1000, "level": 8 },
                         { "value": 2000, "level": 9 },
@@ -23,7 +30,7 @@
                 {
                     "key": "gather_troops_mounted_troop", "label": "Mounted Troop:", "day": 3, "default": 20000,
                     "values": [
-                        { "value": 0, "level": null },
+                        { "value": 0, "level": None },
                         { "value": 500, "level": 7 },
                         { "value": 1000, "level": 8 },
                         { "value": 2000, "level": 9 },
@@ -36,7 +43,7 @@
                 {
                     "key": "gather_troops_ranged_troop", "label": "Ranged Troop:", "day": 3, "default": 20000,
                     "values": [
-                        { "value": 0, "level": null },
+                        { "value": 0, "level": None },
                         { "value": 500, "level": 7 },
                         { "value": 1000, "level": 8 },
                         { "value": 2000, "level": 9 },
@@ -49,7 +56,7 @@
                 {
                     "key": "gather_troops_siege_machine", "label": "Siege Machine:", "day": 4, "default": 20000,
                     "values": [
-                        { "value": 0, "level": null },
+                        { "value": 0, "level": None },
                         { "value": 500, "level": 7 },
                         { "value": 1000, "level": 8 },
                         { "value": 2000, "level": 9 },
@@ -62,7 +69,7 @@
                 {
                     "key": "gather_troops_defense_force", "label": "Defense Force:", "day": 4, "default": 7000,
                     "values": [
-                        { "value": 0, "level": null },
+                        { "value": 0, "level": None },
                         { "value": 1000, "level": 3 },
                         { "value": 2000, "level": 3 },
                         { "value": 3000, "level": 4 },

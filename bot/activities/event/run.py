@@ -22,7 +22,7 @@ from .gather_troops import cultivate_generals, ground_troop, mounted_troop, rang
 from ..event_center import three_day
 from .kings_path import black_market, city_tax, donate, heal, patrol, refine, train_troop, wheel
 
-# (key event, tên log, icon trong danh sách event, [(key nhiệm vụ trong settings / event.json,
+# (key event, tên log, icon trong danh sách event, [(key nhiệm vụ trong settings / event.py,
 # hàm chạy nhiệm vụ)] theo thứ tự chạy).
 EVENTS = [
     ("gather_troops", "Gather Troops", GATHER_TROOPS_ICON, [

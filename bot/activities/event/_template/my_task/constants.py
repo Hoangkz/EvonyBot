@@ -3,7 +3,7 @@ constants.py — ảnh, ngưỡng và action riêng của nhiệm vụ <tên nhi
 """
 from ...constants import EV, THRESHOLDS as EVENT_THRESHOLDS
 
-KEY = "my_task"   # key trong ui/tabs/event.json / settings
+KEY = "my_task"   # key trong ui/tabs/event.py / settings
 
 # ---- Màn <...> ------------------------------------------------------------------
 # Mỗi ảnh ghi kèm điểm khớp đo được (skill template-images): đúng màn / màn khác.
