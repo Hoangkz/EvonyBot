@@ -15,7 +15,10 @@ tab ticks it.
 """
 import difflib
 import math
+import os
 import re
+import time
+from pathlib import Path
 
 from ...ocr.read_power import parse as parse_power
 
@@ -152,6 +155,27 @@ def wanted(selected: dict[str, tuple[set[int], bool]] | None, boss: Boss | None,
     if level is None:
         return plain or not boss.has_level_data
     return level in levels
+
+
+# Cùng thư mục với evonybot.db (database.DATA_DIR); không import database để khỏi vòng import.
+UNKNOWN_LOG = Path(os.environ.get("LOCALAPPDATA", Path.home())) / "EvonyBot" / "ocr_unknown.logs"
+
+
+def log_unknown(coords, name_text: str | None, power_text: str | None,
+                boss: "Boss | None", level: int | None) -> None:
+    """Append to ocr_unknown.logs every read of a card whose name/tier or power holds a
+    "?" (glyph without a sample), to find which samples to add with add_sample."""
+    if "?" not in (name_text or "") + (power_text or ""):
+        return
+    line = (f"{time.strftime('%Y-%m-%d %H:%M:%S')} coords={coords} name={name_text!r} "
+            f"power={power_text!r} -> {boss.name if boss else 'không nhận ra'}"
+            f"{f' lv {level}' if level else ''}\n")
+    try:
+        UNKNOWN_LOG.parent.mkdir(parents=True, exist_ok=True)
+        with open(UNKNOWN_LOG, "a", encoding="utf-8") as f:
+            f.write(line)
+    except OSError:
+        pass
 
 
 def _too_unknown(text: str) -> bool:
