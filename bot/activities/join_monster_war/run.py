@@ -18,6 +18,8 @@ from .constants import (ALLIANCE_ICON, ASSISTANT_GENERAL, BACK, BOSS_MONSTER, CH
                         NO_BOSS, NOT_ENOUGH_STAMINA, OUT_OF_STAMINA, PRESET_COUNT, PRESET_DX,
                         PRESET_LOCKED, PRESET_X0, PRESET_Y, PVP_WAR, REGIONS, SAME_SPOT, SCROLL, SELECT,
                         SELECT_GENERAL, STAMINA_ITEM_USE, STAMINA_REFILL_WAIT, STAMINA_SLIDER_END,
+                        STAMINA_ADDED_WAIT, STAMINA_BASE, STAMINA_BAR_REGION, STAMINA_ITEM_MIN_SCORE, STAMINA_ITEM_REGION, STAMINA_ITEMS,
+                        STAMINA_PLUS, STAMINA_PLUS_DELAY,
                         STAMINA_USE, TAP, WAR_TAB, WAR_TICKED, WAR_UNTICK_TRIES)
 
 # --- CACHE CHECKS TỒN TẠI FILE (Chạy 1 lần duy nhất khi import, không đọc ổ cứng liên tục) ---
@@ -153,7 +155,7 @@ class _Boss:
 
             if action == OUT_OF_STAMINA:
                 # Không đủ thể lực: use_stamina = No -> dừng hẳn Join Boss
-                if self.use_stamina not in ("ALL", "100"):
+                if self.use_stamina not in STAMINA_CHOICES:
                     bot.record("Join Monster War: hết thể lực, không dùng vật phẩm -> dừng Join Boss")
                     return
                 bot.tap(*pos)
@@ -307,7 +309,7 @@ class _Boss:
         bot.tap(*buttons[0])
 
         # Popup số lượng: 100 -> Use luôn; ALL -> bấm cuối thanh trượt (dùng hết) rồi Use
-        _, use = self._poll_screen(
+        shot, use = self._poll_screen(
             "open_stamina_amount",
             lambda image: bot.find(STAMINA_USE, screen=image, region=REGIONS[STAMINA_USE]),
         )
@@ -317,6 +319,8 @@ class _Boss:
         if self.use_stamina == "ALL":
             bot.tap_percent(*STAMINA_SLIDER_END)
             delay(bot, POLL_INTERVAL)
+        elif self.use_stamina in STAMINA_MULTIPLES:
+            self._add_stamina(shot, int(self.use_stamina))
         bot.tap(*use)
         bot.record(f"Join Monster War: dùng vật phẩm thể lực ({self.use_stamina})")
 
@@ -339,6 +343,23 @@ class _Boss:
                 bot.back()
                 return
             self._press_march(coords, march, shot)
+
+    def _add_stamina(self, shot, target: int):
+        """Popup số lượng mở sẵn ở mốc 100 thể lực: bấm nút + thêm (target - 100) / `item`
+        lần (item = thể lực mỗi vật phẩm), mỗi lần cách STAMINA_PLUS_DELAY, xong chờ
+        STAMINA_ADDED_WAIT."""
+        bot = self.bot
+        item = _item_stamina(bot, shot)
+        plus = bot.find(STAMINA_PLUS, screen=shot, region=STAMINA_BAR_REGION)
+        if item is None or plus is None:
+            bot.record(f"Join Monster War: không xác định được vật phẩm / nút + ({self.use_stamina}); dùng mốc 100")
+            return
+        times = max(target - STAMINA_BASE, 0) // item
+        for _ in range(times):
+            bot.tap(*plus)
+            delay(bot, STAMINA_PLUS_DELAY)
+        bot.log(f"Thể lực {target}: vật phẩm {item}, bấm + {times} lần")
+        delay(bot, STAMINA_ADDED_WAIT)
 
     def _march(self, screen, march_pos):
         """Màn hình March: chọn quân, hành quân. Chỉ khi quay lại danh sách War
@@ -747,6 +768,20 @@ PERF_SUMMARY_EVERY = 10 # mỗi 10 mẫu in p50/p95/max của bước đó
 MAX_MAP_COORD = 2000    # chặn kết quả OCR tọa độ hỏng rõ ràng; cố ý rộng hơn mọi map đang dùng
 _WAIT = {"top_left": {LEAVE_ALLIANCE_POPUP}, "tolerance": SAME_SPOT,
          "timeout": STEP_TIMEOUT, "interval": POLL_INTERVAL}
+
+
+STAMINA_MULTIPLES = ("200", "300", "400", "500")     # thể lực muốn nhận; popup mở sẵn ở mốc 100
+STAMINA_CHOICES = ("ALL", "100", *STAMINA_MULTIPLES)
+
+
+def _item_stamina(bot, screen) -> int | None:
+    """Thể lực mỗi vật phẩm (10 / 25 / 50 / 100) của popup số lượng đang mở, nhận theo số vàng
+    trên biểu tượng. Thử từ lớn xuống nhỏ vì số "10" nằm trong số "100" (khớp 0,99)."""
+    for amount, template in STAMINA_ITEMS.items():
+        if bot.find(template, threshold=STAMINA_ITEM_MIN_SCORE, screen=screen,
+                    region=STAMINA_ITEM_REGION):
+            return amount
+    return None
 
 
 def _is_green_button(screen, center) -> bool:

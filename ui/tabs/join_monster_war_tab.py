@@ -8,7 +8,7 @@ from .boss import DATA
 from .tab_placeholder import BaseTab
 
 TROOP_RADIOS = [f"troop_{i}" for i in range(1, 9)]
-STAMINA_OPTIONS = ["ALL", "100", "No"]
+STAMINA_OPTIONS = ["ALL", "100", "200", "300", "400", "500", "No"]
 HAMMER_OPTIONS = ["No", "10", "9", "8", "7", "6","5","4","3","2","1"]
 BOSS_CATALOG_VERSION = 2
 # Boss active mới của từng phiên bản. Cấu hình cũ chưa biết boss này sẽ được

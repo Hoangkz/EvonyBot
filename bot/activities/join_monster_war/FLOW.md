@@ -9,7 +9,7 @@ Worker gọi `run(bot, settings)`, tạo một đối tượng `_Boss` mới r�
 | Cấu hình | Cách sử dụng |
 | --- | --- |
 | `troop` | Danh sách preset quân (vd `["Troop 1", "Troop 3"]`, vẫn nhận chuỗi đơn kiểu cũ); lấy số ở cuối mỗi chuỗi, xoay vòng qua từng preset mỗi lần march; nếu không đọc được thì dùng 1. |
-| `use_stamina` | Chỉ `ALL` hoặc `100` cho phép xử lý bổ sung thể lực; giá trị khác khiến activity kết thúc khi gặp hết thể lực. |
+| `use_stamina` | Chỉ `ALL`, `100`, `200`, `300`, `400`, `500` cho phép xử lý bổ sung thể lực; giá trị khác khiến activity kết thúc khi gặp hết thể lực. |
 | `selected_bosses` | Boss được tích ở tab (`[{category_key, name, levels}]`). Chỉ Join boss có tên trong danh sách; boss có cấp chỉ Join khi cấp đọc được nằm trong `levels`. Không có key này (cấu hình cũ) thì không lọc theo tên. |
 | `exit_when_idle` | Mặc định False. Worker bật True khi còn activity phụ để Join Boss trả quyền điều khiển lúc rảnh. |
 
@@ -231,6 +231,7 @@ Hàm không trả cờ thành công/thất bại. Khi nó trả về, `_march()`
 2. **Popup số lượng** (nút Use lớn `staminaUse.png`):
    - `100`: bấm Use luôn (số lượng mặc định);
    - `ALL`: bấm gần cuối thanh trượt (`STAMINA_SLIDER_END`, dùng hết), rồi bấm Use.
+   - `200` / `300` / `400` / `500` (`_add_stamina`): popup mở sẵn ở mốc 100 thể lực. Nhận loại vật phẩm (10 / 25 / 50 / 100) theo số vàng trên biểu tượng popup (`staminaItem<N>.png`, thử từ lớn xuống nhỏ, ngưỡng 0,995 vì "10" nằm trong "100"), tìm nút + (`staminaPlus.png`), bấm + (mốc − 100) / N lần (VD vật phẩm 10 mốc 200: 10 lần; vật phẩm 50 mốc 500: 8 lần) không delay giữa các lần, xong chờ 1 giây rồi bấm Use. Không nhận ra vật phẩm hoặc không thấy nút + thì ghi log, dùng mốc 100. Không OCR. Đo thật máy 21923 (vật phẩm 25, mở ở 3/15): mốc 200 → bấm 4 lần, 31 → 206; mốc 400 → bấm 12 lần, 32 → 407.
 3. Polling cho tới khi popup Use đóng (timeout 2 giây), Back về màn March, OCR lại tọa độ đích thật rồi **bấm March lại** (`_press_march`, giữ nguyên đội đã chọn). Không giữ `pending` hay tọa độ cũ qua bước bổ sung thể lực. Chỉ khi thấy hàng `Joined` đúng tọa độ thì boss mới được nhớ là đã tham gia.
 
 `use_stamina = No` (hoặc đã hết vật phẩm): gặp popup không đủ thể lực thì Join Boss dừng hẳn (trả `None`).

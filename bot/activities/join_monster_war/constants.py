@@ -75,6 +75,19 @@ PRESET_COUNT = 8
 # Popup dùng vật phẩm thể lực: điểm gần cuối thanh trượt số lượng (% màn hình; đo thanh
 # x 90-300, y 370 trên 396x704) -> dùng hết (use_stamina = ALL).
 STAMINA_SLIDER_END = (74.7, 52.6)
+# Dùng vật phẩm thể lực mốc 200 / 300 / 400 / 500: popup số lượng mở sẵn ở mốc 100 thể lực nên bấm
+# nút + thêm (mốc - 100) / thể lực mỗi vật phẩm lần (VD vật phẩm 10, mốc 200: 10 lần; vật phẩm
+# 50, mốc 500: 8 lần). Loại vật phẩm nhận theo số vàng trên biểu tượng;
+# thứ tự từ lớn xuống nhỏ vì "10" nằm trong "100".
+STAMINA_ITEMS = {100: f"{JB}/staminaItem100.png", 50: f"{JB}/staminaItem50.png",
+                 25: f"{JB}/staminaItem25.png", 10: f"{JB}/staminaItem10.png"}
+STAMINA_ITEM_MIN_SCORE = 0.995
+STAMINA_ITEM_REGION = (8, 30, 34, 44)    # % màn hình: biểu tượng vật phẩm ở góc trái popup (x 40-130, y 220-300)
+STAMINA_PLUS = f"{JB}/staminaPlus.png"
+STAMINA_BAR_REGION = (0, 48, 100, 58)    # % màn hình: dải chứa nút − và nút + (y 370 / 704 = 52,6)
+STAMINA_BASE = 100                       # thể lực popup mở sẵn
+STAMINA_PLUS_DELAY = 0                       # giây sau mỗi lần bấm +: mỗi tap ADB đã mất ~0,5 giây
+STAMINA_ADDED_WAIT = 1                   # giây chờ sau khi bấm + xong, trước khi bấm Use
 STAMINA_REFILL_WAIT = 2             # timeout chờ popup Use đóng; thường hoàn thành trong ~1 giây
 PRESET_X0, PRESET_DX, PRESET_Y = 10.4, 11.3, 11
 
