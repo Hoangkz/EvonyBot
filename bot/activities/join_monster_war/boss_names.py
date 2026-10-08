@@ -20,6 +20,8 @@ import re
 import time
 from pathlib import Path
 
+import cv2
+
 from ...ocr.read_power import parse as parse_power
 
 MATCH_CUTOFF = 0.75     # difflib ratio needed to accept a name / tier
@@ -157,21 +159,34 @@ def wanted(selected: dict[str, tuple[set[int], bool]] | None, boss: Boss | None,
     return level in levels
 
 
-# Cùng thư mục với evonybot.db (database.DATA_DIR); không import database để khỏi vòng import.
-UNKNOWN_LOG = Path(os.environ.get("LOCALAPPDATA", Path.home())) / "EvonyBot" / "ocr_unknown.logs"
+# Trong thư mục dữ liệu của app (cùng chỗ evonybot.db, database.DATA_DIR); không import
+# database để khỏi vòng import.
+LOGS_DIR = Path(os.environ.get("LOCALAPPDATA", Path.home())) / "EvonyBot" / "logs"
+UNKNOWN_LOG = LOGS_DIR / "ocr_unknown.logs"
+UNKNOWN_IMAGES = LOGS_DIR / "images"
+_logged: set = set()    # (tên, công suất) đã ghi trong phiên này: quét lại cùng thẻ không ghi nữa
 
 
-def log_unknown(coords, name_text: str | None, power_text: str | None,
+def log_unknown(screen, coords, name_text: str | None, power_text: str | None,
                 boss: "Boss | None", level: int | None) -> None:
-    """Append to ocr_unknown.logs every read of a card whose name/tier or power holds a
-    "?" (glyph without a sample), to find which samples to add with add_sample."""
-    if "?" not in (name_text or "") + (power_text or ""):
+    """Append to logs/ocr_unknown.logs every read of a card whose name/tier or power holds
+    a "?" (glyph without a sample), and save the screenshot in logs/images/ as
+    <boss>_<power>.png (the same read overwrites it), to find which samples to add with
+    add_sample. Each distinct (name, power) read is logged once per run."""
+    if "?" not in (name_text or "") + (power_text or "") or (name_text, power_text) in _logged:
         return
+    _logged.add((name_text, power_text))
+    # <tên boss>_<công suất>.png: cùng thẻ đọc lại thì ghi đè. Không nhận ra boss thì dùng
+    # chữ OCR; "?" không hợp lệ trong tên file nên đổi thành "x".
+    label = boss.name if boss else re.sub(r"^\s*\([^)]*\)", "", name_text or "").strip()
+    name = re.sub(r'[\\/:*"<>|\s]+', "_", f"{label}_{power_text or 'none'}".replace("?", "x"))
+    image = f"images/{name}.png"
     line = (f"{time.strftime('%Y-%m-%d %H:%M:%S')} coords={coords} name={name_text!r} "
             f"power={power_text!r} -> {boss.name if boss else 'không nhận ra'}"
-            f"{f' lv {level}' if level else ''}\n")
+            f"{f' lv {level}' if level else ''} image={image}\n")
     try:
-        UNKNOWN_LOG.parent.mkdir(parents=True, exist_ok=True)
+        UNKNOWN_IMAGES.mkdir(parents=True, exist_ok=True)
+        cv2.imwrite(str(LOGS_DIR / image), screen)
         with open(UNKNOWN_LOG, "a", encoding="utf-8") as f:
             f.write(line)
     except OSError:
