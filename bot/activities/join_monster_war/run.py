@@ -733,7 +733,7 @@ class _Boss:
 # dừng ở y-60, trên biển "Boss Monster" (cũng chữ vàng, từ y-58).
 NAME_DX, NAME_DY, NAME_W, NAME_DH = -95, -90, 168, 30
 # Lực của boss (số bên phải thanh trên cùng của thẻ, sau biểu tượng kiếm).
-POWER_DX, POWER_DY, POWER_W, POWER_DH = -18, -180, 75, 20   # số dài (147.5M) bắt đầu từ x-14
+POWER_DX, POWER_DY, POWER_W, POWER_DH = -18, -180, 85, 20   # số dài (147.5M) bắt đầu từ x-14
 
 SCROLLS_EACH_WAY = 3                  # mỗi chu kỳ: 3 lần cuộn xuống rồi 3 lần cuộn lên
 IDLE_SCROLLS = 2 * SCROLLS_EACH_WAY   # cuộn hết 1 chu kỳ (6 lần) mà không thấy boss mới -> rảnh
