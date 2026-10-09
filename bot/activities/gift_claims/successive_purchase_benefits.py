@@ -10,7 +10,8 @@ def run(bot):
     return run_carousel_claim(
         bot, GiftScreen.VALUABLE_EVENT, "ValuableEvent/title",
         "SuccessivePurchaseBenefits/tab",
-        ("SuccessivePurchaseBenefits/button_daily_free", "LimitedOffer/button_free"))
+        ("SuccessivePurchaseBenefits/button_daily_free_text",
+         "SuccessivePurchaseBenefits/button_daily_free", "LimitedOffer/button_free"))
 
 
 TASK = GiftTask(KEY, "Successive Purchase Benefits", run)

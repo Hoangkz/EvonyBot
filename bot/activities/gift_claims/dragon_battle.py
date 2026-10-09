@@ -1,5 +1,6 @@
 """Claim the red-dot reward on the rotating Dragon Battle page."""
-from .common import GiftTask, open_event_center_event, return_home, tap_claims
+from .common import (GiftTask, claim_fixed_controls, open_event_center_event,
+                     return_home)
 
 KEY = "gift_dragon_battle"
 
@@ -7,7 +8,7 @@ KEY = "gift_dragon_battle"
 def run(bot):
     if not open_event_center_event(bot, "DragonBattle/list_row", "DragonBattle/title"):
         return False
-    tap_claims(bot, ("DragonBattle/reward",))
+    claim_fixed_controls(bot, ("DragonBattle/reward",))
     return_home(bot)
     return True
 

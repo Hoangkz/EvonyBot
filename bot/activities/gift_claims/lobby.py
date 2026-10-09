@@ -2,7 +2,8 @@
 import cv2
 import numpy as np
 
-from .common import REFERENCE_WIDTH, return_home
+from ...context.errors import YieldToBoss
+from .common import REFERENCE_WIDTH, find_all, return_home
 from .screens import GiftScreen, identify
 
 BOTTOM = "bottom"
@@ -15,6 +16,7 @@ REGIONS = {
 }
 MAX_OPENS_PER_BOUNDARY = 16
 OPEN_WAIT_ATTEMPTS = 6
+IGNORED_RIGHT_LAUNCHERS = ("FollowUs/facebook_icon",)
 
 
 def _red_mask(screen):
@@ -52,6 +54,28 @@ def _bottom_circle_dots(screen, bounds, scale):
     return sorted(points, key=lambda point: point[0])
 
 
+def _dedupe_right_dots(points, scale):
+    """Collapse red artwork fragments belonging to the same right-rail icon."""
+    remaining = list(points)
+    result = []
+    while remaining:
+        seed = remaining.pop(0)
+        cluster = [seed]
+        changed = True
+        while changed:
+            changed = False
+            for point in remaining[:]:
+                if any(abs(point[0] - member[0]) <= 35 * scale
+                       and abs(point[1] - member[1]) <= 18 * scale
+                       for member in cluster):
+                    cluster.append(point)
+                    remaining.remove(point)
+                    changed = True
+        # A real notification badge is attached to the icon's upper-right.
+        result.append(max(cluster, key=lambda point: (point[0], -point[1])))
+    return sorted(result, key=lambda point: (point[1], point[0]))
+
+
 def red_dots(screen, boundary: str) -> list[tuple[int, int]]:
     """Find round red notification fills inside one user-defined boundary."""
     height, width = screen.shape[:2]
@@ -72,13 +96,10 @@ def red_dots(screen, boundary: str) -> list[tuple[int, int]]:
             continue
         center = (left + x + box_width // 2, top + y + box_height // 2)
         on_right_rail = center[0] >= width * 0.90 and pixels >= 90 * scale * scale
-        on_top_row = (center[0] >= width * 0.72
-                      and center[1] <= height * 0.15
-                      and pixels >= 90 * scale * scale)
-        if not (on_right_rail or on_top_row):
+        if not on_right_rail:
             continue
         points.append(center)
-    return sorted(points, key=lambda point: (point[1], point[0]))
+    return _dedupe_right_dots(points, scale)
 
 
 def _already_attempted(point, attempted, width) -> bool:
@@ -87,15 +108,45 @@ def _already_attempted(point, attempted, width) -> bool:
                and abs(point[1] - old[1]) <= tolerance for old in attempted)
 
 
+def _ignored_right_dots(bot, screen) -> set[tuple[int, int]]:
+    """Map Facebook/Follow Us launchers to their attached notification dot."""
+    dots = red_dots(screen, RIGHT)
+    ignored = set()
+    scale = screen.shape[1] / REFERENCE_WIDTH
+    for template in IGNORED_RIGHT_LAUNCHERS:
+        icons = find_all(bot, template, screen, threshold=0.68,
+                         region=REGIONS[RIGHT])
+        for icon in icons:
+            # One Facebook launcher can yield several red connected components
+            # (badge, frame highlight, caption edge). Ignore every component
+            # over that icon, but stop before the next launcher below it.
+            for dot in dots:
+                if (abs(dot[0] - icon[0]) <= 48 * scale
+                        and icon[1] - 20 * scale <= dot[1]
+                        <= icon[1] + 35 * scale):
+                    ignored.add(dot)
+    return ignored
+
+
 def open_next(bot, boundary: str, attempted: list[tuple[int, int]]):
     """Open the next unvisited red-dot icon in one boundary."""
     if not return_home(bot):
-        return None
+        bot.record("Gift Claims: không về được màn chính; chưa được coi là hết vùng")
+        raise YieldToBoss
     bot.sleep(0.7)
     screen = bot.screenshot()
     dots = red_dots(screen, boundary)
-    dot = next((point for point in dots
-                if not _already_attempted(point, attempted, screen.shape[1])), None)
+    ignored = _ignored_right_dots(bot, screen) if boundary == RIGHT else set()
+    dot = None
+    for point in dots:
+        if _already_attempted(point, attempted, screen.shape[1]):
+            continue
+        if point in ignored:
+            attempted.append(point)
+            bot.record("Gift Claims: bỏ qua biểu tượng Facebook/Follow Us ở vùng right")
+            continue
+        dot = point
+        break
     if dot is None:
         bot.log(f"Gift Claims: vùng {boundary} đã hết chấm đỏ chưa xét")
         return None

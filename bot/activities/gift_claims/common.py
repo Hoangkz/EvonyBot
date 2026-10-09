@@ -28,6 +28,21 @@ class GiftTask:
     run: Callable
 
 
+@dataclass(frozen=True)
+class ClaimReport:
+    """Result of safe reward controls, separating taps from real claims."""
+    attempted: int = 0
+    verified: int = 0
+
+    @property
+    def acted(self) -> bool:
+        return self.attempted > 0
+
+    @property
+    def claimed(self) -> bool:
+        return self.verified > 0
+
+
 def path(name: str) -> str:
     return f"{ROOT}/{name}.png"
 
@@ -191,7 +206,7 @@ def open_event_center_event(bot, row: str, page_title: str) -> bool:
 
 
 def tap_claims(bot, templates: tuple[str, ...], *, max_taps: int = 6,
-               initial_wait_attempts: int = 5) -> int:
+               initial_wait_attempts: int = 5, region=None) -> int:
     """Tap each known free/claim control at most once per screen flow.
 
     Some event pages leave a claim-looking control visible after it is tapped.
@@ -201,14 +216,23 @@ def tap_claims(bot, templates: tuple[str, ...], *, max_taps: int = 6,
     count = 0
     waits = 0
     attempted = set()
+    attempted_positions = []
     while count < max_taps:
         screen = bot.screenshot()
         hit = None
         for name in templates:
             if name in attempted:
                 continue
-            pos = find(bot, name, screen, threshold=0.76)
+            pos = find(bot, name, screen, threshold=0.76, region=region)
             if pos is not None:
+                # Several modules keep a full-button fallback plus a stable
+                # text-only template (for example Claimable). Treat aliases
+                # that resolve to the same control as one tap.
+                tolerance = 42 * screen.shape[1] / REFERENCE_WIDTH
+                if any((pos[0] - old[0]) ** 2 + (pos[1] - old[1]) ** 2
+                       <= tolerance ** 2 for old in attempted_positions):
+                    attempted.add(name)
+                    continue
                 hit = name, pos
                 break
         if hit is None:
@@ -221,6 +245,7 @@ def tap_claims(bot, templates: tuple[str, ...], *, max_taps: int = 6,
             break
         name, pos = hit
         attempted.add(name)
+        attempted_positions.append(pos)
         bot.record(f"Gift Claims: tap {name}")
         bot.tap(*pos, delay=2)
         count += 1
@@ -229,5 +254,135 @@ def tap_claims(bot, templates: tuple[str, ...], *, max_taps: int = 6,
         if change < 0.5:
             bot.log(f"Gift Claims: screen unchanged after {name}; will not tap it again")
     return count
+
+
+def close_congratulations(bot, *, attempts: int = 3) -> bool:
+    """Close the common reward popup and report a verified claim."""
+    for attempt in range(attempts):
+        screen = bot.screenshot()
+        if find(bot, "LoginGifts/congratulations", screen, threshold=0.78,
+                region=(0, 38, 100, 62)) is not None:
+            bot.back(delay=0.8)
+            return True
+        if attempt + 1 < attempts:
+            bot.sleep(0.4)
+    return False
+
+
+def claim_fixed_controls(bot, templates: tuple[str, ...], *, max_taps: int = 6,
+                         initial_wait_attempts: int = 2, region=None) -> ClaimReport:
+    """Tap only fixed reward controls and verify every successful claim.
+
+    A tap is verified by the common Congratulations popup or by the exact
+    control disappearing. If the same control remains, stop this child flow;
+    this prevents purchase/navigation controls from being treated as rewards.
+    """
+    attempted_names = set()
+    attempted_positions = []
+    attempted_count = verified_count = waits = 0
+    while attempted_count < max_taps:
+        bot.check()
+        before = bot.screenshot()
+        hit = None
+        for name in templates:
+            if name in attempted_names:
+                continue
+            pos = find(bot, name, before, threshold=0.76, region=region)
+            if pos is None:
+                continue
+            tolerance = 42 * before.shape[1] / REFERENCE_WIDTH
+            if any((pos[0] - old[0]) ** 2 + (pos[1] - old[1]) ** 2
+                   <= tolerance ** 2 for old in attempted_positions):
+                attempted_names.add(name)
+                continue
+            hit = name, pos
+            break
+        if hit is None:
+            if attempted_count == 0 and waits < initial_wait_attempts:
+                waits += 1
+                bot.sleep(1)
+                continue
+            break
+
+        name, pos = hit
+        attempted_names.add(name)
+        attempted_positions.append(pos)
+        attempted_count += 1
+        bot.record(f"Gift Claims: tap fixed claim {name}")
+        bot.tap(*pos, delay=1)
+
+        if close_congratulations(bot):
+            verified_count += 1
+            bot.record(f"Gift Claims: verified Congratulations after {name}")
+            continue
+
+        after = bot.screenshot()
+        if find(bot, name, after, threshold=0.76, region=region) is None:
+            verified_count += 1
+            bot.record(f"Gift Claims: verified control disappeared after {name}")
+            continue
+
+        bot.log(f"Gift Claims: {name} vẫn còn và không có Congratulations; dừng")
+        break
+    return ClaimReport(attempted_count, verified_count)
+
+
+def sparkle_point(before: np.ndarray, after: np.ndarray,
+                   region=(0, 20, 100, 88)) -> tuple[int, int] | None:
+    """Locate one small, bright animated sparkle in the lower content area.
+
+    Large animated backgrounds (fire, treasure piles, characters) are rejected;
+    only compact high-difference highlights are eligible. The bottom purchase
+    strip and the top carousel are outside the default region.
+    """
+    height, width = before.shape[:2]
+    x0, y0, x1, y1 = region
+    left, top = int(width * x0 / 100), int(height * y0 / 100)
+    right, bottom = int(width * x1 / 100), int(height * y1 / 100)
+    old = before[top:bottom, left:right]
+    new = after[top:bottom, left:right]
+    if old.size == 0 or old.shape != new.shape:
+        return None
+    delta = cv2.cvtColor(cv2.absdiff(old, new), cv2.COLOR_BGR2GRAY)
+    value = cv2.cvtColor(new, cv2.COLOR_BGR2HSV)[:, :, 2]
+    mask = ((delta >= 32) & (value >= 190)).astype(np.uint8) * 255
+    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, np.ones((3, 3), np.uint8))
+    count, _, stats, centers = cv2.connectedComponentsWithStats(mask)
+    scale = width / REFERENCE_WIDTH
+    best = None
+    for index in range(1, count):
+        x, y, box_width, box_height, pixels = stats[index]
+        if not (2 * scale * scale <= pixels <= 150 * scale * scale
+                and box_width <= 24 * scale and box_height <= 24 * scale):
+            continue
+        component = delta[y:y + box_height, x:x + box_width]
+        score = float(component.mean()) * pixels
+        if best is None or score > best[0]:
+            cx, cy = centers[index]
+            best = score, (round(left + cx), round(top + cy))
+    return None if best is None else best[1]
+
+
+def tap_sparkle(bot, *, region=(0, 20, 100, 88)) -> bool:
+    """Sample animation twice and tap one safe compact sparkle if present."""
+    before = bot.screenshot()
+    bot.sleep(0.4)
+    after = bot.screenshot()
+    point = sparkle_point(before, after, region)
+    if point is None:
+        return False
+    bot.record(f"Gift Claims: không thấy nút cố định, tap sparkle {point}")
+    bot.tap(*point, delay=1.5)
+    return True
+
+
+def claim_sparkle(bot, *, region=(0, 20, 100, 88)) -> ClaimReport:
+    """Tap one safe sparkle and count it only when reward popup is verified."""
+    if not tap_sparkle(bot, region=region):
+        return ClaimReport()
+    verified = int(close_congratulations(bot))
+    if not verified:
+        bot.log("Gift Claims: sparkle không sinh Congratulations; không tính là đã nhận")
+    return ClaimReport(1, verified)
 
 

@@ -8,7 +8,8 @@ KEY = "gift_super_value_weekly_card"
 
 def run(bot):
     return run_carousel_claim(bot, GiftScreen.VALUABLE_EVENT, "ValuableEvent/title",
-                              "SuperValueWeeklyCard/tab", ("SuperValueWeeklyCard/button_scores",))
+                              "SuperValueWeeklyCard/tab", (),
+                              navigation=("SuperValueWeeklyCard/button_scores",))
 
 
 TASK = GiftTask(KEY, "Super Value Weekly Card", run)

@@ -80,6 +80,7 @@ def run(bot, settings: dict):
         bot.log("Daily Activities: no implemented daily task selected")
     elif all(bot.is_daily_done(task.label) for task in selected) and bot.is_daily_done(REWARDS):
         bot.log("Daily Activities: all done today")
+        _run_gift_claims(bot)
     else:
         _run_selected(bot, selected)
     _run_hourly(bot, settings)
@@ -140,8 +141,9 @@ def _run_selected(bot, selected):
 
 
 def _run_gift_claims(bot):
-    """Worker-only post phase; flow tests opt in explicitly when needed."""
-    if getattr(bot, "post_daily_gifts_enabled", False) is True:
+    """Worker-only post phase; one DB key is written only after a full scan."""
+    if (getattr(bot, "post_daily_gifts_enabled", False) is True
+            and not bot.is_daily_done(gift_claims.KEY)):
         gift_claims.run(bot)
 
 
