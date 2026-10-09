@@ -46,7 +46,7 @@ Cập nhật: 2026-10-03. Xong mục nào thì xoá mục đó. Kịch bản t�
 
 ## 4. Phạm vi (đã chốt 2026-10-02)
 
-Chỉ làm các nhiệm vụ có trong group King's Path của `ui/tabs/event.json`: City Tax, Patrol, Donate,
+Chỉ làm các nhiệm vụ có trong group King's Path của `ui/tabs/event.py`: City Tax, Patrol, Donate,
 Train Troop, Heal, Wheel, Refine Equipment, Black Market. **Không làm** các tab phụ khác: Hoarding, Mining (Day 1);
 Unstoppable — đánh boss, Try Your Best (Day 2); God's Blessing — Offer (Day 3, bỏ 2026-10-02);
 Accumulation (Day 4). Sharp Weapons (Refine Equipment) thêm 2026-10-03.

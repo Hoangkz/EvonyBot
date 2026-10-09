@@ -20,6 +20,7 @@ DOT = "ValuableEvent/notification_dot"
 MAX_SWIPES = 8
 LOWER_CONTENT = (0, 20, 100, 88)
 COMMON_LOWER_CLAIMS = (
+    "Common/button_claim_text",
     "GeneralVault/button_daily_free",
     "SuccessivePurchaseBenefits/button_daily_free_text",
     "SuccessivePurchaseBenefits/button_daily_free",

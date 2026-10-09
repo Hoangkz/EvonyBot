@@ -223,6 +223,20 @@ class FixedGiftFlowTests(unittest.TestCase):
                 self.assertTrue((IMAGES / "GiftClaims" / folder).is_dir())
                 self.assertTrue(any((IMAGES / "GiftClaims" / folder).glob("*.png")))
 
+    def test_common_claim_text_matches_claim_and_claim_free_prefix(self):
+        claim = cv2.imread(str(IMAGES / "GiftClaims" / "BackToTerritory" /
+                              "button_claim.png"))
+        screen = np.zeros((704, 396, 3), dtype=np.uint8)
+        screen[400:400 + claim.shape[0], 200:200 + claim.shape[1]] = claim
+        self.assertIsNotNone(common.find(
+            self.bot, "Common/button_claim_text", screen, threshold=0.76))
+
+        for collection in (valuable_event.COMMON_LOWER_CLAIMS,
+                           super_value_return.COMMON_LOWER_CLAIMS,
+                           event_center.FIXED_CLAIMS,
+                           back_to_territory.FIXED_CLAIMS):
+            self.assertIn("Common/button_claim_text", collection)
+
     def test_dispatch_uses_identified_inner_screen_name(self):
         bot = mock.Mock()
         bot.is_daily_done.return_value = False

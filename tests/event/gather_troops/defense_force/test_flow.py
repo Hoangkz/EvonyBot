@@ -146,7 +146,7 @@ class DefenseForceFlow(unittest.TestCase):
         """Tài khoản B, chọn cấp 4. Rock IV ở giữa khoá (không có "+"), Trap IV / Abatis IV có
         ổ khoá, Fire Arrow IV chưa biết -> bấm Fire Arrow IV -> cũng khoá -> cả 4 loại cấp IV
         khoá -> cấp 3: lùi (bấm vòng trái nhất) tới loại cấp III còn mở -> train cấp 3, mục
-        tiêu theo event.json. (Bước cuối dùng ảnh Abatis III ở giữa thay cho Fire Arrow III.)"""
+        tiêu theo event.py. (Bước cuối dùng ảnh Abatis III ở giữa thay cho Fire Arrow III.)"""
         settings = {KEY: {"value": 3000, "level": 4, "day": 4}}
         device = self._train_flow(
             settings,

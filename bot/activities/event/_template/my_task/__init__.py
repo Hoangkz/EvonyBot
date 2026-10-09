@@ -1,6 +1,6 @@
 """
 my_task — <Event>: <tên nhiệm vụ>
-(key `my_task`, ô tích / ô chọn ở group <Event> trong ui/tabs/event.json).
+(key `my_task`, ô tích / ô chọn ở group <Event> trong ui/tabs/event.py).
 
 - run.py:       `run(bot, task, state)` — flow của nhiệm vụ
 - constants.py: ảnh, ngưỡng và action riêng của nhiệm vụ

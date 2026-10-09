@@ -3,9 +3,6 @@ constants.py — ảnh, ngưỡng và action dùng chung cho các nhiệm vụ t
 Troops (Ground Troop, Mounted Troop, ...). Ảnh riêng của từng nhiệm vụ (tab Day, tab phụ,
 ảnh cấp lính) nằm trong constants.py của nhiệm vụ đó (xem TroopTask trong run.py).
 """
-import json
-
-from .....context import TEMPLATE_DIR
 from ...constants import EV
 
 # ---- Thành chính sau khi bấm Go -----------------------------------------------------
@@ -72,10 +69,11 @@ CONFIRM_POS = (197, 590)
 
 
 def tier_targets(key: str) -> dict[int, int]:
-    """{cấp: số lính} của ô chọn `key` trong ui/tabs/event.json (VD 10 -> 5000): mục tiêu
+    """{cấp: số lính} của ô chọn `key` trong ui/tabs/event.py (VD 10 -> 5000): mục tiêu
     khi cấp người dùng chọn bị khoá và phải train cấp thấp hơn."""
-    data = json.loads((TEMPLATE_DIR.parent / "ui/tabs/event.json").read_text(encoding="utf-8"))
-    for group in data["groups"]:
+    # import trong hàm: bot không import ui ở mức module (tránh import vòng ui <-> bot).
+    from ui.tabs.event import DATA
+    for group in DATA["groups"]:
         for combo in group.get("combos", []):
             if combo["key"] == key:
                 # Giá trị số trơn (King's Path: không gắn cấp) -> không có mục tiêu theo cấp.

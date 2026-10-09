@@ -1,15 +1,23 @@
-{
+"""event.py — mô tả tab Event (dữ liệu tĩnh): groups với checkboxes / combos / redeem.
+
+Mỗi nhiệm vụ có `key` (tên settings), `day`, `default`, `values` (chọn: số hoặc
+{value, level}); tab dựng controls từ đây, bot lấy giá trị (mục tiêu train, hàng
+Redeem...). Trước đây là file .json cùng tên; đổi sang .py để Nuitka compile cùng code,
+không cần ship file riêng lúc build.
+"""
+DATA ={
     "groups": [
         {
+            "key": "gather_troops",
             "title": "Gather Troops",
             "checkboxes": [
-                { "key": "gather_troops_cultivate_generals", "label": "Cultivate Generals", "day": 1, "default": true }
+                { "key": "gather_troops_cultivate_generals", "label": "Cultivate Generals", "day": 1, "default": True }
             ],
             "combos": [
                 {
                     "key": "gather_troops_ground_troop", "label": "Ground Troop:", "day": 2, "default": 20000,
                     "values": [
-                        { "value": 0, "level": null },
+                        { "value": 0, "level": None },
                         { "value": 500, "level": 7 },
                         { "value": 1000, "level": 8 },
                         { "value": 2000, "level": 9 },
@@ -22,7 +30,7 @@
                 {
                     "key": "gather_troops_mounted_troop", "label": "Mounted Troop:", "day": 3, "default": 20000,
                     "values": [
-                        { "value": 0, "level": null },
+                        { "value": 0, "level": None },
                         { "value": 500, "level": 7 },
                         { "value": 1000, "level": 8 },
                         { "value": 2000, "level": 9 },
@@ -35,7 +43,7 @@
                 {
                     "key": "gather_troops_ranged_troop", "label": "Ranged Troop:", "day": 3, "default": 20000,
                     "values": [
-                        { "value": 0, "level": null },
+                        { "value": 0, "level": None },
                         { "value": 500, "level": 7 },
                         { "value": 1000, "level": 8 },
                         { "value": 2000, "level": 9 },
@@ -48,7 +56,7 @@
                 {
                     "key": "gather_troops_siege_machine", "label": "Siege Machine:", "day": 4, "default": 20000,
                     "values": [
-                        { "value": 0, "level": null },
+                        { "value": 0, "level": None },
                         { "value": 500, "level": 7 },
                         { "value": 1000, "level": 8 },
                         { "value": 2000, "level": 9 },
@@ -61,7 +69,7 @@
                 {
                     "key": "gather_troops_defense_force", "label": "Defense Force:", "day": 4, "default": 7000,
                     "values": [
-                        { "value": 0, "level": null },
+                        { "value": 0, "level": None },
                         { "value": 1000, "level": 3 },
                         { "value": 2000, "level": 3 },
                         { "value": 3000, "level": 4 },
@@ -74,6 +82,7 @@
             ]
         },
         {
+            "key": "kings_path",
             "title": "King's Path",
             "checkboxes": [ ],
             "combos": [
@@ -86,6 +95,35 @@
                 { "key": "kings_path_refine", "label": "Refine Equipment:", "day": 4, "values": [ 0, 10, 20, 50, 100 ], "default": 100 },
                 { "key": "kings_path_black_market", "label": "Black Market:", "day": 5, "values": [ 0, 1, 5, 10, 20, 50, 100 ], "default": 100 }
             ]
+        },
+        {
+            "key": "three_day",
+            "title": "3-Day Event (Event Center > Limited)",
+            "checkboxes": [ ],
+            "combos": [
+                { "key": "three_day_alliance", "label": "Alliance:", "values": [ 0, 10, 30, 60 ], "default": 60 },
+                { "key": "three_day_heal", "label": "Heal:", "values": [ 0, 5000, 10000, 30000 ], "default": 30000 }
+            ],
+            "redeem": {
+                "key": "three_day_redeem",
+                "label": "Redeem priority (top first, greyed out items are skipped):",
+                "items": [
+                    { "id": "vit", "label": "VIT", "cost": 10, "row": 5 },
+                    { "id": "gold", "label": "Gold", "cost": 50, "row": 7 },
+                    { "id": "food", "label": "Food", "cost": 20, "row": 0 },
+                    { "id": "lumber", "label": "Lumber", "cost": 20, "row": 1 },
+                    { "id": "silver", "label": "Silver", "cost": 20, "row": 3 },
+                    { "id": "ore", "label": "Ore", "cost": 20, "row": 2 },
+                    { "id": "refining_stone", "label": "Refining Stone", "cost": 90, "row": 4 },
+                    { "id": "medal", "label": "Medal", "cost": 200, "row": 6 },
+                    { "id": "speed_construction", "label": "Speed Construction", "cost": 30, "row": 8 },
+                    { "id": "teleporter", "label": "Teleporter", "cost": 40, "row": 9 },
+                    { "id": "material", "label": "Material", "cost": 40, "row": 10 },
+                    { "id": "march_speedup", "label": "March Speedup", "cost": 20, "row": 11 },
+                    { "id": "blood_of_ares", "label": "Blood Of Ares", "cost": 50, "row": 12 },
+                    { "id": "general_piece", "label": "General Piece", "cost": 60, "row": 13 }
+                ]
+            }
         }
     ]
 }

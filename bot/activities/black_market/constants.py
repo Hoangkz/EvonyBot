@@ -1,17 +1,14 @@
 """
-constants.py — activity "Black Market": danh mục vật phẩm (items.json), vùng / ngưỡng nhận diện, điều kiện dừng.
+constants.py — activity "Black Market": danh mục vật phẩm (items.py), vùng / ngưỡng nhận diện, điều kiện dừng.
 Màn Black Market (tiêu đề, 6 ô, Confirm, Instant Refresh, icon kim cương) dùng chung ảnh / toạ độ với King's Path
 Black Market: event/kings_path/black_market/constants.py.
 """
-import json
-from pathlib import Path
+from .items import DATA as CATALOG
 
 NAME = "Black Market"
-ITEMS_JSON = Path(__file__).with_name("items.json")
-CATALOG = json.loads(ITEMS_JSON.read_text(encoding="utf-8"))
 
 # ---- Nhận diện món trong một ô (quanh tâm nút giá (x, y), xem SLOTS) ---------------------------------------
-# Icon trong items.json: phần hình phía trên ô vật phẩm (bỏ chữ số lượng gói / mệnh giá và số lượng góc dưới phải),
+# Icon trong items.py: phần hình phía trên ô vật phẩm (bỏ chữ số lượng gói / mệnh giá và số lượng góc dưới phải),
 # tìm trong ICON_AREA (dx, dy, w, h) quanh tâm nút giá. Đo trên 366 ô (máy 21913): món đúng >= 0,85, món khác
 # <= 0,72 -> ITEM_THRESHOLD.
 ICON_AREA = (-35, -112, 70, 78)

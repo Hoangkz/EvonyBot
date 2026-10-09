@@ -75,7 +75,7 @@ AGAIN = "again"
 @dataclass(frozen=True)
 class PathTask:
     """Phần riêng của một nhiệm vụ King's Path."""
-    key: str                    # key trong settings / event.json (VD "kings_path_patrol")
+    key: str                    # key trong settings / event.py (VD "kings_path_patrol")
     name: str                   # tên trong log (VD "Patrol")
     day: int                    # ngày mở nhiệm vụ (dùng khi settings thiếu "day")
     tab_index: int              # vị trí tab phụ trong Day: 0, 1, 2 (trái -> phải)

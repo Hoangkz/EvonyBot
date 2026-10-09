@@ -101,7 +101,7 @@ TICK_BUTTON = f"{USE_ALL}/Tick.png"
 TICK_DY = 33
 
 REWARDS = "Activity Rewards"   # key trong daily_done cho bước nhận thưởng cuối
-REWARDS_KEY = "daily_rewards"   # key của bước nhận thưởng cuối trong bot/worker/priority.json
+REWARDS_KEY = "daily_rewards"   # key của bước nhận thưởng cuối trong bot/worker/priority.py
 GENERAL = "General"
 BUY_STAMINA = "General: Buy Stamina"
 BUY_HAMMERS = "General: Buy All Hammers"

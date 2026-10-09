@@ -17,7 +17,8 @@ quà dùng một task chung. DB chỉ lưu `gift_claims` sau khi cả khu 1 và 
 5. Nếu là màn cha có carousel hoặc danh sách, duyệt toàn bộ dấu đỏ trong màn cha.
 6. Trong mỗi màn con, xử lý theo thứ tự:
    - bấm nút điều hướng cố định như Sprint Package, Stockpile hoặc Scores;
-   - tìm các nút nhận thật: Free, Claim, Claimable, Daily Free, Claim All;
+   - tìm các nút nhận thật: Claim, Free, Claim Free, Claimable, Daily Free,
+     Claim All;
    - nếu không có nút cố định, dò một điểm lấp lánh trong vùng nội dung an toàn;
    - không bấm vùng mua hàng, thanh tài nguyên hoặc phần thưởng trả phí.
 7. Xác minh từng lần nhận bằng một trong các điều kiện:

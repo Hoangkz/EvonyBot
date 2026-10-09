@@ -8,7 +8,7 @@
   #define AppVersion "1.0.0"
 #endif
 #define AppName "EvonyBot"
-#define AppExe "{app}\python\pythonw.exe"
+#define AppExe "{app}\app\EvonyBot.exe"
 
 [Setup]
 AppId={{69AE1A99-67B9-44F1-BBC9-3968A0F89A2E}
@@ -35,6 +35,9 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 
 [InstallDelete]
 ; Upgrade: drop the previous runtime/code so no stale files are left behind.
+Type: filesandordirs; Name: "{app}\app"
+; Folder names used by older versions.
+Type: filesandordirs; Name: "{app}\runtime"
 Type: filesandordirs; Name: "{app}\python"
 Type: filesandordirs; Name: "{app}\bot"
 Type: filesandordirs; Name: "{app}\ui"
@@ -58,6 +61,8 @@ Filename: "{#AppExe}"; Parameters: """{app}\EvonyBot.pyw"""; WorkingDir: "{app}"
 
 [UninstallDelete]
 ; __pycache__ folders are written at runtime, so the uninstaller doesn't know them.
+Type: filesandordirs; Name: "{app}\app"
+Type: filesandordirs; Name: "{app}\runtime"
 Type: filesandordirs; Name: "{app}\python"
 Type: filesandordirs; Name: "{app}\bot"
 Type: filesandordirs; Name: "{app}\ui"
@@ -67,7 +72,7 @@ Type: files; Name: "{app}\*.py"
 [Code]
 // Before files are replaced: wait for the closing app (it stops its bots
 // first, which can take a while), then kill whatever still runs from
-// {app}\python - notably the adb server that adbutils starts from its
+// {app}\app (or {app}\runtime / {app}\python from older versions) - notably the adb server that adbutils starts from its
 // bundled adb.exe and that outlives the app. A locked adb.exe made the
 // silent update fail with "Rolling back changes".
 function PrepareToInstall(var NeedsRestart: Boolean): String;
@@ -76,10 +81,11 @@ var
   Script: String;
 begin
   Script :=
-    '$d = ''' + ExpandConstant('{app}') + '\python\''; ' +
+    '$a = ''' + ExpandConstant('{app}') + '''; ' +
+    '$f = { $p = $_.Path; $p -and (($p -like ($a + ''\app\*'')) -or ($p -like ($a + ''\runtime\*'')) -or ($p -like ($a + ''\python\*''))) }; ' +
     '$t = (Get-Date).AddSeconds(20); ' +
-    'while ((Get-Process pythonw, python -EA 0 | ? { $_.Path -like ($d + ''*'') }) -and (Get-Date) -lt $t) { Start-Sleep -Milliseconds 300 }; ' +
-    'Get-Process adb, pythonw, python -EA 0 | ? { $_.Path -like ($d + ''*'') } | Stop-Process -Force; ' +
+    'while ((Get-Process EvonyBot, pythonw, python -EA 0 | ? $f) -and (Get-Date) -lt $t) { Start-Sleep -Milliseconds 300 }; ' +
+    'Get-Process adb, EvonyBot, pythonw, python -EA 0 | ? $f | Stop-Process -Force; ' +
     'Start-Sleep -Milliseconds 500';
   Exec(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'),
     '-NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -Command "' + Script + '"',

@@ -18,15 +18,20 @@ COMPETITION_TAB = f"{EC}/competitionTab.png"
 # thấy ảnh nào cũng bấm rồi tìm icon (bấm tab đang chọn không sao). Mỗi ảnh 1,00 trên màn của
 # nó; màn khác <= 0,48.
 ACTIVITIES = "activities"
+# Tab Limited: ảnh chưa chọn (limitedTab) và đang chọn (limitedTabOn) khớp chéo nhau 0,90; mỗi ảnh
+# 1,00 trên màn của nó, màn khác <= 0,57.
+LIMITED = "limited"
 TABS = {
     ACTIVITIES: (f"{EC}/activitiesTab.png", f"{EC}/activitiesTabOn.png"),
+    LIMITED: (f"{EC}/limitedTab.png", f"{EC}/limitedTabOn.png"),
 }
 TAB_REGION = (0, 5, 100, 18)   # % màn hình: hàng tab (cả 3 tab)
 TAB_THRESHOLD = 0.85
 
 # Danh sách event trong tab: không thấy icon thì cuộn xuống, quá LIST_MAX_SCROLLS lần vẫn
 # không thấy thì BACK.
-LIST_SWIPE = (50, 80, 50, 50)   # % màn hình, ngón tay kéo lên = cuộn danh sách xuống
+LIST_SWIPE = (50, 74, 50, 56)   # % màn hình, ngón tay kéo lên = cuộn danh sách xuống (vuốt dài/nhanh thì lố)
+LIST_SWIPE_DURATION = 1.0
 LIST_MAX_SCROLLS = 8
 # Không thấy tab cần mở / icon event (cuộn hết vẫn không có, VD danh sách bị cuộn sẵn quá icon):
 # run_task_with_retry thử tới ATTEMPTS lần (mỗi lần BACK rồi vào lại Event Center), vẫn không được

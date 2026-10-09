@@ -1,6 +1,6 @@
 # Flow: Black Market (activity)
 
-Code: [run.py](run.py), hằng: [constants.py](constants.py), danh mục vật phẩm: [items.json](items.json) (icon ở
+Code: [run.py](run.py), hằng: [constants.py](constants.py), danh mục vật phẩm: [items.py](items.py) (icon ở
 `Images/Black Market/Items/`). Tab UI: [ui/tabs/black_market_tab.py](../../../ui/tabs/black_market_tab.py). Màn Black
 Market (tiêu đề, 6 ô, Confirm, Instant Refresh, icon kim cương) dùng chung ảnh / toạ độ với King's Path:
 [event/kings_path/black_market/constants.py](../event/kings_path/black_market/constants.py). Test:
@@ -14,9 +14,9 @@ Market (tiêu đề, 6 ô, Confirm, Instant Refresh, icon kim cương) dùng chu
 | `refresh` | số lần Instant Refresh tối đa ("ALL" = không giới hạn) |
 | `quantity_buy` | số lần mua tối đa ("ALL" = không giới hạn) |
 | `resources` | mua gói tài nguyên 4 loại lương thực / gỗ / đá / quặng (mặc định tích) |
-| `items` | `{id: bool}` các món trong items.json (Chips 100 mặc định tích) |
+| `items` | `{id: bool}` các món trong items.py (Chips 100 mặc định tích) |
 
-Món `buy_with_gems: true` trong items.json (Stamina 50, các loại đá, Tactic Scroll, Medal — chỉ bán bằng kim cương)
+Món `buy_with_gems: true` trong items.py (Stamina 50, các loại đá, Tactic Scroll, Medal — chỉ bán bằng kim cương)
 được mua bằng kim cương; Resource và Chips **không bao giờ** mua bằng kim cương.
 
 ## Luồng
@@ -28,7 +28,7 @@ Món `buy_with_gems: true` trong items.json (Stamina 50, các loại đá, Tacti
       thẳng (chia đều vài cú) tới Chợ -> kéo bù ([city_map.py](city_map.py) `goto`).
    3. Go nhiệm vụ Daily **mua Black Market**, không có thì **Tax** (game kéo Chợ vào giữa) — không quét.
    4. Go nhiệm vụ Daily **Gold Levy** (game kéo Thành chính vào giữa): chưa có bản đồ -> **quét thành** (`scan`: đi vòng
-      13 ô theo [city_tour.json](city_tour.json), kéo bù mỗi ô, ghi mọi công trình nhận ra được) -> lưu DB
+      13 ô theo [city_tour.py](city_tour.py), kéo bù mỗi ô, ghi mọi công trình nhận ra được) -> lưu DB
       -> đi thẳng tới Chợ.
    5. Không nhiệm vụ nào còn Go -> **không làm Black Market**, ghi log.
    Bấm Chợ -> menu -> icon "Black Market" (ảnh mẫu chỉ túi tiền, ngưỡng 0,8) -> chờ tiêu đề.

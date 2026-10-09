@@ -1,28 +1,24 @@
 """
 boss_names.py — turn what OCR read on a rally card (name label, power) into a
-boss from boss.json and its level, and decide whether the Join Monster War
+boss from boss.py and its level, and decide whether the Join Monster War
 tab ticks it.
 
 - The name label is "(Boss) <name>" or "(Boss) <tier> <name>", e.g.
   "(Boss) Junior Hydra". The tier word gives the level through that boss's
-  own table in boss.json ("Senior" is level 3 for Cerberus, 2 for Knight Bayard).
+  own table in boss.py ("Senior" is level 3 for Cerberus, 2 for Knight Bayard).
 - A boss with levels but no tier word in its name: the level whose power in
-  boss.json is closest to the power read on the card.
-- A boss whose levels have neither tier nor power in boss.json (and a boss
+  boss.py is closest to the power read on the card.
+- A boss whose levels have neither tier nor power in boss.py (and a boss
   without levels) is checked by name only.
 - The OCR text may hold "?" for glyphs without a sample yet, so names and
   tiers are matched loosely (see _match).
 """
 import difflib
-import json
 import math
 import re
 
-from ...context import TEMPLATE_DIR
 from ...ocr.read_power import parse as parse_power
 
-# Same catalog the tab builds its checkboxes from (shipped next to it).
-BOSS_JSON = TEMPLATE_DIR.parent / "ui" / "tabs" / "boss.json"
 MATCH_CUTOFF = 0.75     # difflib ratio needed to accept a name / tier
 POWER_TOLERANCE = 1.3   # the power read may be at most this factor off a level's power
 
@@ -36,7 +32,7 @@ class Boss:
 
     @property
     def has_level_data(self) -> bool:
-        """Whether boss.json gives a tier or power for any of its levels, i.e.
+        """Whether boss.py gives a tier or power for any of its levels, i.e.
         whether the level on a card can be told at all."""
         return any(tier or power for tier, power in self.levels.values())
 
@@ -56,12 +52,13 @@ class Boss:
 
 
 def catalog() -> dict:
-    """{"bosses": {lower name: Boss}, "tiers": {lower tier word}} from boss.json."""
+    """{"bosses": {lower name: Boss}, "tiers": {lower tier word}} from boss.py."""
     global _catalog
     if _catalog is None:
-        data = json.loads(BOSS_JSON.read_text(encoding="utf-8-sig"))
+        # import trong hàm: bot không import ui ở mức module (tránh import vòng ui <-> bot).
+        from ui.tabs.boss import DATA
         bosses: dict[str, Boss] = {}
-        for category in data["boss_categories"]:
+        for category in DATA["boss_categories"]:
             for entry in category["list"]:
                 boss = bosses.setdefault(entry["name"].lower(), Boss(entry["name"]))
                 for level in entry.get("levels", []):
@@ -79,6 +76,8 @@ def parse(text: str | None) -> tuple[Boss | None, str | None]:
     if not text:
         return None, None
     text = re.sub(r"^\s*\([^)]*\)", "", text)        # bỏ "(Boss)" ở đầu
+    # Boss Special (Viking...) ghi nhãn "Lv.1 Viking" thay vì "(Boss) ...": bỏ "Lv.N" ở đầu ("?" = glyph chưa có mẫu).
+    text = re.sub(r"^\s*[l?][v?]\.?\s*\d+\s+", "", text)
     # Bỏ loại quân trong ngoặc ở cuối, VD Pan có 3 loại: "Pan (Ranged Troop)" (OCR đọc
     # "pan (panged ?roop)"); ngoặc có thể bị cắt mất ở mép vùng đọc.
     text = re.sub(r"\([^)]*\)?\s*$", "", text).strip()
@@ -124,7 +123,7 @@ def wanted(selected: dict[str, tuple[set[int], bool]] | None, boss: Boss | None,
            level: int | None) -> bool:
     """Whether to join `boss` at `level`. An unknown boss is never wanted. A
     level that was told must be ticked. Without a level, the boss is wanted if
-    its plain (no-level) entry is ticked, or if boss.json gives no tier / power
+    its plain (no-level) entry is ticked, or if boss.py gives no tier / power
     to tell its level anyway (then its name is enough)."""
     if selected is None:
         return True

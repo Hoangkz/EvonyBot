@@ -3,7 +3,7 @@ constants.py — ảnh của nhiệm vụ Daily Activities "Alliance Help" (thư
 """
 from ..constants import ROOT
 
-KEY = "daily_alliance_help"   # key nhiệm vụ trong bot/worker/priority.json
+KEY = "daily_alliance_help"   # key nhiệm vụ trong bot/worker/priority.py
 LABEL = "Alliance Help"       # tên ở tab Daily Activities, key daily_done
 FOLDER = "ActivitiesAllianceHelp"
 FOLDER_PATH = f"{ROOT}/{FOLDER}"

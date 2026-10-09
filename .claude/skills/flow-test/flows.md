@@ -185,7 +185,7 @@ Bước 01–04 giống hệt Cultivate Generals (ảnh chép sang `screens/`); 
 | speedup_settings(\_ticked) | Hộp Finish All                                                                                       | Ô góc dưới trái chưa tích thì `tap(".../Train/checkboxOff.png")`, rồi `tap(".../Train/confirm.png")`                                                                                                                                                                                                                                     |
 | train_t13 (sau Finish All) | Nút Train hiện lại, đã bấm đủ số lần                                                                 | `end()`, đánh dấu `ground_troop` đã xong                                                                                                                                                                                                                                                                                                 |
 
-Biến thể màn Train: `locked_12` (dán ổ khoá lên XII, XIII của `train_t11`) → train cấp 11, mục tiêu 10000 theo event.json; ảnh thật `locked_1407xx.png` (tài khoản chỉ mở cấp I, cấp II+ khoá): mở ở VII → lưu `gather_troops_ground_troop_locked`; mở ở XII → bấm cấp trái nhất (X, VIII) tới khi thấy VII khoá → lưu `gather_troops_ground_troop_locked`.
+Biến thể màn Train: `locked_12` (dán ổ khoá lên XII, XIII của `train_t11`) → train cấp 11, mục tiêu 10000 theo event.py; ảnh thật `locked_1407xx.png` (tài khoản chỉ mở cấp I, cấp II+ khoá): mở ở VII → lưu `gather_troops_ground_troop_locked`; mở ở XII → bấm cấp trái nhất (X, VIII) tới khi thấy VII khoá → lưu `gather_troops_ground_troop_locked`.
 
 Tab Ground Troop hết Go (biến thể `no_go`): `end()`, đánh dấu `ground_troop` đã xong.
 
@@ -286,3 +286,17 @@ Quả đập được = có icon búa (`EventCenter/CrazyEggs/hammer.png`) trong
 | 05                                      | Crazy Eggs, 4 quả "Waiting:"                                           | `end()`                                                                   |
 
 Nhánh phụ: bấm quả 2 mà ảnh không đổi → hết búa, quả 2 không chờ nên không dùng búa vàng, return; mọi quả "Waiting" + búa vàng đã dùng hôm nay → return ngay; bấm quả 2 dùng búa vàng mà không hiện hộp thoại → lưu đã dùng, return; quả 1 "Activated" (`08_egg_1_activated.png`, búa vàng đã dùng) → chỉ đập quả 3 → animation trứng vỡ (`10_egg_breaking.png`, màn tối) → `tap_pct(50, 95)` → popup trứng vỡ "Congratulations on activating the egg!" (`09_egg_activated_rewards.png`) → `back()` → return; số búa vàng trên màn là "0" (`12_all_activated.png`, 4 quả đã vỡ) → lưu đã dùng, return; bấm quả 3 khi hết búa → hộp thoại `11_not_enough_hammers.png` → `tap("EventCenter/CrazyEggs/cancel.png")` → return; màn Event Center không có tab Activities (`02?no_activities_tab`) → 3 lần (01 → 02 → `back()`), `shell("am force-stop")`, thêm 2 lần → lưu `crazy_eggs_done`, return; đã có `crazy_eggs_done` → return ngay; tab Activities không có icon (`03_activities.png` thật) → 3 lần (01 → 02 → 03 cuộn 8 lần → `back()`), `shell("am force-stop")`, thêm 2 lần → lưu `crazy_eggs_done`, return.
+
+## Event 3 ngày (Event Center > Limited, `tests/event_center/three_day/`)
+
+Ảnh "Precious Vegetation" ở `three_day/screens/`; màn chính dùng chung `crazy_eggs/screens/01_main.png` (SCREENS = `tests/event_center`).
+
+`test_claim_and_redeem` (không bật nhiệm vụ): 01 `tap_at(359, 216)` → 02_limited `tap("EventCenter/limitedTabOn.png")` → 02_limited `swipe()` → 03_limited_scrolled `tap(icon)` → 04_tasks_claim `tap(claim.png)` → 04_tasks `swipe()` → 05_donate_rows `swipe()` (không đổi = hết danh sách) → 05_donate_rows `tap_at(292, 259)` (tab Redeem) → 06_redeem `swipe()` (về đầu) → 06_redeem `tap_at(334, 350)` (Redeem Food) → 07_qty_popup `tap_at(276, 354)` + `tap_at(198, 452)` → 08_congratulations `back()` → `06_redeem.png?food_grey` `end()` (nút xám = dừng, lưu `three_day_done`).
+
+Nhánh phụ: Alliance 60 → cuộn tới 05_donate_rows → `tap_at(336, 612)` (Go) → after_go (mock) nhận done 0, mục tiêu 60; group tắt (`three_day_active` false) → return ngay; đã có `three_day_done` → return ngay.
+
+Cập nhật event 3 ngày (đã đổi logic): vào event là ở đầu danh sách (không cuộn lên); nhận chữ chung "Donate to the Alliance" / "Heal" (không nhận từng mốc), OCR số đã làm ở Go bất kỳ của nhiệm vụ, đủ mục tiêu -> xong; Claim chỉ kiểm ở màn đầu; Claimed = vùng cuối danh sách; không thấy nhiệm vụ nào -> Back + làm lại 3 lần rồi đánh dấu lỗi; xong cả 2 -> `tap_at(292, 259)` sang tab Redeem luôn. Đổi quà: tìm ảnh quà theo ưu tiên để biết vị trí, cuộn tới hàng, nút xanh -> popup (`tap_at(276, 354)` + `tap_at(198, 452)`) -> Back đóng Congratulations -> loại khỏi danh sách; nút xám -> loại luôn; 5 quà xám liên tiếp -> dừng. Test thêm: `test_heal_row_go` (05_heal_rows), `test_tasks_not_found_three_times_then_marked`, `test_redeem_grey_item_skipped`.
+
+Heal (King's Path / Daily Activities): nút Heal phải sáng (cam, `heal_screen.png`) mới `tap(HEAL_BUTTON)`; xám (`heal_screen_reset.png`) thì làm lại từ màn Hospital (`test_heal_button_not_lit_redo_from_hospital`); thấy hộp "Healing ... Speed Up" ngay sau khi nhập số thì đi tiếp tới Speed Up (`test_heal_already_started_goes_to_speed_up`).
+
+Donate (Alliance Science): bấm Donate tới khi ra nút kim cương (`donate_gems.png`) kể cả khi đã đủ số cần, rồi mới xong.

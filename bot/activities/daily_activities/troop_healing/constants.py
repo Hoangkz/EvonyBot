@@ -3,7 +3,7 @@ constants.py — ảnh của nhiệm vụ Daily Activities "Troop Heading" (thư
 """
 from ..constants import ROOT, OPEN, TAP
 
-KEY = "daily_troop_heading"   # key nhiệm vụ trong bot/worker/priority.json
+KEY = "daily_troop_heading"   # key nhiệm vụ trong bot/worker/priority.py
 LABEL = "Troop Heading"   # ô tích ở tab Daily Activities, key daily_done
 FOLDER = "ActivitiesTroopHeal"
 FOLDER_PATH = f"{ROOT}/{FOLDER}"

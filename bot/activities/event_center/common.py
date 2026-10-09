@@ -27,6 +27,7 @@ from .constants import (
     ATTEMPTS,
     LIST_MAX_SCROLLS,
     LIST_SWIPE,
+    LIST_SWIPE_DURATION,
     MAX_STEPS,
     ON_EVENT_CENTER,
     ON_MAIN_SCREEN,
@@ -147,16 +148,19 @@ def open_event_center(bot, screen):
     bot.tap(center[0] + dx, center[1] + dy, delay=5)
 
 
-def open_event(bot, icon: str, threshold: float = DEFAULT_THRESHOLD) -> bool:
-    """Trong tab Event Center: tìm `icon` (cuộn tối đa LIST_MAX_SCROLLS lần) rồi bấm.
-    Không thấy thì BACK và trả False."""
+def open_event(bot, icon, threshold: float = DEFAULT_THRESHOLD) -> bool:
+    """Trong tab Event Center: tìm `icon` (một ảnh, hoặc danh sách ảnh — thấy ảnh nào bấm ảnh đó)
+    cuộn tối đa LIST_MAX_SCROLLS lần rồi bấm. Không thấy thì BACK và trả False."""
+    icons = (icon,) if isinstance(icon, str) else tuple(icon)
     for scroll in range(LIST_MAX_SCROLLS + 1):
-        pos = bot.find(icon, threshold=threshold)
+        screen = bot.screenshot()
+        pos = next((p for p in (bot.find(i, threshold=threshold, screen=screen) for i in icons)
+                    if p is not None), None)
         if pos is not None:
             bot.tap(*pos, delay=3)
             return True
         if scroll < LIST_MAX_SCROLLS:
-            bot.swipe_percent(*LIST_SWIPE, duration=0.5, delay=2)
-    bot.record(f"Event Center: {icon} not found after {LIST_MAX_SCROLLS} scrolls")
+            bot.swipe_percent(*LIST_SWIPE, duration=LIST_SWIPE_DURATION, delay=2)
+    bot.record(f"Event Center: {icons} not found after {LIST_MAX_SCROLLS} scrolls")
     bot.back(delay=1)
     return False

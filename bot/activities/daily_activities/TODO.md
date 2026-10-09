@@ -2,7 +2,7 @@
 
 Flow mở nhiệm vụ / bấm Go / đánh dấu xong: [OPEN_TASK.md](OPEN_TASK.md).
 
-Bố cục giống Event: mỗi nhiệm vụ một thư mục (`constants.py` ảnh + `KEY` trong `bot/worker/priority.json`,
+Bố cục giống Event: mỗi nhiệm vụ một thư mục (`constants.py` ảnh + `KEY` trong `bot/worker/priority.py`,
 `run.py` handler + `TASK`); test ở `tests/daily_activities/<nhiệm vụ>/` (`test_flow.py` + `screens/`).
 
 ## Đã có

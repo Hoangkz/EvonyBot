@@ -5,7 +5,7 @@
 
 Tài liệu này mô tả **code Python hiện tại** trong [run.py](run.py) (thứ tự nhiệm vụ),
 [common.py](common.py) (vòng lặp chung `run_task`), các thư mục nhiệm vụ (mỗi nhiệm vụ một thư
-mục giống activity Event: `constants.py` ảnh + `KEY` trong `bot/worker/priority.json`, `run.py`
+mục giống activity Event: `constants.py` ảnh + `KEY` trong `bot/worker/priority.py`, `run.py`
 handler + `TASK`), [general.py](general.py) và giao diện cấu hình tại
 [daily_activities_tab.py](../../../ui/tabs/daily_activities_tab.py). Module được
 chuyển từ `DailyActivities1234.cs`, nhưng một số luồng đã được sửa cho giao

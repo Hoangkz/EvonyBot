@@ -1,4 +1,3 @@
-import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -13,7 +12,7 @@ from bot.activities.gift_claims import common, valuable_event
 from bot.activities.gift_claims.screens import GiftScreen
 from bot.activities.daily_activities.run import _run_gift_claims
 from bot.context.errors import YieldToBoss
-from bot.worker.tasks import PRIORITY_FILE
+from bot.worker.priority import DATA
 from database import Database
 
 
@@ -22,7 +21,8 @@ class GiftClaimRegistryTests(unittest.TestCase):
         folder = Path(__file__).parents[2] / "Images" / "GiftClaims"
         expected = {
             "EventCenter/launcher.png", "EventCenter/launcher_side.png",
-            "Common/button_claimable.png", "Common/button_claimable_alt.png",
+            "Common/button_claim_text.png", "Common/button_claimable.png",
+            "Common/button_claimable_alt.png",
             "BackToTerritory/title.png", "BackToTerritory/button_claim.png",
             "FollowUs/title.png",
             "FollowUs/facebook_icon.png",
@@ -66,8 +66,7 @@ class GiftClaimRegistryTests(unittest.TestCase):
                             for name in expected))
 
     def test_gifts_are_one_lowest_priority_db_task(self):
-        data = json.loads(PRIORITY_FILE.read_text(encoding="utf-8"))
-        daily = {item["key"]: item["priority"] for item in data["Daily Activities"]}
+        daily = {item["key"]: item["priority"] for item in DATA["Daily Activities"]}
         keys = {key for key in daily if key.startswith("gift_")}
 
         self.assertEqual({gift_claims.KEY}, keys)

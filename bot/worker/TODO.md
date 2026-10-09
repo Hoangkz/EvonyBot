@@ -4,14 +4,14 @@ Cập nhật: 2026-10-03 (chốt: thread sống khi không có Join Boss, chu k�
 
 Mục tiêu: worker chạy theo **nhiệm vụ**, không theo activity nữa. Activity chỉ còn là nhóm trên UI (nút Select Activity,
 tab cấu hình). Bộ chọn lấy thẳng nhiệm vụ: ưu tiên cao làm trước, cùng ưu tiên thì xoay vòng. Độ ưu tiên đặt ở
-[priority.json](priority.json); số lớn hơn làm trước. Bubble và Join Boss là nhiệm vụ có luật riêng (mục 1).
+[priority.py](priority.py); số lớn hơn làm trước. Bubble và Join Boss là nhiệm vụ có luật riêng (mục 1).
 
 ## 1. Đã chốt (2026-10-03)
 
-- **Bubble và Join Boss cũng là nhiệm vụ** của bộ chọn (có trong `priority.json`), nhưng có luật riêng: Bubble tới hạn khi
+- **Bubble và Join Boss cũng là nhiệm vụ** của bộ chọn (có trong `priority.py`), nhưng có luật riêng: Bubble tới hạn khi
   còn <= 2 giờ (hoặc chưa biết) và ngắt được mọi nhiệm vụ; Join Boss chạy giữa mỗi 2 nhiệm vụ thường, rảnh thì nhường,
   có boss mới thì ngắt nhiệm vụ thường. Nhiệm vụ thường: tối đa 120 giây, xong thì quay lại Join Boss.
-- **Thứ tự ưu tiên**: Bubble > Join Boss > các nhiệm vụ (theo `priority.json`). Bubble đã như vậy và phải giữ khi viết
+- **Thứ tự ưu tiên**: Bubble > Join Boss > các nhiệm vụ (theo `priority.py`). Bubble đã như vậy và phải giữ khi viết
   lại worker: lo bubble trước mọi lần chạy (`_with_bubble`, kể cả Join Boss) và `check()` ngắt mọi thứ đang chạy, kể
   cả Join Boss, khi bubble tới hạn (`BubbleDue` xét trước `BossAvailable` / `TimedOut`).
 - **Khi không chọn Join Boss**: giữ thread sống, chờ các nhiệm vụ lặp lại (Crazy Eggs theo chu kỳ); sang ngày mới (qua
@@ -31,16 +31,16 @@ tab cấu hình). Bộ chọn lấy thẳng nhiệm vụ: ưu tiên cao làm tr�
 
 ## 2. Chuyển worker sang chạy theo nhiệm vụ (làm theo thứ tự, mỗi bước test cũ phải pass)
 
-- [x] **Bước 1 — khung nhiệm vụ và bộ chọn** (2026-10-03): `tasks.py` (đọc `priority.json`, mỗi activity đã chọn trừ
+- [x] **Bước 1 — khung nhiệm vụ và bộ chọn** (2026-10-03): `tasks.py` (đọc `priority.py`, mỗi activity đã chọn trừ
   Join Boss = 1 nhiệm vụ nguyên khối, ưu tiên = cao nhất của nhóm), `scheduler.py` (ưu tiên cao trước, cùng ưu tiên xoay
   vòng, xong thì tới lượt lại sau mốc reset), `BotWorker._run_tasks` thay `_boss_priority` / chạy hết rồi dừng; mỗi vòng
-  1 lượt Join Boss + 1 nhiệm vụ tối đa 120 s; `priority.json` thêm vào `installer/build.ps1`. Test: `tests/worker/test_scheduler.py`,
+  1 lượt Join Boss + 1 nhiệm vụ tối đa 120 s; `priority.py` thêm vào `installer/build.ps1`. Test: `tests/worker/test_scheduler.py`,
   `tests/worker/test_boss_notifications.py`. Chưa chạy thật trên giả lập.
 - [x] **Bước 1b — không có Join Boss vẫn giữ thread sống** (làm cùng bước 1): hết nhiệm vụ tới lượt thì nghỉ 5 s (vẫn lo
   bubble), qua mốc reset thì làm lại; chỉ Stop mới dừng.
 - [ ] **Chạy thật bước 1** trên giả lập (`venv\Scripts\poe dev`): có Join Boss + vài activity (log mỗi vòng: Join Boss rồi
   1 activity); không có Join Boss (chạy hết rồi đứng chờ, không Stopped).
-- [ ] **Bước 2 — Crazy Eggs**: nhiệm vụ lặp lại theo chu kỳ, ưu tiên 999 (theo `priority.json`). Gọi
+- [ ] **Bước 2 — Crazy Eggs**: nhiệm vụ lặp lại theo chu kỳ, ưu tiên 999 (theo `priority.py`). Gọi
   `event_center.crazy_eggs.run`.
   - DB: cấu hình theo thiết bị `{"interval": "2h"}` (`0` / `1h` / `2h` / `3h` / `4h`, mặc định `2h`, `0` = tắt); thời
     điểm chạy xong lần trước để tính lần tới (lưu DB để tắt app mở lại vẫn đúng chu kỳ).
@@ -57,11 +57,11 @@ tab cấu hình). Bộ chọn lấy thẳng nhiệm vụ: ưu tiên cao làm tr�
 
 ## 3. Daily Activities (để sau, khi người dùng yêu cầu)
 
-- [ ] Tách thành từng nhiệm vụ con theo `priority.json`.
+- [ ] Tách thành từng nhiệm vụ con theo `priority.py`.
 - [ ] Đổi key trong code sang dạng `daily_<tên>` (VD `"Offering"` → `daily_offering`, `Activity Rewards` →
   `daily_rewards`) + migration trong `database.py` (`KEY_RENAMES`, giống Gather Troops) cho `daily_done` và cột
   `daily_activities` (tab cấu hình lưu `{tên: bật}`).
-- [ ] Viết các nhiệm vụ mới có trong `priority.json` nhưng chưa có code: `daily_alliance_science`,
+- [ ] Viết các nhiệm vụ mới có trong `priority.py` nhưng chưa có code: `daily_alliance_science`,
   `daily_alliance_research`, `daily_alliance_technology`, `daily_greet_champion`.
 - [ ] `daily_general_enhancing`: người dùng ghi "Cần làm thêm".
 

@@ -475,11 +475,8 @@ class DailyGoTests(unittest.TestCase):
         scroll_to_top.assert_called_once_with(bot)
 
     def test_every_task_has_priority_key(self):
-        import json
-        from pathlib import Path
-        data = json.loads((Path(__file__).parent.parent.parent / "bot" / "worker" / "priority.json")
-                          .read_text(encoding="utf-8"))
-        keys = {t["key"] for t in data["Daily Activities"]}
+        from bot.worker.priority import DATA
+        keys = {t["key"] for t in DATA["Daily Activities"]}
         self.assertEqual([t.label for t in daily.TASKS if t.key not in keys], [])
 
 

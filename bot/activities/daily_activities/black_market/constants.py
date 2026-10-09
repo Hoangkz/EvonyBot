@@ -3,7 +3,7 @@ constants.py — ảnh của nhiệm vụ Daily Activities "Black Market" (thư 
 """
 from ..constants import ROOT, OPEN, TAP
 
-KEY = "daily_black_market"   # key nhiệm vụ trong bot/worker/priority.json
+KEY = "daily_black_market"   # key nhiệm vụ trong bot/worker/priority.py
 LABEL = "Black Market"   # ô tích ở tab Daily Activities, key daily_done
 FOLDER = "ActivitiesBuyMarket"
 FOLDER_PATH = f"{ROOT}/{FOLDER}"

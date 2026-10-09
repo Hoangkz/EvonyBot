@@ -87,7 +87,7 @@ class Task:
     actions: tuple[tuple[str, str], ...]     # (ảnh, action) theo thứ tự ưu tiên
     handler: Callable                        # handler(bot, action, pos, screen) -> bool
     after_open_tap: tuple[float, float] | None = (50, 50)   # % màn hình bấm sau Go (None = không)
-    key: str = ""   # key nhiệm vụ trong bot/worker/priority.json (VD "daily_offering")
+    key: str = ""   # key nhiệm vụ trong bot/worker/priority.py (VD "daily_offering")
 
 
 def run_task(bot, task: Task) -> bool:

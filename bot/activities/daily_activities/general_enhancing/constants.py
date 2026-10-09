@@ -3,7 +3,7 @@ constants.py — ảnh của nhiệm vụ Daily Activities "General Enhancing" (
 """
 from ..constants import ROOT, OPEN
 
-KEY = "daily_general_enhancing"   # key nhiệm vụ trong bot/worker/priority.json
+KEY = "daily_general_enhancing"   # key nhiệm vụ trong bot/worker/priority.py
 LABEL = "General Enhancing"   # ô tích ở tab Daily Activities, key daily_done
 FOLDER = "ActivitiesGeneralEnhancing"
 FOLDER_PATH = f"{ROOT}/{FOLDER}"

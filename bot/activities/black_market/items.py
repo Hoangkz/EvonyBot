@@ -1,4 +1,10 @@
-{
+"""items.py — danh mục vật phẩm Black Market (dữ liệu tĩnh), tab UI dựng ô tích từ đây.
+
+DATA: `source` (cách ghi nhận), `groups` (tên nhóm), `resource_packs` (gói tài nguyên
+10k .. 5M), `items` (món lẻ: icon / label / điều kiện mua). Trước đây là file .json cùng
+tên; đổi sang .py để Nuitka compile cùng code, không cần ship file riêng lúc build.
+"""
+DATA = {
   "source": "Máy 21913 (tài khoản VIP), 2026-10-05: 61 bộ hàng = 366 ô, 60 lần Instant Refresh. seen = số ô thấy món đó; pay = số ô theo loại tiền (gem / gold / resource). Giá không OCR. buy_with_gems: món chỉ bán bằng kim cương -> được mua bằng kim cương; Resource / Chips không bao giờ mua bằng kim cương (ô giá kim cương bị bỏ).",
   "groups": {
     "resource": "Resource",
@@ -96,7 +102,7 @@
       "icons": [
         "Black Market/Items/gold_50k.png"
       ],
-      "buy_with_gems": false
+      "buy_with_gems": False
     },
     {
       "id": "food_5m",
@@ -110,7 +116,7 @@
       "icons": [
         "Black Market/Items/food_5m.png"
       ],
-      "buy_with_gems": false
+      "buy_with_gems": False
     },
     {
       "id": "ore_5m",
@@ -124,7 +130,7 @@
       "icons": [
         "Black Market/Items/ore_5m.png"
       ],
-      "buy_with_gems": false
+      "buy_with_gems": False
     },
     {
       "id": "stone_5m",
@@ -138,7 +144,7 @@
       "icons": [
         "Black Market/Items/stone_5m.png"
       ],
-      "buy_with_gems": false
+      "buy_with_gems": False
     },
     {
       "id": "lumber_5m",
@@ -152,7 +158,7 @@
       "icons": [
         "Black Market/Items/lumber_5m.png"
       ],
-      "buy_with_gems": false
+      "buy_with_gems": False
     },
     {
       "id": "gold_100k",
@@ -165,7 +171,7 @@
       "icons": [
         "Black Market/Items/gold_100k.png"
       ],
-      "buy_with_gems": false
+      "buy_with_gems": False
     },
     {
       "id": "chips_100",
@@ -178,8 +184,8 @@
       "icons": [
         "Black Market/Items/chips_100.png"
       ],
-      "default": true,
-      "buy_with_gems": false
+      "default": True,
+      "buy_with_gems": False
     },
     {
       "id": "stamina_50",
@@ -192,7 +198,7 @@
       "icons": [
         "Black Market/Items/stamina_50.png"
       ],
-      "buy_with_gems": true
+      "buy_with_gems": True
     },
     {
       "id": "refining_stone",
@@ -205,7 +211,7 @@
       "icons": [
         "Black Market/Items/refining_stone.png"
       ],
-      "buy_with_gems": true
+      "buy_with_gems": True
     },
     {
       "id": "research_stone",
@@ -218,7 +224,7 @@
       "icons": [
         "Black Market/Items/research_stone.png"
       ],
-      "buy_with_gems": true
+      "buy_with_gems": True
     },
     {
       "id": "dragon_stone",
@@ -231,7 +237,7 @@
       "icons": [
         "Black Market/Items/dragon_stone.png"
       ],
-      "buy_with_gems": true
+      "buy_with_gems": True
     },
     {
       "id": "tactic_scroll",
@@ -244,7 +250,7 @@
       "icons": [
         "Black Market/Items/tactic_scroll.png"
       ],
-      "buy_with_gems": true
+      "buy_with_gems": True
     },
     {
       "id": "medal",
@@ -257,7 +263,7 @@
       "icons": [
         "Black Market/Items/medal.png"
       ],
-      "buy_with_gems": true
+      "buy_with_gems": True
     }
   ],
   "icon_crop": "icon = ô hình món, cắt hàng 2..28 / cột 4..58 của vùng (x-31..x+31, y-108..y-38) quanh tâm nút giá (x, y): bỏ chữ số lượng và số lượng góc"

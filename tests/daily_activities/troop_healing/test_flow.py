@@ -49,7 +49,7 @@ HEAL_STEPS = [
     Step(f"{KP}heal_screen.png", tap(RESET)),
     Step(f"{KP}heal_screen_reset.png", tap_at(285, 465)),
     Step(f"{KP}heal_input.png", tap(INPUT_OK)),
-    Step(f"{KP}heal_screen_reset.png", tap(HEAL_BUTTON)),
+    Step(f"{KP}heal_screen.png", tap(HEAL_BUTTON)),   # nút Heal sáng (cam) mới bấm
     Step(f"{KP}heal_healing.png", tap(SPEED_UP)),
     *FINISH_ALL_STEPS,
 ]

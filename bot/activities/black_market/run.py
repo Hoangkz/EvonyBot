@@ -1,7 +1,7 @@
 """
 run.py — activity "Black Market": `run(bot, settings)` (settings của tab Black Market, ui/tabs/black_market_tab.py):
 {"check_gold": bool, "refresh": "ALL"/"10"/..., "quantity_buy": "ALL"/"10"/..., "resources": bool,
- "items": {item id: bool}} — danh mục vật phẩm: items.json.
+ "items": {item id: bool}} — danh mục vật phẩm: items.py.
 
 1. Mở màn Black Market: đang ở đó thì thôi; không thì Back về màn chính -> đưa Chợ vào giữa (_market): Chợ trên màn ->
    bản đồ thành của máy (DB, city_map.py: đi từ công trình đã biết đang thấy) -> Go nhiệm vụ mua Black Market /

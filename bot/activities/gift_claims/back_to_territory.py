@@ -16,6 +16,7 @@ INNER_NAV = (0, 41, 100, 61)
 REWARD_LIST = (0, 58, 100, 96)
 MAX_SWIPES = 8
 FIXED_CLAIMS = (
+    "Common/button_claim_text",
     "GeneralVault/button_daily_free",
     "SuccessivePurchaseBenefits/button_daily_free_text",
     "SuccessivePurchaseBenefits/button_daily_free",

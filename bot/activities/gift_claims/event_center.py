@@ -14,6 +14,7 @@ CONGRATULATIONS = "LoginGifts/congratulations"
 MAX_SCROLLS = 8
 LOWER = (0, 18, 100, 88)
 FIXED_CLAIMS = (
+    "Common/button_claim_text",
     "GeneralVault/button_daily_free",
     "SuccessivePurchaseBenefits/button_daily_free_text",
     "SuccessivePurchaseBenefits/button_daily_free",

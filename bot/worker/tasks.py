@@ -1,9 +1,9 @@
 """
-tasks.py — nhiệm vụ của bộ chọn (scheduler.py) và độ ưu tiên đọc từ priority.json.
+tasks.py — nhiệm vụ của bộ chọn (scheduler.py) và độ ưu tiên đọc từ priority.py.
 
 Bước 1 (bot/worker/TODO.md): mỗi activity đã chọn (trừ Join Boss) được bọc thành 1 nhiệm vụ chạy nguyên
-khối; độ ưu tiên của nhiệm vụ đó = cao nhất trong các nhiệm vụ của nhóm (activity) trong priority.json.
-Nhiệm vụ có "must_finish": true trong priority.json: đã bắt đầu thì chạy tới xong, không bị Bubble /
+khối; độ ưu tiên của nhiệm vụ đó = cao nhất trong các nhiệm vụ của nhóm (activity) trong priority.py.
+Nhiệm vụ có "must_finish": true trong priority.py: đã bắt đầu thì chạy tới xong, không bị Bubble /
 Join Boss / giới hạn 120 giây ngắt (chỉ Stop); bước 1 nhóm chỉ tính là must_finish khi mọi nhiệm vụ
 của nhóm đều có cờ này.
 Các bước sau tách activity thành từng nhiệm vụ con. Bubble và Join Boss có luật riêng trong BotWorker.
@@ -11,12 +11,20 @@ Các bước sau tách activity thành từng nhiệm vụ con. Bubble và Join 
 import json
 from dataclasses import dataclass
 
-from ..context import TEMPLATE_DIR
+from .priority import DATA as PRIORITY
 
-# priority.json nằm cạnh file này; đọc theo thư mục gốc của app (giống ui/tabs/event.json) để bản
-# build (Nuitka) cũng tìm được.
-PRIORITY_FILE = TEMPLATE_DIR.parent / "bot" / "worker" / "priority.json"
 DEFAULT_PRIORITY = 1
+
+
+def _read(path) -> dict:
+    """Dữ liệu ưu tiên: mặc định từ priority.py (Nuitka compile cùng code, không cần
+    ship file riêng); `path` (file .json riêng, test) thiếu / lỗi file thì {}."""
+    if path is None:
+        return PRIORITY
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
 
 
 @dataclass
@@ -27,13 +35,10 @@ class Task:
     must_finish: bool = False   # bắt đầu rồi thì chạy tới xong, không bị ngắt (trừ Stop)
 
 
-def load_priorities(path=PRIORITY_FILE) -> dict[str, dict[str, int]]:
-    """{nhóm: {key nhiệm vụ: độ ưu tiên}} từ priority.json; thiếu / lỗi file thì {} (mọi nhiệm vụ
-    dùng DEFAULT_PRIORITY)."""
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return {}
+def load_priorities(path=None) -> dict[str, dict[str, int]]:
+    """{nhóm: {key nhiệm vụ: độ ưu tiên}} từ priority.py (hoặc file .json ở `path`); thiếu /
+    lỗi file thì {} (mọi nhiệm vụ dùng DEFAULT_PRIORITY)."""
+    data = _read(path)
     result = {}
     for group, tasks in data.items():
         if group.startswith("_") or not isinstance(tasks, list):
@@ -43,13 +48,10 @@ def load_priorities(path=PRIORITY_FILE) -> dict[str, dict[str, int]]:
     return result
 
 
-def load_must_finish(path=PRIORITY_FILE) -> dict[str, set[str]]:
+def load_must_finish(path=None) -> dict[str, set[str]]:
     """{nhóm: {key nhiệm vụ có "must_finish": true}}; nhóm có ít nhất 1 nhiệm vụ mới có mặt.
     Thiếu / lỗi file thì {}."""
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return {}
+    data = _read(path)
     result = {}
     for group, tasks in data.items():
         if group.startswith("_") or not isinstance(tasks, list):

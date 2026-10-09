@@ -36,7 +36,7 @@ OCR của project **không dùng Tesseract**: [bot/ocr/_digits.py](../../../bot/
 [bot/ocr/read_boss_name.py](../../../bot/ocr/read_boss_name.py) đọc nhãn "(Boss) <tên> [cấp]" trên thẻ rally. Nó khác OCR số ở mấy điểm:
 - Tách chữ theo **màu vàng** (không dùng Otsu), mẫu lưu dạng xám mềm. Khoảng trống từ 4px là dấu cách.
 - Nhãn mẫu viết **chữ thường**. Một mẫu có thể là nhiều chữ dính nhau (`ryt_1.png`, `ot_1.png`).
-- Mảnh không khớp mẫu nào đọc thành `?`. [boss_names.py](../../../bot/activities/join_monster_war/boss_names.py) coi `?` là 1–3 chữ bất kỳ khi khớp với tên trong `ui/tabs/boss.json`.
+- Mảnh không khớp mẫu nào đọc thành `?`. [boss_names.py](../../../bot/activities/join_monster_war/boss_names.py) coi `?` là 1–3 chữ bất kỳ khi khớp với tên trong `ui/tabs/boss.py`.
 
 Thêm mẫu khi log hiện `Boss (x, y): '...' -> không nhận ra`:
 1. Cắt nhãn tên đúng như bot cắt: góc trên-trái nút Join `(x, y)`, vùng `(x - 95, y - 90)` rộng 168 cao 30 (`NAME_*` trong `run.py`). Lấy `x, y` bằng `probe.py match JoinBoss/thamgia.png --image <ảnh>` (dòng "top-left").
@@ -55,7 +55,7 @@ Thêm mẫu khi log hiện `Boss (x, y): '...' -> không nhận ra`:
 
 - Vùng cắt: `(x - 10, y - 180)`, rộng 65, cao 20, so với góc trên-trái nút Join.
 - Thêm mẫu: `.\venv\Scripts\python.exe -m bot.ocr.add_sample Power power.png "6|.|5|m"`. Dùng `_` cho mảnh đã có mẫu.
-- Lực chỉ được đọc cho boss có cấp mà tên không có chữ tier. Bot chọn cấp có `power` (trong `ui/tabs/boss.json`) gần nhất.
+- Lực chỉ được đọc cho boss có cấp mà tên không có chữ tier. Bot chọn cấp có `power` (trong `ui/tabs/boss.py`) gần nhất.
 
 ## Debug đọc sai
 - Trả `None`: một ký tự dưới 0.6 → thiếu mẫu cho biến thể đó → thêm mẫu từ chính ảnh lỗi.

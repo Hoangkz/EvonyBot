@@ -25,7 +25,7 @@ Chạy lâu (Nuitka compile vài phút) → chạy nền với timeout dài. Yê
 - `Inno Setup 6 (ISCC.exe) not found` → cần cài Inno Setup.
 - `venv is Python X but the embedded runtime is 3.12` → venv sai phiên bản.
 - `Nuitka compile failed` → đọc output Nuitka; thường là lỗi import/cú pháp trong code app.
-- Thêm file dữ liệu mới ngoài `Images/`, `ui/assets/`, `ui/tabs/boss.json` → phải thêm `Copy-Item` trong build.ps1, không thì bản cài sẽ thiếu.
+- Thêm file dữ liệu mới ngoài `Images/`, `ui/assets/` (VD ảnh) → phải thêm `Copy-Item` trong build.ps1, không thì bản cài sẽ thiếu. Dữ liệu dạng `.py` (`boss.py`, `event.py`, `priority.py`, ...) được Nuitka compile cùng code, không cần copy.
 
 Kết quả: `dist\EvonyBot-Setup-<version>.exe`. `venv\Scripts\poe clean` xoá output build (giữ zip Python embed đã cache).
 
