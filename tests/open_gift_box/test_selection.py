@@ -9,23 +9,19 @@ class GiftBoxSelectionTests(unittest.TestCase):
         self.assertEqual(_box_images({}), [])
 
     def test_one_selection_uses_only_its_folder(self):
-        selected = _box_images({"Gift Box Alliance": True})
+        selected = _box_images({"Resource": True})
         self.assertTrue(selected)
-        self.assertTrue(all("/Alliance/" in path for path in selected))
+        self.assertTrue(all("/BoxResource/" in path for path in selected))
 
-    def test_all_boxes_expands_all_six_csharp_folders(self):
-        selected = _box_images({"All Gift Box": True})
-        self.assertTrue(any("/Alliance/" in path for path in selected))
-        self.assertTrue(any("/Boss/" in path for path in selected))
+    def test_all_boxes_expands_all_four_folders(self):
+        selected = _box_images({"All": True})
         self.assertTrue(any("/BoxResource/" in path for path in selected))
         self.assertTrue(any("/Gems/" in path for path in selected))
         self.assertTrue(any("/Gold/" in path for path in selected))
         self.assertTrue(any("/etc/" in path for path in selected))
 
-    def test_selected_images_follow_csharp_numeric_file_order(self):
-        selected = _box_images({"Gift Box Alliance": True, "Gift Box Boss": True})
-        numbers = [int(path.rsplit("/", 1)[-1].removesuffix(".png")) for path in selected]
-        self.assertEqual(numbers, sorted(numbers))
+    def test_selected_images_have_no_duplicates(self):
+        selected = _box_images({"Resource": True, "Gems": True})
         self.assertEqual(len(selected), len(set(selected)))
 
 

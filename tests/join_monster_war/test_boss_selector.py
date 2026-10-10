@@ -7,7 +7,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PyQt5.QtWidgets import QApplication
 
-from ui.tabs.join_monster_war_tab import BOSS_CATALOG_VERSION, JoinMonsterWarTab
+from ui.tabs.join_monster_war_tab import JoinMonsterWarTab
 
 
 class BossSelectorTests(unittest.TestCase):
@@ -15,56 +15,33 @@ class BossSelectorTests(unittest.TestCase):
     def setUpClass(cls):
         cls.app = QApplication.instance() or QApplication([])
 
-    def test_elite_temple_guard_has_its_own_join_button_active_by_default(self):
+    def test_boss_with_one_level_has_only_a_level_box_active_by_default(self):
         tab = JoinMonsterWarTab()
         self.addCleanup(tab.deleteLater)
 
         category, name, enabled, levels = next(
-            choice for choice in tab.boss_choices if choice[1] == "Elite Temple Guard"
+            choice for choice in tab.boss_choices if choice[1] == "Aglaope"
         )
 
         self.assertEqual(category, "mythical_and_elite_bosses")
-        self.assertEqual(name, "Elite Temple Guard")
-        self.assertIsNotNone(enabled)
-        self.assertEqual(enabled.text(), "Join")
-        self.assertTrue(enabled.isChecked())
-        self.assertEqual(levels, {})
+        self.assertIsNone(enabled)                  # chỉ có ô cấp, không có ô Join riêng
+        self.assertEqual(list(levels), [1])
+        self.assertTrue(levels[1].isChecked())
 
         saved = next(
-            boss for boss in tab.get_settings()["selected_bosses"]
-            if boss["name"] == "Elite Temple Guard"
+            boss for boss in tab.get_settings()["selected_bosses"] if boss["name"] == "Aglaope"
         )
-        self.assertEqual(saved, {
-            "category_key": "mythical_and_elite_bosses",
-            "name": "Elite Temple Guard",
-            "levels": [],
-        })
-        self.assertEqual(tab.get_settings()["boss_catalog_version"], BOSS_CATALOG_VERSION)
+        self.assertEqual(saved, {"category_key": "mythical_and_elite_bosses",
+                                 "name": "Aglaope", "levels": [1]})
 
-    def test_old_saved_settings_enable_new_default_boss_once(self):
+    def test_saved_settings_can_untick_the_level(self):
         tab = JoinMonsterWarTab()
         self.addCleanup(tab.deleteLater)
 
-        tab.set_settings({"selected_bosses": [
-            {"category_key": "standard_bosses", "name": "Peryton", "levels": []},
-        ]})
+        tab.set_settings({"selected_bosses": []})
 
-        elite = next(choice[2] for choice in tab.boss_choices
-                     if choice[1] == "Elite Temple Guard")
-        self.assertTrue(elite.isChecked())
-
-    def test_current_settings_can_keep_elite_temple_guard_disabled(self):
-        tab = JoinMonsterWarTab()
-        self.addCleanup(tab.deleteLater)
-
-        tab.set_settings({
-            "boss_catalog_version": BOSS_CATALOG_VERSION,
-            "selected_bosses": [],
-        })
-
-        elite = next(choice[2] for choice in tab.boss_choices
-                     if choice[1] == "Elite Temple Guard")
-        self.assertFalse(elite.isChecked())
+        levels = next(choice[3] for choice in tab.boss_choices if choice[1] == "Aglaope")
+        self.assertFalse(levels[1].isChecked())
 
 
 if __name__ == "__main__":

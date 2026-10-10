@@ -44,6 +44,9 @@ class _Boss:
         self.bot = bot
         self.troops = _troops(settings.get("troop"))        # Các đội quân (preset 1-8) được chọn ở tab
         self.last_troop = None                              # Đội vừa bấm chọn trên màn March
+        self.card_boss = None                               # "tên_lv_lực" của thẻ vừa đọc ở _boss_is_wanted
+        self.card_label = None                              # Thông tin thẻ đang Join (tọa độ, tên, cấp, lực) để đặt tên ảnh lỗi March
+        self.march_coords = None                            # Tọa độ đích đã đọc ở lần March gần nhất (dùng lại sau khi dùng thể lực)
         self.select_general = bool(settings.get("select_general"))            # Tích "Select General"
         self.select_assistant = bool(settings.get("select_assistant_general"))  # Tích "With Assistant General"
         self.development_general = bool(settings.get("development_general"))  # Tích "Development General"
@@ -324,25 +327,33 @@ class _Boss:
         bot.tap(*use)
         bot.record(f"Join Monster War: dùng vật phẩm thể lực ({self.use_stamina})")
 
-        # Popup đóng là tín hiệu vật phẩm đã được dùng; không chờ cố định 5 giây.
-        self._poll_screen(
-            "apply_stamina",
-            lambda image: bot.find(STAMINA_USE, screen=image,
-                                   region=REGIONS[STAMINA_USE]) is None,
-            timeout=STAMINA_REFILL_WAIT,
-        )
+        # Bấm Use xong game tự đóng popup: chờ STAMINA_REFILL_WAIT (2 s) rồi mới Back.
+        # Sau đó chờ màn dùng thể lực (popup số lượng / danh sách Use Item) đóng,
+        # kiểm tra mỗi 1 s, tối đa 10 lần; chưa đóng thì Back thêm một lần rồi chờ tiếp 10 lần
+        # nữa. Tổng 20 s vẫn chưa đóng thì Back 2 lần và coi như đã dùng thể lực xong: thoát về
+        # vòng chính, tiếp tục các bước Join Boss như bình thường theo màn hình hiện tại.
+        delay(bot, STAMINA_REFILL_WAIT)
         bot.back()
-        shot, march = self._poll_screen(
-            "stamina_back_to_march",
-            lambda image: bot.find(MARCH, screen=image, region=REGIONS[MARCH]),
-        )
-        if march is not None:
-            coords = self._read_march_target_coords(shot) if CAN_READ_COORDS else None
-            if CAN_READ_COORDS and coords is None:
-                bot.record("Join Monster War: sau khi dùng thể lực không đọc được tọa độ đích; không March")
+        for round_ in range(STAMINA_CLOSE_ROUNDS):
+            shot, closed = self._poll_screen(
+                "stamina_screen_closed",
+                lambda image: (bot.find(STAMINA_USE, screen=image, region=REGIONS[STAMINA_USE]) is None
+                               and not bot.find_all(STAMINA_ITEM_USE, screen=image,
+                                                    region=REGIONS[STAMINA_ITEM_USE])),
+                timeout=STAMINA_CLOSE_WAIT, interval=1,
+            )
+            if closed:
+                break
+            if round_ < STAMINA_CLOSE_ROUNDS - 1:
                 bot.back()
-                return
-            self._press_march(coords, march, shot)
+        if not closed:
+            bot.record("Join Monster War: màn dùng thể lực chưa đóng sau 20 s; Back 2 lần, coi như đã dùng xong, tiếp tục Join Boss")
+            bot.back()
+            bot.back()
+            return
+        # Không OCR lại, không chọn đội lại: bấm March với tọa độ đã đọc ở lần March trước.
+        # Không thấy nút March trên ảnh này thì không bấm, vòng chính tự nhận diện màn hình.
+        self._press_march(self.march_coords, None, shot)
 
     def _add_stamina(self, shot, target: int):
         """Popup số lượng mở sẵn ở mốc 100 thể lực: bấm nút + thêm (target - 100) / `item`
@@ -366,6 +377,8 @@ class _Boss:
         sau khi tap hành quân thì boss vừa Join mới được nhớ là đã tham gia;
         mọi nhánh Back (thất bại) để boss đó được thử lại lần sau."""
         bot = self.bot
+        # Thẻ vừa Join ở danh sách (None nếu vào thẳng màn March, VD bật bot khi đang ở March).
+        label, self.card_label = self.card_label, None
         if bot.find(BOSS_MONSTER, screen=screen, region=REGIONS[BOSS_MONSTER]) is None:
             bot.back()
             return
@@ -375,6 +388,8 @@ class _Boss:
         coords = self._read_march_target_coords(screen) if CAN_READ_COORDS else None
         if CAN_READ_COORDS and coords is None:
             bot.record("Join Monster War: không đọc được tọa độ đích trên March; không March")
+            if label:   # không biết thẻ nào (vào thẳng màn March) thì không chụp ảnh
+                boss_names.log_march_coords_fail(screen, "march", label)
             bot.back()
             return
 
@@ -397,13 +412,14 @@ class _Boss:
         if self.select_general and self.select_assistant:
             self._choose_general(ASSISTANT_GENERAL)
 
+        self.march_coords = coords
         self._press_march(coords, march_pos, screen)
 
     def _press_march(self, coords, march_pos=None, screen=None):
         """Bấm March và ghi JOINED khi game quay lại danh sách War.
 
         Popup hết thể lực được kiểm tra trước và không được tính là thành công. Sau khi dùng
-        thể lực, `_use_stamina()` gọi lại hàm này nên lần March mới được kiểm tra bình thường.
+        thể lực, `_use_stamina()` gọi lại hàm này với `self.march_coords` nên lần March mới được kiểm tra bình thường.
         """
         bot = self.bot
         screen = screen if screen is not None else bot.screenshot()
@@ -416,8 +432,8 @@ class _Boss:
         def march_result(shot):
             # Không đủ thể lực: popup "Get more now?" đè lên màn March (nút March mờ vẫn khớp
             # ảnh mẫu) -> trả màn này cho vòng lặp chính xử lý OUT_OF_STAMINA.
-            # Không giữ tọa độ cũ; sau khi dùng thể lực `_use_stamina()` sẽ OCR lại
-            # mục tiêu đang hiện trên màn March trước khi bấm March lần nữa.
+            # Sau khi dùng thể lực `_use_stamina()` bấm March lại với tọa độ đã lưu
+            # trong `self.march_coords`, không OCR lại.
             if bot.find(NOT_ENOUGH_STAMINA, screen=shot) is not None:
                 return OUT_OF_STAMINA
 
@@ -655,6 +671,8 @@ class _Boss:
             #    thông báo "You cannot send more troops.") thì lượt sau xét lại chính nút này
             #    (thời gian đỏ -> bỏ qua, không đỏ -> bấm Join lại), không bỏ sang Join khác.
             bot.report_boss(coords)
+            self.card_label = "_".join(str(part) for part in (
+                *(coords or ()), self.card_boss) if part not in (None, ""))
             bot.tap(x + jw // 2, y + jh // 2)
             self.idle_scrolls = 0   # cả khi không đọc được tọa độ
             return True
@@ -734,6 +752,7 @@ class _Boss:
         """Đọc nhãn tên "(Boss) [tier] <tên>" của thẻ có nút Join ở góc (x, y),
         tìm cấp (từ tier; không có tier thì từ lực của boss) và kiểm tra boss
         đó có được tích ở tab không. Tên / cấp không nhận ra = không tham gia."""
+        self.card_boss = None
         if self.selected is None:
             return True
         bot = self.bot
@@ -742,6 +761,8 @@ class _Boss:
         level, power = boss_names.level(
             boss, tier, lambda: read_power_text(bot.crop(screen, x + POWER_DX, y + POWER_DY, POWER_W, POWER_DH)))
         wanted = boss_names.wanted(self.selected, boss, level)
+        self.card_boss = "_".join(str(part) for part in (
+            boss.name if boss else text, f"lv{level}" if level else None, power) if part)
         bot.log(f"Boss {coords}: {text!r}"
                 f"{f' power {power}' if power else ''}"
                 f" -> {boss.name if boss else 'không nhận ra'}"
@@ -772,6 +793,8 @@ _WAIT = {"top_left": {LEAVE_ALLIANCE_POPUP}, "tolerance": SAME_SPOT,
 
 STAMINA_MULTIPLES = ("200", "300", "400", "500")     # thể lực muốn nhận; popup mở sẵn ở mốc 100
 STAMINA_CHOICES = ("ALL", "100", *STAMINA_MULTIPLES)
+STAMINA_CLOSE_WAIT = 10     # giây chờ popup dùng thể lực đóng (kiểm tra mỗi 1 s)
+STAMINA_CLOSE_ROUNDS = 2    # số đợt chờ (Back giữa hai đợt); hết đợt mà chưa đóng thì Back 2 lần
 
 
 def _item_stamina(bot, screen) -> int | None:

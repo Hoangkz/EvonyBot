@@ -193,6 +193,27 @@ def log_unknown(screen, coords, name_text: str | None, power_text: str | None,
         pass
 
 
+def log_march_coords_fail(screen, where: str, label: str | None = None) -> None:
+    """Không đọc được tọa độ đích trên màn March: ghi logs/ocr_unknown.logs và lưu ảnh
+    logs/images/march_<label>.png, `label` = thông tin thẻ đã đọc ở danh sách trước khi
+    Join (tọa độ, tên boss, cấp, lực): cùng thẻ lỗi lại thì ghi đè, không tràn ổ đĩa. Không
+    có label (hàm gọi không truyền) thì đặt tên theo thời điểm (không bao giờ ghi đè)."""
+    if label:
+        name = re.sub(r'[\\/:*"<>|\s?]+', "_", label)
+    else:
+        name = time.strftime("%Y%m%d_%H%M%S") + f"_{int(time.time() * 1000) % 1000:03d}"
+    image = f"images/march_{name}.png"
+    line = (f"{time.strftime('%Y-%m-%d %H:%M:%S')} march_coords_fail where={where} "
+            f"card={label!r} image={image}\n")
+    try:
+        UNKNOWN_IMAGES.mkdir(parents=True, exist_ok=True)
+        cv2.imwrite(str(LOGS_DIR / image), screen)
+        with open(UNKNOWN_LOG, "a", encoding="utf-8") as f:
+            f.write(line)
+    except OSError:
+        pass
+
+
 def _too_unknown(text: str) -> bool:
     return text.count("?") > len(text) * MAX_UNKNOWN
 

@@ -17,7 +17,7 @@ python -m unittest discover -s tests/join_monster_war -p "test_*.py" -v
 | Không có tọa độ mục tiêu thì không được xác nhận thành công dù đã về PvP War | `test_march_target_flow.py::test_pvp_war_without_a_readable_target_is_not_success` |
 | Phải thấy hàng Joined có đúng tọa độ mục tiêu mới ghi BossMemory | `test_march_target_flow.py::test_matching_joined_row_marks_actual_march_coordinate` |
 | Hàng Joined sai tọa độ không được xác nhận nhầm | `test_march_target_flow.py::test_wrong_joined_coordinates_do_not_confirm_success` |
-| Sau khi dùng thể lực phải OCR lại mục tiêu trên màn March | `test_march_target_flow.py::test_stamina_refill_rereads_march_target_before_retry` |
+| Sau khi dùng thể lực chỉ bấm March lại với tọa độ cũ, không OCR / chọn đội lại | `test_march_target_flow.py::test_stamina_refill_presses_march_again_without_ocr_or_troop_pick` |
 | Runtime không giữ trạng thái `pending` | `test_march_target_flow.py::test_runtime_has_no_pending_target_state` |
 | Card ở danh sách đọc lỗi tọa độ phải bị blacklist để tránh kẹt vòng lặp | `test_edge_cases.py::test_unreadable_card_coordinates_are_blacklisted_for_current_screen` |
 | Card OCR lỗi không được cản bot xét card hợp lệ kế tiếp | `test_march_target_flow.py::test_unreadable_list_card_does_not_block_the_next_valid_card` |

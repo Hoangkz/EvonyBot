@@ -4,7 +4,7 @@ device_view.py — the workspace for a single connected device.
 Python/PyQt5 counterpart of the C# `panelData` + `Start` TabControl: a
 QTabWidget hosting one tab per bot module, in the same order as the
 original Form3 (Initialization, Join Monster War, Alliance Capacity,
-Daily Activities, Open Gift Box, Black Market, Event, Battlefield Shop),
+Daily Activities, Open Gift Box, Black Market, Event),
 plus a Logs tab showing this device's bot log (not a settings tab).
 """
 from PyQt5.QtCore import pyqtSignal
@@ -12,7 +12,6 @@ from PyQt5.QtWidgets import QTabWidget, QVBoxLayout, QWidget
 
 from .tabs import (
     AllianceCapacityTab,
-    BattlefieldShopTab,
     BlackMarketTab,
     DailyActivitiesTab,
     EventTab,
@@ -52,7 +51,6 @@ class DeviceView(QWidget):
         self.open_gift_box_tab = OpenGiftBoxTab()
         self.black_market_tab = BlackMarketTab()
         self.event_tab = EventTab()
-        self.battlefield_shop_tab = BattlefieldShopTab()
 
         self._add_tab(self.initialization_tab, "Initialization")
         self._add_tab(self.join_monster_war_tab, "Join Monster War")
@@ -61,7 +59,6 @@ class DeviceView(QWidget):
         self._add_tab(self.open_gift_box_tab, "Open Gift Box")
         self._add_tab(self.black_market_tab, "Black Market")
         self._add_tab(self.event_tab, "Event")
-        self._add_tab(self.battlefield_shop_tab, "Battlefield Shop")
         # Logs không có cấu hình: thêm thẳng, không nối Apply ALL / settings.
         self.logs_tab = LogsTab()
         self.tabs.addTab(self.logs_tab, "Logs")

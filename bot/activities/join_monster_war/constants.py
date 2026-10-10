@@ -88,7 +88,7 @@ STAMINA_BAR_REGION = (0, 48, 100, 58)    # % màn hình: dải chứa nút − v
 STAMINA_BASE = 100                       # thể lực popup mở sẵn
 STAMINA_PLUS_DELAY = 0                       # giây sau mỗi lần bấm +: mỗi tap ADB đã mất ~0,5 giây
 STAMINA_ADDED_WAIT = 1                   # giây chờ sau khi bấm + xong, trước khi bấm Use
-STAMINA_REFILL_WAIT = 2             # timeout chờ popup Use đóng; thường hoàn thành trong ~1 giây
+STAMINA_REFILL_WAIT = 2             # giây chờ sau khi bấm Use (game tự đóng popup) rồi mới Back
 PRESET_X0, PRESET_DX, PRESET_Y = 10.4, 11.3, 11
 
 # Dải ngay trên nút Battle Logs / Auto-Join (% màn hình). Trống (chỉ nền tối,

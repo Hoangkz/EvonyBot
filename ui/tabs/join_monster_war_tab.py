@@ -10,10 +10,6 @@ from .tab_placeholder import BaseTab
 TROOP_RADIOS = [f"troop_{i}" for i in range(1, 9)]
 STAMINA_OPTIONS = ["ALL", "100", "200", "300", "400", "500", "No"]
 HAMMER_OPTIONS = ["No", "10", "9", "8", "7", "6","5","4","3","2","1"]
-BOSS_CATALOG_VERSION = 2
-# Boss active mới của từng phiên bản. Cấu hình cũ chưa biết boss này sẽ được
-# bật một lần; sau khi lưu version mới, người dùng vẫn có thể tắt bình thường.
-NEW_DEFAULT_BOSSES = {"Elite Temple Guard": 2}
 
 
 class JoinMonsterWarTab(BaseTab):
@@ -217,7 +213,6 @@ class JoinMonsterWarTab(BaseTab):
             "select_assistant_general": c["checkBoxAssistantGeneral"].isChecked(),
             "development_general": c["checkBoxDevelopmentGeneral"].isChecked(),
             "viking_summon": c["viking_summon"].isChecked() if "viking_summon" in c else False,
-            "boss_catalog_version": BOSS_CATALOG_VERSION,
             "selected_bosses": [
                 {"category_key": category, "name": name,
                  "levels": [level for level, box in levels.items() if box.isChecked()]}
@@ -246,21 +241,17 @@ class JoinMonsterWarTab(BaseTab):
         if "selected_bosses" in data:
             selected = {(boss["category_key"], boss["name"]): boss.get("levels", [])
                         for boss in data["selected_bosses"]}
-            saved_catalog_version = int(data.get("boss_catalog_version", 0) or 0)
             for category, name, enabled, levels in self.boss_choices:
                 key = (category, name)
                 if enabled is not None:
-                    introduced = NEW_DEFAULT_BOSSES.get(name, 0)
-                    enable_new_default = introduced > saved_catalog_version
-                    enabled.setChecked(key in selected or enable_new_default)
+                    enabled.setChecked(key in selected)
                 for level, box in levels.items():
                     box.setChecked(level in selected.get(key, []))
         else:
             # Older device settings only had a Viking checkbox.
             for _, name, enabled, levels in self.boss_choices:
                 if enabled is not None:
-                    enabled.setChecked((name == "Viking" and bool(data.get("viking", False)))
-                                       or name in NEW_DEFAULT_BOSSES)
+                    enabled.setChecked(name == "Viking" and bool(data.get("viking", False)))
                 for box in levels.values():
                     box.setChecked(False)
 
