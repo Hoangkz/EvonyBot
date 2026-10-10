@@ -9,7 +9,7 @@ Worker gọi `run(bot, settings)`, tạo một đối tượng `_Boss` mới r�
 | Cấu hình | Cách sử dụng |
 | --- | --- |
 | `troop` | Danh sách preset quân (vd `["Troop 1", "Troop 3"]`, vẫn nhận chuỗi đơn kiểu cũ); lấy số ở cuối mỗi chuỗi, xoay vòng qua từng preset mỗi lần march; nếu không đọc được thì dùng 1. |
-| `use_stamina` | Chỉ `ALL` hoặc `100` cho phép xử lý bổ sung thể lực; giá trị khác khiến activity kết thúc khi gặp hết thể lực. |
+| `use_stamina` | Chỉ `ALL`, `100`, `200`, `300`, `400`, `500` cho phép xử lý bổ sung thể lực; giá trị khác khiến activity kết thúc khi gặp hết thể lực. |
 | `selected_bosses` | Boss được tích ở tab (`[{category_key, name, levels}]`). Chỉ Join boss có tên trong danh sách; boss có cấp chỉ Join khi cấp đọc được nằm trong `levels`. Không có key này (cấu hình cũ) thì không lọc theo tên. |
 | `exit_when_idle` | Mặc định False. Worker bật True khi còn activity phụ để Join Boss trả quyền điều khiển lúc rảnh. |
 
@@ -204,7 +204,7 @@ Chi tiết triển khai nằm ở [boss_board.py](../../worker/boss_board.py) v�
 5. Khi vừa vào màn March, tìm các icon LOCATION và OCR tọa độ bên phải (tọa độ bên trái là người gọi rally). Đây là **tọa độ mục tiêu thật** dùng cho lần hành quân; không so với tọa độ đã đọc ở danh sách. Không đọc được thì Back, không March.
 6. Tìm lại MARCH; tap vị trí mới nếu có, nếu không dùng vị trí MARCH đã nhận diện ở vòng chính.
 7. Polling mỗi 0,2 giây, tối đa 2 giây để kiểm tra:
-   - Popup **không đủ thể lực** ("Get more now?", nút Confirm `hettheluc.png`): trả màn này cho vòng lặp chính, **không giữ tọa độ cũ**. Vòng lặp chính gặp `OUT_OF_STAMINA`: `use_stamina = No` thì **dừng hẳn Join Boss**; `ALL` / `100` thì bấm Confirm rồi `_use_stamina()`. Sau khi dùng vật phẩm và Back về March, bot OCR lại mục tiêu đang hiện rồi mới March. Popup đè lên màn March nhưng nút March mờ vẫn khớp ảnh mẫu (0,99), nên phải kiểm tra popup trước.
+   - Popup **không đủ thể lực** ("Get more now?", nút Confirm `hettheluc.png`): trả màn này cho vòng lặp chính (tọa độ đã đọc nằm ở `self.march_coords`). Vòng lặp chính gặp `OUT_OF_STAMINA`: `use_stamina = No` thì **dừng hẳn Join Boss**; `ALL` / `100` thì bấm Confirm rồi `_use_stamina()`. Sau khi dùng vật phẩm và Back về March, bot bấm March lại ngay với tọa độ đã đọc ở lần March trước (`self.march_coords`), không OCR lại, không chọn đội / tướng lại. Popup đè lên màn March nhưng nút March mờ vẫn khớp ảnh mẫu (0,99), nên phải kiểm tra popup trước.
    - Thấy tab PvP War **và** hàng `Joined` có cùng tọa độ mục tiêu: coi hành quân thành công và ghi `JOINED` cho tọa độ thật đọc trên March.
    - Chỉ thấy tab PvP War nhưng không thấy hàng `Joined` đúng tọa độ: không ghi nhớ, tránh trường hợp game từ chối March nhưng vẫn quay về danh sách.
 8. Nếu nút MARCH vẫn còn sau các lần chờ, Back.
@@ -231,7 +231,8 @@ Hàm không trả cờ thành công/thất bại. Khi nó trả về, `_march()`
 2. **Popup số lượng** (nút Use lớn `staminaUse.png`):
    - `100`: bấm Use luôn (số lượng mặc định);
    - `ALL`: bấm gần cuối thanh trượt (`STAMINA_SLIDER_END`, dùng hết), rồi bấm Use.
-3. Polling cho tới khi popup Use đóng (timeout 2 giây), Back về màn March, OCR lại tọa độ đích thật rồi **bấm March lại** (`_press_march`, giữ nguyên đội đã chọn). Không giữ `pending` hay tọa độ cũ qua bước bổ sung thể lực. Chỉ khi thấy hàng `Joined` đúng tọa độ thì boss mới được nhớ là đã tham gia.
+   - `200` / `300` / `400` / `500` (`_add_stamina`): popup mở sẵn ở mốc 100 thể lực. Nhận loại vật phẩm (10 / 25 / 50 / 100) theo số vàng trên biểu tượng popup (`staminaItem<N>.png`, thử từ lớn xuống nhỏ, ngưỡng 0,995 vì "10" nằm trong "100"), tìm nút + (`staminaPlus.png`), bấm + (mốc − 100) / N lần (VD vật phẩm 10 mốc 200: 10 lần; vật phẩm 50 mốc 500: 8 lần) không delay giữa các lần, xong chờ 1 giây rồi bấm Use. Không nhận ra vật phẩm hoặc không thấy nút + thì ghi log, dùng mốc 100. Không OCR. Đo thật máy 21923 (vật phẩm 25, mở ở 3/15): mốc 200 → bấm 4 lần, 31 → 206; mốc 400 → bấm 12 lần, 32 → 407.
+3. Chờ 2 giây (game tự đóng popup sau khi bấm Use), Back một lần rồi chờ màn dùng thể lực (popup số lượng và danh sách Use Item) đóng: kiểm tra mỗi 1 giây, tối đa 10 lần; chưa đóng thì Back thêm một lần rồi chờ tiếp 10 lần; tổng 20 giây vẫn chưa đóng thì Back 2 lần, coi như đã dùng thể lực xong và quay về vòng chính tiếp tục các bước Join Boss theo màn hình hiện tại (không bấm March ngay). Khi đã đóng: **bấm March lại** nếu thấy nút March trên ảnh đó (không thấy thì để vòng chính nhận diện) (`_press_march`) với tọa độ `self.march_coords` đã đọc ở lần March trước; không OCR lại, không chọn đội / tướng lại (đội đã chọn vẫn giữ nguyên). Không có `pending`. Chỉ khi thấy hàng `Joined` đúng tọa độ thì boss mới được nhớ là đã tham gia.
 
 `use_stamina = No` (hoặc đã hết vật phẩm): gặp popup không đủ thể lực thì Join Boss dừng hẳn (trả `None`).
 
@@ -293,7 +294,7 @@ Các nhánh quan trọng và test chịu trách nhiệm trực tiếp:
 | Không có tọa độ đích: không xác nhận thành công dù đã về PvP War | `test_march_target_flow.py::test_pvp_war_without_a_readable_target_is_not_success` |
 | Chỉ Joined đúng tọa độ mục tiêu mới ghi `BossMemory.JOINED` | `test_march_target_flow.py::test_matching_joined_row_marks_actual_march_coordinate` |
 | Nhiều hàng Joined: duyệt tọa độ từng hàng; hàng sai không được xác nhận | `test_march_target_flow.py::test_joined_confirmation_checks_every_visible_joined_row_by_coordinate`, `test_wrong_joined_coordinates_do_not_confirm_success` |
-| Hồi thể lực: quay lại March, OCR lại tọa độ rồi mới thử March | `test_march_target_flow.py::test_stamina_refill_rereads_march_target_before_retry` |
+| Hồi thể lực: quay lại March, bấm March lại với tọa độ cũ, không OCR / chọn đội lại | `test_march_target_flow.py::test_stamina_refill_presses_march_again_without_ocr_or_troop_pick` |
 | Runtime không còn trạng thái `pending` | `test_march_target_flow.py::test_runtime_has_no_pending_target_state` |
 | OCR tọa độ card lỗi: blacklist card để vòng lặp không kẹt | `test_edge_cases.py::test_unreadable_card_coordinates_are_blacklisted_for_current_screen` |
 | Card OCR lỗi không chặn việc xét card hợp lệ kế tiếp | `test_march_target_flow.py::test_unreadable_list_card_does_not_block_the_next_valid_card` |

@@ -19,7 +19,7 @@ from bot.activities import join_monster_war
 from bot.activities.join_monster_war.boss_memory import JOINED, SKIPPED, BossMemory
 from bot.activities.join_monster_war.constants import (CHOOSE_DEVELOPMENT, FAVORITE_OFF, IDLE, JOIN, JOINED_BUTTON, LISTBOSS, MARCH,
                                                      NOT_ENOUGH_STAMINA, PRESET_DX, PRESET_X0, PRESET_Y,
-                                                     REGIONS, SELECT_GENERAL, STAMINA_SLIDER_END,
+                                                     REGIONS, SELECT_GENERAL, STAMINA_PLUS, STAMINA_SLIDER_END,
                                                      STAMINA_USE, WAR_TICKED)
 from bot.activities.join_monster_war.run import (POLL_INTERVAL, STEP_TIMEOUT, _Boss,
                                                  _is_green_button)
@@ -411,6 +411,14 @@ OUT_OF_STAMINA_ITEMS = [
     Step(W("war_after_march_joined.png"), end(IDLE)),
 ]
 REFILL_100 = refill([Step("stamina_use_popup_100.png", tap(STAMINA_USE))])   # mặc định 10/87 (= 100)
+
+
+def refill_plus(popup, times):
+    """Mốc 200-500: popup mở sẵn ở mốc 100 -> bấm nút + `times` lần -> Use."""
+    return refill([*[Step(popup, tap(STAMINA_PLUS)) for _ in range(times)],
+                   Step(popup, tap(STAMINA_USE))])
+
+
 REFILL_ALL = refill([Step("stamina_use_popup.png", tap_pct(*STAMINA_SLIDER_END, tol=8)),
                      Step("stamina_use_popup_all.png", tap(STAMINA_USE))])
 # Tướng phụ đã có sẵn -> không chọn gì thêm, March luôn.
@@ -597,6 +605,16 @@ class JoinMonsterWarFlow(unittest.TestCase):
         self.assertIn("Join Monster War: dùng vật phẩm thể lực (ALL)", device.logs)
         with device.fake_time():
             self.assertEqual(device.ctx.boss_memory.status(PERYTON), JOINED)
+
+    def test_refill_stamina_by_plus_presses(self):
+        # (mốc, ảnh popup của vật phẩm, số lần bấm +) = (mốc - 100) / thể lực mỗi vật phẩm
+        for target, popup, times in ((200, "stamina_popup_item_10.png", 10),
+                                     (500, "stamina_popup_item_10.png", 40),
+                                     (500, "stamina_popup_item_50.png", 8)):
+            with self.subTest(target=target, popup=popup):
+                device = run_join(self, refill_plus(popup, times),
+                                  {**ALL_TROOPS, "use_stamina": str(target)})
+                self.assertIn(f"Join Monster War: dùng vật phẩm thể lực ({target})", device.logs)
 
     def test_out_of_stamina_items_does_not_mark_joined(self):
         device = run_join(self, OUT_OF_STAMINA_ITEMS, {**ALL_TROOPS, "use_stamina": "ALL"})

@@ -668,7 +668,7 @@ DATA ={
                             "level": 2,
                             "tier": "Medium",
                             "power": "154.8M",
-                            "active": True
+                            "active": False
                         },
                         {
                             "level": 3,
@@ -689,7 +689,7 @@ DATA ={
                         {
                             "level": 2,
                             "power": "398.1M",
-                            "active": True
+                            "active": False
                         },
                         {
                             "level": 3,
@@ -879,7 +879,7 @@ DATA ={
                             "level": 3,
                             "tier": "Fierce",
                             "power": "492.7K",
-                            "active": False
+                            "active": True
                         }
                     ]
                 }

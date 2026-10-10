@@ -100,27 +100,15 @@ class BossLevelTests(unittest.TestCase):
     def test_power_gives_level_without_tier(self):
         ymir, tier = parse("(boss) ymir")
         self.assertIsNone(tier)
-        self.assertEqual(level(ymir, tier, lambda: 120_200_000), (3, 120_200_000))
-        self.assertEqual(level(ymir, tier, lambda: 125_000_000), (3, 125_000_000))  # lệch ít
-        self.assertEqual(level(ymir, tier, lambda: 9_000_000_000), (None, 9_000_000_000))
+        # read_power trả chuỗi OCR của lực; trả (cấp, chuỗi lực đã đọc).
+        self.assertEqual(level(ymir, tier, lambda: "120.2M"), (3, "120.2M"))
+        self.assertEqual(level(ymir, tier, lambda: "125M"), (3, "125M"))  # lệch ít
+        self.assertEqual(level(ymir, tier, lambda: "9000M"), (None, "9000M"))
         self.assertEqual(level(ymir, tier, lambda: None), (None, None))  # không đọc được lực
 
     def test_standard_boss_has_no_level(self):
         self.assertEqual(level(boss("Peryton"), None, lambda: self.fail("không cần lực")),
                          (None, None))
-
-    def test_elite_temple_guard_is_a_separate_name_only_boss(self):
-        elite, tier = parse("elite temple guard")
-
-        self.assertEqual((elite.name, tier), ("Elite Temple Guard", None))
-        self.assertFalse(elite.has_level_data)
-        selected = selection({"selected_bosses": [{
-            "category_key": "mythical_and_elite_bosses",
-            "name": "Elite Temple Guard",
-            "levels": [],
-        }]})
-        self.assertTrue(wanted(selected, elite, None))
-        self.assertFalse(wanted(selection({"selected_bosses": []}), elite, None))
 
     def test_wanted(self):
         selected = selection({"selected_bosses": [

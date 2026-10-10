@@ -7,7 +7,8 @@ người sửa code về sau đọc tên test là hiểu hành vi bắt buộc:
 * không đọc được tọa độ thì Back, tuyệt đối không March;
 * PvP War chỉ chứng minh đã về danh sách, chưa chứng minh đã tham gia;
 * chỉ hàng Joined có đúng tọa độ đích mới được ghi vào BossMemory;
-* sau khi bổ sung thể lực phải OCR lại màn March, không tái sử dụng tọa độ cũ.
+* sau khi bổ sung thể lực chỉ bấm March lại với tọa độ đã đọc ở lần March trước:
+  không OCR lại, không chọn đội / tướng lại.
 """
 
 import importlib
@@ -72,6 +73,7 @@ class MarchTargetContractTests(unittest.TestCase):
         boss._march(MARCH_SCREEN, (300, 680))
 
         boss._press_march.assert_called_once_with((767, 811), (300, 680), MARCH_SCREEN)
+        self.assertEqual(boss.march_coords, (767, 811))
 
     def test_unreadable_march_coordinate_backs_out_before_troop_or_march(self):
         bot = fake_bot()
@@ -83,7 +85,9 @@ class MarchTargetContractTests(unittest.TestCase):
         boss._pick_troop = mock.Mock()
         boss._press_march = mock.Mock()
 
-        boss._march(MARCH_SCREEN, (300, 680))
+        # Mock để test không ghi ảnh thật vào logs/images của app.
+        with mock.patch.object(run_module.boss_names, "log_march_coords_fail"):
+            boss._march(MARCH_SCREEN, (300, 680))
 
         bot.back.assert_called_once()
         boss._pick_troop.assert_not_called()
@@ -157,22 +161,41 @@ class MarchTargetContractTests(unittest.TestCase):
 
         self.assertFalse(boss._joined_target_visible(SCREEN, (767, 811)))
 
-    def test_stamina_refill_rereads_march_target_before_retry(self):
+    def test_stamina_refill_presses_march_again_without_ocr_or_troop_pick(self):
         bot = fake_bot()
         boss = _Boss(bot, {"use_stamina": "100"})
         boss._poll_screen = mock.Mock(side_effect=[
             (SCREEN, [(290, 360)]),       # màn Use Item
             (SCREEN, (300, 500)),         # popup số lượng
-            (SCREEN, True),               # popup đã đóng
-            (MARCH_SCREEN, (300, 680)),   # đã Back về March
+            (SCREEN, True),               # màn dùng thể lực đã đóng
         ])
-        boss._read_march_target_coords = mock.Mock(return_value=(767, 811))
+        boss.march_coords = (767, 811)      # đã đọc ở lần March trước khi hết thể lực
+        boss._read_march_target_coords = mock.Mock()
+        boss._pick_troop = mock.Mock()
         boss._press_march = mock.Mock()
 
         boss._use_stamina()
 
-        boss._read_march_target_coords.assert_called_once_with(MARCH_SCREEN)
-        boss._press_march.assert_called_once_with((767, 811), (300, 680), MARCH_SCREEN)
+        boss._read_march_target_coords.assert_not_called()
+        boss._pick_troop.assert_not_called()
+        boss._press_march.assert_called_once_with((767, 811), None, SCREEN)
+
+    def test_stamina_popup_never_closing_backs_out_twice_without_march(self):
+        bot = fake_bot()
+        boss = _Boss(bot, {"use_stamina": "100"})
+        boss.march_coords = (767, 811)
+        boss._poll_screen = mock.Mock(side_effect=[
+            (SCREEN, [(290, 360)]),       # màn Use Item
+            (SCREEN, (300, 500)),         # popup số lượng
+            (SCREEN, False),              # 10 s đầu: popup chưa đóng
+            (SCREEN, False),              # 10 s sau: vẫn chưa đóng
+        ])
+        boss._press_march = mock.Mock()
+
+        boss._use_stamina()
+
+        self.assertEqual(bot.back.call_count, 4)    # 1 sau khi dùng + 1 giữa hai đợt chờ + 2 khi bỏ cuộc
+        boss._press_march.assert_not_called()
 
     def test_unreadable_list_card_does_not_block_the_next_valid_card(self):
         bot = fake_bot()

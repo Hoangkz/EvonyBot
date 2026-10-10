@@ -248,12 +248,16 @@ class JoinBossEdgeCaseTests(unittest.TestCase):
                                                             else (300, 680) if template == MARCH else None)
         boss = _Boss(bot, {})
         boss._read_march_target_coords = mock.Mock(return_value=None)
+        boss.card_label = "767_811_Cerberus_lv3_234.2M"
 
-        boss._march(SCREEN, (300, 680))
+        # Mock để test không ghi ảnh thật vào logs/images của app.
+        with mock.patch.object(run_module.boss_names, "log_march_coords_fail") as saved:
+            boss._march(SCREEN, (300, 680))
 
         bot.back.assert_called_once()
         bot.tap.assert_not_called()
         self.assertIn("không đọc được tọa độ đích", bot.record.call_args.args[0])
+        saved.assert_called_once_with(SCREEN, "march", "767_811_Cerberus_lv3_234.2M")
 
     def test_march_target_uses_right_side_location(self):
         bot = fake_bot()

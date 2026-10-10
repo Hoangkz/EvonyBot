@@ -15,11 +15,17 @@ tab ticks it.
 """
 import difflib
 import math
+import os
 import re
+import time
+from pathlib import Path
+
+import cv2
 
 from ...ocr.read_power import parse as parse_power
 
 MATCH_CUTOFF = 0.75     # difflib ratio needed to accept a name / tier
+MAX_UNKNOWN = 0.5       # more than this share of "?" in a read: too unsure, not checked
 POWER_TOLERANCE = 1.3   # the power read may be at most this factor off a level's power
 
 _catalog: dict | None = None
@@ -29,6 +35,7 @@ class Boss:
     def __init__(self, name: str):
         self.name = name
         self.levels: dict[int, tuple[str | None, int | None]] = {}   # level -> (tier, power)
+        self.power_texts: dict[int, str] = {}                        # level -> "120.2m"
 
     @property
     def has_level_data(self) -> bool:
@@ -41,6 +48,17 @@ class Boss:
             if level_tier and level_tier.lower() == tier:
                 return level
         return None
+
+    def level_of_power_text(self, text: str | None) -> int | None:
+        """Level whose power text ("120.2m") fits the OCR `text` ("12?.2?"): a "?"
+        (glyph without a sample) is a position to skip, matching any 1-2 characters.
+        Only a single fitting level counts."""
+        if not text or "?" not in text or _too_unknown(text):
+            return None
+        pattern = re.compile("".join(".{1,2}" if ch == "?" else re.escape(ch)
+                                     for ch in text.lower()))
+        fits = [level for level, raw in self.power_texts.items() if pattern.fullmatch(raw)]
+        return fits[0] if len(fits) == 1 else None
 
     def level_of_power(self, power: int | None) -> int | None:
         """Level whose power is closest (by ratio) to `power`, if close enough."""
@@ -65,6 +83,8 @@ def catalog() -> dict:
                     if isinstance(level, dict):
                         boss.levels[level["level"]] = (level.get("tier"),
                                                        parse_power(level.get("power")))
+                        if level.get("power"):
+                            boss.power_texts[level["level"]] = str(level["power"]).lower()
         tiers = {tier.lower() for boss in bosses.values()
                  for tier, _ in boss.levels.values() if tier}
         _catalog = {"bosses": bosses, "tiers": tiers}
@@ -94,13 +114,17 @@ def parse(text: str | None) -> tuple[Boss | None, str | None]:
 
 def level(boss: Boss | None, tier: str | None, read_power) -> tuple[int | None, int | None]:
     """(level, power read) of `boss`: from its tier word if there is one,
-    else from `read_power()` (called only then) for a boss with levels."""
+    else from `read_power()` (the power text, called only then) for a boss with levels."""
     if boss is None or not boss.has_level_data:
         return None, None
     if tier:
         return boss.level_of_tier(tier), None
-    power = read_power()
-    return boss.level_of_power(power), power
+    text = read_power()
+    found = boss.level_of_power_text(text)
+    if found is not None:
+        return found, text
+    power = parse_power(text)
+    return boss.level_of_power(power), text
 
 
 def selection(settings: dict) -> dict[str, tuple[set[int], bool]] | None:
@@ -135,16 +159,79 @@ def wanted(selected: dict[str, tuple[set[int], bool]] | None, boss: Boss | None,
     return level in levels
 
 
+# Trong thư mục dữ liệu của app (cùng chỗ evonybot.db, database.DATA_DIR); không import
+# database để khỏi vòng import.
+LOGS_DIR = Path(os.environ.get("LOCALAPPDATA", Path.home())) / "EvonyBot" / "logs"
+UNKNOWN_LOG = LOGS_DIR / "ocr_unknown.logs"
+UNKNOWN_IMAGES = LOGS_DIR / "images"
+_logged: set = set()    # (tên, công suất) đã ghi trong phiên này: quét lại cùng thẻ không ghi nữa
+
+
+def log_unknown(screen, coords, name_text: str | None, power_text: str | None,
+                boss: "Boss | None", level: int | None) -> None:
+    """Append to logs/ocr_unknown.logs every read of a card whose name/tier or power holds
+    a "?" (glyph without a sample), and save the screenshot in logs/images/ as
+    <boss>_<power>.png (the same read overwrites it), to find which samples to add with
+    add_sample. Each distinct (name, power) read is logged once per run."""
+    if "?" not in (name_text or "") + (power_text or "") or (name_text, power_text) in _logged:
+        return
+    _logged.add((name_text, power_text))
+    # <tên boss>_<công suất>.png: cùng thẻ đọc lại thì ghi đè. Không nhận ra boss thì dùng
+    # chữ OCR; "?" không hợp lệ trong tên file nên đổi thành "x".
+    label = boss.name if boss else re.sub(r"^\s*\([^)]*\)", "", name_text or "").strip()
+    name = re.sub(r'[\\/:*"<>|\s]+', "_", f"{label}_{power_text or 'none'}".replace("?", "x"))
+    image = f"images/{name}.png"
+    line = (f"{time.strftime('%Y-%m-%d %H:%M:%S')} coords={coords} name={name_text!r} "
+            f"power={power_text!r} -> {boss.name if boss else 'không nhận ra'}"
+            f"{f' lv {level}' if level else ''} image={image}\n")
+    try:
+        UNKNOWN_IMAGES.mkdir(parents=True, exist_ok=True)
+        cv2.imwrite(str(LOGS_DIR / image), screen)
+        with open(UNKNOWN_LOG, "a", encoding="utf-8") as f:
+            f.write(line)
+    except OSError:
+        pass
+
+
+def log_march_coords_fail(screen, where: str, label: str | None = None) -> None:
+    """Không đọc được tọa độ đích trên màn March: ghi logs/ocr_unknown.logs và lưu ảnh
+    logs/images/march_<label>.png, `label` = thông tin thẻ đã đọc ở danh sách trước khi
+    Join (tọa độ, tên boss, cấp, lực): cùng thẻ lỗi lại thì ghi đè, không tràn ổ đĩa. Không
+    có label (hàm gọi không truyền) thì đặt tên theo thời điểm (không bao giờ ghi đè)."""
+    if label:
+        name = re.sub(r'[\\/:*"<>|\s?]+', "_", label)
+    else:
+        name = time.strftime("%Y%m%d_%H%M%S") + f"_{int(time.time() * 1000) % 1000:03d}"
+    image = f"images/march_{name}.png"
+    line = (f"{time.strftime('%Y-%m-%d %H:%M:%S')} march_coords_fail where={where} "
+            f"card={label!r} image={image}\n")
+    try:
+        UNKNOWN_IMAGES.mkdir(parents=True, exist_ok=True)
+        cv2.imwrite(str(LOGS_DIR / image), screen)
+        with open(UNKNOWN_LOG, "a", encoding="utf-8") as f:
+            f.write(line)
+    except OSError:
+        pass
+
+
+def _too_unknown(text: str) -> bool:
+    return text.count("?") > len(text) * MAX_UNKNOWN
+
+
 def _match(text: str, choices) -> str | None:
     """The choice (lower case) `text` reads as. A "?" (glyph without a sample,
     maybe letters touching) stands for 1-3 letters: if exactly one choice fits,
     that's it. Otherwise the closest choice by difflib, if close enough."""
     choices = list(choices)
+    if _too_unknown(text):
+        return None
     if "?" in text:
         pattern = re.compile("".join(".{1,3}" if ch == "?" else re.escape(ch) for ch in text))
         fits = [choice for choice in choices if pattern.fullmatch(choice)]
         if len(fits) == 1:
             return fits[0]
+        if fits:    # nhiều lựa chọn cùng khớp phần đọc được: lấy cái giống nhất
+            return difflib.get_close_matches(text.replace("?", ""), fits, n=1, cutoff=0)[0]
     match = difflib.get_close_matches(text, choices, n=1, cutoff=MATCH_CUTOFF)
     if match:
         return match[0]
