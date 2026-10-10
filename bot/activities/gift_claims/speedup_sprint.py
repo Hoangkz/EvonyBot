@@ -9,8 +9,8 @@ KEY = "gift_speedup_sprint"
 def run(bot):
     return run_carousel_claim(bot, GiftScreen.VALUABLE_EVENT, "ValuableEvent/title",
                               "SpeedupSprint/tab",
-                              ("SpeedupSprint/subtab_package",
-                               "SpeedupSprint/button_free"))
+                              ("SpeedupSprint/button_free",),
+                              navigation=("SpeedupSprint/subtab_package",))
 
 
 TASK = GiftTask(KEY, "Speedup Sprint", run)

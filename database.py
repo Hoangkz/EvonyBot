@@ -111,12 +111,29 @@ def _reset_old_layout(conn: sqlite3.Connection):
 KEY_RENAMES = {old: f"gather_troops_{old}" for old in
                ("ground_troop", "mounted_troop", "ranged_troop", "siege_machine", "defense_force")}
 
+# Gift claims used to persist every inner module separately. They are now one
+# resumable task (``gift_claims``), so stale child keys must not keep appearing
+# in DB/UI progress after upgrading. They are deliberately not promoted to the
+# combined key because a few old children being done does not mean both lobby
+# boundaries were fully scanned.
+LEGACY_GIFT_KEYS = {
+    "gift_dragon_battle", "gift_grace_of_star_trail",
+    "gift_refining_stone_sprint", "gift_strategic_stockpile",
+    "gift_limited_offer", "gift_speedup_sprint", "gift_super_blazon_sale",
+    "gift_sulis_wishing", "gift_super_value_weekly_card",
+    "gift_successive_purchase_benefits", "gift_login_gifts",
+    "gift_empire_depot", "gift_lucky_raffle", "gift_city_growth_plan",
+    "gift_event_center_limited",
+}
+
 
 def _rename_keys(conn: sqlite3.Connection):
     """Đổi key cũ (KEY_RENAMES) sang key mới trong cột `event` và `daily_done`."""
     def renamed(data: dict) -> dict:
         out = {}
         for key, value in data.items():
+            if key in LEGACY_GIFT_KEYS:
+                continue
             base, suffix = (key[:-len("_locked")], "_locked") if key.endswith("_locked") else (key, "")
             new = KEY_RENAMES.get(base)
             out[new + suffix if new and (new + suffix) not in data else key] = value

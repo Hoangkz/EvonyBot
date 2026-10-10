@@ -9,7 +9,9 @@ KEY = "gift_lucky_raffle"
 def run(bot):
     return run_carousel_claim(bot, GiftScreen.SUPER_VALUE_RETURN,
                               "SuperValueReturn/title",
-                              "LuckyRaffle/tab", ("LuckyRaffle/button_claimable",))
+                              "LuckyRaffle/tab", ("Common/button_claimable",
+                                                  "Common/button_claimable_alt",
+                                                  "LuckyRaffle/button_claimable"))
 
 
 TASK = GiftTask(KEY, "Lucky Raffle", run)

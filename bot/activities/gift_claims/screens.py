@@ -12,6 +12,8 @@ class GiftScreen(str, Enum):
     DRAGON_BATTLE = "DragonBattle"
     GRACE_OF_STAR_TRAIL = "GraceOfStarTrail"
     BACCHUS_TAVERN = "BacchusTavern"
+    BACK_TO_TERRITORY = "BackToTerritory"
+    FOLLOW_US = "FollowUs"
 
 
 TITLE_TEMPLATES = {
@@ -21,6 +23,8 @@ TITLE_TEMPLATES = {
     GiftScreen.DRAGON_BATTLE: "DragonBattle/title",
     GiftScreen.GRACE_OF_STAR_TRAIL: "GraceOfStarTrail/title",
     GiftScreen.BACCHUS_TAVERN: "BacchusTavern/title",
+    GiftScreen.BACK_TO_TERRITORY: "BackToTerritory/title",
+    GiftScreen.FOLLOW_US: "FollowUs/title",
 }
 
 
