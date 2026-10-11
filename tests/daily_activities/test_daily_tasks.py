@@ -1,6 +1,6 @@
 """
-Hàm run riêng của các nhiệm vụ Daily Activities do worker gọi thẳng (luật chạy: bot/worker/daily/policy.py, khai báo ở
-bot/worker/daily/tasks.py; việc làm trong game: bot/activities/daily_activities/): nhiệm vụ Daily thường (chưa xong thì hẹn thử lại), nhiệm vụ theo giờ, nhận thưởng cuối. Crazy Eggs: xem
+Hàm run riêng của các nhiệm vụ Daily Activities do worker gọi thẳng (luật chạy: bot/worker/policies.py, khai báo ở
+bot/worker/priority.py; việc làm trong game: bot/activities/daily_activities/): nhiệm vụ Daily thường (chưa xong thì hẹn thử lại), nhiệm vụ theo giờ, nhận thưởng cuối. Crazy Eggs: xem
 tests/event_center/test_task.py.
 """
 import importlib
@@ -11,7 +11,7 @@ from unittest import mock
 from bot.activities.result import NOT_DONE, TaskResult
 from bot.worker.registry import REGISTRY
 
-daily = importlib.import_module("bot.worker.daily.policy")
+daily = importlib.import_module("bot.worker.policies")
 DEFS = {d.key: d for d in REGISTRY}
 
 
@@ -44,9 +44,11 @@ class DailyTaskTests(unittest.TestCase):
         self.assertFalse(DEFS["daily_offering"].enabled({"Offering": False}))
         self.assertTrue(DEFS["daily_alliance_donation"].enabled({"Alliance Donation": 4}))
         self.assertFalse(DEFS["daily_alliance_donation"].enabled({"Alliance Donation": 0}))
-        self.assertTrue(DEFS["daily_buy_stamina"].enabled({"General": {"buy_stamina": True, "stamina_quantity": 10}}))
-        self.assertFalse(DEFS["daily_buy_stamina"].enabled({"General": {"buy_stamina": True, "stamina_quantity": 0}}))
-        self.assertTrue(DEFS["daily_buy_hammers"].enabled({"General": {"buy_all_hammers": True}}))
+        buy = DEFS["daily_buy_general"].enabled
+        self.assertTrue(buy({"General": {"buy_stamina": True, "stamina_quantity": 10}}))
+        self.assertFalse(buy({"General": {"buy_stamina": True, "stamina_quantity": 0}}))
+        self.assertTrue(buy({"General": {"buy_all_hammers": True}}))
+        self.assertFalse(buy({"General": {}}))
         self.assertFalse(DEFS["daily_rewards"].enabled({"Alliance Donation": 4}))   # chỉ có việc theo giờ
         self.assertTrue(DEFS["daily_rewards"].enabled({"Offering": True}))
 
@@ -113,9 +115,9 @@ class DailyTaskTests(unittest.TestCase):
         bot = FakeBot()
         daily.record_result(bot, task.key, task.label, TaskResult(done=True, reached=6))
         bot.daily_keys = lambda: list(bot.done)
-        self.assertTrue(daily.is_complete(bot, task, {"Offer Gems": 6}))
-        self.assertFalse(daily.is_complete(bot, task, {"Offer Gems": 10}))
-        self.assertTrue(daily.is_complete(bot, task, {"Offer Gems": 5}))
+        self.assertTrue(daily.daily_complete(bot, task, {"Offer Gems": 6}))
+        self.assertFalse(daily.daily_complete(bot, task, {"Offer Gems": 10}))
+        self.assertTrue(daily.daily_complete(bot, task, {"Offer Gems": 5}))
 
     def test_offering_target_zero_is_done_whatever_the_quantity(self):
         """Dòng Offer không còn Go (mục tiêu 0): xong hôm nay dù đang chọn 30 lượt."""
@@ -124,7 +126,7 @@ class DailyTaskTests(unittest.TestCase):
         daily.record_result(bot, task.key, task.label, TaskResult(done=True, reached=0))
         bot.daily_keys = lambda: list(bot.done)
         self.assertEqual(set(bot.done), {"Offering", "daily_offering_reached_0"})
-        self.assertTrue(daily.is_complete(bot, task, {"Offer Gems": 30}))
+        self.assertTrue(daily.daily_complete(bot, task, {"Offer Gems": 30}))
 
 
 if __name__ == "__main__":

@@ -87,7 +87,7 @@ class DailyActivitiesTab(BaseTab):
         general_grid = QGridLayout(general)
         # Buy Stamina: 0 = không mua.
         self.stamina_quantity = QComboBox()
-        self.stamina_quantity.addItems(["0", "10", "20", "30"])
+        self.stamina_quantity.addItems(["0", "10", "16", "20"])
         self.stamina_quantity.setCurrentText("0")
         self.buy_hammers = QCheckBox("Buy Hammer")
         general_grid.addWidget(QLabel("Buy Stamina"), 0, 0)

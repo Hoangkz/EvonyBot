@@ -21,8 +21,8 @@ from PIL import Image
 from bot.activities.event import city_building, constants as event_constants
 from bot.activities.result import take_all
 from bot.context import TEMPLATE_DIR, BotContext, StopRequested, TimedOut
-from bot.worker.daily.policy import record_result
-from bot.worker.event.policy import record_outcome
+from bot.worker.policies import record_result
+from bot.worker.policies import record_outcome
 
 TAP_THRESHOLD = 0.8     # điểm khớp tối thiểu để coi template có trên ảnh
 STUCK_SECONDS = 120     # giây giả tối đa cho mỗi bước trước khi coi là kẹt

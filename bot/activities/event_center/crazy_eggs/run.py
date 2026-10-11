@@ -13,7 +13,7 @@ lưu daily_done LUCKY_KEY. Rồi kết thúc.
 
 Trả TaskResult(done=True) khi cả 4 quả đã vỡ (4 nhãn "Activated"), hoặc rồi kết thúc khi không thấy tab Activities / icon Crazy Eggs sau ATTEMPTS lần thử và
 AFTER_RESTART_ATTEMPTS lần thử sau khi tắt / mở lại game (run_task_with_retry) cũng là done=True.
-Đã xong hôm nay chưa, hẹn đập lại sau mấy giờ: việc của worker (bot/worker/event_center/).
+Đã xong hôm nay chưa, hẹn đập lại sau mấy giờ: việc của worker (bot/worker/policies.py).
 
 Quả đã nhận hết vật phẩm thì vỡ: animation (cả màn tối, tiêu đề mờ -> bấm (50 %, 95 %) để bỏ
 qua), rồi popup thưởng thêm "Congratulations on activating the egg!" -> BACK; nhãn thành

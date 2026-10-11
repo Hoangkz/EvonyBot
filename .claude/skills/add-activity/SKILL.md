@@ -66,7 +66,7 @@ Quy tắc bắt buộc:
 - Tap theo offset từ góc trên-trái: truyền `top_left={ACTION}` cho `find_first`.
 - Giới hạn vùng tìm (nhanh + ít khớp nhầm): `regions={path: (x0, y0, x1, y1)}` theo % màn hình.
 - `return` bình thường = activity hoàn thành (worker bỏ khỏi pending). Activity có thể bị cắt giữa chừng (timeout 120 s / boss mới) và được gọi lại **từ đầu** → phải chạy lại được từ bất kỳ màn hình nào.
-- Việc làm 1 lần/ngày: activity KHÔNG tự ghi `daily_done`. `run` chỉ làm thao tác rồi trả `TaskResult` (`bot/activities/result.py`, VD `TaskResult(done=True)`). Khai báo `TaskDef` ở worker (`bot/worker/standalone.py` cho nhóm một nhiệm vụ, hoặc `bot/worker/<nhóm>/tasks.py` + `policy.py` cho nhóm nhiều nhiệm vụ), worker lưu "xong hôm nay", hẹn thử lại, bỏ qua việc đã xong và chọn việc nào chạy. Thêm key vào `bot/worker/priority.py`. `bot.is_daily_done` / `bot.mark_daily_done` chỉ dùng cho trí nhớ giữa các bước nhỏ của chính nhiệm vụ (VD đã patrol lượt thứ n).
+- Việc làm 1 lần/ngày: activity KHÔNG tự ghi `daily_done`. `run` chỉ làm thao tác rồi trả `TaskResult` (`bot/activities/result.py`, VD `TaskResult(done=True)`). Khai báo nhiệm vụ bằng MỘT DÒNG trong bảng `bot/worker/priority.py` (có `key`, `priority`, `policy` chọn luật chạy ở `bot/worker/policies.py`; luật mới thì thêm vào `policies.BUILDERS`); worker lưu "xong hôm nay", hẹn thử lại, bỏ qua việc đã xong và chọn việc nào chạy. `bot.is_daily_done` / `bot.mark_daily_done` chỉ dùng cho trí nhớ giữa các bước nhỏ của chính nhiệm vụ (VD đã patrol lượt thứ n).
 - Cần cấu hình tab khác: `bot.settings["<Tab Title>"]`.
 - Comment/docstring: tiếng Anh hoặc tiếng Việt như code xung quanh; docstring module ghi rõ "port of C# ..." nếu là port.
 

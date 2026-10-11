@@ -3,7 +3,7 @@ daily_activities — "Daily Activities" activity (bố cục giống activity Ev
 
 - run.py:       TASKS (thứ tự nhiệm vụ), HOURLY (việc theo giờ), mua General -> chỉ làm thao tác, trả TaskResult
                 (bot/activities/result.py). KHÔNG chọn việc / ghi "xong hôm nay" / hẹn thử lại: việc của worker
-                (bot/worker/daily/).
+                (bot/worker/policies.py).
 - common.py:    vòng lặp chung của một nhiệm vụ (run_task -> TaskResult), mở Activity, dòng Go, cuộn, nhận thưởng cuối
 - constants.py: thư mục ảnh, tên action, key daily_done dùng chung
 - general.py:   Buy Stamina / Buy All Hammers

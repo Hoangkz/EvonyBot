@@ -2,7 +2,7 @@
 run.py — nhiệm vụ của "Event" (Gather Troops, King's Path): chỉ làm thao tác trong game, trả TaskResult.
 
 Không có hàm run của cả activity và không có phần phân phối: nhiệm vụ nào được chọn (ô tích), bỏ qua nhiệm vụ đã xong /
-đã đạt mục tiêu / Day khoá, ghi kết quả, khi nào nhận thưởng event là việc của worker (bot/worker/event/). EVENTS liệt kê
+đã đạt mục tiêu / Day khoá, ghi kết quả, khi nào nhận thưởng event là việc của worker (bot/worker/policies.py). EVENTS liệt kê
 nhiệm vụ của từng event theo thứ tự; perform_task chạy một nhiệm vụ, claim_event nhận thưởng của một event (claim.py).
 
 Mỗi nhiệm vụ là một file riêng (gather_troops/..., kings_path/...) với hàm `run(bot, task, state)`; phần đi từ màn

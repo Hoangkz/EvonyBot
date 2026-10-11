@@ -10,7 +10,7 @@ Luồng mới (donate_free, worker gọi theo giờ — ô chọn 0 / 1h / 2h / 
 3. Bấm "Donate" thẻ khoa học trên cùng tới khi hết lượt miễn phí (nút thành kim cương / hộp xác nhận kim
    cương -> Back). Không mua lượt bằng kim cương. Không donate được lần nào -> dừng (lần sau thử lại).
 4. Có donate -> Back, kiểm tra dòng Activity lần nữa: xong -> TaskResult(done=True).
-Giờ thử, khoảng cách giữa các lần thử: việc của worker (bot/worker/daily/).
+Giờ thử, khoảng cách giữa các lần thử: việc của worker (bot/worker/policies.py).
 """
 from ...event.kings_path.donate.alliance import _open_science
 from ...event.kings_path.donate.constants import DONATE_WAIT, MAX_MISSES

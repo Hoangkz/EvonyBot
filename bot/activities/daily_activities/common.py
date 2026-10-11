@@ -654,7 +654,7 @@ def _same_list(before, after) -> bool:
     return float(cv2.matchTemplate(a, b, cv2.TM_CCOEFF_NORMED).max()) >= LIST_END_SAME
 
 
-# ---- Báo xong hôm nay (worker ghi lại, xem bot/worker/daily/) --------------------------------------
+# ---- Báo xong hôm nay (worker ghi lại, xem bot/worker/policies.py) --------------------------------------
 def mark_task_done(bot, task: Task, target: int = 0):
     """Luồng bên trong báo nhiệm vụ đã xong hôm nay, kèm mục tiêu `target` (result.done). Không ghi gì vào DB."""
     return done(bot, target, label=task.label, key=task.key)

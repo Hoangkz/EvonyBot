@@ -2,7 +2,7 @@
 bot_worker.py — BotWorker: chạy các nhiệm vụ của một thiết bị trên QThread riêng, tới khi Stop.
 
 Thứ tự ưu tiên: Bubble > Auto Times Out > Join Boss > nhiệm vụ (scheduler.py, độ ưu tiên trong priority.py).
-- Bubble: lo trước mọi lần chạy (_with_bubble); tới hạn thì ngắt mọi thứ đang chạy (BubbleDue).
+- Bubble: lo trước mọi lần chạy (guards.py); tới hạn thì ngắt mọi thứ đang chạy (BubbleDue).
 - Auto Times Out (số phút chọn ở màn Home, chung mọi thiết bị): lo ngay sau bubble; chạy đủ số phút kể từ
   lần đóng game trước thì ngắt mọi thứ đang chạy (RestartDue) và đóng game; nhiệm vụ đang dở làm lại.
 - Có chọn Join Boss: mỗi vòng chạy Join Boss (rảnh thì nhường), rồi 1 nhiệm vụ tối đa OTHERS_WINDOW
@@ -23,16 +23,18 @@ import threading
 import time
 import traceback
 from datetime import datetime
+from types import SimpleNamespace
 
 from PyQt5.QtCore import QThread, pyqtSignal
 
 from ..activities import ACTIVITIES
 from .registry import REGISTRY
 from ..activities.join_monster_war import IDLE as BOSS_IDLE
-from ..common import GAME_PACKAGE, NotEnoughGems, get_server, keep_bubble
+from ..common import get_server
 from ..daily_reset import done_today, last_reset
 from ..context import BotContext, BotInterrupted, TimedOut
-from ..context.errors import BossAvailable, BubbleDue, RestartDue, StopRequested, YieldToBoss
+from ..context.errors import BossAvailable, StopRequested, YieldToBoss
+from .guards import Guards
 from .scheduler import Scheduler
 from .server_clock import ServerClock
 from .tasks import build_tasks, load_must_finish, load_priorities
@@ -41,11 +43,6 @@ from .status import STATUS_ERROR, STATUS_RUNNING, STATUS_STOPPED
 JOIN_BOSS = "Join Monster War"
 OTHERS_WINDOW = 120   # giây tối đa cho 1 nhiệm vụ khi có Join Boss (không có Join Boss: không giới hạn)
 IDLE_WAIT = 5         # giây nghỉ khi không còn nhiệm vụ nào tới lượt
-BUBBLE = "Bubble"
-BUBBLE_RENEW_BEFORE = 7200   # bubble còn <= 2 tiếng -> dùng bubble mới
-BUBBLE_RETRY = 300           # đọc / dùng bubble không được -> 5 phút sau thử lại
-AUTO_RESTART = "Auto Times Out"
-RESTART_WAIT = 3             # giây chờ sau khi đóng game
 
 
 def _print_safe(message: str):
@@ -64,14 +61,6 @@ def _print_safe(message: str):
     except (OSError, ValueError):
         # Console đã đóng / stream không còn hợp lệ: log UI vẫn tiếp tục hoạt động.
         pass
-
-
-def _seconds_until(iso) -> float | None:
-    """Số giây từ bây giờ tới thời điểm ISO (giờ máy); None nếu rỗng / sai định dạng."""
-    try:
-        return (datetime.fromisoformat(iso) - datetime.now()).total_seconds()
-    except (TypeError, ValueError):
-        return None
 
 
 def _describe_error(e: Exception, activity: str | None) -> str:
@@ -116,24 +105,15 @@ class BotWorker(QThread):
         self.server_clock = server_clock if server_clock is not None else ServerClock()
         # {task: done_at} lấy từ DB; task chỉ tính là xong nếu done_at sau mốc reset gần nhất.
         self.daily_done = dict(daily_done or {})
-        # Bubble: tích ở tab Initialization -> luôn giữ bubble, ưu tiên hơn mọi activity.
-        init = settings.get("Initialization", {})
-        self.bubble_enabled = bool(init.get("bubble"))
-        self.bubble_type = init.get("bubble_type") or "24h"
-        self._bubble_expiry = None       # time.monotonic() lúc bubble hết; None = chưa biết
-        self._bubble_next_check = 0.0    # time.monotonic() lần xử lý bubble tiếp theo
-        # Đang chạy nhiệm vụ must_finish: hoãn bubble / Auto Times Out tới khi xong.
-        self._hold_interrupts = False
-        # Auto Times Out: hàm trả số phút chọn ở màn Home (đọc lại mỗi lần, đổi là dùng ngay; 0 = tắt),
-        # tính từ lúc bot bắt đầu / lần đóng game gần nhất.
-        self._auto_timeout = auto_timeout or (lambda: 0)
-        self._last_restart = time.monotonic()
-        # Thời điểm bubble hết đã lưu trong DB: còn hơn 2 tiếng thì không vào game
-        # kiểm tra, hẹn lúc còn 2 tiếng.
-        left = _seconds_until(init.get("bubble_until"))
-        if left is not None and left > 0:
-            self._bubble_expiry = time.monotonic() + left
-            self._bubble_next_check = self._bubble_expiry - BUBBLE_RENEW_BEFORE
+        # Bubble + Auto Times Out (guards.py): ưu tiên hơn mọi nhiệm vụ. Auto Times Out: hàm trả số phút chọn ở màn Home
+        # (đọc lại mỗi lần, đổi là dùng ngay; 0 = tắt).
+        self.guards = Guards(
+            lambda: self.ctx, settings.get("Initialization", {}), auto_timeout or (lambda: 0),
+            SimpleNamespace(
+                found=lambda seconds: self.bubble_found.emit(self.serial, seconds),
+                disabled=self._on_bubble_disabled,
+                activity=lambda label: self.activity_changed.emit(self.serial, label),
+                log=self.log, record=self.record))
 
     def stop(self):
         # Chỉ yêu cầu dừng; activity phải kiểm tra cờ, không cưỡng chế tắt thread.
@@ -213,7 +193,7 @@ class BotWorker(QThread):
             task = resume if resume is not None and scheduler.is_due(resume) else scheduler.pick()
             resume = None
             if task is None:
-                self._with_bubble(None, self.ctx.sleep, IDLE_WAIT)
+                self.guards.call(None, self.ctx.sleep, IDLE_WAIT)
                 continue
             if not self._run_task(scheduler, task, boss):
                 resume = task
@@ -239,11 +219,10 @@ class BotWorker(QThread):
             self.ctx._boss_interrupt_enabled = True
         try:
             # Lo bubble trước (không có Join Boss thì không có bước nào khác lo), rồi xét Stop / boss mới.
-            self._with_bubble(None, self.ctx.check)
+            self.guards.call(None, self.ctx.check)
             if task.must_finish:
                 # Bubble / Auto Times Out vừa lo xong -> hoãn tới khi nhiệm vụ xong.
-                self._hold_interrupts = True
-                self.ctx._bubble_due_at = self.ctx._restart_due_at = None
+                self.guards.hold()
             self.activity_changed.emit(self.serial, task.group)
             scheduler.started(task)
             self.record(f"Bắt đầu: {task.key}")
@@ -266,7 +245,7 @@ class BotWorker(QThread):
             raise
         # Luôn gỡ deadline, kể cả khi Stop/lỗi, để không ảnh hưởng lượt chạy boss.
         finally:
-            self._hold_interrupts = False
+            self.guards.release()
             self.ctx._boss_interrupt_enabled = False
             self.ctx._deadline = None
 
@@ -282,7 +261,7 @@ class BotWorker(QThread):
             return
         self.activity_changed.emit(self.serial, "Get Server")
         # Đọc server trong game; nếu chưa đọc được, lần gọi sau sẽ thử lại.
-        server = self._with_bubble("Get Server", get_server, self.ctx)
+        server = self.guards.call("Get Server", get_server, self.ctx)
         if server:
             self.server = server
             self.record(f"Đọc được server: {server}")
@@ -290,106 +269,10 @@ class BotWorker(QThread):
             # Gửi server cho UI xử lý/lưu; worker chỉ cập nhật self.server.
             self.server_found.emit(self.serial, server)
 
-    def _with_bubble(self, label, fn, *args):
-        """Gọi fn sau khi lo xong bubble rồi Auto Times Out. Tới hạn giữa chừng (BubbleDue / RestartDue)
-        -> xử lý rồi gọi lại fn từ đầu."""
-        while True:
-            acted = self._ensure_bubble()
-            acted = self._ensure_restart() or acted
-            if acted and label:
-                self.activity_changed.emit(self.serial, label)
-            try:
-                return fn(*args)
-            except BubbleDue:
-                self.log(f"Bubble tới hạn; xử lý bubble rồi làm lại {label or 'bước đang dở'}")
-            except RestartDue:
-                self.log(f"Tới giờ Auto Times Out; đóng game rồi làm lại {label or 'bước đang dở'}")
-
-    def _ensure_bubble(self) -> bool:
-        """Có tích Bubble: chưa biết thời gian -> đi lấy; còn <= 2 tiếng -> dùng
-        bubble mới. Rồi hẹn ctx ngắt activity đúng lúc cần xử lý lần sau.
-        Trả về True nếu vừa thao tác trong game (màn hình đã đổi)."""
-        if not self.bubble_enabled:
-            return False
-        ctx = self.ctx
-        if self._hold_interrupts:
-            ctx._bubble_due_at = None
-            return False
-        if time.monotonic() < self._bubble_next_check:
-            ctx._bubble_due_at = self._bubble_next_check
-            return False
-
-        # Bước bubble không bị boss / deadline 120 giây / Auto Times Out cắt ngang; khôi phục sau đó
-        # (_ensure_restart chạy ngay sau sẽ hẹn lại Auto Times Out).
-        saved = (ctx._deadline, ctx._boss_interrupt_enabled)
-        ctx._deadline, ctx._boss_interrupt_enabled, ctx._bubble_due_at = None, False, None
-        ctx._restart_due_at = None
-        try:
-            self.activity_changed.emit(self.serial, BUBBLE)
-            # Vào game đọc lại cả khi đã biết: có thể bubble đã được gia hạn tay.
-            try:
-                remaining = keep_bubble(ctx, self.bubble_type, BUBBLE_RENEW_BEFORE)
-            except NotEnoughGems:
-                # Không mua được thì thôi giữ bubble: bỏ tích ở UI, không thử lại nữa.
-                self.record(f"Bubble: không đủ kim cương mua {self.bubble_type}, bỏ tích Bubble")
-                self.bubble_enabled = False
-                self.settings.setdefault("Initialization", {})["bubble"] = False
-                self.bubble_disabled.emit(self.serial)
-                return True
-            if remaining is None:
-                self.log("Bubble: không đọc được thời gian, sẽ thử lại sau")
-            else:
-                self._set_bubble_remaining(remaining)
-                if remaining <= BUBBLE_RENEW_BEFORE:
-                    self.log(f"Bubble: chưa dùng được bubble {self.bubble_type}, sẽ thử lại sau")
-        finally:
-            ctx._deadline, ctx._boss_interrupt_enabled = saved
-            # Còn > 2 tiếng -> hẹn lúc còn đúng 2 tiếng; không thì thử lại sau BUBBLE_RETRY.
-            if self._bubble_expiry is not None and self._bubble_left() > BUBBLE_RENEW_BEFORE:
-                self._bubble_next_check = self._bubble_expiry - BUBBLE_RENEW_BEFORE
-            else:
-                self._bubble_next_check = time.monotonic() + BUBBLE_RETRY
-            # Đã bỏ tích (không đủ kim cương) thì không hẹn nữa.
-            ctx._bubble_due_at = self._bubble_next_check if self.bubble_enabled else None
-        return True
-
-    def _ensure_restart(self) -> bool:
-        """Auto Times Out (phút, màn Home; 0 = tắt): chạy đủ số phút kể từ lần đóng game trước -> đóng game
-        (bot đang chạy tự mở lại qua go_home). Chưa tới giờ thì hẹn ctx ngắt activity đúng lúc.
-        Trả về True nếu vừa đóng game (màn hình đã đổi)."""
-        ctx = self.ctx
-        minutes = self._auto_timeout()
-        if self._hold_interrupts or minutes <= 0:
-            ctx._restart_due_at = None
-            return False
-        due = self._last_restart + minutes * 60
-        if time.monotonic() < due:
-            ctx._restart_due_at = due
-            return False
-
-        # Bước đóng game không bị boss / deadline 120 giây / bubble cắt ngang; khôi phục sau đó.
-        saved = (ctx._deadline, ctx._boss_interrupt_enabled, ctx._bubble_due_at)
-        ctx._deadline, ctx._boss_interrupt_enabled = None, False
-        ctx._bubble_due_at = ctx._restart_due_at = None
-        try:
-            self.activity_changed.emit(self.serial, AUTO_RESTART)
-            self.record(f"Auto Times Out: đã chạy {minutes} phút, đóng game")
-            # Chỉ đóng game; activity chạy sau thấy launcher thì tự mở lại (go_home).
-            ctx.shell(f"am force-stop {GAME_PACKAGE}")
-            ctx.sleep(RESTART_WAIT)
-        finally:
-            ctx._deadline, ctx._boss_interrupt_enabled, ctx._bubble_due_at = saved
-            self._last_restart = time.monotonic()
-            ctx._restart_due_at = self._last_restart + minutes * 60
-        return True
-
-    def _bubble_left(self) -> float:
-        return self._bubble_expiry - time.monotonic()
-
-    def _set_bubble_remaining(self, seconds: float):
-        seconds = max(0, seconds)
-        self._bubble_expiry = time.monotonic() + seconds
-        self.bubble_found.emit(self.serial, int(seconds))
+    def _on_bubble_disabled(self):
+        """Không đủ kim cương: bỏ tích Bubble ở cấu hình và báo UI bỏ tích."""
+        self.settings.setdefault("Initialization", {})["bubble"] = False
+        self.bubble_disabled.emit(self.serial)
 
     def _is_daily_done(self, task: str) -> bool:
         return done_today(self.daily_done.get(task), self.server_time)
@@ -419,7 +302,7 @@ class BotWorker(QThread):
         """Chạy thẳng hàm run riêng của nhiệm vụ (không qua hàm run của activity). Bubble được lo trước; tới hạn
         giữa chừng thì nhiệm vụ làm lại từ đầu."""
         self._current = task.key
-        return self._with_bubble(task.key, task.run, self.ctx, self.settings.get(task.group, {}))
+        return self.guards.call(task.key, task.run, self.ctx, self.settings.get(task.group, {}))
 
     def _run_activity(self, activity: str, tab_settings: dict):
         self._current = activity
@@ -432,7 +315,7 @@ class BotWorker(QThread):
             return None
         # Trả nguyên kết quả; để exception truyền lên cấp điều phối xử lý.
         # Bubble được lo trước; tới hạn giữa chừng thì activity làm lại từ đầu.
-        return self._with_bubble(activity, run, self.ctx, tab_settings)
+        return self.guards.call(activity, run, self.ctx, tab_settings)
 
     def log(self, message: str):
         # Gắn serial vào log để phân biệt các thiết bị; gửi thêm lên tab Logs của thiết bị.

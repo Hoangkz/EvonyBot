@@ -2,7 +2,7 @@
 claim.py — nhận thưởng của một event (Gather Troops, King's Path) theo chấm đỏ.
 
 Chỉ làm thao tác nhận thưởng. Khi nào nhận (event có ít nhất 1 nhiệm vụ xong hôm nay, mỗi khi số nhiệm vụ xong tăng lên,
-đánh dấu `<event>_claimed_<số nhiệm vụ xong>`) là việc của worker (bot/worker/event/policy.py maybe_claim).
+đánh dấu `<event>_claimed_<số nhiệm vụ xong>`) là việc của worker (bot/worker/policies.py maybe_claim).
 
 Đang ở sẵn bảng event đó (thấy tiêu đề, VD nhiệm vụ cuối vừa xong ngay trên bảng) thì nhận luôn
 tại chỗ; không thì mở event bằng run_task (màn chính -> Event Center -> danh sách -> icon).

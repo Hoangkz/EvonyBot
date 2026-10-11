@@ -11,7 +11,7 @@ from unittest import mock
 from bot.worker.registry import REGISTRY, TaskDef
 from bot.context import BotContext
 from bot.context.errors import StopRequested
-from bot.worker import bot_worker
+from bot.worker import bot_worker, guards
 from bot.worker.bot_worker import BOSS_IDLE, JOIN_BOSS, BotWorker
 from bot.worker.scheduler import Scheduler
 from bot.worker.server_clock import ServerClock
@@ -161,7 +161,7 @@ class RealRegistryTests(unittest.TestCase):
                                          "Alliance Donation": 4, "Alliance Help": 0}}
         tasks = self.build(["Daily Activities", "Open Gift Box"], settings)
         ordered = [t.key for t in sorted(tasks, key=lambda t: -t.priority)]
-        self.assertEqual(ordered, ["crazy_eggs", "open_gift_box", "daily_buy_stamina", "daily_offering",
+        self.assertEqual(ordered, ["crazy_eggs", "open_gift_box", "daily_buy_general", "daily_offering",
                                    "daily_gold_levy", "daily_alliance_donation", "daily_patrol", "daily_rewards"])
         by_key = {t.key: t for t in tasks}
         self.assertTrue(by_key["crazy_eggs"].repeat)
@@ -187,8 +187,23 @@ class RealRegistryTests(unittest.TestCase):
         from bot.activities.event_center import crazy_eggs  # noqa: F401
         tasks = {t.key: t for t in self.build(["Open Gift Box", "Alliance Capacity"], {})}
         from bot.activities import ACTIVITIES
-        self.assertIs(tasks["open_gift_box"].run, ACTIVITIES["Open Gift Box"])
+        self.assertIsNot(tasks["open_gift_box"].run, ACTIVITIES["Open Gift Box"])   # worker bọc: lưu "xong hôm nay"
         self.assertIs(tasks["alliance_capacity"].run, ACTIVITIES["Alliance Capacity"])
+
+    def test_every_policy_row_builds_and_names_a_known_policy(self):
+        from bot.worker.policies import BUILDERS
+        from bot.worker.priority import DATA
+        rows = [(g, e) for g, v in DATA.items() if isinstance(v, list) for e in v]
+        self.assertTrue(all(e["policy"] in BUILDERS for _, e in rows if "policy" in e))
+        self.assertEqual(len(REGISTRY), sum(1 for _, e in rows if "policy" in e))
+
+    def test_event_and_daily_catalogs_match_priority_rows(self):
+        """Mọi nhiệm vụ trong danh mục của activity (TASKS / HOURLY / EVENTS) có một dòng `policy` ở priority.py."""
+        from bot.activities.daily_activities.run import HOURLY, TASKS
+        from bot.activities.event.run import EVENTS
+        keys = {d.key for d in REGISTRY}
+        wanted = {t.key for t in TASKS} | {t.key for t, _ in HOURLY} | {k for *_, ts in EVENTS for k, _ in ts}
+        self.assertEqual(sorted(wanted - keys), [])
 
     def test_real_priority_file_loads(self):
         self.assertIn("Crazy Eggs", load_priorities())
@@ -312,8 +327,8 @@ class WorkerLoopTests(unittest.TestCase):
             worker._stop.set()
 
         worker = self.make_worker(["G"], [("a", 1, run)])
-        self.assertFalse(worker.bubble_enabled)
-        with mock.patch.object(bot_worker, "keep_bubble") as keep:
+        self.assertFalse(worker.guards.bubble.enabled)
+        with mock.patch.object(guards, "keep_bubble") as keep:
             self.run_until_stop(worker)
         keep.assert_not_called()
 

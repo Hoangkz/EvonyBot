@@ -4,7 +4,7 @@ Tài liệu mô tả code hiện tại trong [run.py](run.py), [constants.py](co
 
 ## 1. Điểm vào
 
-`run(bot, settings)` là nhiệm vụ của Event Center. **Không phải activity** (không có trong `ACTIVITIES`): worker gọi nó (`bot/worker/event_center/tasks.py` `run_crazy_eggs`, nhóm Daily Activities, mục General), ô chọn 0 / 1h / 2h / 3h / 4h (mặc định 2h) ở tab Daily Activities, khoá `settings["General"]["crazy_eggs_hours"]`. Chưa đủ 4 quả vỡ thì đập lại sau chừng đó giờ; đủ 4 nhãn "Activated" (`activated.png`) thì `run` trả `done=True` và worker đánh dấu `crazy_eggs_done`. `settings` hiện chưa dùng.
+`run(bot, settings)` là nhiệm vụ của Event Center. **Không phải activity** (không có trong `ACTIVITIES`): worker gọi nó (`bot/worker/policies.py` `run_crazy_eggs`, nhóm Daily Activities, mục General), ô chọn 0 / 1h / 2h / 3h / 4h (mặc định 2h) ở tab Daily Activities, khoá `settings["General"]["crazy_eggs_hours"]`. Chưa đủ 4 quả vỡ thì đập lại sau chừng đó giờ; đủ 4 nhãn "Activated" (`activated.png`) thì `run` trả `done=True` và worker đánh dấu `crazy_eggs_done`. `settings` hiện chưa dùng.
 
 Dùng `bot.is_daily_done` / `bot.mark_daily_done` với 2 key:
 

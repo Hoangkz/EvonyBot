@@ -6,8 +6,8 @@ import cv2
 import numpy as np
 
 from bot.activities import gift_claims
-from bot.worker.daily import gifts
-from bot.worker.daily.gifts import run_gift_claims
+from bot.worker import gifts
+from bot.worker.gifts import run_gift_claims
 from bot.activities.gift_claims import (empire_depot, limited_offer, login_gifts,
                                         super_value_return, valuable_event)
 from bot.activities.gift_claims import lobby

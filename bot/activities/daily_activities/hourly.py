@@ -1,6 +1,6 @@
 """
 hourly.py — khung chung của các nhiệm vụ Daily chạy theo giờ: Alliance Donation, Alliance Help. Khi nào thử, cách nhau
-bao lâu, ghi giờ thử: việc của worker (bot/worker/daily/); ở đây chỉ có một lần thử.
+bao lâu, ghi giờ thử: việc của worker (bot/worker/policies.py); ở đây chỉ có một lần thử.
 
 Một lần thử (try_task):
 1. Kiểm tra trước: mở danh sách Activity, xem dòng / thẻ của nhiệm vụ (open_task tap_go=False, không bấm Go).

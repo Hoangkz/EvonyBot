@@ -18,7 +18,7 @@ from bot.activities.daily_activities.alliance_donation.constants import KEY, LAB
 from bot.activities.daily_activities.alliance_donation.run import donate_free
 from bot.activities.daily_activities.constants import MAIN_MORE, OLD_MENU_ACTIVITY
 from bot.activities.event.kings_path.donate.constants import DONATE_BUTTON_2
-from bot.worker.daily.policy import record_result
+from bot.worker.policies import record_result
 from tests.daily_activities import SCROLL
 from tests.flow import Step, back, end, run_flow, swipe, tap, tap_at
 

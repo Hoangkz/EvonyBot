@@ -5,7 +5,7 @@ from unittest import mock
 import numpy as np
 
 from bot.activities.result import TaskResult
-from bot.worker.daily import policy
+from bot.worker import policies as policy
 from ui.tabs.daily_activities_tab import SUPPORTED_TASKS
 
 _PKG = "bot.activities.daily_activities"
@@ -93,7 +93,7 @@ class DailyGoTests(unittest.TestCase):
         self.assertEqual(sorted(key for key, _ in SUPPORTED_TASKS),
                          sorted(task.label for task in daily.TASKS))
 
-    @mock.patch("bot.worker.daily.policy.run_task")
+    @mock.patch("bot.worker.policies.run_task")
     def test_monster_not_finished_is_retried_later(self, run_task):
         """Monster Killing là một nhiệm vụ riêng: đánh 2 lần rồi hoãn (chưa xong) -> hẹn thử lại (ctx.again_after,
         ưu tiên thấp nhất nên chạy sau các nhiệm vụ khác); lần sau đánh nốt thì lưu xong, không hẹn nữa."""

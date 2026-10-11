@@ -1,5 +1,5 @@
 """
-Test nhận thưởng theo chấm đỏ + rương mốc (bot/activities/event/claim.py; khi nào nhận: bot/worker/event/policy.py), chạy sau khi xong
+Test nhận thưởng theo chấm đỏ + rương mốc (bot/activities/event/claim.py; khi nào nhận: bot/worker/policies.py), chạy sau khi xong
 các nhiệm vụ của một event. Ảnh King's Path dùng chung tests/event/kings_path/screens/; ảnh
 Gather Troops / rương mốc ở tests/event/claim_screens/ (396x704).
 """
@@ -11,8 +11,8 @@ import cv2
 
 from bot.activities import event
 from bot.activities.event.claim import red_dots
-from bot.worker.event import policy as event_policy
-from bot.worker.event.policy import claim_key
+from bot.worker import policies as event_policy
+from bot.worker.policies import claim_key
 from bot.activities.event.constants import CLAIM_ALL, DOT_DAY_Y, DOT_TAB_Y, GATHER_CHESTS, KINGS_PATH_ICON
 from bot.activities.event.gather_troops import cultivate_generals
 from bot.activities.event.kings_path import wheel

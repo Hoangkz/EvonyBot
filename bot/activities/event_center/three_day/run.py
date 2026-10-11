@@ -13,7 +13,7 @@ event (tab nhiệm vụ đang chọn, tab Redeem):
    Đổi quà: nhớ vị trí hàng của từng quà, cuộn thẳng tới đó (không cuộn về đầu mỗi quà).
 3. Mọi thứ xong -> trả TaskResult(done=True) (worker lưu DONE_KEY: các lần sau trong ngày không vào game). Không
    thấy tab / icon event (hết event) cũng done=True. Event có bật không (group 3-Day Event, tab Event) và hôm nay đã
-   xong chưa: việc của worker (bot/worker/event_center/).
+   xong chưa: việc của worker (bot/worker/policies.py).
 """
 from types import SimpleNamespace
 

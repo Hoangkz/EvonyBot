@@ -44,14 +44,14 @@ Server ban đầu lấy từ `settings["Initialization"]["server"]`. Nếu chưa
 ## 3. Vòng lặp nhiệm vụ: `_run_tasks()`
 
 Worker chạy theo **nhiệm vụ**, không theo activity. Activity (nút Select Activity, tab cấu hình) chỉ dùng để chia
-loại. Nhiệm vụ khai báo bằng `TaskDef` (xem [task_def.py](task_def.py)). **Daily Activities, Event và
-Event Center khai báo ngay ở worker**: [daily/](daily/), [event/](event/), [event_center/](event_center/) (Crazy Eggs,
-event 3 ngày), mỗi nơi có `tasks.py` (danh sách, ô tích) và `policy.py` (luật chạy: chọn việc, bỏ qua việc đã xong / đạt
-mục tiêu / Day khoá, ghi "xong hôm nay", hẹn thử lại, khoảng giờ của việc theo giờ, nhận thưởng cuối / thưởng event).
-Các thư mục `bot/activities/daily_activities/`, `event/`, `event_center/` chỉ làm thao tác trong game rồi trả
-`TaskResult` ([result.py](../activities/result.py)). Nhóm chỉ có một nhiệm vụ (Alliance Capacity, Open Gift Box, Black Market, Battlefield Shop) khai báo ở
-[standalone.py](standalone.py). [registry.py](registry.py) chỉ gom các danh sách
-đó (thêm nhiệm vụ mới vào nhóm đã có thì không sửa registry.py). Khi bấm Start, `build_tasks` ([tasks.py](tasks.py)) lấy mọi nhiệm vụ trong registry có nhóm (activity)
+loại. **Mọi nhiệm vụ nằm trong bảng [priority.py](priority.py)**: mỗi dòng có `key`, `priority`, `must_finish?` và `policy`
+(luật chạy ở [policies.py](policies.py): `daily`, `hourly`, `buy_general`, `rewards`, `event`, `event_claim`,
+`crazy_eggs`, `three_day`, `open_gift_box`, `plain`). [registry.py](registry.py) dựng `TaskDef` ([task_def.py](task_def.py)) từ
+các dòng có `policy`; dòng không có `policy` (Bubble, Join Monster War, gift_*, việc chưa làm) không vào bộ chọn. Luật chạy
+quyết định chọn việc (ô tích), bỏ qua việc đã xong / đạt mục tiêu / Day khoá, ghi "xong hôm nay", hẹn thử lại, khoảng giờ,
+nhận thưởng cuối ([gifts.py](gifts.py)) và thưởng event. Các thư mục `bot/activities/...` chỉ làm thao tác trong game rồi trả
+`TaskResult` ([result.py](../activities/result.py)). Thêm nhiệm vụ mới = thêm hàm làm việc ở activity và một dòng ở priority.py.
+Khi bấm Start, `build_tasks` ([tasks.py](tasks.py)) lấy mọi nhiệm vụ trong registry có nhóm (activity)
 được chọn và đã được tích ở tab cấu hình (`TaskDef.enabled(cấu hình tab)`), gắn độ ưu tiên của chính nhiệm vụ đó ([priority.py](priority.py), số lớn hơn làm
 trước; ưu tiên < 0 không vào danh sách). Mỗi nhiệm vụ mang theo hàm `run` riêng (`Task.run`); worker gọi thẳng hàm đó
 (`BotWorker._run_one`), không đi qua hàm `run` của activity. Bộ chọn [scheduler.py](scheduler.py) lấy nhiệm vụ tới lượt
@@ -106,17 +106,19 @@ flowchart TD
 - **Hẹn chạy lại**: activity gán `ctx.again_after` (giây) trước khi return (VD Daily Activities: Alliance Donation
   chưa xong, chờ lượt free hồi) → `scheduler.finished(task, again_after=...)`: tới giờ hẹn thì nhiệm vụ lại tới lượt
   dù chưa qua mốc reset, với độ ưu tiên `AGAIN_PRIORITY` (-1000: chỉ chạy khi không còn nhiệm vụ nào khác tới lượt).
-- **Không còn nhiệm vụ tới lượt**: nghỉ `IDLE_WAIT` = 5 giây (qua `_with_bubble`) rồi xét lại; có Join Boss thì mỗi vòng
+- **Không còn nhiệm vụ tới lượt**: nghỉ `IDLE_WAIT` = 5 giây (qua `guards.call`) rồi xét lại; có Join Boss thì mỗi vòng
   vẫn kiểm tra boss. **Thread vẫn sống tới khi Stop**, kể cả khi không chọn Join Boss.
 - **Không chọn Join Boss: không có luật 120 giây** (không deadline, không ngắt bởi boss mới).
-- **Không tích Bubble: không có luật Bubble** (`_ensure_bubble` không làm gì, không hẹn `BubbleDue`).
+- **Không tích Bubble: không có luật Bubble** (`BubbleGuard.ensure` không làm gì, không hẹn `BubbleDue`).
 - Join Boss trả về khác IDLE (dừng hẳn, VD hết thể lực và không cho dùng vật phẩm): không gọi lại Join Boss, vẫn chạy
   các nhiệm vụ.
-- Trước mỗi nhiệm vụ: `_with_bubble(None, ctx.check)` — lo bubble trước (không có Join Boss thì không có bước nào khác
+- Trước mỗi nhiệm vụ: `guards.call(None, ctx.check)` — lo bubble trước (không có Join Boss thì không có bước nào khác
   lo), rồi xét Stop / boss mới.
 - Tên activity không tồn tại trong ACTIVITIES: ghi log, chờ 1 giây qua `ctx.sleep()`, coi như xong.
 
 ## 3b. Bubble (khiên): ưu tiên hơn mọi activity
+
+Bubble và Auto Times Out nằm trong [guards.py](guards.py) (`BubbleGuard`, `RestartGuard`, bọc bởi `Guards`), tách khỏi `BotWorker`. `BotWorker` chỉ gọi `guards.call(nhãn, hàm, ...)`, `guards.hold()` / `release()` (nhiệm vụ `must_finish`) và cung cấp hook UI (`bubble_found`, `bubble_disabled`, `activity_changed`).
 
 Bật khi tích **Bubble** ở tab Initialization (`settings["Initialization"]["bubble"]`), loại dùng lấy từ ô select (`bubble_type`: 8h / 24h / 3d / 7d, mặc định 24h). Thao tác trong game là `keep_bubble()` ở [bot/common/bubble.py](bot/common/bubble.py), làm trong một lần vào game:
 
@@ -142,7 +144,7 @@ flowchart TD
 
 - Hẹn lần sau: bubble còn hơn 2 tiếng thì hẹn đúng lúc còn 2 tiếng; đọc hoặc dùng không được thì 5 phút sau thử lại (`BUBBLE_RETRY`), không đọc lại trước từng activity.
 - Tới hẹn, `ctx.check()` ném `BubbleDue` ở bất kỳ activity nào, kể cả Join Boss. Thứ tự ưu tiên: Stop → Bubble → thông báo boss → timeout.
-- `_with_bubble()` bắt `BubbleDue`, xử lý bubble rồi gọi lại activity từ đầu (giống khi timeout). Bước bubble không bị deadline 120 giây hoặc thông báo boss cắt ngang.
+- `Guards.call()` ([guards.py](guards.py)) bắt `BubbleDue`, xử lý bubble rồi gọi lại activity từ đầu (giống khi timeout). Bước bubble không bị deadline 120 giây hoặc thông báo boss cắt ngang.
 - Mỗi lần biết thời gian, worker phát `bubble_found(serial, giây)`; main lưu thời điểm bubble hết vào cột `devices.bubble_until` và UI đếm ngược ở tab Initialization (ẩn khi không có bubble).
 - Lần chạy sau, worker đọc `bubble_until` từ DB: còn hơn 2 tiếng thì không vào game kiểm tra, chỉ hẹn lúc còn 2 tiếng. `bubble_until` không bị chép qua Apply ALL.
 - OCR thời gian (font `Timer`): dưới 1 ngày game hiện `06:55:22`, từ 1 ngày trở lên hiện `2d 23:38`.

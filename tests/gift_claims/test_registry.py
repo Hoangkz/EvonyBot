@@ -8,7 +8,7 @@ import numpy as np
 
 from bot.activities import gift_claims
 from bot.activities.gift_claims import common
-from bot.worker.daily.gifts import run_gift_claims
+from bot.worker.gifts import run_gift_claims
 from bot.worker.priority import DATA
 
 

@@ -1,6 +1,6 @@
 """
 Flow test activity Event. Test nhiệm vụ chỉ kiểm phần nhiệm vụ: import setUpModule /
-tearDownModule từ đây để tắt lượt nhận thưởng theo chấm đỏ (worker/event/policy.py maybe_claim) chạy sau mỗi
+tearDownModule từ đây để tắt lượt nhận thưởng theo chấm đỏ (worker/policies.py maybe_claim) chạy sau mỗi
 event. Test nhận thưởng bật lại bằng `mock.patch.object(event_policy, "maybe_claim", MAYBE_CLAIM)`.
 Cũng tắt bước kiểm rương Login Rewards ở danh sách event (common.claim_login_reward): ảnh
 04_event_list.png có rương chưa mở; test rương bật lại bằng
@@ -11,7 +11,7 @@ lại bằng `mock.patch.object(common, "open_voyage", OPEN_VOYAGE)`.
 from unittest import mock
 
 from bot.activities.event import common
-from bot.worker.event import policy as event_policy
+from bot.worker import policies as event_policy
 from bot.worker.registry import REGISTRY
 
 MAYBE_CLAIM = event_policy.maybe_claim   # hàm thật

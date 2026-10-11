@@ -1,5 +1,5 @@
 """
-Nhiệm vụ của Event Center do worker gọi thẳng (bot/worker/event_center/tasks.py): Crazy Eggs (ô giờ ở mục General của
+Nhiệm vụ của Event Center do worker gọi thẳng (bot/worker/policies.py): Crazy Eggs (ô giờ ở mục General của
 tab Daily Activities, đập lại mỗi N giờ tới khi đủ 4 quả vỡ) và event 3 ngày.
 """
 import importlib
@@ -12,7 +12,7 @@ from bot.activities.event_center.three_day.constants import DONE_KEY as THREE_DA
 from bot.activities.result import TaskResult
 from bot.worker.registry import REGISTRY
 
-tasks = importlib.import_module("bot.worker.event_center.tasks")
+tasks = importlib.import_module("bot.worker.policies")
 DEFS = {d.key: d for d in REGISTRY}
 
 

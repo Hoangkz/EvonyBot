@@ -2,7 +2,7 @@
 event — "Event" activity.
 
 - run.py:           EVENTS (nhiệm vụ từng event), perform_task / claim_event -> TaskResult; chọn nhiệm vụ, bỏ qua nhiệm vụ đã xong,
-                    ghi kết quả, khi nào nhận thưởng: việc của worker (bot/worker/event/)
+                    ghi kết quả, khi nào nhận thưởng: việc của worker (bot/worker/policies.py)
 - common.py:        phần dùng chung (quà đăng nhập, tìm Event Center, bấm nút event)
 - constants.py:     image folders, limits and action names
 - gather_troops/:   nhiệm vụ event Gather Troops, mỗi nhiệm vụ một thư mục

@@ -1,5 +1,5 @@
 """
-Hàm run riêng của các nhiệm vụ Event do worker gọi thẳng (luật chạy: bot/worker/event/policy.py; việc làm trong
+Hàm run riêng của các nhiệm vụ Event do worker gọi thẳng (luật chạy: bot/worker/policies.py; việc làm trong
 game: bot/activities/event/run.py; bảng nhiệm vụ: bot/worker/registry.py).
 """
 import importlib
@@ -10,7 +10,7 @@ from bot.activities.event.common import mark_done, mark_locked, mark_target_reac
 from bot.worker.registry import REGISTRY
 
 event = importlib.import_module("bot.activities.event.run")
-policy = importlib.import_module("bot.worker.event.policy")
+policy = importlib.import_module("bot.worker.policies")
 DEFS = {d.key: d for d in REGISTRY}
 
 ON = {"enabled": True, "day": 1}
@@ -73,14 +73,14 @@ class EventRunTests(unittest.TestCase):
         calls = []
         settings = {"kings_path_patrol": ON}
         policy.run_event_task(bot, settings, key="kings_path_patrol",
-                              run_task=lambda b, task, state: calls.append(task))
+                              run=lambda b, task, state: calls.append(task))
         self.assertEqual(calls, [ON])
 
     def test_skips_complete_task(self):
         bot = FakeBot(done=["kings_path_patrol_complete"])
         calls = []
         policy.run_event_task(bot, {"kings_path_patrol": ON}, key="kings_path_patrol",
-                              run_task=lambda *a: calls.append(1))
+                              run=lambda *a: calls.append(1))
         self.assertEqual(calls, [])
 
     def test_skips_task_done_today_or_locked(self):
@@ -88,7 +88,7 @@ class EventRunTests(unittest.TestCase):
             bot = FakeBot(done=done)
             calls = []
             policy.run_event_task(bot, {"kings_path_patrol": ON}, key="kings_path_patrol",
-                                  run_task=lambda *a: calls.append(1))
+                                  run=lambda *a: calls.append(1))
             self.assertEqual(calls, [], done)
 
     def test_records_done_when_task_finishes(self):
@@ -97,7 +97,7 @@ class EventRunTests(unittest.TestCase):
         def run_task(b, task, state):
             mark_done(b, "kings_path_patrol")
 
-        policy.run_event_task(bot, {"kings_path_patrol": ON}, key="kings_path_patrol", run_task=run_task)
+        policy.run_event_task(bot, {"kings_path_patrol": ON}, key="kings_path_patrol", run=run_task)
         self.assertIn("Event: xong kings_path_patrol", bot.logs)
         self.assertIn("kings_path_patrol", bot.done)
 
@@ -105,19 +105,19 @@ class EventRunTests(unittest.TestCase):
         settings = {"kings_path_patrol": {"value": 30, "day": 2}}
         bot = FakeBot()
         policy.run_event_task(bot, settings, key="kings_path_patrol",
-                              run_task=lambda b, task, state: mark_target_reached(b, "kings_path_patrol"))
+                              run=lambda b, task, state: mark_target_reached(b, "kings_path_patrol"))
         self.assertEqual(set(bot.done), {"kings_path_patrol", "kings_path_patrol_complete_30",
                                          "kings_path_patrol_reached_30"})
         bot = FakeBot()
         policy.run_event_task(bot, settings, key="kings_path_patrol",
-                              run_task=lambda b, task, state: mark_locked(b, "kings_path_patrol"))
+                              run=lambda b, task, state: mark_locked(b, "kings_path_patrol"))
         self.assertEqual(set(bot.done), {"kings_path_patrol_locked"})
 
     def test_raised_target_runs_again(self):
         """Xong vì đạt mục tiêu 30; tăng lên 60 ở tab UI -> chưa xong, chạy lại; giảm về 20 -> vẫn xong."""
         bot = FakeBot()
         policy.run_event_task(bot, {"kings_path_patrol": {"value": 30}}, key="kings_path_patrol",
-                              run_task=lambda b, task, state: mark_target_reached(b, "kings_path_patrol"))
+                              run=lambda b, task, state: mark_target_reached(b, "kings_path_patrol"))
         self.assertTrue(policy.is_done_today(bot, {"kings_path_patrol": {"value": 20}}, "kings_path_patrol"))
         self.assertFalse(policy.is_done_today(bot, {"kings_path_patrol": {"value": 60}}, "kings_path_patrol"))
 

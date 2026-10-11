@@ -6,7 +6,7 @@ Cập nhật: 2026-10-11. Xong mục nào thì xoá mục đó. Flow hiện tạ
 
 - Worker chạy theo **nhiệm vụ**, không theo activity. Activity (nút Select Activity, tab cấu hình) chỉ dùng để chia loại.
 - Bấm Start: `build_tasks` ([tasks.py](tasks.py)) lấy mọi nhiệm vụ trong bảng [registry.py](registry.py) có
-  nhóm được chọn và đã được tích (khai báo ở worker: daily/, event/, event_center/, standalone.py; registry.py chỉ gom lại), gắn độ ưu tiên của chính nhiệm vụ ([priority.py](priority.py), số lớn làm trước, < 0
+  nhóm được chọn và đã được tích (khai báo trong bảng priority.py (`policy`), luật chạy ở policies.py; registry.py dựng TaskDef từ bảng đó), gắn độ ưu tiên của chính nhiệm vụ ([priority.py](priority.py), số lớn làm trước, < 0
   không vào danh sách). Mỗi nhiệm vụ có hàm `run` riêng; worker gọi thẳng (`BotWorker._run_one`), không qua `run` của
   activity.
 - Mỗi lần chọn 1 nhiệm vụ ưu tiên cao nhất (cùng ưu tiên thì xoay vòng). Xong nhiệm vụ thì đánh dấu xong hôm nay, tới mốc
@@ -39,7 +39,7 @@ Cập nhật: 2026-10-11. Xong mục nào thì xoá mục đó. Flow hiện tạ
 ## 3. Daily Activities (để sau, khi người dùng yêu cầu)
 
 - [ ] Viết các nhiệm vụ có trong `priority.py` nhưng chưa có code: `daily_alliance_science`, `daily_alliance_research`,
-  `daily_alliance_technology`, `daily_greet_champion` (khi viết thì thêm vào TASKS ở run.py và key vào priority.py; worker/daily/tasks.py tự lấy).
+  `daily_alliance_technology`, `daily_greet_champion` (khi viết thì thêm vào TASKS ở run.py và key vào priority.py; priority.py tự lấy).
 - [ ] `daily_general_enhancing`: người dùng ghi "Cần làm thêm".
 - [ ] Đổi key daily_done từ nhãn ("Offering") sang dạng `daily_<tên>` + migration trong `database.py` (`KEY_RENAMES`, giống
   Gather Troops) cho `daily_done` và cột `daily_activities`. Hiện `Task.key` (key priority.py) và nhãn (key daily_done)

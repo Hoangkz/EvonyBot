@@ -1,7 +1,7 @@
 """Low-priority gift claims performed after Daily Activities is complete.
 
 Chỉ có việc làm trong game (TASKS và các luồng con). Việc nào đến hạn, đã nhận hôm nay chưa, ghi kết quả: worker lo
-(bot/worker/daily/gifts.py).
+(bot/worker/gifts.py).
 """
 from . import (
     city_growth_plan,

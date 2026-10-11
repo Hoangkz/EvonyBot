@@ -15,7 +15,7 @@ import adbutils
 import cv2
 
 from bot.activities import gift_claims
-from bot.worker.daily.gifts import run_gift_claims
+from bot.worker.gifts import run_gift_claims
 from bot.context import BotContext
 
 

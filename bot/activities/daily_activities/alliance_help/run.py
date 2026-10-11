@@ -1,5 +1,5 @@
 """
-run.py — Daily Activities "Alliance Help": một lần thử theo giờ (worker gọi, bot/worker/daily/):
+run.py — Daily Activities "Alliance Help": một lần thử theo giờ (worker gọi, bot/worker/policies.py):
 1. Màn chính -> Liên minh -> dòng "Alliance Help" -> màn Alliance Help.
 2. "No records" (không ai cần giúp) -> Back, sang nhiệm vụ khác: KHÔNG kiểm tra Activity, chưa xong.
 3. Có "Help All" -> bấm -> Back -> kiểm tra dòng / thẻ Activity như Alliance Donation
