@@ -6,6 +6,8 @@ import cv2
 import numpy as np
 
 from bot.activities import gift_claims
+from bot.worker.daily import gifts
+from bot.worker.daily.gifts import run_gift_claims
 from bot.activities.gift_claims import (empire_depot, limited_offer, login_gifts,
                                         super_value_return, valuable_event)
 from bot.activities.gift_claims import lobby
@@ -140,7 +142,7 @@ class FixedGiftFlowTests(unittest.TestCase):
                                 return_value=(super_result, True)) as run_super,
               mock.patch.object(valuable_event, "run_opened",
                                 return_value=(valuable_result, True)) as run_valuable):
-            gift_claims.run(bot)
+            run_gift_claims(bot)
 
         run_super.assert_called_once_with(bot, {empire_depot.KEY})
         run_valuable.assert_called_once_with(bot, {limited_offer.KEY})
@@ -154,10 +156,10 @@ class FixedGiftFlowTests(unittest.TestCase):
                                 side_effect=(GiftScreen.UNKNOWN,
                                              GiftScreen.VALUABLE_EVENT,
                                              None, None)),
-              mock.patch.object(gift_claims, "return_home") as return_home,
+              mock.patch.object(gifts, "return_home") as return_home,
               mock.patch.object(valuable_event, "run_opened",
                                 return_value=({limited_offer.KEY: "no_dot"}, True)) as run):
-            gift_claims.run(bot)
+            run_gift_claims(bot)
 
         return_home.assert_called_once_with(bot)
         run.assert_called_once_with(bot, {limited_offer.KEY})
@@ -172,7 +174,7 @@ class FixedGiftFlowTests(unittest.TestCase):
               mock.patch.object(super_value_return, "run_opened",
                                 return_value=({empire_depot.KEY: "remaining"},
                                               False))):
-            gift_claims.run(bot)
+            run_gift_claims(bot)
 
         bot.mark_daily_done.assert_not_called()
 

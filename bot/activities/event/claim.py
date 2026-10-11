@@ -1,10 +1,8 @@
 """
-claim.py — nhận thưởng của một event (Gather Troops, King's Path) theo chấm đỏ, chạy sau
-khi event/run.py làm xong mọi nhiệm vụ.
+claim.py — nhận thưởng của một event (Gather Troops, King's Path) theo chấm đỏ.
 
-Chỉ chạy khi event có ít nhất 1 nhiệm vụ đã xong hôm nay (daily_done), và mỗi khi số nhiệm
-vụ xong tăng lên (lưu daily_done `<event>_claimed_<số nhiệm vụ xong>`): bị ngắt giữa chừng
-thì lượt sau nhận lại.
+Chỉ làm thao tác nhận thưởng. Khi nào nhận (event có ít nhất 1 nhiệm vụ xong hôm nay, mỗi khi số nhiệm vụ xong tăng lên,
+đánh dấu `<event>_claimed_<số nhiệm vụ xong>`) là việc của worker (bot/worker/event/policy.py maybe_claim).
 
 Đang ở sẵn bảng event đó (thấy tiêu đề, VD nhiệm vụ cuối vừa xong ngay trên bảng) thì nhận luôn
 tại chỗ; không thì mở event bằng run_task (màn chính -> Event Center -> danh sách -> icon).
@@ -48,25 +46,6 @@ CHESTS = {"gather_troops": GATHER_CHESTS}
 # Tiêu đề bảng event: thấy là đang ở sẵn bảng đó -> nhận luôn, không mở lại từ màn chính.
 TITLES = {"gather_troops": GATHER_TROOPS_TITLE, "kings_path": KINGS_PATH_TITLE}
 ON_EVENT = "on_event"   # action: đang ở bảng event (thấy tiêu đề)
-
-
-def claim_key(event: str, done_count: int) -> str:
-    """Key daily_done: đã nhận thưởng của `event` khi có `done_count` nhiệm vụ xong."""
-    return f"{event}_claimed_{done_count}"
-
-
-def maybe_claim(bot, state: EventState, event: str, name: str, icon: str, keys: list[str]):
-    """Nhận thưởng `event` nếu có nhiệm vụ trong `keys` xong hôm nay mà chưa nhận ứng với số
-    nhiệm vụ xong hiện tại."""
-    done_count = sum(1 for key in keys if bot.is_daily_done(key))
-    if done_count == 0:
-        return
-    key = claim_key(event, done_count)
-    if bot.is_daily_done(key):
-        return
-    bot.record(f"{name}: {done_count} task(s) done, claiming rewards")
-    run(bot, state, name, icon, CHESTS.get(event, ()), TITLES.get(event))
-    bot.mark_daily_done(key)
 
 
 def run(bot, state: EventState, name: str, icon: str, chests=(), title: str | None = None):

@@ -4,7 +4,9 @@ from unittest import mock
 import numpy as np
 
 from bot.activities.daily_activities import general
-from bot.activities.daily_activities.run import BUY_HAMMERS, BUY_STAMINA, _run_general
+from bot.activities.daily_activities.constants import BUY_HAMMERS, BUY_STAMINA
+from bot.activities.result import TaskResult
+from bot.worker.daily import policy
 
 
 class _PurchaseBot:
@@ -71,10 +73,10 @@ class DailyGeneralPurchaseTests(unittest.TestCase):
         bot.is_daily_done.side_effect = done.__contains__
         bot.mark_daily_done.side_effect = done.add
 
-        settings = {"buy_stamina": True, "stamina_quantity": 20,
-                    "buy_all_hammers": True}
-        _run_general(bot, settings)
-        _run_general(bot, settings)
+        settings = {"General": {"buy_stamina": True, "stamina_quantity": 20, "buy_all_hammers": True}}
+        for _ in range(2):   # lần hai: đã xong hôm nay, worker không mua lại
+            policy.run_buy_stamina_task(bot, settings)
+            policy.run_buy_hammers_task(bot, settings)
 
         stamina.assert_called_once_with(bot, 20)
         hammers.assert_called_once_with(bot)

@@ -14,12 +14,23 @@ from unittest import mock
 import cv2
 
 from bot.activities.event_center.three_day import constants as c
+from bot.worker.daily.policy import record_result
+from bot.worker.event.policy import record_outcome
 from tests.flow import Step, back, end, run_flow, swipe, tap, tap_at
 
 SCREENS = Path(__file__).resolve().parents[1]   # tests/event_center
 MAIN = "crazy_eggs/screens/01_main.png"
 TD = "three_day/screens/"
 run_module = importlib.import_module("bot.activities.event_center.three_day.run")
+def _three_day(bot, settings):
+    """Như worker: ghi kết quả nhiệm vụ con và DONE_KEY (xong hôm nay)."""
+    result = run_module.run(bot, settings)
+    for outcome in result.outcomes:
+        record_outcome(bot, settings, outcome)
+    record_result(bot, None, c.DONE_KEY, result)
+    return result
+
+
 ICON = "EventCenter/ThreeDay/Icons/precious_vegetation.png"
 
 
@@ -45,7 +56,7 @@ def _to_event():
 
 class ThreeDayFlow(unittest.TestCase):
     def _run(self, flow, settings, **kwargs):
-        return run_flow(self, run_module.run, SCREENS, flow, settings,
+        return run_flow(self, _three_day, SCREENS, flow, settings,
                         ctx_settings={"Event": settings}, variants=VARIANTS, **kwargs)
 
     def test_claim_and_redeem(self):
@@ -200,16 +211,6 @@ class ThreeDayFlow(unittest.TestCase):
         settings = {"three_day_alliance": {"value": 60}, "three_day_heal": {"value": 0}}
         with mock.patch.object(run_module, "_claim_and_redeem", return_value=None):
             self._run(flow, settings)
-
-    def test_group_not_active(self):
-        """Bỏ tích group: không làm gì, return ngay."""
-        run_flow(self, run_module.run, SCREENS, [Step(MAIN, end())],
-                 {"three_day_active": {"enabled": False}})
-
-    def test_done_today(self):
-        """Đã xong hôm nay (daily_done): return ngay, không vào game."""
-        run_flow(self, run_module.run, SCREENS, [Step(MAIN, end())], OFF,
-                 daily_done={c.DONE_KEY: "2026-10-06T09:00:00"})
 
 
 if __name__ == "__main__":

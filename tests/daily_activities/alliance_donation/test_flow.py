@@ -14,10 +14,11 @@ Go nên không cần ảnh popup thẻ.
 import unittest
 from pathlib import Path
 
-from bot.activities.daily_activities.alliance_donation.constants import LABEL, TRIED_KEY
+from bot.activities.daily_activities.alliance_donation.constants import KEY, LABEL
 from bot.activities.daily_activities.alliance_donation.run import donate_free
 from bot.activities.daily_activities.constants import MAIN_MORE, OLD_MENU_ACTIVITY
 from bot.activities.event.kings_path.donate.constants import DONATE_BUTTON_2
+from bot.worker.daily.policy import record_result
 from tests.daily_activities import SCROLL
 from tests.flow import Step, back, end, run_flow, swipe, tap, tap_at
 
@@ -46,7 +47,9 @@ TO_SCIENCE = [
 
 
 def _donate_free(bot, _settings):
-    return donate_free(bot)
+    result = donate_free(bot)
+    record_result(bot, KEY, LABEL, result)   # như worker: xong thì lưu "xong hôm nay"
+    return bool(result)
 
 
 class AllianceDonationFlow(unittest.TestCase):
@@ -55,7 +58,6 @@ class AllianceDonationFlow(unittest.TestCase):
         flow = [*CHECK_DONE, Step("11_old_main.png", end(result=True))]
         device = run_flow(self, _donate_free, SCREENS, flow, {})
         self.assertIn(LABEL, device.daily_done)
-        self.assertIn(TRIED_KEY, device.daily_done)
 
     def test_donate_free_then_done(self):
         """Chưa xong: donate 1 lượt free -> hết lượt (nút kim cương, không mua) -> Back -> kiểm tra lại ->
@@ -80,7 +82,6 @@ class AllianceDonationFlow(unittest.TestCase):
         ]
         device = run_flow(self, _donate_free, SCREENS, flow, {})
         self.assertNotIn(LABEL, device.daily_done)
-        self.assertIn(TRIED_KEY, device.daily_done)
 
 
 if __name__ == "__main__":

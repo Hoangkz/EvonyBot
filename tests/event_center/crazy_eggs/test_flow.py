@@ -13,7 +13,15 @@ import cv2
 from bot.activities.event_center import crazy_eggs
 from bot.activities.event_center.crazy_eggs.constants import DONE_KEY, LUCKY_KEY
 from bot.activities.event_center.constants import AFTER_RESTART_ATTEMPTS, ATTEMPTS, LIST_MAX_SCROLLS
+from bot.worker.daily.policy import record_result
 from tests.flow import Step, back, end, run_flow, shell, swipe, tap, tap_at, tap_pct
+
+def _eggs(bot, settings):
+    """Như worker: xong (đủ 4 quả vỡ / không thấy event) thì lưu DONE_KEY."""
+    result = crazy_eggs.run(bot, settings)
+    record_result(bot, None, DONE_KEY, result)
+    return result
+
 
 SCREENS = Path(__file__).parent / "screens"
 ICON = "EventCenter/CrazyEggs/icon.png"
@@ -87,7 +95,7 @@ class CrazyEggsFlow(unittest.TestCase):
             Step("06_congratulations.png", back()),
             Step("05_eggs_waiting.png", end()),
         ]
-        device = run_flow(self, crazy_eggs.run, SCREENS, flow, {}, variants=VARIANTS)
+        device = run_flow(self, _eggs, SCREENS, flow, {}, variants=VARIANTS)
         self.assertIn(LUCKY_KEY, device.daily_done)
 
     def test_not_enough_hammers_dialog(self):
@@ -98,7 +106,7 @@ class CrazyEggsFlow(unittest.TestCase):
             Step("11_not_enough_hammers.png", tap(CANCEL)),
             Step("08_egg_1_activated.png", end()),
         ]
-        run_flow(self, crazy_eggs.run, SCREENS, flow, {}, daily_done=LUCKY_USED)
+        run_flow(self, _eggs, SCREENS, flow, {}, daily_done=LUCKY_USED)
 
     def test_out_of_hammers(self):
         """Bấm quả 2 mà vẫn còn búa (số quả có búa không giảm) -> hết búa. Quả 2 không chờ
@@ -107,12 +115,12 @@ class CrazyEggsFlow(unittest.TestCase):
             Step("04_eggs_ready.png", tap_at(*EGGS[2])),
             Step("04_eggs_ready.png", end()),
         ]
-        device = run_flow(self, crazy_eggs.run, SCREENS, flow, {})
+        device = run_flow(self, _eggs, SCREENS, flow, {})
         self.assertNotIn(LUCKY_KEY, device.daily_done)
 
     def test_all_waiting_lucky_used_returns(self):
         """Mọi quả đang chờ, búa vàng đã dùng hôm nay: không bấm gì, return luôn."""
-        run_flow(self, crazy_eggs.run, SCREENS, [Step("05_eggs_waiting.png", end())], {},
+        run_flow(self, _eggs, SCREENS, [Step("05_eggs_waiting.png", end())], {},
                  daily_done=LUCKY_USED)
 
     def test_activated_egg_skipped(self):
@@ -126,13 +134,37 @@ class CrazyEggsFlow(unittest.TestCase):
             Step("09_egg_activated_rewards.png", back()),
             Step("08_egg_1_activated.png?cracked_3", end()),
         ]
-        run_flow(self, crazy_eggs.run, SCREENS, flow, {}, variants=VARIANTS, daily_done=LUCKY_USED)
+        device = run_flow(self, _eggs, SCREENS, flow, {}, variants=VARIANTS, daily_done=LUCKY_USED)
+        self.assertNotIn(DONE_KEY, device.daily_done)   # mới vỡ 2 quả: chưa xong hôm nay, còn phải đập lại
 
     def test_no_lucky_hammer_left(self):
         """Số búa vàng trên màn là "0" (12_all_activated.png, đã dùng tay, DB chưa có): lưu đã dùng,
-        return (4 quả đã vỡ, không còn gì để đập)."""
-        device = run_flow(self, crazy_eggs.run, SCREENS, [Step("12_all_activated.png", end())], {})
+        return (4 quả đã vỡ, không còn gì để đập) và đánh dấu xong hôm nay."""
+        device = run_flow(self, _eggs, SCREENS, [Step("12_all_activated.png", end())], {})
         self.assertIn(LUCKY_KEY, device.daily_done)
+        self.assertIn(DONE_KEY, device.daily_done)
+
+    def test_all_eggs_activated_marks_done(self):
+        """4 quả "Activated" (12_all_activated.png), búa vàng đã dùng: đánh dấu xong hôm nay (DONE_KEY)."""
+        device = run_flow(self, _eggs, SCREENS, [Step("12_all_activated.png", end())], {},
+                          daily_done=LUCKY_USED)
+        self.assertIn(DONE_KEY, device.daily_done)
+
+    def test_some_eggs_waiting_not_done(self):
+        """Còn quả đang chờ (05_eggs_waiting.png), búa vàng đã dùng: return nhưng chưa xong hôm nay."""
+        device = run_flow(self, _eggs, SCREENS, [Step("05_eggs_waiting.png", end())], {},
+                          daily_done=LUCKY_USED)
+        self.assertNotIn(DONE_KEY, device.daily_done)
+
+    def test_one_egg_activated_not_done(self):
+        """Mới vỡ 1 quả (08_egg_1_activated.png), hết búa: chưa xong hôm nay."""
+        flow = [
+            Step("08_egg_1_activated.png", tap_at(*EGGS[3])),
+            Step("11_not_enough_hammers.png", tap(CANCEL)),
+            Step("08_egg_1_activated.png", end()),
+        ]
+        device = run_flow(self, _eggs, SCREENS, flow, {}, daily_done=LUCKY_USED)
+        self.assertNotIn(DONE_KEY, device.daily_done)
 
     def test_no_activities_tab_marks_done(self):
         """Màn Event Center (thấy tab Competition) mà không có tab Activities: BACK; thử ATTEMPTS lần,
@@ -144,7 +176,7 @@ class CrazyEggsFlow(unittest.TestCase):
                 Step("02_event_center.png?no_activities_tab", back()),
             ]
         flow = _retry_flow(attempt)
-        device = run_flow(self, crazy_eggs.run, SCREENS, flow, {}, variants=VARIANTS)
+        device = run_flow(self, _eggs, SCREENS, flow, {}, variants=VARIANTS)
         self.assertIn(DONE_KEY, device.daily_done)
 
     def test_icon_not_found_restarts_then_marks_done(self):
@@ -157,13 +189,8 @@ class CrazyEggsFlow(unittest.TestCase):
                 Step("02_event_center.png", tap("EventCenter/activitiesTab.png")),
                 Step("03_activities.png", *[swipe() for _ in range(LIST_MAX_SCROLLS)], back()),
             ]
-        device = run_flow(self, crazy_eggs.run, SCREENS, _retry_flow(attempt), {})
+        device = run_flow(self, _eggs, SCREENS, _retry_flow(attempt), {})
         self.assertIn(DONE_KEY, device.daily_done)
-
-    def test_done_today_skips(self):
-        """Đã đánh dấu xong hôm nay: return ngay, không thao tác gì."""
-        run_flow(self, crazy_eggs.run, SCREENS, [Step("01_main.png", end())], {},
-                 daily_done={DONE_KEY: "2026-10-02T09:00:00"})
 
     def test_lucky_hammer_no_dialog(self):
         """Bấm quả 2 để dùng búa vàng mà không hiện hộp thoại (đã dùng tay) -> lưu đã dùng, return."""
@@ -171,7 +198,7 @@ class CrazyEggsFlow(unittest.TestCase):
             Step("05_eggs_waiting.png", tap_at(*EGG_2_WAITING)),
             Step("05_eggs_waiting.png", end()),
         ]
-        device = run_flow(self, crazy_eggs.run, SCREENS, flow, {})
+        device = run_flow(self, _eggs, SCREENS, flow, {})
         self.assertIn(LUCKY_KEY, device.daily_done)
 
 

@@ -1,8 +1,10 @@
 """
 daily_activities — "Daily Activities" activity (bố cục giống activity Event: mỗi nhiệm vụ một thư mục).
 
-- run.py:       entry point `run(bot, settings)`: General, thứ tự nhiệm vụ (TASKS), nhận thưởng
-- common.py:    vòng lặp chung của một nhiệm vụ (run_task), mở Activity, dòng Go, cuộn, nhận thưởng
+- run.py:       TASKS (thứ tự nhiệm vụ), HOURLY (việc theo giờ), mua General -> chỉ làm thao tác, trả TaskResult
+                (bot/activities/result.py). KHÔNG chọn việc / ghi "xong hôm nay" / hẹn thử lại: việc của worker
+                (bot/worker/daily/).
+- common.py:    vòng lặp chung của một nhiệm vụ (run_task -> TaskResult), mở Activity, dòng Go, cuộn, nhận thưởng cuối
 - constants.py: thư mục ảnh, tên action, key daily_done dùng chung
 - general.py:   Buy Stamina / Buy All Hammers
 - OPEN_TASK.md: flow mở nhiệm vụ / bấm Go / đánh dấu xong (đọc trước)
@@ -11,6 +13,3 @@ daily_activities — "Daily Activities" activity (bố cục giống activity Ev
                 trap_building, alliance_donation, black_market, general_enhancing, wheel_of_fortune,
                 patrol, material_composing
 """
-from .run import run
-
-__all__ = ["run"]

@@ -43,10 +43,24 @@ Server ban đầu lấy từ `settings["Initialization"]["server"]`. Nếu chưa
 
 ## 3. Vòng lặp nhiệm vụ: `_run_tasks()`
 
-Worker chạy theo **nhiệm vụ** (bot/worker/TODO.md). Bước 1: mỗi activity đã chọn (trừ Join Boss) là 1 nhiệm vụ chạy
-nguyên khối ([tasks.py](tasks.py)); độ ưu tiên = cao nhất trong các nhiệm vụ của nhóm đó trong
-[priority.py](priority.py) (số lớn hơn làm trước). Bộ chọn [scheduler.py](scheduler.py) lấy nhiệm vụ tới lượt có ưu
-tiên cao nhất; cùng ưu tiên thì xoay vòng (nhiệm vụ lâu chưa được bắt đầu nhất đi trước).
+Worker chạy theo **nhiệm vụ**, không theo activity. Activity (nút Select Activity, tab cấu hình) chỉ dùng để chia
+loại. Nhiệm vụ khai báo bằng `TaskDef` (xem [task_def.py](task_def.py)). **Daily Activities, Event và
+Event Center khai báo ngay ở worker**: [daily/](daily/), [event/](event/), [event_center/](event_center/) (Crazy Eggs,
+event 3 ngày), mỗi nơi có `tasks.py` (danh sách, ô tích) và `policy.py` (luật chạy: chọn việc, bỏ qua việc đã xong / đạt
+mục tiêu / Day khoá, ghi "xong hôm nay", hẹn thử lại, khoảng giờ của việc theo giờ, nhận thưởng cuối / thưởng event).
+Các thư mục `bot/activities/daily_activities/`, `event/`, `event_center/` chỉ làm thao tác trong game rồi trả
+`TaskResult` ([result.py](../activities/result.py)). Nhóm chỉ có một nhiệm vụ (Alliance Capacity, Open Gift Box, Black Market, Battlefield Shop) khai báo ở
+[standalone.py](standalone.py). [registry.py](registry.py) chỉ gom các danh sách
+đó (thêm nhiệm vụ mới vào nhóm đã có thì không sửa registry.py). Khi bấm Start, `build_tasks` ([tasks.py](tasks.py)) lấy mọi nhiệm vụ trong registry có nhóm (activity)
+được chọn và đã được tích ở tab cấu hình (`TaskDef.enabled(cấu hình tab)`), gắn độ ưu tiên của chính nhiệm vụ đó ([priority.py](priority.py), số lớn hơn làm
+trước; ưu tiên < 0 không vào danh sách). Mỗi nhiệm vụ mang theo hàm `run` riêng (`Task.run`); worker gọi thẳng hàm đó
+(`BotWorker._run_one`), không đi qua hàm `run` của activity. Bộ chọn [scheduler.py](scheduler.py) lấy nhiệm vụ tới lượt
+có ưu tiên cao nhất; cùng ưu tiên thì xoay vòng (nhiệm vụ lâu chưa được bắt đầu nhất đi trước).
+
+Nhiệm vụ trong bảng: Alliance Capacity, Open Gift Box, Black Market (`once`), Battlefield Shop, Crazy Eggs (`repeat`,
+ô giờ ở mục General của tab Daily Activities), Buy Stamina / Buy Hammer, từng việc Daily (Offering, Gold Levy, ...,
+Alliance Donation / Help theo giờ), `daily_rewards` (nhận thưởng cuối + quà), từng nhiệm vụ Event (Gather Troops,
+King's Path), `gather_troops_claim` / `kings_path_claim`, `three_day_event`. Join Boss không nằm trong bảng (luật riêng).
 
 **Giờ reset server** (mốc làm lại nhiệm vụ đã xong): người dùng chọn ở màn Home (ô "Reset Time", "HH:MM", mặc định 14:00), lưu bảng `settings` của DB, dùng chung mọi thiết bị qua `ServerClock`; đổi là các worker đang chạy dùng ngay. Bot không vào game đọc giờ reset nữa (đã xoá `get_server_time` / OCR `read_server_time`).
 
@@ -81,6 +95,14 @@ flowchart TD
   hàm activity; worker không lưu tiến độ nội bộ (activity tự bỏ qua phần đã `mark_daily_done`).
 - **Nhiệm vụ xong** thì không tới lượt nữa cho tới mốc reset server kế tiếp (tính theo mốc lúc bắt đầu lượt làm xong);
   qua mốc thì tự tới lượt lại (trước đây chỉ Daily Activities được thêm lại).
+- **Nhiệm vụ chạy 1 lần** (`TaskDef.once` trong standalone.py, hiện là Black Market): xong rồi không tới lượt lại khi
+  qua mốc reset; chỉ chạy lại khi Stop rồi Start (trạng thái bộ chọn nằm trong bộ nhớ).
+- **Độ ưu tiên < 0** (priority.py, VD Battlefield Shop -1): nhiệm vụ không được đưa vào danh sách.
+- **Crazy Eggs** (`TaskDef.repeat`): ô 0 / 1h .. 4h (mặc định 2h, khoá `crazy_eggs_hours` ở mục General của tab Daily
+  Activities). Mỗi lần chạy đập một lượt; chưa đủ 4 quả vỡ (4 nhãn "Activated") thì gán `ctx.again_after` = số giờ chọn
+  (hẹn chạy lại, giữ nguyên độ ưu tiên 999); đủ 4 quả thì đánh dấu `crazy_eggs_done` (xong hôm nay, reset theo mốc reset).
+- **Nhiệm vụ Daily chưa xong** (`run_daily_task`): hẹn thử lại sau 300 giây (`ctx.again_after`, ưu tiên thấp nhất), tối
+  đa 5 lần mỗi ngày. Nhiệm vụ Event chạy một lần mỗi ngày (xong hay không).
 - **Hẹn chạy lại**: activity gán `ctx.again_after` (giây) trước khi return (VD Daily Activities: Alliance Donation
   chưa xong, chờ lượt free hồi) → `scheduler.finished(task, again_after=...)`: tới giờ hẹn thì nhiệm vụ lại tới lượt
   dù chưa qua mốc reset, với độ ưu tiên `AGAIN_PRIORITY` (-1000: chỉ chạy khi không còn nhiệm vụ nào khác tới lượt).

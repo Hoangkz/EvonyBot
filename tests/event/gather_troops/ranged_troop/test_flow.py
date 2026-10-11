@@ -22,7 +22,7 @@ from bot.activities.event.gather_troops import ranged_troop
 from bot.activities.event.gather_troops.ranged_troop.constants import LOCKED_KEY
 from bot.context import TEMPLATE_DIR
 from tests.flow import Step, back, end, run_flow, tap, tap_at
-from tests.event import setUpModule, tearDownModule  # noqa: F401 (tắt lượt nhận thưởng)
+from tests.event import setUpModule, tearDownModule, run_event_tasks  # noqa: F401 (tắt lượt nhận thưởng)
 
 SCREENS = Path(__file__).parent / "screens"
 KEY = ranged_troop.KEY
@@ -109,7 +109,7 @@ class RangedTroopFlow(unittest.TestCase):
             Step("04_event_list.png", tap("Event/GatherTroops/icon.png")),
             *TO_FIRST_GO,
         ]
-        device = run_flow(self, event.run, SCREENS, flow, SETTINGS, variants=VARIANTS)
+        device = run_flow(self, run_event_tasks, SCREENS, flow, SETTINGS, variants=VARIANTS)
         self.assertNotIn(LOCKED_KEY, device.daily_done)
         self.assertIn("Ranged Troop: done 0, remaining 20000", device.logs)
         self.assertIn("Ranged Troop: train tier 13 (chosen 13), goal 20000, count 20000",
@@ -118,13 +118,13 @@ class RangedTroopFlow(unittest.TestCase):
     def test_day3_locked_saved(self):
         """3 ổ khoá trên hàng tab Day (Day 3..5 khoá): lưu LOCKED_KEY rồi dừng."""
         flow = [*TO_EVENT, Step("06_day_locked_tmp.png?day3_locked", end())]
-        device = run_flow(self, event.run, SCREENS, flow, SETTINGS, variants=VARIANTS)
+        device = run_flow(self, run_event_tasks, SCREENS, flow, SETTINGS, variants=VARIANTS)
         self.assertIn(LOCKED_KEY, device.daily_done)
 
     def _train_flow(self, settings, *train_steps):
         """Tới màn Train rồi các bước chọn cấp `train_steps`."""
         flow = [*TO_EVENT, *TO_FIRST_GO[:-1], *train_steps]
-        device = run_flow(self, event.run, SCREENS, flow, settings, variants=VARIANTS)
+        device = run_flow(self, run_event_tasks, SCREENS, flow, settings, variants=VARIANTS)
         # Không bao giờ bấm "Instant Train" (tốn gems), nút trái đáy màn Train.
         instant = [(i, e) for i, e in device.events
                    if e[0] == "tap" and flow[i].screen.startswith(("train_t", "locked_"))
@@ -224,7 +224,7 @@ class RangedTroopFlow(unittest.TestCase):
             Step("10_after_go.png", tap_at(*CENTER)),
             *TO_FIRST_GO[4:],
         ]
-        device = run_flow(self, event.run, SCREENS, flow, SETTINGS, variants=VARIANTS)
+        device = run_flow(self, run_event_tasks, SCREENS, flow, SETTINGS, variants=VARIANTS)
         self.assertIn("Ranged Troop: building already training, Speed Up from menu (not counted)",
                       device.logs)
         self.assertNotIn(LOCKED_KEY, device.daily_done)
@@ -232,16 +232,16 @@ class RangedTroopFlow(unittest.TestCase):
     def test_no_go_marks_done(self):
         """Tab Ranged Troop không còn Go: đánh dấu xong."""
         flow = [*TO_EVENT, Step("09_day3_ranged_troop.png?no_go", end())]
-        device = run_flow(self, event.run, SCREENS, flow, SETTINGS, variants=VARIANTS)
+        device = run_flow(self, run_event_tasks, SCREENS, flow, SETTINGS, variants=VARIANTS)
         self.assertIn(KEY, device.daily_done)
 
     def test_already_done_skips(self):
         flow = [Step("03_main.png", end())]
-        run_flow(self, event.run, SCREENS, flow, SETTINGS, daily_done={KEY: "2026-10-01T08:00:00"})
+        run_flow(self, run_event_tasks, SCREENS, flow, SETTINGS, daily_done={KEY: "2026-10-01T08:00:00"})
 
     def test_disabled_skips(self):
         flow = [Step("03_main.png", end())]
-        run_flow(self, event.run, SCREENS, flow, {KEY: {"value": 0, "level": None, "day": 3}})
+        run_flow(self, run_event_tasks, SCREENS, flow, {KEY: {"value": 0, "level": None, "day": 3}})
 
 
 if __name__ == "__main__":

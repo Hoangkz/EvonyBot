@@ -28,7 +28,7 @@ import cv2
 import numpy as np
 
 from ...city_building import FORGE
-from ...common import EventState
+from ...common import EventState, mark_done
 from .. import path_task
 from ..building import open_menu
 from .constants import (
@@ -209,7 +209,7 @@ def _refine(bot, path, done, target):
     if _last_done.get(id(bot)) == done:
         bot.record(f"{NAME}: progress still {done} after refining, done for today")
         _last_done.pop(id(bot), None)
-        bot.mark_daily_done(path.key)
+        mark_done(bot, path.key)
         return None
     _, pos = open_menu(bot, NAME, FORGE, {"craft": MENU_CRAFT})
     if pos is None:
@@ -224,7 +224,7 @@ def _refine(bot, path, done, target):
         bot.record(f"{NAME}: ERROR no blue / purple equipment found (ring -> helmet), "
                    f"done for today, retry tomorrow")
         bot.back(delay=STEP_WAIT)
-        bot.mark_daily_done(path.key)
+        mark_done(bot, path.key)
         return None
     item, color = found
     bot.log(f"{NAME}: {color} equipment at {item}")

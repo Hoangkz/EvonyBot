@@ -15,11 +15,19 @@ from pathlib import Path
 import cv2
 
 from bot.activities.open_gift_box.constants import BOX_FOLDERS, KEY, LIST_SWIPE
-from bot.activities.open_gift_box.run import _seen_done, run
+from bot.activities.open_gift_box.run import _seen_done, run as open_boxes
 from bot.context.screen import ScreenMixin
 from bot.common import images_in
 from bot.context import TEMPLATE_DIR
 from tests.flow import Step, back, end, run_flow, swipe, tap
+
+
+def run(bot, settings):
+    """Như worker: mở hết hộp (done=True) thì lưu "xong hôm nay"."""
+    result = open_boxes(bot, settings)
+    if result.done:
+        bot.mark_daily_done(KEY)
+    return result
 
 
 SCREENS = Path(__file__).parents[1] / "event" / "kings_path" / "screens"

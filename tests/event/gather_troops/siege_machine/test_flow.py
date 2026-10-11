@@ -25,7 +25,7 @@ from bot.activities import event
 from bot.activities.event.gather_troops import siege_machine
 from bot.activities.event.gather_troops.siege_machine.constants import LOCKED_KEY
 from tests.flow import Step, back, end, run_flow, tap, tap_at
-from tests.event import setUpModule, tearDownModule  # noqa: F401 (tắt lượt nhận thưởng)
+from tests.event import setUpModule, tearDownModule, run_event_tasks  # noqa: F401 (tắt lượt nhận thưởng)
 
 SCREENS = Path(__file__).parent / "screens"
 KEY = siege_machine.KEY
@@ -101,7 +101,7 @@ class SiegeMachineFlow(unittest.TestCase):
             Step("04_event_list.png", tap("Event/GatherTroops/icon.png")),
             *TO_FIRST_GO,
         ]
-        device = run_flow(self, event.run, SCREENS, flow, SETTINGS, variants=VARIANTS)
+        device = run_flow(self, run_event_tasks, SCREENS, flow, SETTINGS, variants=VARIANTS)
         self.assertNotIn(LOCKED_KEY, device.daily_done)
         self.assertIn("Siege Machine: done 0, remaining 20000", device.logs)
         self.assertIn("Siege Machine: train tier 13 (chosen 13), goal 20000, count 20000",
@@ -114,7 +114,7 @@ class SiegeMachineFlow(unittest.TestCase):
             Step("07_gather_day3.png", tap(f"{SM}/day4.png")),
             *TO_FIRST_GO[1:3],
         ]
-        run_flow(self, event.run, SCREENS, flow, SETTINGS, variants=VARIANTS)
+        run_flow(self, run_event_tasks, SCREENS, flow, SETTINGS, variants=VARIANTS)
 
     def test_defense_tab_selected_opens_siege(self):
         """Day 4 đang ở tab phụ Defense Force: bấm tab Siege Machine rồi mới Go."""
@@ -123,18 +123,18 @@ class SiegeMachineFlow(unittest.TestCase):
             Step("09_day4_defense_force.png", tap(f"{SM}/siegeMachine.png")),
             *TO_FIRST_GO[1:3],
         ]
-        run_flow(self, event.run, SCREENS, flow, SETTINGS, variants=VARIANTS)
+        run_flow(self, run_event_tasks, SCREENS, flow, SETTINGS, variants=VARIANTS)
 
     def test_day4_locked_saved(self):
         """2 ổ khoá trên hàng tab Day (Day 4, 5 khoá): lưu LOCKED_KEY rồi dừng."""
         flow = [*TO_EVENT, Step("06_day_locked_tmp.png", end())]
-        device = run_flow(self, event.run, SCREENS, flow, SETTINGS, variants=VARIANTS)
+        device = run_flow(self, run_event_tasks, SCREENS, flow, SETTINGS, variants=VARIANTS)
         self.assertIn(LOCKED_KEY, device.daily_done)
 
     def _train_flow(self, settings, *train_steps):
         """Tới màn Train rồi các bước chọn cấp `train_steps`."""
         flow = [*TO_EVENT, *TO_FIRST_GO[:-1], *train_steps]
-        device = run_flow(self, event.run, SCREENS, flow, settings, variants=VARIANTS)
+        device = run_flow(self, run_event_tasks, SCREENS, flow, settings, variants=VARIANTS)
         # Không bao giờ bấm "Instant Train" (tốn gems), nút trái đáy màn Train.
         instant = [(i, e) for i, e in device.events
                    if e[0] == "tap" and flow[i].screen.startswith(("train_t", "locked_"))
@@ -235,7 +235,7 @@ class SiegeMachineFlow(unittest.TestCase):
             Step("12_after_finish_all.png", tap_at(*CENTER)),
             *TO_FIRST_GO[3:],
         ]
-        device = run_flow(self, event.run, SCREENS, flow, SETTINGS, variants=VARIANTS)
+        device = run_flow(self, run_event_tasks, SCREENS, flow, SETTINGS, variants=VARIANTS)
         self.assertIn("Siege Machine: building already training, Speed Up from menu (not counted)",
                       device.logs)
         self.assertNotIn(LOCKED_KEY, device.daily_done)
@@ -243,16 +243,16 @@ class SiegeMachineFlow(unittest.TestCase):
     def test_no_go_marks_done(self):
         """Tab Siege Machine không còn Go: đánh dấu xong."""
         flow = [*TO_EVENT, Step("08_day4_siege_machine.png?no_go", end())]
-        device = run_flow(self, event.run, SCREENS, flow, SETTINGS, variants=VARIANTS)
+        device = run_flow(self, run_event_tasks, SCREENS, flow, SETTINGS, variants=VARIANTS)
         self.assertIn(KEY, device.daily_done)
 
     def test_already_done_skips(self):
         flow = [Step("03_main.png", end())]
-        run_flow(self, event.run, SCREENS, flow, SETTINGS, daily_done={KEY: "2026-10-01T08:00:00"})
+        run_flow(self, run_event_tasks, SCREENS, flow, SETTINGS, daily_done={KEY: "2026-10-01T08:00:00"})
 
     def test_disabled_skips(self):
         flow = [Step("03_main.png", end())]
-        run_flow(self, event.run, SCREENS, flow, {KEY: {"value": 0, "level": None, "day": 4}})
+        run_flow(self, run_event_tasks, SCREENS, flow, {KEY: {"value": 0, "level": None, "day": 4}})
 
 
 if __name__ == "__main__":

@@ -26,7 +26,7 @@ Flow:
 """
 from .....common import wait_gone
 from .....ocr import read_progress
-from ...common import (HANDLED, STOP, EventState, is_done_today, mark_complete,
+from ...common import (HANDLED, STOP, EventState, mark_complete,
                        mark_target_reached, run_task)
 from ...constants import GATHER_TROOPS_ICON, GO_BUTTON, GO_REGION, PROGRESS_FROM_GO
 from .constants import (
@@ -66,9 +66,6 @@ _X100 = "x100"             # action của nút Cultivate x100 (dùng cho wait_go
 
 def run(bot, task: dict, state: EventState):
     """`task` là settings của nhiệm vụ: {"enabled": bool, "day": int}."""
-    if is_done_today(bot, KEY):
-        bot.log("Cultivate Generals: already done")
-        return
     done = None   # số lần đã cultivate, đọc ở dòng có nút Go (None = chưa đọc / đọc lỗi)
     went = False   # đã bấm Go trong lượt này (bắt buộc trước các màn sau Go)
 

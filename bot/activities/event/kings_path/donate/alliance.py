@@ -5,6 +5,7 @@ alliance.py — Donate khi người dùng không làm Patrol (ô Patrol = 0): kh
 Go nên tự lưu số lần đã donate hôm nay vào daily_done (alliance_key).
 """
 from .....common import click_images, delay, exit_images, find_first, go_home
+from ...common import mark_done
 from .constants import (
     ALLIANCE_BUTTON,
     ALLIANCE_SCIENCE,
@@ -35,14 +36,11 @@ def donated_today(bot, target: int) -> int:
 
 def run(bot, task: dict):
     """`task` là settings của nhiệm vụ Donate: {"value": int, "day": int}."""
-    if bot.is_daily_done(KEY):
-        bot.log(f"{NAME}: already done")
-        return
     target = int(task.get("value") or 0)
     done = donated_today(bot, target)
     if done >= target:
         bot.log(f"{NAME}: donated {done} / {target} today (alliance), done")
-        bot.mark_daily_done(KEY)
+        mark_done(bot, KEY)
         return
     bot.log(f"{NAME}: Patrol off -> donate via Alliance Science ({done} / {target})")
     if not _open_science(bot):
@@ -52,7 +50,7 @@ def run(bot, task: dict):
     if done + donated >= target:
         bot.record(f"{NAME}: donated {done + donated} / {target}, done")
         bot.back(delay=1)
-        bot.mark_daily_done(KEY)
+        mark_done(bot, KEY)
 
 
 def _open_science(bot) -> bool:

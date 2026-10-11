@@ -22,7 +22,7 @@ Hospital "Wounded Troops 0/0" không có dòng lính nào (heal_empty.png).
 from .....ocr import read_heal_count
 from .....ocr.read_heal_count import CROP as HEAL_COUNT_CROP
 from ...city_building import HOSPITAL
-from ...common import EventState
+from ...common import EventState, mark_done
 from ...gather_troops.train_troop.constants import (
     CHECKBOX_OFF,
     CONFIRM,
@@ -121,7 +121,7 @@ def _no_wounded(bot, path):
     """Không có lính bị thương: Back, đánh dấu xong hôm nay."""
     bot.record(f"{NAME}: no wounded troops, done for today")
     bot.back(delay=1 + EXTRA_WAIT)
-    bot.mark_daily_done(path.key)
+    mark_done(bot, path.key)
     return None
 
 

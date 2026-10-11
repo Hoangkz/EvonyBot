@@ -8,7 +8,7 @@ import numpy as np
 
 from bot.activities import gift_claims
 from bot.activities.gift_claims import common
-from bot.activities.daily_activities.run import _run_gift_claims
+from bot.worker.daily.gifts import run_gift_claims
 from bot.worker.priority import DATA
 
 
@@ -68,19 +68,10 @@ class GiftClaimRegistryTests(unittest.TestCase):
         bot.mark_daily_done.side_effect = done.add
 
         with mock.patch.object(gift_claims, "TASKS", tasks):
-            gift_claims.run(bot)
+            run_gift_claims(bot)
 
         self.assertEqual(called, ["b"])
         self.assertEqual(done, {"gift_a", "gift_b"})
-
-    def test_post_daily_phase_runs_only_when_worker_enabled_it(self):
-        bot = SimpleNamespace(post_daily_gifts_enabled=False)
-        with mock.patch.object(gift_claims, "run") as run:
-            _run_gift_claims(bot)
-            run.assert_not_called()
-            bot.post_daily_gifts_enabled = True
-            _run_gift_claims(bot)
-            run.assert_called_once_with(bot)
 
     def test_claim_template_is_never_tapped_twice_on_an_unchanged_page(self):
         bot = mock.Mock()

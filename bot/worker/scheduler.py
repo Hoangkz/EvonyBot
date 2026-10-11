@@ -5,6 +5,9 @@ scheduler.py — Scheduler: chọn nhiệm vụ tiếp theo cho BotWorker.
   xong gần nhất (sang ngày mới thì làm lại).
 - Chọn nhiệm vụ tới lượt có độ ưu tiên cao nhất (số lớn hơn làm trước); cùng ưu tiên thì xoay vòng
   (nhiệm vụ lâu chưa được bắt đầu nhất đi trước, chưa từng chạy thì theo thứ tự danh sách).
+- Nhiệm vụ once (Task.once, VD Black Market): xong rồi thì không tới lượt lại khi qua mốc reset (chỉ chạy lại khi
+  Stop rồi Start: bộ chọn giữ trạng thái trong bộ nhớ).
+- Task.repeat (VD Crazy Eggs): hẹn chạy lại vẫn giữ độ ưu tiên của nhiệm vụ.
 - Hẹn chạy lại (finished(task, again_after=giây), VD Daily Activities chờ lượt Alliance Donation free hồi):
   đã xong hôm nay nhưng tới giờ hẹn thì lại tới lượt, với độ ưu tiên AGAIN_PRIORITY (thấp nhất: chỉ chạy khi
   không còn nhiệm vụ nào khác tới lượt).
@@ -32,7 +35,9 @@ class Scheduler:
 
     def _due_by_reset(self, task: Task) -> bool:
         done_for = self._done_for.get(task.key)
-        return done_for is None or self._last_reset() > done_for
+        if done_for is None:
+            return True
+        return not task.once and self._last_reset() > done_for
 
     def _due_again(self, task: Task) -> bool:
         again = self._again_at.get(task.key)
@@ -40,7 +45,7 @@ class Scheduler:
 
     def _priority(self, task: Task) -> int:
         """Độ ưu tiên lúc chọn: tới lượt chỉ vì hẹn giờ chạy lại -> AGAIN_PRIORITY."""
-        return task.priority if self._due_by_reset(task) else AGAIN_PRIORITY
+        return task.priority if self._due_by_reset(task) or task.repeat else AGAIN_PRIORITY
 
     def pick(self) -> Task | None:
         """Nhiệm vụ tới lượt nên làm tiếp, hoặc None nếu không còn nhiệm vụ nào tới lượt."""

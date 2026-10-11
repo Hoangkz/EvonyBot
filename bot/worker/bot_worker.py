@@ -27,6 +27,7 @@ from datetime import datetime
 from PyQt5.QtCore import QThread, pyqtSignal
 
 from ..activities import ACTIVITIES
+from .registry import REGISTRY
 from ..activities.join_monster_war import IDLE as BOSS_IDLE
 from ..common import GAME_PACKAGE, NotEnoughGems, get_server, keep_bubble
 from ..daily_reset import done_today, last_reset
@@ -152,7 +153,6 @@ class BotWorker(QThread):
             # Truyền cờ Stop, deadline None (không giới hạn) và hàm log.
             self.ctx = BotContext(device, self._stop, None, self.log)
             self.ctx.settings = self.settings
-            self.ctx.post_daily_gifts_enabled = True
             self.ctx.report_boss = self._report_boss
             self.ctx.is_daily_done = self._is_daily_done
             self.ctx.mark_daily_done = self._mark_daily_done
@@ -199,7 +199,8 @@ class BotWorker(QThread):
     def _run_tasks(self):
         """Vòng lặp chính (xem docstring đầu file) cho tới khi Stop."""
         boss = JOIN_BOSS in self.activities
-        tasks = build_tasks(self.activities, {JOIN_BOSS}, load_priorities(), load_must_finish())
+        tasks = build_tasks(self.activities, {JOIN_BOSS}, load_priorities(), load_must_finish(),
+                            self.settings, REGISTRY)
         if boss and not tasks:
             self._run_once([JOIN_BOSS])   # chỉ Join Boss: chạy liên tục như trước
             return
@@ -247,7 +248,7 @@ class BotWorker(QThread):
             scheduler.started(task)
             self.record(f"Bắt đầu: {task.key}")
             self.ctx.again_after = None
-            self._run_activity(task.group, self.settings.get(task.group, {}))
+            self._run_one(task)
             scheduler.finished(task, again_after=self.ctx.again_after)
             self.record(f"Xong: {task.key}")
             return True
@@ -413,6 +414,12 @@ class BotWorker(QThread):
     def _report_boss(self, coords):
         if self.boss_board is not None:
             self.boss_board.publish(self.serial, self.server, coords)
+
+    def _run_one(self, task):
+        """Chạy thẳng hàm run riêng của nhiệm vụ (không qua hàm run của activity). Bubble được lo trước; tới hạn
+        giữa chừng thì nhiệm vụ làm lại từ đầu."""
+        self._current = task.key
+        return self._with_bubble(task.key, task.run, self.ctx, self.settings.get(task.group, {}))
 
     def _run_activity(self, activity: str, tab_settings: dict):
         self._current = activity

@@ -90,9 +90,24 @@ WAITING_THRESHOLD = 0.8
 # Sau khi đập mỗi quả chờ refresh riêng (quả 1 30 phút, 2 4 giờ, 3 1 giờ, 4 2 giờ): game hiện
 # "Waiting:" không có búa, nên bot chỉ cần đập quả còn búa.
 
+# Nhãn "Activated" dưới quả đã vỡ (chữ, cắt từ 12_all_activated.png): đủ 4 quả vỡ = nhiệm vụ hôm nay xong
+# (DONE_KEY). Trên ảnh 4 quả khớp 1,00 / 0,94 / 0,88 / 0,84; màn khác chỉ khớp tối đa 1 chỗ (>= 0,8: quả 1 vỡ
+# 0,86, animation / hộp thoại tối 0,81..0,83) -> đếm khớp >= ACTIVATED_THRESHOLD, đủ EGG_COUNT mới tính.
+ACTIVATED = f"{FOLDER}/activated.png"
+ACTIVATED_THRESHOLD = 0.8
+EGG_COUNT = 4
+
 # Ở màn Event Center mà không thấy tab Activities: đánh dấu hôm nay xong (daily_done DONE_KEY, lưu
 # DB), các lần gọi sau trong ngày return ngay, không vào game; qua mốc reset server thì chạy lại.
 DONE_KEY = "crazy_eggs_done"
+
+# ---- Theo giờ (Daily Activities, mục General, daily_activities/run.py _run_crazy_eggs) ------------------------
+# Ô chọn 0 / 1h / 2h / 3h / 4h (mặc định 2h; 0 = không làm): chưa xong hôm nay (đủ 4 quả vỡ) thì cứ mỗi chừng
+# này giờ đập lại một lần.
+INTERVAL_KEY = "crazy_eggs_hours"    # settings["General"][INTERVAL_KEY]
+INTERVAL_CHOICES = (0, 1, 2, 3, 4)   # giờ
+INTERVAL_DEFAULT = 2
+TRIED_KEY = "crazy_eggs_tried"       # daily_done: lúc thử gần nhất (tính giờ chờ lần sau)
 
 # ---- Actions -----------------------------------------------------------
 ON_EGGS = "on_eggs"

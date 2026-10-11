@@ -15,6 +15,7 @@ import cv2
 
 from ...common import click_images, delay, exit_images, find_first, go_home
 from ...context.templates import TEMPLATE_DIR
+from ..result import NOT_DONE, TaskResult, clear, done, take
 from .constants import (
     ACTIVITY_LIST,
     ACTIVITY_TAB,
@@ -81,7 +82,7 @@ MONSTER_KILLING = "Monster Killing"   # nhãn nhiệm vụ đánh quái (run_tas
 
 @dataclass(frozen=True)
 class Task:
-    label: str          # tên nhiệm vụ (ô tích ở tab Daily Activities, key daily_done)
+    label: str          # tên nhiệm vụ (ô tích ở tab Daily Activities; worker dùng làm key "xong hôm nay")
     folder: str         # thư mục ảnh dưới DailyActivites/
     done: tuple[str, ...]                    # ảnh "đã xong"
     actions: tuple[tuple[str, str], ...]     # (ảnh, action) theo thứ tự ưu tiên
@@ -90,8 +91,10 @@ class Task:
     key: str = ""   # key nhiệm vụ trong bot/worker/priority.py (VD "daily_offering")
 
 
-def run_task(bot, task: Task) -> bool:
-    """True khi thấy ảnh Finish của task (đã hoàn thành trong ngày)."""
+def run_task(bot, task: Task) -> TaskResult:
+    """Vòng lặp chung của một nhiệm vụ Daily. TaskResult(done=True) khi thấy ảnh Finish của task (đã hoàn thành
+    trong ngày) hoặc handler đã báo xong (result.done); handler dừng mà chưa xong -> NOT_DONE."""
+    clear(bot)
     targets = task_targets(task)
     last_scroll_pos = None
     scroll_stalls = 0
@@ -104,7 +107,7 @@ def run_task(bot, task: Task) -> bool:
         action, pos = find_first(bot, screen, active_targets, top_left=ROW_ANCHORS,
                                  position_cache=image_positions(bot), fallback_full=True)
         if action == DONE:
-            return True
+            return take(bot) or TaskResult(done=True)
         if action == BACK:
             bot.back(delay=1)
         elif action == TAP:
@@ -128,7 +131,7 @@ def run_task(bot, task: Task) -> bool:
         elif action == OPEN:
             row_state = open_task_row(bot, screen, pos, task.after_open_tap, task.folder)
             if row_state == ROW_COMPLETE:
-                return True
+                return TaskResult(done=True)
         elif action in (OPEN_MONSTER_FIRST, OPEN_MONSTER_SECOND):
             if action == OPEN_MONSTER_SECOND:
                 # Supports resuming after the first 2-kill task was already
@@ -146,15 +149,15 @@ def run_task(bot, task: Task) -> bool:
                     bot._daily_monster_deferred = True
                     bot.log("Daily Activities: Monster Killing deferred after 2 attacks")
                     delay(bot, 2)
-                    return False
-                return True
+                    return NOT_DONE
+                return TaskResult(done=True)
         elif action == VERIFY_COLLECTING:
             # ClaimCollecting is the real Resource Collecting task. The
             # Research technologies row is only a shortcut to Collection.
             row_state = open_task_row(bot, screen, pos, None, task.folder,
                                       open_when_available=False)
             if row_state == ROW_COMPLETE:
-                return True
+                return TaskResult(done=True)
             if row_state == ROW_OPENED:
                 bot.log("Daily Activities: Resource Collecting still has Go")
                 scroll_to_top(bot)
@@ -170,7 +173,7 @@ def run_task(bot, task: Task) -> bool:
             # opens Evony's Quit dialog and hides every Daily control.
             delay(bot, 1)
         elif task.handler(bot, action, pos, screen):
-            return False
+            return take(bot) or NOT_DONE
 
 
 @lru_cache(maxsize=None)
@@ -651,24 +654,18 @@ def _same_list(before, after) -> bool:
     return float(cv2.matchTemplate(a, b, cv2.TM_CCOEFF_NORMED).max()) >= LIST_END_SAME
 
 
-# ---- Đánh dấu xong hôm nay -------------------------------------------------------------------
-def reached_key(task: Task, target: int) -> str:
-    """Key daily_done: hôm nay nhiệm vụ đã xong với mục tiêu `target` (0 = không còn gì để làm)."""
-    return f"{task.key}_reached_{target}"
-
-
+# ---- Báo xong hôm nay (worker ghi lại, xem bot/worker/daily/) --------------------------------------
 def mark_task_done(bot, task: Task, target: int = 0):
-    """Xong hôm nay (daily_done nhãn nhiệm vụ) kèm mục tiêu `target`."""
-    bot.mark_daily_done(task.label)
-    bot.mark_daily_done(reached_key(task, target))
+    """Luồng bên trong báo nhiệm vụ đã xong hôm nay, kèm mục tiêu `target` (result.done). Không ghi gì vào DB."""
+    return done(bot, target, label=task.label, key=task.key)
 
 
 def open_task_or_finish(bot, task: Task) -> bool:
     """open_task cho `task`. True khi đã bấm Go (làm tiếp phần sau Go).
-    - Dòng không còn Go mà thấy rõ Claim / tích V (TASK_DONE) -> đánh dấu xong hôm nay, mục tiêu 0.
+    - Dòng không còn Go mà thấy rõ Claim / tích V (TASK_DONE) -> báo xong hôm nay, mục tiêu 0.
     - Lướt hết (kể cả LIST_RETRIES lần thử lại) không thấy (TASK_NOT_FOUND) -> bỏ qua lượt này, KHÔNG
-      đánh dấu (có thể cuộn trượt; lần chạy sau tìm lại).
-    - Không nhận ra nút / thiếu ảnh thẻ (TASK_UNKNOWN), không mở được bảng Activity -> không đánh dấu."""
+      báo xong (có thể cuộn trượt; lần chạy sau tìm lại).
+    - Không nhận ra nút / thiếu ảnh thẻ (TASK_UNKNOWN), không mở được bảng Activity -> không báo xong."""
     result = open_task(bot, task_titles(task), task_cards(task), done_cards=task_done_cards(task))
     if result == TASK_OPENED:
         return True

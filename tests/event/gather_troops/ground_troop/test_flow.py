@@ -23,7 +23,7 @@ from bot.activities.event.gather_troops.ground_troop.constants import LOCKED_KEY
 from bot.activities.event.gather_troops.troop_tier import TIER_LOCK
 from bot.context import TEMPLATE_DIR
 from tests.flow import Step, back, end, run_flow, swipe, tap, tap_at
-from tests.event import setUpModule, tearDownModule  # noqa: F401 (tắt lượt nhận thưởng)
+from tests.event import setUpModule, tearDownModule, run_event_tasks  # noqa: F401 (tắt lượt nhận thưởng)
 
 SCREENS = Path(__file__).parent / "screens"
 KEY = ground_troop.KEY
@@ -144,14 +144,14 @@ class GroundTroopFlow(unittest.TestCase):
             Step("04_event_list.png", tap("Event/GatherTroops/icon.png")),
             *TO_FIRST_GO,
         ]
-        device = run_flow(self, event.run, SCREENS, flow, SETTINGS, variants=VARIANTS)
+        device = run_flow(self, run_event_tasks, SCREENS, flow, SETTINGS, variants=VARIANTS)
         self.assertNotIn(LOCKED_KEY, device.daily_done)
         self.assertIn("Ground Troop: done 0, remaining 20000", device.logs)
 
     def test_day2_locked_saved(self):
         """4 ổ khoá trên hàng tab Day (Day 2..5 khoá): lưu LOCKED_KEY rồi dừng."""
         flow = [*TO_EVENT, Step("06_day_locked_tmp.png?day2_locked", end())]
-        device = run_flow(self, event.run, SCREENS, flow, SETTINGS, variants=VARIANTS)
+        device = run_flow(self, run_event_tasks, SCREENS, flow, SETTINGS, variants=VARIANTS)
         self.assertIn(LOCKED_KEY, device.daily_done)
 
     def test_later_days_locked_day2_open(self):
@@ -159,14 +159,14 @@ class GroundTroopFlow(unittest.TestCase):
         (ảnh tạm King's Path có "Claim All" nên bước kế là bấm Claim All; hết kịch bản
         harness bật Stop)."""
         flow = [*TO_EVENT, Step("06_day_locked_tmp.png", tap("Event/claimAll.png"))]
-        device = run_flow(self, event.run, SCREENS, flow, SETTINGS, variants=VARIANTS)
+        device = run_flow(self, run_event_tasks, SCREENS, flow, SETTINGS, variants=VARIANTS)
         self.assertNotIn(LOCKED_KEY, device.daily_done)
 
     def test_go_waits_then_opens_barracks(self):
         """Bấm Go -> bấm giữa màn hình ngay sau đó (không thao tác nào khác xen giữa) ->
         thấy icon Train -> dừng (TODO). Thời gian chờ không kiểm ở đây (đồng hồ giả)."""
         flow = [*TO_EVENT, *TO_FIRST_GO]
-        device = run_flow(self, event.run, SCREENS, flow, SETTINGS, variants=VARIANTS)
+        device = run_flow(self, run_event_tasks, SCREENS, flow, SETTINGS, variants=VARIANTS)
         go = next(i for i, (_, e) in enumerate(device.events) if e[1:] == FIRST_GO)
         self.assertEqual(device.events[go + 1][1][1:], CENTER)
 
@@ -178,13 +178,13 @@ class GroundTroopFlow(unittest.TestCase):
             Step("10_after_go.png", tap_at(*CENTER)),
             *TO_FIRST_GO[3:],
         ]
-        device = run_flow(self, event.run, SCREENS, flow, SETTINGS, variants=VARIANTS)
+        device = run_flow(self, run_event_tasks, SCREENS, flow, SETTINGS, variants=VARIANTS)
         self.assertIn("Ground Troop: Train menu not shown, tapping center again", device.logs)
 
     def _train_flow(self, settings, *train_steps):
         """Tới màn Train (mở ở cấp train lần trước) rồi các bước chọn cấp `train_steps`."""
         flow = [*TO_EVENT, *TO_FIRST_GO[:-1], *train_steps]
-        device = run_flow(self, event.run, SCREENS, flow, settings, variants=VARIANTS)
+        device = run_flow(self, run_event_tasks, SCREENS, flow, settings, variants=VARIANTS)
         # Không bao giờ bấm "Instant Train" (tốn gems), nút trái đáy màn Train.
         instant = [(i, e) for i, e in device.events
                    if e[0] == "tap" and flow[i].screen.startswith(("train_t", "locked_"))
@@ -328,7 +328,7 @@ class GroundTroopFlow(unittest.TestCase):
             Step("10_after_go.png", tap_at(*CENTER)),
             *TO_FIRST_GO[4:],
         ]
-        device = run_flow(self, event.run, SCREENS, flow, SETTINGS, variants=VARIANTS)
+        device = run_flow(self, run_event_tasks, SCREENS, flow, SETTINGS, variants=VARIANTS)
         self.assertIn("Ground Troop: building already training, Speed Up from menu (not counted)",
                       device.logs)
         self.assertNotIn(LOCKED_KEY, device.daily_done)
@@ -336,24 +336,24 @@ class GroundTroopFlow(unittest.TestCase):
     def test_no_go_marks_done(self):
         """Tab Ground Troop không còn Go: đánh dấu nhiệm vụ đã xong rồi kết thúc."""
         flow = [*TO_EVENT, Step("09_day2_ground_troop.png?no_go", end())]
-        device = run_flow(self, event.run, SCREENS, flow, SETTINGS, variants=VARIANTS)
+        device = run_flow(self, run_event_tasks, SCREENS, flow, SETTINGS, variants=VARIANTS)
         self.assertIn(KEY, device.daily_done)
 
     def test_already_done_skips(self):
         """Đã đánh dấu xong từ lần reset server gần nhất: không làm gì."""
         flow = [Step("03_main.png", end())]
-        run_flow(self, event.run, SCREENS, flow, SETTINGS, daily_done={KEY: "2026-10-01T08:00:00"})
+        run_flow(self, run_event_tasks, SCREENS, flow, SETTINGS, daily_done={KEY: "2026-10-01T08:00:00"})
 
     def test_locked_skips_until_reset(self):
         """Đã lưu Day 2 khoá từ lần reset server gần nhất: không làm gì."""
         flow = [Step("03_main.png", end())]
-        run_flow(self, event.run, SCREENS, flow, SETTINGS,
+        run_flow(self, run_event_tasks, SCREENS, flow, SETTINGS,
                  daily_done={LOCKED_KEY: "2026-10-01T08:00:00"})
 
     def test_disabled_skips(self):
         """Ô Ground Troop chọn 0: không làm gì."""
         flow = [Step("03_main.png", end())]
-        run_flow(self, event.run, SCREENS, flow, {KEY: {"value": 0, "level": None, "day": 2}})
+        run_flow(self, run_event_tasks, SCREENS, flow, {KEY: {"value": 0, "level": None, "day": 2}})
 
     def test_gather_troops_not_found(self):
         """Danh sách event không có Gather Troops: cuộn xuống 4 lần rồi BACK, bỏ nhiệm vụ."""
@@ -364,7 +364,7 @@ class GroundTroopFlow(unittest.TestCase):
                  *[swipe(50, 80, 50, 50) for _ in range(4)], back()),
             Step("03_main.png?claimed", end()),
         ]
-        run_flow(self, event.run, SCREENS, flow, SETTINGS, variants=VARIANTS)
+        run_flow(self, run_event_tasks, SCREENS, flow, SETTINGS, variants=VARIANTS)
 
 
 if __name__ == "__main__":

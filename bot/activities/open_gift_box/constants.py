@@ -12,15 +12,17 @@ FRAGMENT = f"{ITEMS}/FragmentPuzzle.png"
 FRAGMENT_NEAR = 8.5         # max distance feather -> puzzle piece, % of screen height
 # After tapping a box: wait 1s for its Open / Use button, then up to this many more 1s waits.
 BUTTON_EXTRA_WAITS = 5
-KEY = "open_gift_box"       # daily_done key: every box opened today
+MAX = f"{SETUP}/Max.png"    # quantity popup: select the whole stack
+KEY = "open_gift_box"      # daily_done key: every box opened today
 
-# Checkbox label -> folder of box icons.
-BOX_FOLDERS = {
-    "Resource": f"{ITEMS}/resource",
-    "Gold": f"{ITEMS}/gold",
-    "Gems": f"{ITEMS}/gem",
-    "Etc": f"{ITEMS}/etc",
-}
+# (checkbox label, folder of box icons, ticked by default), in the order shown in the tab.
+BOX_TYPES = [
+    ("Resource", f"{ITEMS}/resource", True),
+    ("Gold", f"{ITEMS}/gold", True),
+    ("Gems", f"{ITEMS}/gem", True),
+    ("Etc", f"{ITEMS}/etc", False),
+]
+BOX_FOLDERS = {label: folder for label, folder, _ in BOX_TYPES}
 ALL_BOXES = "All"
 
 # One match threshold for every image of this activity (find_first's default is 0.9).
@@ -43,4 +45,5 @@ LIST_SWIPE = (50, 62, 50, 36)
 CONFIRM = "confirm"
 BOX_LIST = "box_list"       # gift box list open -> tap the next wanted box
 TAP = "tap"                 # item, Open or Use button: just tap it
+USE_POPUP = "use_popup"     # quantity popup -> Max, then Use
 BACK = "back"

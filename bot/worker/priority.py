@@ -38,9 +38,12 @@ DATA ={
         { "key": "kings_path_heal", "label": "King's Path: Heal", "priority": 547 },
         { "key": "kings_path_refine", "label": "King's Path: Refine Equipment", "priority": 546 },
         { "key": "gather_troops_claim", "label": "Gather Troops: nhận thưởng (chấm đỏ + rương mốc)", "priority": 500 },
-        { "key": "kings_path_claim", "label": "King's Path: nhận thưởng (chấm đỏ)", "priority": 499 }
+        { "key": "kings_path_claim", "label": "King's Path: nhận thưởng (chấm đỏ)", "priority": 499 },
+        { "key": "three_day_event", "label": "Event 3 ngày (Event Center)", "priority": 498 }
     ],
     "Daily Activities": [
+        { "key": "daily_buy_stamina", "label": "General: Buy Stamina", "priority": 668 },
+        { "key": "daily_buy_hammers", "label": "General: Buy All Hammers", "priority": 667 },
         { "key": "daily_offering", "label": "Offering", "priority": 666 },
         { "key": "daily_resource_gathering", "label": "Resource Gathering", "priority": 665, "note": "Phải chạy ngay sau Offering (bàn tay nổi trong thành)" },
         { "key": "daily_resource_tax", "label": "Resource Tax", "priority": 399 },

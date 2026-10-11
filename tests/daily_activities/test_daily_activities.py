@@ -4,10 +4,12 @@ from unittest import mock
 
 import numpy as np
 
+from bot.activities.result import TaskResult
+from bot.worker.daily import policy
 from ui.tabs.daily_activities_tab import SUPPORTED_TASKS
 
 _PKG = "bot.activities.daily_activities"
-daily = importlib.import_module(f"{_PKG}.run")          # thứ tự nhiệm vụ, run()
+daily = importlib.import_module(f"{_PKG}.run")          # thứ tự nhiệm vụ, hàm run của từng nhiệm vụ
 common = importlib.import_module(f"{_PKG}.common")      # vòng lặp chung run_task
 const = importlib.import_module(f"{_PKG}.constants")
 collecting = importlib.import_module(f"{_PKG}.resource_collecting.run")
@@ -91,38 +93,27 @@ class DailyGoTests(unittest.TestCase):
         self.assertEqual(sorted(key for key, _ in SUPPORTED_TASKS),
                          sorted(task.label for task in daily.TASKS))
 
-    @mock.patch.object(daily, "collect_activity_rewards")
-    @mock.patch.object(daily, "run_task")
-    def test_monster_is_retried_after_five_other_completed_tasks(self, run_task,
-                                                                 collect_rewards):
-        selected = daily.TASKS[:7]
+    @mock.patch("bot.worker.daily.policy.run_task")
+    def test_monster_not_finished_is_retried_later(self, run_task):
+        """Monster Killing là một nhiệm vụ riêng: đánh 2 lần rồi hoãn (chưa xong) -> hẹn thử lại (ctx.again_after,
+        ưu tiên thấp nhất nên chạy sau các nhiệm vụ khác); lần sau đánh nốt thì lưu xong, không hẹn nữa."""
+        monster_task = next(task for task in daily.TASKS if task.label == "Monster Killing")
         done = set()
-        monster_calls = 0
         bot = mock.Mock()
-        bot._daily_monster_deferred = False
+        bot.again_after = None
         bot.is_daily_done.side_effect = lambda label: label in done
         bot.mark_daily_done.side_effect = done.add
+        run_task.side_effect = [TaskResult(), TaskResult(done=True)]
 
-        def execute(current_bot, task):
-            nonlocal monster_calls
-            if task.label == "Monster Killing":
-                monster_calls += 1
-                current_bot._daily_monster_deferred = monster_calls == 1
-                return monster_calls > 1
-            return True
+        policy.run_daily_task(bot, {}, task=monster_task)
+        self.assertEqual(bot.again_after, policy.RETRY_AFTER)
+        self.assertNotIn("Monster Killing", done)
 
-        run_task.side_effect = execute
-        settings = {task.label: True for task in selected}
-
-        with mock.patch.object(daily, "TASKS", selected):
-            daily.run(bot, settings)
-
-        labels = [call.args[1].label for call in run_task.call_args_list]
-        self.assertEqual(labels[:7], [selected[0].label]
-                         + [task.label for task in selected[1:6]]
-                         + [selected[0].label])
-        self.assertEqual(monster_calls, 2)
-        collect_rewards.assert_called_once_with(bot)
+        bot.again_after = None
+        policy.run_daily_task(bot, {}, task=monster_task)
+        self.assertIsNone(bot.again_after)
+        self.assertIn("Monster Killing", done)
+        self.assertEqual(run_task.call_count, 2)
 
     @mock.patch.object(collecting, "open_daily_activity", return_value=True)
     def test_resource_collecting_returns_to_daily_after_collection(self, open_activity):

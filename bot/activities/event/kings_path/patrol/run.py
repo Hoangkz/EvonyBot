@@ -16,7 +16,7 @@ import cv2
 import numpy as np
 
 from ...city_building import WALLS
-from ...common import EventState, mark_target_reached
+from ...common import EventState, mark_done, mark_target_reached
 from .. import path_task
 from ..building import open_building
 from .constants import (
@@ -132,7 +132,7 @@ def _finish(bot, path, message: str, complete: bool = False):
     if complete:
         mark_target_reached(bot, path.key)
     else:
-        bot.mark_daily_done(path.key)
+        mark_done(bot, path.key)
 
 
 def _claimed(screen) -> bool:
