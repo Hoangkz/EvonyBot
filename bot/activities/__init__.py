@@ -5,7 +5,7 @@ Pressing Stop makes any BotContext call raise, which ends the activity.
 
 ACTIVITIES maps the activity's display name (same as its tab title and
 its Select Activity button) to that function. Worker chạy theo từng nhiệm vụ
-(registry.py), không theo activity; ACTIVITIES chỉ còn Join Monster War và các activity chỉ có một nhiệm vụ (Daily
+(bot/worker/priority.py), không theo activity; ACTIVITIES chỉ còn Join Monster War và các activity chỉ có một nhiệm vụ (Daily
 Activities và Event không có hàm run của cả activity).
 """
 from . import alliance_capacity

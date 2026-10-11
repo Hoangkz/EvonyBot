@@ -11,7 +11,7 @@ FOLDER_PATH = f"{ROOT}/{FOLDER}"
 DONE_IMAGES = ()
 ACTIONS = ()
 
-# ---- Theo giờ (../hourly.py try_task, gọi từ ../run.py), như Alliance Donation ------------------------
+# ---- Theo giờ (../common.py try_task, worker gọi), như Alliance Donation ------------------------
 # Nhiệm vụ "Complete Alliance Help for 5 time(s)". Màn chính -> Liên minh -> dòng "Alliance Help" -> màn Alliance
 # Help: "No records" (không ai cần giúp) -> Back, sang nhiệm vụ khác, KHÔNG lưu gì vào DB (không kiểm tra Activity);
 # có "Help All" -> bấm -> Back -> lưu giờ thử -> kiểm tra dòng / thẻ Activity (như Alliance Donation): xong -> đánh dấu.

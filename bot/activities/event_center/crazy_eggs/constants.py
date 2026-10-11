@@ -101,7 +101,7 @@ EGG_COUNT = 4
 # DB), các lần gọi sau trong ngày return ngay, không vào game; qua mốc reset server thì chạy lại.
 DONE_KEY = "crazy_eggs_done"
 
-# ---- Theo giờ (Daily Activities, mục General, daily_activities/run.py _run_crazy_eggs) ------------------------
+# ---- Theo giờ (Daily Activities, mục General, event_center/crazy_eggs/run.py _run_crazy_eggs) ------------------------
 # Ô chọn 0 / 1h / 2h / 3h / 4h (mặc định 2h; 0 = không làm): chưa xong hôm nay (đủ 4 quả vỡ) thì cứ mỗi chừng
 # này giờ đập lại một lần.
 INTERVAL_KEY = "crazy_eggs_hours"    # settings["General"][INTERVAL_KEY]

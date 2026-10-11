@@ -8,7 +8,6 @@ import numpy as np
 
 from bot.activities import gift_claims
 from bot.activities.gift_claims import common
-from bot.worker.gifts import run_gift_claims
 from bot.worker.priority import DATA
 
 
@@ -68,7 +67,7 @@ class GiftClaimRegistryTests(unittest.TestCase):
         bot.mark_daily_done.side_effect = done.add
 
         with mock.patch.object(gift_claims, "TASKS", tasks):
-            run_gift_claims(bot)
+            gift_claims.run(bot)
 
         self.assertEqual(called, ["b"])
         self.assertEqual(done, {"gift_a", "gift_b"})

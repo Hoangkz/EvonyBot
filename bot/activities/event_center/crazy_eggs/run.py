@@ -13,13 +13,13 @@ lưu daily_done LUCKY_KEY. Rồi kết thúc.
 
 Trả TaskResult(done=True) khi cả 4 quả đã vỡ (4 nhãn "Activated"), hoặc rồi kết thúc khi không thấy tab Activities / icon Crazy Eggs sau ATTEMPTS lần thử và
 AFTER_RESTART_ATTEMPTS lần thử sau khi tắt / mở lại game (run_task_with_retry) cũng là done=True.
-Đã xong hôm nay chưa, hẹn đập lại sau mấy giờ: việc của worker (bot/worker/policies.py).
+Đã xong hôm nay chưa, hẹn đập lại sau mấy giờ: nhiệm vụ tự lưu vào DB, worker (bot/worker/tasks.py) chỉ kiểm tra đã xong chưa.
 
 Quả đã nhận hết vật phẩm thì vỡ: animation (cả màn tối, tiêu đề mờ -> bấm (50 %, 95 %) để bỏ
 qua), rồi popup thưởng thêm "Congratulations on activating the egg!" -> BACK; nhãn thành
 "Activated": không còn búa nên đập thường tự bỏ qua.
 """
-from ...result import NOT_DONE, TaskResult, clear, done, take
+from ...result import NOT_DONE, TaskResult, clear, done, save_errors, take
 from ..common import HANDLED, ICON_NOT_FOUND, TAB_NOT_FOUND, run_task_with_retry
 from ..constants import ACTIVITIES
 from .constants import (
@@ -29,6 +29,8 @@ from .constants import (
     DIM_MAX_TAPS,
     DONE,
     DONE_KEY,
+    INTERVAL_KEY,
+    TRIED_KEY,
     EGG_COUNT,
     EGG_TAP_DELAY,
     COLUMN_SPLIT,
@@ -215,3 +217,33 @@ def _ordered(bot, screen) -> list[tuple[int, tuple[int, int]]]:
     hits = bot.find_all(HAMMER, threshold=HAMMER_THRESHOLD, screen=screen)
     pairs = [(_egg_number(screen, pos), pos) for pos in hits]
     return sorted(pairs, key=lambda pair: ORDER.index(pair[0]))
+
+
+# ---- Luật của việc (bảng bot/worker/priority.py: "run": JOB) -------------------------------------------------------
+# Việc theo giờ (ô chọn 0 / 1h .. 4h ở mục General của tab Daily Activities): đập một lần rồi worker lưu giờ đã đập vào DB, mỗi
+# vòng lặp chỉ so giờ đó. Đủ 4 quả vỡ thì lưu DONE_KEY (xong hôm nay).
+GENERAL = "General"   # mục General của tab Daily Activities
+
+
+def crazy_eggs_hours(settings: dict) -> int:
+    """Số giờ giữa hai lần đập trứng (ô chọn ở mục General của tab UI; thiếu khoá / sai kiểu -> 0 = không làm)."""
+    general = settings.get(GENERAL, {})
+    if not isinstance(general, dict):
+        return 0
+    try:
+        return max(0, int(general.get(INTERVAL_KEY, 0)))
+    except (TypeError, ValueError):
+        return 0
+
+
+@save_errors("crazy_eggs")   # lỗi thì lưu `crazy_eggs_error` vào DB
+def _run_crazy_eggs(ctx, settings: dict):
+    ctx.log(f"Daily General: Crazy Eggs (every {crazy_eggs_hours(settings)}h)")
+    if run(ctx, {}).done:
+        ctx.mark_daily_done(DONE_KEY)   # đủ 4 quả vỡ: lưu "xong hôm nay" vào DB
+    # Lưu giờ vừa đập vào DB: worker chỉ so giờ này để biết tới giờ đập lại chưa. Bị ngắt / lỗi giữa chừng thì chưa lưu giờ.
+    ctx.mark_daily_done(TRIED_KEY)
+
+
+JOB = {"run": _run_crazy_eggs, "enabled": lambda settings: crazy_eggs_hours(settings) > 0,
+       "done": lambda ctx, settings: ctx.is_daily_done(DONE_KEY), "every": crazy_eggs_hours}

@@ -11,8 +11,8 @@ import cv2
 import numpy as np
 
 from ....ocr._digits import read as read_digits
-from ...result import TaskResult
-from ..constants import HAMMER_DONE, STAMINA_REACHED
+from ...result import TaskResult, save_errors
+from ..constants import GENERAL, HAMMER_DONE, STAMINA_REACHED
 from ....common import click_images, delay, exit_images, find_first, go_home
 
 BUY = "DailyActivites/ActivitiesBuyDaily"
@@ -266,4 +266,57 @@ def buy_all_hammers(bot) -> bool:
     return False
 
 
+# ---- Luật của việc (bảng bot/worker/priority.py: "run": JOB) -------------------------------------------------------
+# Mỗi món xong thì lưu dấu riêng vào DB: Stamina `General: Stamina reached <mốc>` (nâng mốc ở tab thì chỉ mua phần còn lại),
+# Hammer `General: Hammer`. "Xong" tính lại từ các dấu đó mỗi vòng lặp: đã mua tới 10, tab đổi lên 16 -> chưa xong; đổi về
+# 10 -> xong lại.
+def _general(settings: dict) -> dict:
+    general = settings.get(GENERAL, {})
+    return general if isinstance(general, dict) else {}
 
+
+def stamina_quantity(general: dict) -> int:
+    """Mốc Stamina chọn ở mục General (0 = không mua)."""
+    try:
+        return max(0, int(general.get("stamina_quantity", 10))) if general.get("buy_stamina") else 0
+    except (TypeError, ValueError):
+        return 0
+
+
+def stamina_reached(ctx) -> int:
+    """Số Stamina đã mua tới hôm nay (lớn nhất trong các dấu `General: Stamina reached <N>`), 0 nếu chưa mua."""
+    prefix = f"{STAMINA_REACHED} "
+    return max((int(k[len(prefix):]) for k in ctx.daily_keys()
+                if k.startswith(prefix) and k[len(prefix):].isdigit() and ctx.is_daily_done(k)), default=0)
+
+
+def needs(ctx, settings: dict) -> tuple[int, bool]:
+    """(mốc Stamina cần mua tới, có cần mua Hammer không) — chỉ phần chưa mua hôm nay."""
+    general = _general(settings)
+    quantity = stamina_quantity(general)
+    return (quantity if quantity > stamina_reached(ctx) else 0), (
+        bool(general.get("buy_all_hammers")) and not ctx.is_daily_done(HAMMER_DONE))
+
+
+def _job_enabled(settings: dict) -> bool:
+    general = _general(settings)
+    return stamina_quantity(general) > 0 or bool(general.get("buy_all_hammers"))
+
+
+def _job_done(ctx, settings: dict) -> bool:
+    quantity, hammers = needs(ctx, settings)
+    return quantity == 0 and not hammers
+
+
+@save_errors("daily_buy_general")   # lỗi thì lưu `daily_buy_general_error` vào DB
+def _job_run(ctx, settings: dict):
+    quantity, hammers = needs(ctx, settings)
+    if quantity == 0 and not hammers:
+        return
+    ctx.log(f"Daily General: Buy Stamina to {quantity}, Hammers {hammers}")
+    for outcome in run(ctx, quantity, hammers).outcomes:
+        if outcome.done:
+            ctx.mark_daily_done(outcome.key)   # mỗi món mua xong thì lưu dấu của món đó vào DB ngay
+
+
+JOB = {"run": _job_run, "enabled": _job_enabled, "done": _job_done}

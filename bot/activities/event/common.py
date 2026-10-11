@@ -130,7 +130,7 @@ class EventState:
 
 
 # ---- Báo kết quả nhiệm vụ cho worker ------------------------------------------------------
-# Nhiệm vụ chỉ BÁO kết quả (bot/activities/result.py); worker (bot/worker/policies.py) ghi daily_done, quyết định
+# Nhiệm vụ BÁO kết quả giữa chừng (bot/activities/result.py); chỗ chạy nhiệm vụ (event/run.py event_job) lưu vào daily_done ngay; worker chỉ quyết định
 # bỏ qua nhiệm vụ đã xong / đã đạt mục tiêu / Day khoá, và đọc lại mục tiêu người dùng chọn.
 # - mark_done: hết lượt / hết tài nguyên trong ngày (mai kiểm tra tiếp).
 # - mark_complete: hết nút Go (đã làm tới mốc cao nhất của nhiệm vụ) -> xong hẳn dù người dùng chọn mục tiêu nào.

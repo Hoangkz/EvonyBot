@@ -1,12 +1,11 @@
 """
 daily_activities — "Daily Activities" activity (bố cục giống activity Event: mỗi nhiệm vụ một thư mục).
 
-- run.py:       TASKS (thứ tự nhiệm vụ), HOURLY (việc theo giờ), mua General -> chỉ làm thao tác, trả TaskResult
-                (bot/activities/result.py). KHÔNG chọn việc / ghi "xong hôm nay" / hẹn thử lại: việc của worker
-                (bot/worker/policies.py).
-- common.py:    vòng lặp chung của một nhiệm vụ (run_task -> TaskResult), mở Activity, dòng Go, cuộn, nhận thưởng cuối
+- common.py:    vòng lặp chung của một việc (run_task -> TaskResult), mở Activity, dòng Go, cuộn, nhận thưởng cuối; cuối file là
+                luật của các việc Daily cho bảng bot/worker/priority.py (daily_job, hourly_job, REWARDS_JOB, GIFTS_JOB): việc TỰ
+                LƯU kết quả vào DB, worker chỉ kiểm tra đã xong chưa (bot/worker/tasks.py).
 - constants.py: thư mục ảnh, tên action, key daily_done dùng chung
-- general.py:   Buy Stamina / Buy All Hammers
+- buy_daily/:   General: mua Stamina + Hammer (run.py + luật ở cuối file)
 - OPEN_TASK.md: flow mở nhiệm vụ / bấm Go / đánh dấu xong (đọc trước)
 - <nhiệm vụ>/:  constants.py (ảnh) + run.py (handler, TASK) — monster_killing, resource_collecting,
                 offering, resource_gathering, resource_tax, gold_levy, troop_training, troop_healing,

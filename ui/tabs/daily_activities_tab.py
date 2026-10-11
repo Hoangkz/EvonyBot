@@ -65,8 +65,8 @@ GENERAL_KEY = "General"
 HOURLY_TASKS = {
     alliance_donation.constants.INTERVAL_KEY: (
         alliance_donation.constants,
-        "Donate lượt miễn phí ở Alliance Science, chưa xong thì làm lại sau chừng này giờ (không ưu tiên). "
-        "0 = không làm."),
+        "Donate lượt miễn phí ở Alliance Science rồi nhận thưởng; làm lại sau chừng này giờ kể từ lần donate trước "
+        "(mặc định 4h). 0 = không làm."),
     alliance_help.constants.INTERVAL_KEY: (
         alliance_help.constants,
         "Help All ở Alliance Help, chưa xong thì làm lại sau chừng này giờ (không ưu tiên, sau Alliance "

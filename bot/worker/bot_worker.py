@@ -1,19 +1,27 @@
 """
 bot_worker.py — BotWorker: chạy các nhiệm vụ của một thiết bị trên QThread riêng, tới khi Stop.
 
-Thứ tự ưu tiên: Bubble > Auto Times Out > Join Boss > nhiệm vụ (scheduler.py, độ ưu tiên trong priority.py).
+Danh sách nhiệm vụ: lúc Start lấy mọi nhiệm vụ đã tích (tasks.build_tasks), xếp theo độ ưu tiên (priority.py). Mỗi vòng lặp:
+1. đọc DB, bỏ qua nhiệm vụ đã xong hôm nay (xong = dấu lưu sau mốc reset server gần nhất);
+2. việc theo giờ (đập trứng, Alliance Donation / Help): làm xong thì lưu giờ vào DB; mỗi vòng chỉ so giờ đó, tới giờ thì làm ngay;
+3. không có việc theo giờ nào tới giờ thì lấy nhiệm vụ đầu danh sách làm; chưa xong thì chuyển xuống cuối, rồi làm việc khác.
+Sang ngày mới (qua mốc reset server) thì tắt game bật lại (giữa hai nhiệm vụ), dấu "xong" của hôm qua hết hiệu lực nên nhiệm vụ
+tự quay lại (trừ nhiệm vụ `once` đã xong).
+
+Thứ tự ưu tiên: Bubble > Auto Times Out > Join Boss > nhiệm vụ.
 - Bubble: lo trước mọi lần chạy (guards.py); tới hạn thì ngắt mọi thứ đang chạy (BubbleDue).
 - Auto Times Out (số phút chọn ở màn Home, chung mọi thiết bị): lo ngay sau bubble; chạy đủ số phút kể từ
   lần đóng game trước thì ngắt mọi thứ đang chạy (RestartDue) và đóng game; nhiệm vụ đang dở làm lại.
 - Có chọn Join Boss: mỗi vòng chạy Join Boss (rảnh thì nhường), rồi 1 nhiệm vụ tối đa OTHERS_WINDOW
-  giây; xong nhiệm vụ là quay lại Join Boss ngay. Hết giờ / có boss mới -> quay lại, nhiệm vụ đang dở
-  làm lại đầu tiên ở vòng sau. Join Boss dừng hẳn (không phải rảnh) -> vẫn chạy tiếp các nhiệm vụ.
+  giây; xong nhiệm vụ là quay lại Join Boss ngay. Hết giờ / có boss mới -> nhiệm vụ đang dở chưa xong nên xuống cuối danh sách.
+  Join Boss dừng hẳn (không phải rảnh) -> vẫn chạy tiếp các nhiệm vụ.
 - Nhiệm vụ must_finish (priority.py): đã bắt đầu thì chạy tới xong; Bubble / Auto Times Out / boss mới /
   120 giây không ngắt (chỉ Stop). Xong rồi mới tới Bubble, Auto Times Out và Join Boss.
 - Không chọn Join Boss: không có giới hạn 120 giây, các nhiệm vụ chạy lần lượt tới khi xong.
 - Không tích Bubble: không có luật Bubble (không lo bubble, không bị ngắt vì bubble).
-- Không còn nhiệm vụ tới lượt: nghỉ ngắn rồi xét lại (thread vẫn sống); qua mốc reset server thì các
-  nhiệm vụ đã xong lại tới lượt.
+- Một nhiệm vụ chạy hết một lượt mà vẫn chưa xong tối đa MAX_ATTEMPTS (6) lần mỗi ngày; quá thì bỏ qua tới ngày mới
+  (bị ngắt giữa chừng không tính là một lần thử).
+- Danh sách rỗng hoặc cả danh sách đều chưa xong: nghỉ ngắn (IDLE_WAIT) rồi xét lại (thread vẫn sống).
 - Chỉ chọn mỗi Join Boss: chạy Join Boss liên tục như trước.
 """
 import json
@@ -28,20 +36,19 @@ from types import SimpleNamespace
 from PyQt5.QtCore import QThread, pyqtSignal
 
 from ..activities import ACTIVITIES
-from .registry import REGISTRY
 from ..activities.join_monster_war import IDLE as BOSS_IDLE
 from ..common import get_server
 from ..daily_reset import done_today, last_reset
 from ..context import BotContext, BotInterrupted, TimedOut
 from ..context.errors import BossAvailable, StopRequested, YieldToBoss
 from .guards import Guards
-from .scheduler import Scheduler
 from .server_clock import ServerClock
-from .tasks import build_tasks, load_must_finish, load_priorities
+from .tasks import build_tasks
 from .status import STATUS_ERROR, STATUS_RUNNING, STATUS_STOPPED
 
 JOIN_BOSS = "Join Monster War"
 OTHERS_WINDOW = 120   # giây tối đa cho 1 nhiệm vụ khi có Join Boss (không có Join Boss: không giới hạn)
+MAX_ATTEMPTS = 6       # số lần tối đa mỗi ngày một nhiệm vụ chạy hết một lượt mà vẫn chưa xong (quá thì bỏ qua tới ngày mới)
 IDLE_WAIT = 5         # giây nghỉ khi không còn nhiệm vụ nào tới lượt
 
 
@@ -113,7 +120,8 @@ class BotWorker(QThread):
                 found=lambda seconds: self.bubble_found.emit(self.serial, seconds),
                 disabled=self._on_bubble_disabled,
                 activity=lambda label: self.activity_changed.emit(self.serial, label),
-                log=self.log, record=self.record))
+                log=self.log, record=self.record),
+            server_time=lambda: self.server_time)
 
     def stop(self):
         # Chỉ yêu cầu dừng; activity phải kiểm tra cờ, không cưỡng chế tắt thread.
@@ -179,24 +187,73 @@ class BotWorker(QThread):
     def _run_tasks(self):
         """Vòng lặp chính (xem docstring đầu file) cho tới khi Stop."""
         boss = JOIN_BOSS in self.activities
-        tasks = build_tasks(self.activities, {JOIN_BOSS}, load_priorities(), load_must_finish(),
-                            self.settings, REGISTRY)
+        tasks = build_tasks(self.activities, {JOIN_BOSS}, self.settings)   # đã xếp theo độ ưu tiên
         if boss and not tasks:
             self._run_once([JOIN_BOSS])   # chỉ Join Boss: chạy liên tục như trước
             return
-        scheduler = Scheduler(tasks, lambda: last_reset(self.server_time))
-        resume = None   # nhiệm vụ bị ngắt giữa chừng: làm lại đầu tiên ở vòng sau
+        timed = [task for task in tasks if task.due is not None]   # việc theo giờ: giờ lần làm trước lưu trong DB
+        order = [task for task in tasks if task.due is None]       # thứ tự làm: chưa xong thì chuyển xuống cuối
+        reset = last_reset(self.server_time)
+        self.guards.reset_handled = reset   # vừa Start thì không đóng game; chỉ đóng khi qua một mốc reset mới
+        ran = set()        # nhiệm vụ không có dấu xong trong DB: đã chạy hết một lượt kể từ lần reset gần nhất
+        ran_once = set()   # nhiệm vụ `once` đã chạy xong: không làm lại khi sang ngày mới (chỉ khi Start lại)
+        attempts = {}      # key -> số lần chạy hết một lượt mà vẫn chưa xong hôm nay (tối đa MAX_ATTEMPTS)
+        stalled = 0        # số nhiệm vụ liên tiếp chạy xong một lượt mà vẫn chưa xong
         while not self._stop.is_set():
             if boss:
                 self._ensure_server()
                 boss = self._check_boss()
-            task = resume if resume is not None and scheduler.is_due(resume) else scheduler.pick()
-            resume = None
+            now_reset = last_reset(self.server_time)
+            if now_reset > reset:   # sang ngày mới: các dấu "đã chạy" và số lần thử của hôm qua hết hiệu lực
+                reset = now_reset
+                ran.clear()
+                attempts.clear()
+                # Tới mốc reset server: tắt game bật lại. Thường đã làm đúng giờ bởi ResetDue (guards.py, kể cả khi đang chạy
+                # nhiệm vụ); ở đây chỉ làm nếu chưa (restart_for_reset bỏ qua mốc đã xử lý). Game tự mở lại ở nhiệm vụ kế tiếp
+                # (go_home).
+                self.guards.restart_for_reset(now_reset)
+            # Mỗi vòng đọc lại trạng thái từ DB và bỏ qua nhiệm vụ đã xong hôm nay (đổi mục tiêu ở tab, sang ngày mới... thì
+            # nhiệm vụ tự quay lại, không cần dựng lại danh sách).
+            skip = lambda t: ((t.once and t.key in ran_once) or attempts.get(t.key, 0) >= MAX_ATTEMPTS
+                              or self._is_done(t, ran))
+            # Việc theo giờ: chỉ cần so giờ đã lưu trong DB; tới giờ thì làm ngay, trước các việc trong danh sách.
+            task = next((t for t in timed if not skip(t) and self._is_due(t)), None)
+            pending = [t for t in order if not skip(t)]
             if task is None:
-                self.guards.call(None, self.ctx.sleep, IDLE_WAIT)
+                if not pending:
+                    self.guards.call(None, self.ctx.sleep, IDLE_WAIT)
+                    continue
+                task = pending[0]
+            completed = self._run_task(task, boss)   # False: bị ngắt giữa chừng (không tính là một lần thử)
+            if completed and task.done is None:
+                ran.add(task.key)
+                if task.once:
+                    ran_once.add(task.key)
+            if self._is_done(task, ran):
+                stalled = 0
                 continue
-            if not self._run_task(scheduler, task, boss):
-                resume = task
+            if completed and task.due is None:   # việc theo giờ đã bị giãn bởi số giờ trên tab: không giới hạn số lần thử
+                attempts[task.key] = attempts.get(task.key, 0) + 1
+                if attempts[task.key] >= MAX_ATTEMPTS:
+                    self.record(f"{task.key}: chưa xong sau {MAX_ATTEMPTS} lần thử, bỏ qua tới ngày mới")
+                    continue
+            if task.due is None:
+                order.remove(task)
+                order.append(task)   # chưa xong: chuyển xuống cuối (việc theo giờ thì chờ tới giờ kế tiếp)
+                stalled += 1
+                if stalled >= len(pending):   # cả danh sách đều chưa xong: nghỉ chút rồi mới vòng lại
+                    stalled = 0
+                    self.guards.call(None, self.ctx.sleep, IDLE_WAIT)
+
+    def _is_done(self, task, ran) -> bool:
+        """Nhiệm vụ đã xong hôm nay: theo dấu trong DB (`done`), hoặc (không có dấu) đã chạy hết một lượt."""
+        if task.done is None:
+            return task.key in ran
+        return bool(task.done(self.ctx, self.settings.get(task.group, {})))
+
+    def _is_due(self, task) -> bool:
+        """Việc theo giờ đã tới giờ làm (so với giờ lần làm trước lưu trong DB)."""
+        return bool(task.due(self.ctx, self.settings.get(task.group, {})))
 
     def _check_boss(self) -> bool:
         """Một lượt Join Boss, rảnh thì nhường (exit_when_idle). False nếu Join Boss dừng hẳn."""
@@ -209,10 +266,10 @@ class BotWorker(QThread):
         self.record("Join Monster War dừng; chạy tiếp các nhiệm vụ khác")
         return False
 
-    def _run_task(self, scheduler: Scheduler, task, boss: bool) -> bool:
+    def _run_task(self, task, boss: bool) -> bool:
         """Chạy 1 nhiệm vụ. Có Join Boss: tối đa OTHERS_WINDOW giây, boss mới cũng ngắt; không có Join
         Boss: không giới hạn thời gian. must_finish: không bị Bubble / boss / thời gian ngắt (chỉ Stop).
-        True nếu chạy tới cuối (xong), False nếu bị ngắt (làm lại ở vòng sau)."""
+        True nếu chạy hết một lượt, False nếu bị ngắt (chưa xong: chuyển xuống cuối danh sách)."""
         if boss and not task.must_finish:
             # Timeout chỉ phát hiện khi BotContext kiểm tra; không ngắt cưỡng chế.
             self.ctx._deadline = time.monotonic() + OTHERS_WINDOW
@@ -224,14 +281,11 @@ class BotWorker(QThread):
                 # Bubble / Auto Times Out vừa lo xong -> hoãn tới khi nhiệm vụ xong.
                 self.guards.hold()
             self.activity_changed.emit(self.serial, task.group)
-            scheduler.started(task)
             self.record(f"Bắt đầu: {task.key}")
-            self.ctx.again_after = None
             self._run_one(task)
-            scheduler.finished(task, again_after=self.ctx.again_after)
             self.record(f"Xong: {task.key}")
             return True
-        # Bị ngắt: lượt sau gọi lại từ đầu hàm run(); worker không lưu điểm thực thi.
+        # Bị ngắt: chưa xong, nhiệm vụ xuống cuối danh sách rồi gọi lại từ đầu hàm run(); worker không lưu điểm thực thi.
         except TimedOut:
             self.record(f"Tạm dừng: {task.key} (hết {OTHERS_WINDOW} giây, quay lại Join Monster War)")
             return False    # hết OTHERS_WINDOW giây

@@ -21,6 +21,16 @@ Bố cục giống Event: mỗi nhiệm vụ một thư mục (`constants.py` �
 - Test: `tests/daily_activities/test_open_task.py` (phần chung), `offering/`, `resource_tax/`,
   `resource_collecting/`, `troop_training/` (bản mới), `troop_healing/` (bản cũ).
 
+## TODO — ưu tiên bấm Claim khi vào danh sách nhiệm vụ (giao diện MỚI)
+
+- [ ] **Giao diện mới: vào danh sách nhiệm vụ Activity mà chưa ưu tiên bấm Claim.** Khi vào list (nút Quests → tab Activity →
+  danh sách), việc đầu tiên phải là nhận thưởng đang có (nút **Claim** của dòng / **Claim All** sáng), rồi mới tìm dòng hoặc làm việc
+  khác. Hiện trong code: `common.open_task` → `_search_list` có bấm Claim All trước (mỗi màn), nhưng vòng `common.run_task`
+  (`task_targets`, xem comment "Claim All belongs to the final reward phase") **cố ý không bấm Claim All** khi đang làm từng việc,
+  nên đi thẳng tới dòng nhiệm vụ mà không nhận thưởng trước. Cần: xác định đường vào list nào đang bỏ qua Claim, cho Claim lên đầu
+  mà không làm mất dòng đã xong trước khi kịp xác nhận hoàn thành (lý do của comment trên), rồi thêm test với ảnh danh sách có
+  nút Claim.
+
 ## TODO — phần mở nhiệm vụ / bấm Go (common.open_task, OPEN_TASK.md)
 
 Logic đã xong; còn thiếu **ảnh** (thêm ảnh là dùng được, không phải sửa logic) và kiểm tra trên máy thật.

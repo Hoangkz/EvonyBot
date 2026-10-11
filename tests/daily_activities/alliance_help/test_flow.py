@@ -16,7 +16,7 @@ from pathlib import Path
 from bot.activities.daily_activities.alliance_help.constants import HELP_ALL, HELP_ROW, KEY, LABEL
 from bot.activities.daily_activities.alliance_help.run import help_all
 from bot.activities.daily_activities.constants import MAIN_MORE, OLD_MENU_ACTIVITY
-from bot.worker.policies import record_result
+from bot.activities.daily_activities.common import record_result
 from tests.daily_activities import SCROLL
 from tests.flow import Step, back, end, run_flow, tap, tap_at
 

@@ -1,5 +1,5 @@
 """
-Test nhận thưởng theo chấm đỏ + rương mốc (bot/activities/event/claim.py; khi nào nhận: bot/worker/policies.py), chạy sau khi xong
+Test nhận thưởng theo chấm đỏ + rương mốc (bot/activities/event/claim.py; khi nào nhận: bot/worker/tasks.py), chạy sau khi xong
 các nhiệm vụ của một event. Ảnh King's Path dùng chung tests/event/kings_path/screens/; ảnh
 Gather Troops / rương mốc ở tests/event/claim_screens/ (396x704).
 """
@@ -11,13 +11,14 @@ import cv2
 
 from bot.activities import event
 from bot.activities.event.claim import red_dots
-from bot.worker import policies as event_policy
-from bot.worker.policies import claim_key
+from functools import partial
+
+from bot.activities.event.run import claim_key
 from bot.activities.event.constants import CLAIM_ALL, DOT_DAY_Y, DOT_TAB_Y, GATHER_CHESTS, KINGS_PATH_ICON
 from bot.activities.event.gather_troops import cultivate_generals
 from bot.activities.event.kings_path import wheel
 from bot.ocr import read_milestone
-from tests.event import LOGIN_REWARD_PATCHER, MAYBE_CLAIM, VOYAGE_PATCHER
+from tests.event import LOGIN_REWARD_PATCHER, VOYAGE_PATCHER
 from tests.event import run_event_tasks
 from tests.flow import Step, end, run_flow, tap, tap_at
 
@@ -57,10 +58,11 @@ def tearDownModule():
     LOGIN_REWARD_PATCHER.stop()
 
 
+run_with_claims = partial(run_event_tasks, claims=True)
+
+
 def _run(testcase, flow, daily_done):
-    with mock.patch.object(event_policy, "maybe_claim", MAYBE_CLAIM):
-        return run_flow(testcase, run_event_tasks, SCREENS, flow, SETTINGS, daily_done=daily_done,
-                        variants=VARIANTS)
+    return run_flow(testcase, run_with_claims, SCREENS, flow, SETTINGS, daily_done=daily_done, variants=VARIANTS)
 
 
 class RedDots(unittest.TestCase):
@@ -133,11 +135,10 @@ class ClaimFlow(unittest.TestCase):
             # Băng "Congratulations!" (rương 10 đã tích) -> chờ mất rồi mới xét tiếp.
             Step("gather_chest_claimed.png", end()),
         ]
-        with mock.patch.object(event_policy, "maybe_claim", MAYBE_CLAIM):
-            device = run_flow(self, run_event_tasks, CLAIM_SCREENS, flow,
-                              {cultivate_generals.KEY: {"enabled": True, "day": 1}},
-                              daily_done={cultivate_generals.KEY: "2026-10-02T08:00:00"},
-                              variants=VARIANTS)
+        device = run_flow(self, run_with_claims, CLAIM_SCREENS, flow,
+                          {cultivate_generals.KEY: {"enabled": True, "day": 1}},
+                          daily_done={cultivate_generals.KEY: "2026-10-02T08:00:00"},
+                          variants=VARIANTS)
         self.assertIn("Gather Troops: claim chest 10 (progress 12)", device.logs)
         self.assertIn(claim_key("gather_troops", 1), device.daily_done)
 
@@ -160,8 +161,7 @@ class ClaimFlow(unittest.TestCase):
     def test_no_task_done(self):
         """Không nhiệm vụ nào bật / xong: không mở event để nhận."""
         flow = [Step("03_main.png", end())]
-        with mock.patch.object(event_policy, "maybe_claim", MAYBE_CLAIM):
-            device = run_flow(self, run_event_tasks, SCREENS, flow, {})
+        device = run_flow(self, run_with_claims, SCREENS, flow, {})
         self.assertFalse(device.daily_done)
 
 

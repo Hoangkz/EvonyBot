@@ -13,7 +13,7 @@ event (tab nhiệm vụ đang chọn, tab Redeem):
    Đổi quà: nhớ vị trí hàng của từng quà, cuộn thẳng tới đó (không cuộn về đầu mỗi quà).
 3. Mọi thứ xong -> trả TaskResult(done=True) (worker lưu DONE_KEY: các lần sau trong ngày không vào game). Không
    thấy tab / icon event (hết event) cũng done=True. Event có bật không (group 3-Day Event, tab Event) và hôm nay đã
-   xong chưa: việc của worker (bot/worker/policies.py).
+   xong chưa: nhiệm vụ tự lưu vào DB, worker (bot/worker/tasks.py) chỉ kiểm tra đã xong chưa.
 """
 from types import SimpleNamespace
 
@@ -22,7 +22,8 @@ import numpy as np
 from ....ocr import read_progress
 from ....context.templates import TEMPLATE_DIR
 from ...event.common import mark_done, mark_target_reached
-from ...result import NOT_DONE, TaskResult, clear, take_all
+from ...event.run import record_outcome
+from ...result import NOT_DONE, TaskResult, clear, save_errors, take_all
 from ...event.constants import CONGRATULATIONS, GO_BUTTON, GO_REGION
 from ...event.kings_path.donate.run import _donate as donate_after_go
 from ...event.kings_path.heal.run import _heal as heal_after_go
@@ -541,3 +542,24 @@ def _button_green(bot, screen, center) -> bool:
     dx, dy, w, h = c.REDEEM_COLOR_BOX
     area = bot.crop(screen, center[0] + dx, center[1] + dy, w, h).reshape(-1, 3).mean(axis=0)
     return float(area[1] - area[2]) >= c.REDEEM_GREEN_DIFF   # BGR: G - R
+
+
+# ---- Luật của việc (bảng bot/worker/priority.py: "run": JOB) -------------------------------------------------------
+def three_day_active(settings: dict) -> bool:
+    """Tab Event có group 3-Day Event và group đó đang bật (thiếu ô bật = bật)."""
+    if not any(key.startswith(c.GROUP_KEY) for key in settings):
+        return False
+    group = settings.get(f"{c.GROUP_KEY}_active")
+    return True if group is None else bool(group.get("enabled") if isinstance(group, dict) else group)
+
+
+@save_errors("three_day_event")   # lỗi thì lưu `three_day_event_error` vào DB
+def _run_three_day(ctx, settings: dict):
+    result = run(ctx, settings)
+    for outcome in result.outcomes:
+        record_outcome(ctx, settings, outcome)
+    if result.done:
+        ctx.mark_daily_done(c.DONE_KEY)
+
+
+JOB = {"run": _run_three_day, "enabled": three_day_active, "done": lambda ctx, settings: ctx.is_daily_done(c.DONE_KEY)}

@@ -8,7 +8,12 @@ import numpy as np
 from bot.activities.daily_activities.buy_daily import run as general
 from bot.activities.daily_activities.constants import HAMMER_DONE, STAMINA_REACHED
 from bot.activities.result import TaskResult
-from bot.worker import policies as policy
+from bot.activities.daily_activities.buy_daily.run import JOB
+
+
+def run_buy(ctx, settings):
+    """Chạy nhiệm vụ mua Stamina + Hammer như bảng priority.py khai báo (JOB['run']); nhiệm vụ tự lưu từng món vào DB."""
+    return JOB["run"](ctx, settings)
 
 
 class _PurchaseBot:
@@ -71,7 +76,7 @@ class DailyGeneralPurchaseTests(unittest.TestCase):
         bot = self._ctx(done)
         settings = {"General": {"buy_stamina": True, "stamina_quantity": 20, "buy_all_hammers": True}}
         for _ in range(2):   # lần hai: đã xong hôm nay, worker không mua lại
-            policy.run_buy_general_task(bot, settings)
+            run_buy(bot, settings)
 
         stamina.assert_called_once_with(bot, 20)
         hammers.assert_called_once_with(bot)
@@ -83,13 +88,13 @@ class DailyGeneralPurchaseTests(unittest.TestCase):
         """Đã mua tới mốc 10 và Hammer: nâng lên 16 -> chỉ mua Stamina tới 16 (popup tự tính phần còn lại), không mua Hammer."""
         done = {f"{STAMINA_REACHED} 10", HAMMER_DONE}
         bot = self._ctx(done)
-        policy.run_buy_general_task(bot, {"General": {"buy_stamina": True, "stamina_quantity": 16,
+        run_buy(bot, {"General": {"buy_stamina": True, "stamina_quantity": 16,
                                                       "buy_all_hammers": True}})
         stamina.assert_called_once_with(bot, 16)
         hammers.assert_not_called()
         self.assertIn(f"{STAMINA_REACHED} 16", done)
         stamina.reset_mock()
-        policy.run_buy_general_task(bot, {"General": {"buy_stamina": True, "stamina_quantity": 10}})   # hạ mốc: không mua
+        run_buy(bot, {"General": {"buy_stamina": True, "stamina_quantity": 10}})   # hạ mốc: không mua
         stamina.assert_not_called()
 
     @mock.patch("bot.activities.daily_activities.buy_daily.run.buy_all_hammers", return_value=False)
@@ -97,11 +102,11 @@ class DailyGeneralPurchaseTests(unittest.TestCase):
     def test_failed_item_is_not_marked_but_the_other_is(self, stamina, hammers):
         done = set()
         bot = self._ctx(done)
-        policy.run_buy_general_task(bot, {"General": {"buy_stamina": True, "stamina_quantity": 10,
+        run_buy(bot, {"General": {"buy_stamina": True, "stamina_quantity": 10,
                                                       "buy_all_hammers": True}})
         self.assertEqual(done, {f"{STAMINA_REACHED} 10"})   # lần sau chỉ mua lại Hammer
         stamina.reset_mock()
-        policy.run_buy_general_task(bot, {"General": {"buy_stamina": True, "stamina_quantity": 10,
+        run_buy(bot, {"General": {"buy_stamina": True, "stamina_quantity": 10,
                                                       "buy_all_hammers": True}})
         stamina.assert_not_called()
         self.assertEqual(hammers.call_count, 2)
@@ -177,7 +182,7 @@ class DailyGeneralPurchaseTests(unittest.TestCase):
     @mock.patch("bot.activities.daily_activities.buy_daily.run.buy_stamina", return_value=True)
     def test_general_buys_only_ticked_items(self, stamina, hammers):
         bot = self._ctx(set())
-        policy.run_buy_general_task(bot, {"General": {"buy_all_hammers": True}})
+        run_buy(bot, {"General": {"buy_all_hammers": True}})
         stamina.assert_not_called()
         hammers.assert_called_once_with(bot)
 

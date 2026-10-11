@@ -15,7 +15,6 @@ import adbutils
 import cv2
 
 from bot.activities import gift_claims
-from bot.worker.gifts import run_gift_claims
 from bot.context import BotContext
 
 
@@ -52,7 +51,7 @@ def main():
 
     if not args.task:
         log("START complete gift-claim flow")
-        run_gift_claims(bot)
+        gift_claims.run(bot)
         log("END complete gift-claim flow")
         log(f"daily_done: {done}")
         return

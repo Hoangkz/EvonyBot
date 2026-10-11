@@ -14,8 +14,8 @@ from unittest import mock
 import cv2
 
 from bot.activities.event_center.three_day import constants as c
-from bot.worker.policies import record_result
-from bot.worker.policies import record_outcome
+from bot.activities.daily_activities.common import record_result
+from bot.activities.event.run import record_outcome
 from tests.flow import Step, back, end, run_flow, swipe, tap, tap_at
 
 SCREENS = Path(__file__).resolve().parents[1]   # tests/event_center

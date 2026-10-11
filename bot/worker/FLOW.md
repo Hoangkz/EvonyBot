@@ -43,78 +43,64 @@ Server ban đầu lấy từ `settings["Initialization"]["server"]`. Nếu chưa
 
 ## 3. Vòng lặp nhiệm vụ: `_run_tasks()`
 
-Worker chạy theo **nhiệm vụ**, không theo activity. Activity (nút Select Activity, tab cấu hình) chỉ dùng để chia
-loại. **Mọi nhiệm vụ nằm trong bảng [priority.py](priority.py)**: mỗi dòng có `key`, `priority`, `must_finish?` và `policy`
-(luật chạy ở [policies.py](policies.py): `daily`, `hourly`, `buy_general`, `rewards`, `event`, `event_claim`,
-`crazy_eggs`, `three_day`, `open_gift_box`, `plain`). [registry.py](registry.py) dựng `TaskDef` ([task_def.py](task_def.py)) từ
-các dòng có `policy`; dòng không có `policy` (Bubble, Join Monster War, gift_*, việc chưa làm) không vào bộ chọn. Luật chạy
-quyết định chọn việc (ô tích), bỏ qua việc đã xong / đạt mục tiêu / Day khoá, ghi "xong hôm nay", hẹn thử lại, khoảng giờ,
-nhận thưởng cuối ([gifts.py](gifts.py)) và thưởng event. Các thư mục `bot/activities/...` chỉ làm thao tác trong game rồi trả
-`TaskResult` ([result.py](../activities/result.py)). Thêm nhiệm vụ mới = thêm hàm làm việc ở activity và một dòng ở priority.py.
-Khi bấm Start, `build_tasks` ([tasks.py](tasks.py)) lấy mọi nhiệm vụ trong registry có nhóm (activity)
-được chọn và đã được tích ở tab cấu hình (`TaskDef.enabled(cấu hình tab)`), gắn độ ưu tiên của chính nhiệm vụ đó ([priority.py](priority.py), số lớn hơn làm
-trước; ưu tiên < 0 không vào danh sách). Mỗi nhiệm vụ mang theo hàm `run` riêng (`Task.run`); worker gọi thẳng hàm đó
-(`BotWorker._run_one`), không đi qua hàm `run` của activity. Bộ chọn [scheduler.py](scheduler.py) lấy nhiệm vụ tới lượt
-có ưu tiên cao nhất; cùng ưu tiên thì xoay vòng (nhiệm vụ lâu chưa được bắt đầu nhất đi trước).
+Worker chạy theo **một danh sách nhiệm vụ** và chỉ làm ba việc: lấy nhiệm vụ trong danh sách, kiểm tra nó **đã xong chưa** (đọc
+DB), chưa xong thì chạy, xong rồi thì bỏ qua. **Worker không ghi kết quả nhiệm vụ vào DB**: mỗi nhiệm vụ trong `bot/activities`
+tự lưu ngay chỗ biết kết quả: xong thì `mark_daily_done(<key>)` (hoặc các dấu mục tiêu `<key>_reached_N`), lỗi thật thì
+`<key>_error` + một dòng History (`result.py` `save_errors`), việc theo giờ thì lưu giờ vừa làm (`<key>_tried`). Bị ngắt (Stop,
+hết 120 giây, boss, bubble) không phải lỗi, không lưu gì.
 
-Nhiệm vụ trong bảng: Alliance Capacity, Open Gift Box, Black Market (`once`), Battlefield Shop, Crazy Eggs (`repeat`,
-ô giờ ở mục General của tab Daily Activities), Buy Stamina / Buy Hammer, từng việc Daily (Offering, Gold Levy, ...,
-Alliance Donation / Help theo giờ), `daily_rewards` (nhận thưởng cuối + quà), từng nhiệm vụ Event (Gather Troops,
-King's Path), `gather_troops_claim` / `kings_path_claim`, `three_day_event`. Join Boss không nằm trong bảng (luật riêng).
-
-**Giờ reset server** (mốc làm lại nhiệm vụ đã xong): người dùng chọn ở màn Home (ô "Reset Time", "HH:MM", mặc định 14:00), lưu bảng `settings` của DB, dùng chung mọi thiết bị qua `ServerClock`; đổi là các worker đang chạy dùng ngay. Bot không vào game đọc giờ reset nữa (đã xoá `get_server_time` / OCR `read_server_time`).
-
-Thứ tự ưu tiên: **Bubble > Join Boss > nhiệm vụ**. Bubble và Join Boss có luật riêng trong code (mục 3b, các ý dưới).
+Mọi nhiệm vụ nằm trong bảng [priority.py](priority.py): mỗi dòng có `key`, `priority`, `must_finish?`, `once?`, `group?` và
+`run`: một hàm trơn `run(ctx, cấu hình tab)` hoặc một dict `{run, enabled, done, every}` do code của nhiệm vụ dựng sẵn (VD
+`daily_job(...)`, `event_job(...)` cuối `run.py` / `common.py` của nhóm). `saves: True` = hàm tự lưu key của dòng khi xong.
+Dòng không có `run` (Bubble, Join Monster War, `gift_*`, việc chưa làm) không phải nhiệm vụ của danh sách. [tasks.py](tasks.py) ghép
+các dòng thành `Task`: `enabled` (đã tích ở tab cấu hình chưa), `done` (hôm nay đã xong chưa, đọc `daily_done`), `due` (chỉ việc
+theo giờ: so giờ `<key>_tried` trong DB với số giờ trên tab) và `run`.
 
 ```mermaid
 flowchart TD
-    A[_run_tasks] --> O{Chỉ chọn mỗi Join Boss?}
-    O -->|Có| P[_run_once: Join Boss chạy liên tục như trước] --> Z[Kết thúc khi Join Boss trả về / Stop]
-    O -->|Không| L{Stop?}
-    L -->|Có| Z
-    L -->|Không| C[Đảm bảo server]
-    C --> B{Có Join Boss và chưa dừng hẳn?}
-    B -->|Có| D[_check_boss: Join Boss với exit_when_idle=True]
-    D -->|Khác IDLE: dừng hẳn| X[Bỏ Join Boss, vẫn chạy nhiệm vụ]
-    D -->|IDLE| T
-    X --> T
-    B -->|Không| T{Có nhiệm vụ bị ngắt còn tới lượt?}
-    T -->|Có| R[Lấy nhiệm vụ đó]
-    T -->|Không| S[scheduler.pick]
-    S -->|None| W[Nghỉ IDLE_WAIT giây, vẫn lo bubble] --> L
-    S -->|Nhiệm vụ| R
-    R --> G[_run_task: có Join Boss thì deadline 120 s + bật ngắt bởi boss mới]
-    G -->|Trả về bình thường| H[scheduler.finished: xong tới mốc reset kế tiếp] --> L
-    G -->|TimedOut / BossAvailable / YieldToBoss| I[Giữ làm nhiệm vụ bị ngắt] --> L
+    S[Start: tasks.build_tasks - việc đã tích, xếp theo ưu tiên] --> L{Stop?}
+    L -->|Có| Z[Kết thúc]
+    L -->|Không| B[Join Boss 1 lượt nếu có chọn]
+    B --> R{Qua mốc reset server?}
+    R -->|Có| N[Đưa lại mọi nhiệm vụ vào danh sách, trừ once đã xong]
+    R -->|Không| F
+    N --> F[Bỏ nhiệm vụ đã xong hôm nay]
+    F --> D{Việc theo giờ nào tới giờ?}
+    D -->|Có| T[Chạy việc theo giờ đó]
+    D -->|Không| E{Danh sách rỗng?}
+    E -->|Có| W[Nghỉ IDLE_WAIT giây] --> L
+    E -->|Không| T2[Lấy nhiệm vụ đầu danh sách, chạy]
+    T --> X
+    T2 --> X{Xong chưa?}
+    X -->|Xong| L
+    X -->|Chưa| M[Chuyển xuống cuối danh sách; việc theo giờ thì chờ giờ kế tiếp] --> L
 ```
 
-- **Mỗi vòng có Join Boss: 1 lượt Join Boss rồi đúng 1 nhiệm vụ**, tối đa `OTHERS_WINDOW` = 120 giây cho **từng** nhiệm vụ
-  (không còn ngân sách chung cả nhóm). Xong nhiệm vụ là quay lại Join Boss ngay. Mỗi nhiệm vụ đi kèm một lượt kiểm tra
-  boss: Join Boss rảnh vẫn cuộn danh sách War 6 lần rồi mới nhường.
-- Nhiệm vụ bị ngắt (hết 120 giây, có boss mới, `yield_to_boss`) được làm lại **đầu tiên** ở vòng sau, gọi lại từ đầu
-  hàm activity; worker không lưu tiến độ nội bộ (activity tự bỏ qua phần đã `mark_daily_done`).
-- **Nhiệm vụ xong** thì không tới lượt nữa cho tới mốc reset server kế tiếp (tính theo mốc lúc bắt đầu lượt làm xong);
-  qua mốc thì tự tới lượt lại (trước đây chỉ Daily Activities được thêm lại).
-- **Nhiệm vụ chạy 1 lần** (`TaskDef.once` trong standalone.py, hiện là Black Market): xong rồi không tới lượt lại khi
-  qua mốc reset; chỉ chạy lại khi Stop rồi Start (trạng thái bộ chọn nằm trong bộ nhớ).
-- **Độ ưu tiên < 0** (priority.py, VD Battlefield Shop -1): nhiệm vụ không được đưa vào danh sách.
-- **Crazy Eggs** (`TaskDef.repeat`): ô 0 / 1h .. 4h (mặc định 2h, khoá `crazy_eggs_hours` ở mục General của tab Daily
-  Activities). Mỗi lần chạy đập một lượt; chưa đủ 4 quả vỡ (4 nhãn "Activated") thì gán `ctx.again_after` = số giờ chọn
-  (hẹn chạy lại, giữ nguyên độ ưu tiên 999); đủ 4 quả thì đánh dấu `crazy_eggs_done` (xong hôm nay, reset theo mốc reset).
-- **Nhiệm vụ Daily chưa xong** (`run_daily_task`): hẹn thử lại sau 300 giây (`ctx.again_after`, ưu tiên thấp nhất), tối
-  đa 5 lần mỗi ngày. Nhiệm vụ Event chạy một lần mỗi ngày (xong hay không).
-- **Hẹn chạy lại**: activity gán `ctx.again_after` (giây) trước khi return (VD Daily Activities: Alliance Donation
-  chưa xong, chờ lượt free hồi) → `scheduler.finished(task, again_after=...)`: tới giờ hẹn thì nhiệm vụ lại tới lượt
-  dù chưa qua mốc reset, với độ ưu tiên `AGAIN_PRIORITY` (-1000: chỉ chạy khi không còn nhiệm vụ nào khác tới lượt).
-- **Không còn nhiệm vụ tới lượt**: nghỉ `IDLE_WAIT` = 5 giây (qua `guards.call`) rồi xét lại; có Join Boss thì mỗi vòng
-  vẫn kiểm tra boss. **Thread vẫn sống tới khi Stop**, kể cả khi không chọn Join Boss.
+- **Mỗi vòng có Join Boss: 1 lượt Join Boss rồi đúng 1 nhiệm vụ**, tối đa `OTHERS_WINDOW` = 120 giây cho **từng** nhiệm vụ. Bị
+  ngắt (hết 120 giây, có boss mới, `yield_to_boss`) thì chưa xong nên xuống cuối danh sách.
+- **Xong hay chưa** do `Task.done` quyết định (đọc daily_done). Nhiệm vụ không có dấu trong DB (`done` = None: Alliance Capacity,
+  Black Market, Battlefield Shop) coi là xong hôm nay khi đã chạy hết một lượt.
+- **Sang ngày mới** (qua mốc reset server, chọn ở màn Home, mặc định 14:00) thì đưa lại mọi nhiệm vụ vào danh sách; nhiệm vụ
+  `once` (Black Market) đã chạy xong thì không đưa lại, chỉ chạy lại khi Stop rồi Start.
+- **Đúng giờ reset thì tắt game bật lại**: `Guards` hẹn `ctx` ngắt (`ResetDue`) đúng mốc reset kế tiếp, kể cả khi đang chạy nhiệm vụ
+  `must_finish` (Bubble / Auto Times Out thì bị hoãn, reset thì không). Ngắt xong thì `am force-stop` game một lần cho mỗi mốc
+  (`restart_for_reset`), rồi làm lại từ đầu việc đang dở. Vừa Start thì không đóng game.
+- **Việc theo giờ** (Crazy Eggs, Alliance Donation / Help): làm xong thì lưu giờ đã làm vào DB (`daily_done`). Mỗi vòng lặp chỉ
+  so giờ đó với ô chọn giờ ở tab (`Task.due`): đã qua N giờ thì làm ngay, trước các việc trong danh sách; chưa tới thì thôi.
+- **Tối đa 6 lần mỗi ngày** (`MAX_ATTEMPTS`): một nhiệm vụ chạy hết một lượt mà vẫn chưa xong thì tính một lần thử; quá 6
+  lần thì bỏ khỏi danh sách tới ngày mới. Bị ngắt giữa chừng (hết 120 giây, có boss) không tính là một lần thử.
+- **Cả danh sách đều chưa xong** (hoặc danh sách rỗng): nghỉ `IDLE_WAIT` = 5 giây rồi xét lại, không chạy liên tục. Thread vẫn
+  sống tới khi Stop.
+- **Quà cuối ngày** (`daily_gift_claims`) là một nhiệm vụ như các nhiệm vụ khác; chỉ làm khi mọi việc Daily đã tích và thưởng
+  Activity đã xong, chưa thì để xuống cuối danh sách.
+- **Nhiệm vụ `must_finish`** (priority.py): đã bắt đầu thì chạy tới xong; Bubble / Auto Times Out / boss mới / 120 giây không
+  ngắt (chỉ Stop); xong rồi mới tới Bubble, Auto Times Out và Join Boss. **Mọi nhiệm vụ nhóm Daily Activities** (các dòng `daily_*`,
+  kể cả Alliance Donation / Help, thưởng Activity, quà cuối ngày) đều `must_finish`; Crazy Eggs, Event, Open Gift Box,
+  Alliance Capacity, Black Market không.
 - **Không chọn Join Boss: không có luật 120 giây** (không deadline, không ngắt bởi boss mới).
 - **Không tích Bubble: không có luật Bubble** (`BubbleGuard.ensure` không làm gì, không hẹn `BubbleDue`).
-- Join Boss trả về khác IDLE (dừng hẳn, VD hết thể lực và không cho dùng vật phẩm): không gọi lại Join Boss, vẫn chạy
-  các nhiệm vụ.
-- Trước mỗi nhiệm vụ: `guards.call(None, ctx.check)` — lo bubble trước (không có Join Boss thì không có bước nào khác
-  lo), rồi xét Stop / boss mới.
-- Tên activity không tồn tại trong ACTIVITIES: ghi log, chờ 1 giây qua `ctx.sleep()`, coi như xong.
+- Join Boss trả về khác IDLE (dừng hẳn, VD hết thể lực): không gọi lại Join Boss, vẫn chạy các nhiệm vụ.
+- Trước mỗi nhiệm vụ: `guards.call(None, ctx.check)` — lo bubble trước, rồi xét Stop / boss mới.
 
 ## 3b. Bubble (khiên): ưu tiên hơn mọi activity
 

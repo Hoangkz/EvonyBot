@@ -12,17 +12,18 @@ known image on it (checked in list order) and acts on it.
 import math
 
 from ...common import click_images, delay, exit_images, find_first, go_home, images_in
-from ..result import NOT_DONE, TaskResult
+from ..result import save_errors
 from .constants import (ALL_BOXES, BACK, BOX_FOLDERS, BOX_LIST, BOX_BOTTOM, BOX_THRESHOLD, BUTTON_EXTRA_WAITS, CONFIRM, DONE, FRAGMENT, FRAGMENT_NEAR, ITEMS, KEY,
                         FRAGMENT_PREFIX, LIST_SWIPE, MAX, ROW_TOLERANCE, SETUP, TAB_HALF_HEIGHT, TAB_REGIONS, TAP, USE_POPUP)
 
 
-def run(bot, settings: dict) -> TaskResult:
-    """`bot` is the device's BotContext; `settings` is the "Open Gift Box" tab's config. done=True when every box has
-    been opened (the worker saves \"done today\")."""
+@save_errors(KEY)   # lỗi thì lưu `open_gift_box_error` vào DB
+def run(bot, settings: dict):
+    """`bot` is the device's BotContext; `settings` is the "Open Gift Box" tab's config. When every box has been opened
+    it saves KEY ("done today") to the database."""
     boxes = _box_images(settings.get("selection_gift_box", {}))
     if not boxes:
-        return NOT_DONE
+        return
     targets = _targets()
     thresholds = dict.fromkeys((path for path, _ in targets), BOX_THRESHOLD)
     done_images = images_in(DONE)
@@ -44,7 +45,8 @@ def run(bot, settings: dict) -> TaskResult:
             if _open_next_box(bot, screen, boxes, done_images, pos):
                 passes_done += 1
                 if passes_done == 2:
-                    return TaskResult(done=True)
+                    bot.mark_daily_done(KEY)
+                    return
                 bot.tap(*pos)       # Common tab: the list jumps back to the top
                 delay(bot, 2)
         elif action == USE_POPUP:

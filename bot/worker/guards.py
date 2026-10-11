@@ -10,10 +10,11 @@ Nhiệm vụ must_finish: `Guards.hold()` hoãn cả hai tới khi xong (`Guards
 """
 import time
 from contextlib import contextmanager
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from ..common import GAME_PACKAGE, NotEnoughGems, keep_bubble
-from ..context.errors import BubbleDue, RestartDue
+from ..context.errors import BubbleDue, ResetDue, RestartDue
+from ..daily_reset import last_reset
 
 BUBBLE = "Bubble"
 BUBBLE_RENEW_BEFORE = 7200   # bubble còn <= 2 tiếng -> dùng bubble mới
@@ -34,13 +35,13 @@ def _seconds_until(iso) -> float | None:
 def _quiet(ctx):
     """Tạm tắt deadline và ngắt-bởi-boss (bước của guard không bị cắt ngang); khôi phục khi ra. Mốc hẹn bubble / restart
     cũng tạm xoá; mỗi guard tự hẹn lại sau đó."""
-    saved = (ctx._deadline, ctx._boss_interrupt_enabled, ctx._bubble_due_at)
+    saved = (ctx._deadline, ctx._boss_interrupt_enabled, ctx._bubble_due_at, ctx._reset_due_at)
     ctx._deadline, ctx._boss_interrupt_enabled = None, False
-    ctx._bubble_due_at = ctx._restart_due_at = None
+    ctx._bubble_due_at = ctx._restart_due_at = ctx._reset_due_at = None
     try:
         yield saved[2]
     finally:
-        ctx._deadline, ctx._boss_interrupt_enabled = saved[0], saved[1]
+        ctx._deadline, ctx._boss_interrupt_enabled, ctx._reset_due_at = saved[0], saved[1], saved[3]
 
 
 class BubbleGuard:
@@ -133,26 +134,36 @@ class RestartGuard:
             ctx._restart_due_at = due
             return False
 
+        self.close_game(f"Auto Times Out: đã chạy {minutes} phút")
+        return True
+
+    def close_game(self, reason: str):
+        """Đóng game (bot tự mở lại khi chạy tiếp, qua go_home), rồi tính lại mốc Auto Times Out từ lúc này. Dùng cho Auto
+        Times Out và cho mốc reset server (Guards.restart_game)."""
+        ctx = self._ctx()
         with _quiet(ctx) as bubble_due:
             try:
                 self._hooks.activity(AUTO_RESTART)
-                self._hooks.record(f"Auto Times Out: đã chạy {minutes} phút, đóng game")
+                self._hooks.record(f"{reason}, đóng game")
                 # Chỉ đóng game; activity chạy sau thấy launcher thì tự mở lại (go_home).
                 ctx.shell(f"am force-stop {GAME_PACKAGE}")
                 ctx.sleep(RESTART_WAIT)
             finally:
                 ctx._bubble_due_at = bubble_due
                 self.last = time.monotonic()
-                ctx._restart_due_at = self.last + minutes * 60
-        return True
+                minutes = self._minutes()
+                ctx._restart_due_at = self.last + minutes * 60 if minutes > 0 else None
 
 
 class Guards:
     """Bubble + Auto Times Out của một thiết bị."""
 
-    def __init__(self, get_ctx, init: dict, auto_timeout, hooks):
+    def __init__(self, get_ctx, init: dict, auto_timeout, hooks, server_time=lambda: ""):
         self._get_ctx = get_ctx
         self._hooks = hooks
+        self._server_time = server_time   # hàm trả giờ reset server "HH:MM" (đọc lại mỗi lần, đổi là dùng ngay)
+        # Mốc reset server đã xử lý (đã tắt game bật lại): worker đặt lúc bắt đầu chạy nên vừa Start không đóng game.
+        self.reset_handled = datetime.min
         self.held = False   # đang chạy nhiệm vụ must_finish: hoãn bubble / Auto Times Out tới khi xong
         self.bubble = BubbleGuard(get_ctx, init, hooks, self)
         self.restart = RestartGuard(get_ctx, auto_timeout, hooks, self)
@@ -166,10 +177,26 @@ class Guards:
     def release(self):
         self.held = False
 
+    def arm_reset(self):
+        """Hẹn ctx ngắt (ResetDue) đúng mốc reset server kế tiếp — kể cả khi đang chạy nhiệm vụ must_finish."""
+        now = datetime.now()
+        next_reset = last_reset(self._server_time(), now) + timedelta(days=1)
+        self._get_ctx()._reset_due_at = time.monotonic() + (next_reset - now).total_seconds()
+
+    def restart_for_reset(self, reset_at: datetime) -> bool:
+        """Tới mốc reset server `reset_at`: tắt game rồi để bot bật lại (đến mốc reset chỉ làm một lần). False nếu mốc này đã
+        xử lý rồi."""
+        if reset_at <= self.reset_handled:
+            return False
+        self.reset_handled = reset_at
+        self.restart.close_game("Tới mốc reset server")
+        return True
+
     def call(self, label, fn, *args):
         """Gọi fn sau khi lo xong bubble rồi Auto Times Out. Tới hạn giữa chừng (BubbleDue / RestartDue) -> xử lý rồi
         gọi lại fn từ đầu."""
         while True:
+            self.arm_reset()
             acted = self.bubble.ensure()
             acted = self.restart.ensure() or acted
             if acted and label:
@@ -180,3 +207,6 @@ class Guards:
                 self._hooks.log(f"Bubble tới hạn; xử lý bubble rồi làm lại {label or 'bước đang dở'}")
             except RestartDue:
                 self._hooks.log(f"Tới giờ Auto Times Out; đóng game rồi làm lại {label or 'bước đang dở'}")
+            except ResetDue:
+                self._hooks.log(f"Tới mốc reset server; tắt game bật lại rồi làm lại {label or 'bước đang dở'}")
+                self.restart_for_reset(last_reset(self._server_time()))

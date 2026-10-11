@@ -1,154 +1,76 @@
 """
-Bộ chọn nhiệm vụ (bot/worker/scheduler.py, tasks.py), bảng nhiệm vụ (bot/activities/registry.py) và vòng lặp nhiệm vụ
+Danh sách nhiệm vụ (tasks.py build_tasks, bảng priority.py) và vòng lặp nhiệm vụ
 của BotWorker (bot/worker/TODO.md mục 1: Bubble > Join Boss > nhiệm vụ; mỗi vòng 1 lượt Join Boss + 1 nhiệm vụ;
 không còn nhiệm vụ tới lượt thì thread vẫn sống). Worker gọi thẳng `run` riêng của từng nhiệm vụ.
 """
+import time
 import unittest
-from datetime import datetime
+from datetime import datetime, timedelta
 from types import SimpleNamespace
 from unittest import mock
 
-from bot.worker.registry import REGISTRY, TaskDef
+from bot.worker.tasks import DEFAULT_PRIORITY, REGISTRY, Task, build_tasks
 from bot.context import BotContext
 from bot.context.errors import StopRequested
 from bot.worker import bot_worker, guards
 from bot.worker.bot_worker import BOSS_IDLE, JOIN_BOSS, BotWorker
-from bot.worker.scheduler import Scheduler
 from bot.worker.server_clock import ServerClock
-from bot.worker.tasks import DEFAULT_PRIORITY, Task, build_tasks, load_must_finish, load_priorities
-
-DAY1, DAY2 = datetime(2026, 10, 3, 9), datetime(2026, 10, 4, 9)
-
-
-class SchedulerTests(unittest.TestCase):
-    def setUp(self):
-        self.reset = [DAY1]
-        self.make = lambda tasks: Scheduler(tasks, lambda: self.reset[0])
-
-    def run_one(self, scheduler):
-        task = scheduler.pick()
-        scheduler.started(task)
-        scheduler.finished(task)
-        return task.key
-
-    def test_higher_priority_first(self):
-        s = self.make([Task("low", "low", 1), Task("high", "high", 9), Task("mid", "mid", 5)])
-        self.assertEqual([self.run_one(s) for _ in range(3)], ["high", "mid", "low"])
-        self.assertIsNone(s.pick())
-
-    def test_same_priority_rotates(self):
-        """Cùng ưu tiên: nhiệm vụ lâu chưa được bắt đầu nhất đi trước (nhiệm vụ bị ngắt xuống cuối)."""
-        a, b, c = Task("a", "a", 1), Task("b", "b", 1), Task("c", "c", 1)
-        s = self.make([a, b, c])
-        self.assertEqual(s.pick(), a)
-        s.started(a)                    # a bị ngắt, chưa xong
-        self.assertEqual(s.pick(), b)
-        s.started(b)
-        self.assertEqual(s.pick(), c)
-        s.started(c)
-        self.assertEqual(s.pick(), a)   # quay vòng lại
-
-    def test_done_task_due_again_after_reset(self):
-        s = self.make([Task("a", "a", 1)])
-        self.assertEqual(self.run_one(s), "a")
-        self.assertIsNone(s.pick())
-        self.reset[0] = DAY2           # qua mốc reset server
-        self.assertEqual(self.run_one(s), "a")
-
-    def test_done_uses_reset_at_start(self):
-        """Bắt đầu trước mốc reset, xong sau mốc: vẫn làm lại trong ngày mới (tính theo lúc bắt đầu)."""
-        s = self.make([Task("a", "a", 1)])
-        task = s.pick()
-        s.started(task)
-        self.reset[0] = DAY2
-        s.finished(task)
-        self.assertEqual(s.pick(), task)
-
-    def test_once_task_not_due_after_reset(self):
-        """Nhiệm vụ once (Black Market): xong rồi thì qua mốc reset cũng không tới lượt lại."""
-        s = self.make([Task("a", "a", 1, once=True), Task("b", "b", 1)])
-        self.assertEqual([self.run_one(s) for _ in range(2)], ["a", "b"])
-        self.reset[0] = DAY2
-        self.assertEqual(s.pick().key, "b")   # b làm lại, a thì không
-        self.run_one(s)
-        self.assertIsNone(s.pick())
-
-    def test_once_task_interrupted_still_due(self):
-        """Nhiệm vụ once bị ngắt giữa chừng (chưa xong) vẫn tới lượt để làm lại."""
-        s = self.make([Task("a", "a", 1, once=True)])
-        task = s.pick()
-        s.started(task)
-        self.reset[0] = DAY2
-        self.assertEqual(s.pick(), task)
-
-    def test_repeat_keeps_priority_when_due_again(self):
-        """Crazy Eggs (repeat): hẹn chạy lại vẫn giữ ưu tiên 999, làm trước nhiệm vụ khác dù nhiệm vụ đó cũng tới lượt."""
-        s = self.make([Task("eggs", "Daily Activities", 999, repeat=True), Task("other", "other", 5)])
-        eggs = s.pick()
-        s.started(eggs)
-        s.finished(eggs, again_after=1)
-        s._again_at["eggs"] = datetime(2000, 1, 1)   # đã tới giờ hẹn; other vẫn chưa làm hôm nay
-        self.assertEqual(s.pick().key, "eggs")
-
-    def test_non_repeat_again_goes_last(self):
-        """Hẹn chạy lại thường (Alliance Donation ...): ưu tiên thấp nhất, sau mọi nhiệm vụ khác."""
-        s = self.make([Task("daily", "Daily Activities", 999), Task("other", "other", 5)])
-        daily = s.pick()
-        s.started(daily)
-        s.finished(daily, again_after=1)
-        s._again_at["daily"] = datetime(2000, 1, 1)
-        self.assertEqual(s.pick().key, "other")
-
 
 def _fake_registry(*specs):
-    """[(key, group, enabled, once)] -> TaskDef giả."""
-    return [TaskDef(key, group, (lambda s, e=enabled: e(s) if callable(e) else e), lambda bot, s: None, once=once)
-            for key, group, enabled, once in specs]
+    """[(key, group, enabled, once)] hoặc [(key, group, enabled, once, priority, must_finish)] -> Task giả."""
+    tasks = []
+    for key, group, enabled, once, *rest in specs:
+        priority, must_finish = (rest + [DEFAULT_PRIORITY, False])[:2] if rest else (DEFAULT_PRIORITY, False)
+        tasks.append(Task(key, group, priority, must_finish=must_finish, once=once, run=lambda bot, s: None,
+                          enabled=(lambda s, e=enabled: e(s) if callable(e) else e)))
+    return tasks
 
 
 class BuildTasksTests(unittest.TestCase):
     def test_only_selected_groups_and_enabled_tasks(self):
         """Chỉ nhiệm vụ có group được chọn và đã được tích; activity chỉ để chia loại."""
-        registry = _fake_registry(("a", "G1", True, False), ("b", "G1", False, False), ("c", "G2", True, False))
-        priorities = {"G1": {"a": 5, "b": 9}, "G2": {"c": 7}}
-        tasks = build_tasks(["G1"], set(), priorities, settings={}, registry=registry)
+        registry = _fake_registry(("a", "G1", True, False, 5), ("b", "G1", False, False, 9), ("c", "G2", True, False, 7))
+        tasks = build_tasks(["G1"], set(), settings={}, registry=registry)
         self.assertEqual([(t.key, t.group, t.priority) for t in tasks], [("a", "G1", 5)])
 
     def test_enabled_receives_group_settings(self):
         registry = _fake_registry(("a", "G1", lambda s: s.get("x"), False))
-        tasks = build_tasks(["G1"], set(), {}, settings={"G1": {"x": True}}, registry=registry)
+        tasks = build_tasks(["G1"], set(), settings={"G1": {"x": True}}, registry=registry)
         self.assertEqual([t.key for t in tasks], ["a"])
         self.assertEqual(tasks[0].priority, DEFAULT_PRIORITY)
-        self.assertEqual(build_tasks(["G1"], set(), {}, settings={"G1": {"x": False}}, registry=registry), [])
+        self.assertEqual(build_tasks(["G1"], set(), settings={"G1": {"x": False}}, registry=registry), [])
 
     def test_skip_group(self):
         registry = _fake_registry(("a", "G1", True, False))
-        self.assertEqual(build_tasks(["G1"], {"G1"}, {}, registry=registry), [])
+        self.assertEqual(build_tasks(["G1"], {"G1"}, registry=registry), [])
 
     def test_negative_priority_not_in_task_list(self):
         """Ưu tiên < 0 không được đưa vào danh sách nhiệm vụ; 0 trở lên thì có."""
-        registry = _fake_registry(("zero", "G", True, False), ("neg", "G", True, False), ("pos", "G", True, False))
-        tasks = build_tasks(["G"], set(), {"G": {"zero": 0, "neg": -1, "pos": 5}}, registry=registry)
+        registry = _fake_registry(("zero", "G", True, False, 0), ("neg", "G", True, False, -1),
+                                  ("pos", "G", True, False, 5))
+        tasks = build_tasks(["G"], set(), registry=registry)
         self.assertEqual([t.key for t in tasks], ["zero", "pos"])
 
     def test_flags_and_run_carried_to_task(self):
-        registry = _fake_registry(("a", "G", True, True))
-        tasks = build_tasks(["G"], set(), {"G": {"a": 3}}, {"G": {"a"}}, registry=registry)
+        registry = _fake_registry(("a", "G", True, True, 3, True))
+        tasks = build_tasks(["G"], set(), registry=registry)
         self.assertTrue(tasks[0].once)
         self.assertTrue(tasks[0].must_finish)
         self.assertIs(tasks[0].run, registry[0].run)
 
 
 class RealRegistryTests(unittest.TestCase):
-    """Bảng nhiệm vụ thật (registry.py) + priority.py thật."""
+    """Bảng nhiệm vụ thật (priority.py)."""
 
     def build(self, activities, settings):
-        return build_tasks(activities, {JOIN_BOSS}, load_priorities(), load_must_finish(), settings, REGISTRY)
+        return build_tasks(activities, {JOIN_BOSS}, settings)
 
-    def test_keys_exist_in_priority_file(self):
-        known = {t["key"] for group in load_priorities().values() for t in [{"key": k} for k in group]}
-        missing = [d.key for d in REGISTRY if d.key not in known]
-        self.assertEqual(missing, [], "nhiệm vụ trong registry thiếu độ ưu tiên ở priority.py")
+    def test_every_task_has_a_priority_and_a_run_in_the_table(self):
+        from bot.worker.priority import DATA
+        rows = {e["key"]: e for g, v in DATA.items() if isinstance(v, list) for e in v}
+        for task in REGISTRY:
+            self.assertIn("priority", rows[task.key], task.key)
+            self.assertTrue(callable(rows[task.key]["run"]) or isinstance(rows[task.key]["run"], dict), task.key)
 
     def test_unique_keys(self):
         keys = [d.key for d in REGISTRY]
@@ -160,13 +82,14 @@ class RealRegistryTests(unittest.TestCase):
                                          "Offering": True, "Gold Levy": True, "Patrol": True,
                                          "Alliance Donation": 4, "Alliance Help": 0}}
         tasks = self.build(["Daily Activities", "Open Gift Box"], settings)
-        ordered = [t.key for t in sorted(tasks, key=lambda t: -t.priority)]
+        ordered = [t.key for t in tasks]   # build_tasks đã xếp theo độ ưu tiên
         self.assertEqual(ordered, ["crazy_eggs", "open_gift_box", "daily_buy_general", "daily_offering",
-                                   "daily_gold_levy", "daily_alliance_donation", "daily_patrol", "daily_rewards"])
+                                   "daily_gold_levy", "daily_alliance_donation", "daily_patrol", "daily_rewards",
+                                   "daily_gift_claims"])
         by_key = {t.key: t for t in tasks}
-        self.assertTrue(by_key["crazy_eggs"].repeat)
+        self.assertIsNotNone(by_key["crazy_eggs"].due)   # việc theo giờ: tới giờ mới đẩy lên đầu danh sách
         self.assertTrue(by_key["daily_patrol"].must_finish)
-        self.assertFalse(by_key["daily_offering"].must_finish)
+        self.assertTrue(by_key["daily_offering"].must_finish)   # mọi việc Daily: làm tới xong, không giới hạn 120 giây
         self.assertEqual(by_key["daily_offering"].group, "Daily Activities")
         self.assertNotIn("Daily Activities", by_key)
 
@@ -174,9 +97,16 @@ class RealRegistryTests(unittest.TestCase):
         settings = {"Event": {"gather_troops_ground_troop": {"enabled": True, "day": 1},
                               "kings_path_patrol": {"enabled": False}}}
         tasks = self.build(["Event"], settings)
-        self.assertEqual([(t.key, t.priority) for t in sorted(tasks, key=lambda t: -t.priority)],
+        self.assertEqual([(t.key, t.priority) for t in tasks],
                          [("gather_troops_ground_troop", 552), ("gather_troops_claim", 500),
                           ("three_day_event", 498)])
+
+    def test_alliance_capacity_runs_once_and_saves_nothing(self):
+        """Alliance Capacity chỉ làm 1 lần (once) và xong thì không lưu gì vào DB (done = None: xong khi chạy hết một lượt)."""
+        task = {t.key: t for t in REGISTRY}["alliance_capacity"]
+        self.assertTrue(task.once)
+        self.assertIsNone(task.done)
+        self.assertIsNone(task.due)
 
     def test_battlefield_shop_excluded_black_market_once(self):
         tasks = self.build(["Battlefield Shop", "Black Market"], {})
@@ -187,26 +117,25 @@ class RealRegistryTests(unittest.TestCase):
         from bot.activities.event_center import crazy_eggs  # noqa: F401
         tasks = {t.key: t for t in self.build(["Open Gift Box", "Alliance Capacity"], {})}
         from bot.activities import ACTIVITIES
-        self.assertIsNot(tasks["open_gift_box"].run, ACTIVITIES["Open Gift Box"])   # worker bọc: lưu "xong hôm nay"
+        self.assertIs(tasks["open_gift_box"].run, ACTIVITIES["Open Gift Box"])   # nhiệm vụ tự lưu "xong hôm nay"
         self.assertIs(tasks["alliance_capacity"].run, ACTIVITIES["Alliance Capacity"])
 
-    def test_every_policy_row_builds_and_names_a_known_policy(self):
-        from bot.worker.policies import BUILDERS
+    def test_every_row_with_run_is_a_task(self):
         from bot.worker.priority import DATA
-        rows = [(g, e) for g, v in DATA.items() if isinstance(v, list) for e in v]
-        self.assertTrue(all(e["policy"] in BUILDERS for _, e in rows if "policy" in e))
-        self.assertEqual(len(REGISTRY), sum(1 for _, e in rows if "policy" in e))
+        rows = [e for g, v in DATA.items() if isinstance(v, list) for e in v]
+        self.assertEqual(len(REGISTRY), sum(1 for e in rows if "run" in e))
+        self.assertTrue(all("handler" in e for e in rows if e["key"] == "join_monster_war"))   # không vào danh sách
 
-    def test_event_and_daily_catalogs_match_priority_rows(self):
-        """Mọi nhiệm vụ trong danh mục của activity (TASKS / HOURLY / EVENTS) có một dòng `policy` ở priority.py."""
-        from bot.activities.daily_activities.run import HOURLY, TASKS
+    def test_event_catalog_matches_priority_rows(self):
+        """Mọi nhiệm vụ Event trong danh mục EVENTS có một dòng `run` ở priority.py."""
         from bot.activities.event.run import EVENTS
         keys = {d.key for d in REGISTRY}
-        wanted = {t.key for t in TASKS} | {t.key for t, _ in HOURLY} | {k for *_, ts in EVENTS for k, _ in ts}
+        wanted = {k for *_, ts in EVENTS for k, _ in ts}
         self.assertEqual(sorted(wanted - keys), [])
 
     def test_real_priority_file_loads(self):
-        self.assertIn("Crazy Eggs", load_priorities())
+        from bot.worker.priority import DATA
+        self.assertIn("Crazy Eggs", DATA)
 
 
 class WorkerLoopTests(unittest.TestCase):
@@ -215,7 +144,11 @@ class WorkerLoopTests(unittest.TestCase):
         worker = BotWorker("b", activities, {"Initialization": {"server": "1"}},
                            server_clock=ServerClock("known"))
         worker.ctx = BotContext(SimpleNamespace(serial="b"), worker._stop, None, worker.log)
-        tasks = [Task(key, "G", priority, run=run) for key, priority, run in specs]
+        worker.ctx.shell = mock.Mock()   # đóng game ở mốc reset server: không chạm thiết bị thật
+        wait = mock.patch.object(guards, "RESTART_WAIT", 0)
+        wait.start()
+        self.addCleanup(wait.stop)
+        tasks = sorted((Task(key, "G", priority, run=run) for key, priority, run in specs), key=lambda t: -t.priority)
         patcher = mock.patch.object(bot_worker, "build_tasks", return_value=tasks)
         patcher.start()
         self.addCleanup(patcher.stop)
@@ -296,7 +229,7 @@ class WorkerLoopTests(unittest.TestCase):
         self.assertEqual(calls, [("a", None, False), ("b", None, False)])
 
     def test_task_limited_to_120s_with_boss(self):
-        """Có Join Boss: mỗi nhiệm vụ tối đa 120 giây; hết giờ thì làm lại đầu tiên ở vòng sau."""
+        """Có Join Boss: mỗi nhiệm vụ tối đa 120 giây; hết giờ thì chưa xong nên xuống cuối danh sách."""
         calls = []
 
         def run_a(ctx, settings):
@@ -318,7 +251,7 @@ class WorkerLoopTests(unittest.TestCase):
             return BOSS_IDLE
 
         self.run_until_stop(worker, run_activity)
-        self.assertEqual(calls, [JOIN_BOSS, "a", JOIN_BOSS, "a", JOIN_BOSS, "b"])
+        self.assertEqual(calls, [JOIN_BOSS, "a", JOIN_BOSS, "b"])
 
     def test_bubble_off_no_bubble_rule(self):
         """Không tích Bubble: không lo bubble trước nhiệm vụ, không hẹn ngắt vì bubble."""
@@ -360,19 +293,268 @@ class WorkerLoopTests(unittest.TestCase):
         worker._run_tasks()
         self.assertEqual(calls, [(JOIN_BOSS, False)])
 
-    def test_again_after_set_by_task_reschedules(self):
-        """Nhiệm vụ gán ctx.again_after (VD Crazy Eggs chưa đủ 4 quả vỡ): bộ chọn hẹn chạy lại."""
+    def with_flags(self, worker, done=None, due=None):
+        """Gắn `done` / `due` cho nhiệm vụ của worker: done[key] / due[key] là dict cờ có thể đổi trong lúc chạy."""
+        for task in worker_tasks():
+            if done is not None:
+                task.done = lambda ctx, s, key=task.key: done[key]
+            if due is not None and task.key in due:
+                task.due = lambda ctx, s, key=task.key: due[key]
+
+    def test_not_done_task_goes_to_the_end(self):
+        """Nhiệm vụ chưa xong chuyển xuống cuối danh sách, làm việc khác trước rồi mới quay lại."""
+        calls, done = [], {"a": False, "b": False}
+
+        def run_a(ctx, s):
+            calls.append("a")
+            done["a"] = calls.count("a") == 2   # lần đầu chưa xong, lần hai xong
+
+        def run_b(ctx, s):
+            calls.append("b")
+            done["b"] = True
+
+        worker = self.make_worker(["G"], [("a", 2, run_a), ("b", 1, run_b)])
+        self.with_flags(worker, done=done)
+
+        def sleep(seconds):
+            worker._stop.set()
+            worker.ctx.check()
+
+        worker.ctx.sleep = sleep
+        self.run_until_stop(worker)
+        self.assertEqual(calls, ["a", "b", "a"])
+
+    def test_done_tasks_are_dropped_each_loop(self):
+        """Nhiệm vụ đã xong hôm nay (theo DB) bị loại khỏi danh sách, không chạy."""
         calls = []
 
-        def run(ctx, settings):
-            calls.append(1)
-            ctx.again_after = 60
+        def run_todo(ctx, s):
+            calls.append("todo")
             worker._stop.set()
 
-        worker = self.make_worker(["G"], [("a", 1, run)])
-        with mock.patch.object(Scheduler, "finished", autospec=True) as finished:
+        worker = self.make_worker(["G"], [("done", 9, lambda c, s: calls.append("done")), ("todo", 1, run_todo)])
+        self.with_flags(worker, done={"done": True, "todo": False})
+        self.run_until_stop(worker)
+        self.assertEqual(calls, ["todo"])
+
+    def test_done_task_comes_back_when_the_db_says_not_done_any_more(self):
+        """Mỗi vòng đọc lại DB: nhiệm vụ đã xong mà giữa ngày đổi mục tiêu ở tab (thành chưa xong) thì được làm lại ngay."""
+        calls, done = [], {"a": True, "b": False}
+
+        def run_b(ctx, s):
+            calls.append("b")
+            done["b"] = True
+            done["a"] = False      # giả lập đổi mục tiêu ở tab: a thành chưa xong
+
+        def run_a(ctx, s):
+            calls.append("a")
+            done["a"] = True
+            worker._stop.set()
+
+        worker = self.make_worker(["G"], [("a", 9, run_a), ("b", 1, run_b)])
+        self.with_flags(worker, done=done)
+        self.run_until_stop(worker)
+        self.assertEqual(calls, ["b", "a"])
+
+    def test_done_before_the_reset_time_is_not_done_after_it(self):
+        """Xong lúc 12:00, qua mốc reset 14:00 cùng ngày thì không còn tính là xong (is_daily_done so với mốc reset)."""
+        from bot.daily_reset import done_today
+        done_at = datetime(2026, 10, 11, 12, 0).isoformat()
+        self.assertTrue(done_today(done_at, "14:00", datetime(2026, 10, 11, 13, 59)))
+        self.assertFalse(done_today(done_at, "14:00", datetime(2026, 10, 11, 14, 0)))
+        self.assertFalse(done_today(done_at, "14:00", datetime(2026, 10, 12, 9, 0)))
+
+    def test_all_not_done_pauses_before_next_pass(self):
+        """Cả danh sách đều chưa xong: nghỉ IDLE_WAIT sau mỗi lượt qua hết danh sách, không chạy liên tục."""
+        calls, sleeps = [], []
+        worker = self.make_worker(["G"], [("a", 2, lambda c, s: calls.append("a")),
+                                          ("b", 1, lambda c, s: calls.append("b"))])
+        self.with_flags(worker, done={"a": False, "b": False})
+
+        def sleep(seconds):
+            sleeps.append((seconds, list(calls)))
+            if len(sleeps) == 2:
+                worker._stop.set()
+            worker.ctx.check()
+
+        worker.ctx.sleep = sleep
+        self.run_until_stop(worker)
+        self.assertEqual(sleeps, [(bot_worker.IDLE_WAIT, ["a", "b"]), (bot_worker.IDLE_WAIT, ["a", "b", "a", "b"])])
+
+    def test_new_day_puts_done_tasks_back(self):
+        """Sang ngày mới (qua mốc reset server): nhiệm vụ đã xong được đưa lại vào danh sách."""
+        calls, done = [], {"a": False}
+        day = [datetime(2026, 10, 3, 9)]
+
+        def run_a(ctx, s):
+            calls.append("a")
+            if len(calls) == 1:
+                done["a"] = True          # xong hôm nay
+            else:
+                worker._stop.set()
+
+        worker = self.make_worker(["G"], [("a", 1, run_a)])
+        self.with_flags(worker, done=done)
+
+        def sleep(seconds):
+            if len(calls) == 1:           # đang nghỉ vì danh sách rỗng: sang ngày mới, chưa xong lại
+                day[0] += timedelta(days=1)
+                done["a"] = False
+            worker.ctx.check()
+
+        worker.ctx.sleep = sleep
+        with mock.patch.object(bot_worker, "last_reset", side_effect=lambda server_time: day[0]):
             self.run_until_stop(worker)
-        self.assertEqual(finished.call_args.kwargs["again_after"], 60)
+        self.assertEqual(calls, ["a", "a"])
+
+    def test_game_is_closed_at_the_reset_time(self):
+        """Tới mốc reset server: tắt game bật lại (am force-stop) đúng một lần, giữa hai nhiệm vụ."""
+        calls, done = [], {"a": False}
+        day = [datetime(2026, 10, 3, 9)]
+
+        def run_a(ctx, s):
+            calls.append("a")
+            done["a"] = len(calls) == 1
+            if len(calls) == 2:
+                worker._stop.set()
+
+        worker = self.make_worker(["G"], [("a", 1, run_a)])
+        self.with_flags(worker, done=done)
+
+        def sleep(seconds):
+            if len(calls) == 1:
+                day[0] += timedelta(days=1)       # đang nghỉ vì xong hết: sang ngày mới
+                done["a"] = False
+            worker.ctx.check()
+
+        worker.ctx.sleep = sleep
+        with mock.patch.object(bot_worker, "last_reset", side_effect=lambda server_time: day[0]):
+            self.run_until_stop(worker)
+        self.assertEqual(calls, ["a", "a"])
+        shell = [c.args[0] for c in worker.ctx.shell.call_args_list]
+        self.assertEqual(len(shell), 1)
+        self.assertIn("force-stop", shell[0])
+
+    def test_reset_time_interrupts_even_a_must_finish_task(self):
+        """Tới đúng mốc reset server: ngắt cả nhiệm vụ must_finish (Bubble / Auto Times Out thì bị hoãn), tắt game bật lại, rồi làm
+        lại việc đang dở từ đầu."""
+        calls = []
+
+        def run_a(ctx, s):
+            calls.append("a")
+            if len(calls) == 1:
+                ctx._reset_due_at = time.monotonic() - 1     # giả lập vừa tới 14:00 giữa lúc đang làm
+                worker.guards.reset_handled = datetime.min   # mốc reset mới này chưa xử lý
+            ctx.check()                                      # lần đầu ném ResetDue
+            worker._stop.set()
+
+        worker = self.make_worker(["G"], [("a", 1, run_a)])
+        for task in worker_tasks():
+            task.must_finish = True
+        self.run_until_stop(worker)
+        self.assertEqual(calls, ["a", "a"])                  # làm lại từ đầu sau khi game mở lại
+        shell = [c.args[0] for c in worker.ctx.shell.call_args_list]
+        self.assertEqual(len(shell), 1)
+        self.assertIn("force-stop", shell[0])
+
+    def test_reset_time_is_armed_for_the_next_reset(self):
+        """Mỗi lần gọi qua guards.call, ctx được hẹn ngắt đúng mốc reset kế tiếp (hôm nay hoặc ngày mai)."""
+        worker = self.make_worker(["G"], [])
+        before = time.monotonic()
+        worker.guards.call(None, lambda: None)
+        waiting = worker.ctx._reset_due_at - before
+        self.assertGreater(waiting, 0)
+        self.assertLessEqual(waiting, 24 * 3600 + 5)
+
+    def test_game_is_not_closed_when_the_day_does_not_change(self):
+        calls = []
+        worker = self.make_worker(["G"], [("a", 1, lambda c, s: (calls.append("a"), worker._stop.set()))])
+        self.run_until_stop(worker)
+        worker.ctx.shell.assert_not_called()
+
+    def test_once_task_not_put_back_on_new_day(self):
+        """Nhiệm vụ `once` xong rồi thì sang ngày mới cũng không đưa lại (chỉ chạy lại khi Start lại)."""
+        calls, sleeps = [], []
+        day = [datetime(2026, 10, 3, 9)]
+        worker = self.make_worker(["G"], [("a", 1, lambda c, s: calls.append("a"))])
+        for task in worker_tasks():
+            task.once = True
+
+        def sleep(seconds):
+            sleeps.append(seconds)
+            day[0] += timedelta(days=1)
+            if len(sleeps) == 3:
+                worker._stop.set()
+            worker.ctx.check()
+
+        worker.ctx.sleep = sleep
+        with mock.patch.object(bot_worker, "last_reset", side_effect=lambda server_time: day[0]):
+            self.run_until_stop(worker)
+        self.assertEqual(calls, ["a"])
+
+    def test_gives_up_after_max_attempts_per_day(self):
+        """Chạy hết một lượt mà vẫn chưa xong: tối đa MAX_ATTEMPTS lần mỗi ngày, rồi bỏ qua tới ngày mới."""
+        calls, sleeps = [], []
+        day = [datetime(2026, 10, 3, 9)]
+        worker = self.make_worker(["G"], [("a", 1, lambda c, s: calls.append("a"))])
+        self.with_flags(worker, done={"a": False})
+
+        def sleep(seconds):
+            sleeps.append(len(calls))
+            if len(calls) > bot_worker.MAX_ATTEMPTS:
+                worker._stop.set()                    # đã thử lại sau khi sang ngày mới
+            elif len(sleeps) == bot_worker.MAX_ATTEMPTS + 3:
+                day[0] += timedelta(days=1)           # bỏ cuộc rồi, sang ngày mới: được thử lại
+            worker.ctx.check()
+
+        worker.ctx.sleep = sleep
+        with mock.patch.object(bot_worker, "last_reset", side_effect=lambda server_time: day[0]):
+            self.run_until_stop(worker)
+        self.assertEqual(calls.count("a"), bot_worker.MAX_ATTEMPTS + 1)   # 6 lần hôm trước + 1 lần sau khi sang ngày
+
+    def test_interrupted_run_is_not_an_attempt(self):
+        """Bị ngắt giữa chừng (không phải chạy hết một lượt) thì không tính là một lần thử."""
+        calls = []
+
+        def run_a(ctx, s):
+            calls.append("a")
+            if len(calls) <= bot_worker.MAX_ATTEMPTS + 2:
+                ctx._deadline = 0
+                ctx.check()                   # TimedOut
+            worker._stop.set()
+
+        worker = self.make_worker([JOIN_BOSS, "G"], [("a", 1, run_a)])
+        self.with_flags(worker, done={"a": False})
+        self.run_until_stop(worker, lambda activity, settings: BOSS_IDLE)
+        self.assertEqual(len(calls), bot_worker.MAX_ATTEMPTS + 3)
+
+    def test_timed_task_runs_as_soon_as_it_is_due(self):
+        """Việc theo giờ: mỗi vòng chỉ so giờ; chưa tới giờ thì bỏ qua, tới giờ thì làm ngay trước các việc còn lại."""
+        calls, due, done = [], {"t": False}, {"x": False, "y": False, "t": False}
+
+        def run_x(ctx, s):
+            calls.append("x")
+            done["x"] = True
+            due["t"] = True    # tới giờ
+
+        def run_y(ctx, s):
+            calls.append("y")
+            done["y"] = True
+
+        def run_t(ctx, s):
+            calls.append("t")
+            done["t"] = True
+            worker._stop.set()
+
+        worker = self.make_worker(["G"], [("x", 9, run_x), ("y", 5, run_y), ("t", 1, run_t)])
+        self.with_flags(worker, done=done, due=due)
+        self.run_until_stop(worker)
+        self.assertEqual(calls, ["x", "t"])   # t tới giờ nên làm ngay, trước y
+
+
+def worker_tasks():
+    """Danh sách Task mà make_worker đã patch cho build_tasks."""
+    return bot_worker.build_tasks()
 
 
 if __name__ == "__main__":

@@ -42,6 +42,7 @@ from ..daily_activities.gold_levy import TASK as GOLD_LEVY_TASK
 from ..daily_activities.resource_tax import TASK as RESOURCE_TAX_TASK
 from ..daily_activities.constants import TASK_OPENED
 from ..event.kings_path.black_market.run import _refresh
+from ..result import save_errors
 from ..event.kings_path.constants import SCREEN_WAIT
 from .constants import (
     CATALOG,
@@ -81,6 +82,7 @@ class Target:
     item: str
 
 
+@save_errors("black_market_market")   # lỗi thì lưu `black_market_market_error` vào DB
 def run(bot, settings: dict):
     """`bot` là BotContext của thiết bị; `settings` là cấu hình tab Black Market."""
     wanted = wanted_items(settings)

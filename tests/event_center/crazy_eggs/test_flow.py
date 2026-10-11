@@ -13,7 +13,7 @@ import cv2
 from bot.activities.event_center import crazy_eggs
 from bot.activities.event_center.crazy_eggs.constants import DONE_KEY, LUCKY_KEY
 from bot.activities.event_center.constants import AFTER_RESTART_ATTEMPTS, ATTEMPTS, LIST_MAX_SCROLLS
-from bot.worker.policies import record_result
+from bot.activities.daily_activities.common import record_result
 from tests.flow import Step, back, end, run_flow, shell, swipe, tap, tap_at, tap_pct
 
 def _eggs(bot, settings):

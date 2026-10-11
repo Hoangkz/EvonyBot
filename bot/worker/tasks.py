@@ -1,87 +1,84 @@
 """
-tasks.py — danh sách nhiệm vụ của bộ chọn (scheduler.py) và độ ưu tiên đọc từ priority.py.
+tasks.py — danh sách nhiệm vụ của worker, dựng từ bảng priority.py.
 
-Khi bấm Start, build_tasks lấy mọi nhiệm vụ trong bảng bot/worker/registry.py có nhóm (activity) được chọn và đã
-được tích, sắp theo độ ưu tiên của chính nhiệm vụ; mỗi Task mang hàm `run` riêng để worker gọi thẳng. Activity chỉ
-dùng để chia loại. Nhiệm vụ có "must_finish": true trong priority.py: đã bắt đầu thì chạy tới xong, không bị Bubble /
-Join Boss / giới hạn 120 giây ngắt (chỉ Stop). Bubble và Join Boss có luật riêng trong BotWorker.
+Mỗi dòng của bảng có `run` (một hàm trơn `run(ctx, cấu hình tab)`, hoặc một dict `{"run", "enabled", "done", "every"}` do code của
+nhiệm vụ dựng sẵn, VD daily_job(...), event_job(...)), `priority`, và tuỳ chọn `must_finish`, `once`,
+`group` (nhóm chọn nhiệm vụ, nếu khác nhóm chứa dòng), `saves` (hàm `run` tự lưu key của dòng vào DB khi làm xong:
+xong hôm nay = key đó có trong DB). Luật của từng nhiệm vụ (được tích chưa, hôm nay xong chưa — đọc từ DB —
+bao lâu làm một lần) nằm trong dict đó, cạnh code của nhiệm vụ; ở đây chỉ ghép lại thành `Task` cho vòng lặp ở bot_worker.py.
 """
-import json
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import datetime
 
-from .priority import DATA as PRIORITY
+from .priority import DATA
 
 DEFAULT_PRIORITY = 1
 
-def _read(path) -> dict:
-    """Dữ liệu ưu tiên: mặc định từ priority.py (Nuitka compile cùng code, không cần
-    ship file riêng); `path` (file .json riêng, test) thiếu / lỗi file thì {}."""
-    if path is None:
-        return PRIORITY
-    try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return {}
+
+def always(settings: dict) -> bool:
+    """enabled cho nhiệm vụ không có ô tích riêng (chọn activity là chạy)."""
+    return True
 
 
 @dataclass
 class Task:
-    key: str        # VD "Event" (bước 1: tên activity)
+    key: str        # key nhiệm vụ trong priority.py / settings / daily_done
     group: str      # activity chứa nhiệm vụ = tên chạy qua ACTIVITIES / tab settings
     priority: int
     must_finish: bool = False   # bắt đầu rồi thì chạy tới xong, không bị ngắt (trừ Stop)
-    once: bool = False          # xong rồi thì không tới lượt lại khi qua mốc reset server
-    repeat: bool = False        # hẹn chạy lại thì vẫn giữ độ ưu tiên của nó
-    run: Callable | None = None  # hàm riêng của nhiệm vụ: run(bot, cấu hình tab của group); worker gọi thẳng
+    once: bool = False          # xong rồi thì không đưa lại vào danh sách khi sang ngày mới (chỉ chạy lại khi Start lại)
+    run: Callable | None = None  # run(ctx, cấu hình tab của group): làm nhiệm vụ rồi lưu kết quả vào DB
+    enabled: Callable[[dict], bool] = always       # enabled(cấu hình tab của group) -> nhiệm vụ này đã được tích?
+    done: Callable | None = None                   # done(ctx, cấu hình tab của group) -> hôm nay đã xong chưa? (đọc DB)
+    due: Callable | None = None                    # due(ctx, cấu hình tab của group) -> việc theo giờ: đã tới giờ làm chưa?
 
 
-def load_priorities(path=None) -> dict[str, dict[str, int]]:
-    """{nhóm: {key nhiệm vụ: độ ưu tiên}} từ priority.py (hoặc file .json ở `path`); thiếu /
-    lỗi file thì {} (mọi nhiệm vụ dùng DEFAULT_PRIORITY)."""
-    data = _read(path)
-    result = {}
-    for group, tasks in data.items():
-        if group.startswith("_") or not isinstance(tasks, list):
-            continue
-        result[group] = {t["key"]: int(t.get("priority", DEFAULT_PRIORITY))
-                         for t in tasks if isinstance(t, dict) and "key" in t}
-    return result
+def _hours_since(ctx, key: str) -> float | None:
+    """Số giờ kể từ lần làm trước (giờ lưu trong daily_done `key`), None nếu chưa làm lần nào."""
+    try:
+        return (datetime.now() - datetime.fromisoformat(ctx.done_at(key))).total_seconds() / 3600
+    except (TypeError, ValueError):
+        return None
 
 
-def load_must_finish(path=None) -> dict[str, set[str]]:
-    """{nhóm: {key nhiệm vụ có "must_finish": true}}; nhóm có ít nhất 1 nhiệm vụ mới có mặt.
-    Thiếu / lỗi file thì {}."""
-    data = _read(path)
-    result = {}
-    for group, tasks in data.items():
-        if group.startswith("_") or not isinstance(tasks, list):
-            continue
-        keys = {t["key"] for t in tasks if isinstance(t, dict) and "key" in t and t.get("must_finish")}
-        if keys:
-            result[group] = keys
-    return result
+def build_task(row: dict, group: str) -> Task:
+    """Một dòng của bảng -> Task. Worker KHÔNG ghi gì vào DB: nhiệm vụ (bot/activities) tự lưu kết quả của nó. Việc theo giờ
+    (dict có "every"): nhiệm vụ tự lưu giờ vừa làm vào DB (`<key>_tried`); `due` chỉ so giờ đó với số giờ trên tab."""
+    key = row["key"]
+    job = row["run"] if isinstance(row["run"], dict) else {"run": row["run"]}
+    every = job.get("every")
+    due = None
+    if every is not None:
+        tried_key = f"{key}_tried"
+
+        def due(ctx, settings, every=every, tried_key=tried_key):
+            hours = every(settings)
+            since = _hours_since(ctx, tried_key)
+            return hours > 0 and (since is None or since >= hours)
+
+    return Task(key, row.get("group", group), int(row.get("priority", DEFAULT_PRIORITY)),
+                must_finish=bool(row.get("must_finish")), once=bool(row.get("once")),
+                run=job["run"], enabled=job.get("enabled", always), due=due,
+                done=job.get("done") or ((lambda ctx, settings: ctx.is_daily_done(key)) if row.get("saves") else None))
 
 
-def build_tasks(activities: list[str], skip: set[str], priorities: dict, must_finish: dict | None = None,
-                settings: dict | None = None, registry=None) -> list[Task]:
-    """Danh sách nhiệm vụ khi bấm Start: mọi nhiệm vụ trong `registry` (bot/worker/registry.py) có group nằm
-    trong `activities` (activity chỉ dùng để chia loại; `skip`: VD Join Boss) và đã được tích (`enabled` nhận cấu
-    hình tab của group, lấy từ `settings`). Mỗi nhiệm vụ theo độ ưu tiên của chính nó (priority.py, số lớn làm
-    trước); ưu tiên < 0 không được đưa vào danh sách. Cùng ưu tiên thì theo thứ tự trong registry."""
-    must_keys = set().union(*(must_finish or {}).values())
-    by_key = {key: priority for group in priorities.values() for key, priority in group.items()}
+def build_registry(data: dict) -> list[Task]:
+    """Mọi nhiệm vụ (dòng có `run`) của bảng `data` (priority.DATA), theo thứ tự trong bảng."""
+    return [build_task(row, group) for group, rows in data.items()
+            if not group.startswith("_") and isinstance(rows, list) for row in rows if "run" in row]
+
+
+REGISTRY: list[Task] = build_registry(DATA)
+
+
+def build_tasks(activities: list[str], skip: set[str], settings: dict | None = None,
+                registry: list[Task] | None = None) -> list[Task]:
+    """Danh sách nhiệm vụ khi bấm Start: mọi nhiệm vụ có group nằm trong `activities` (activity chỉ dùng để chia loại;
+    `skip`: VD Join Boss) và đã được tích (`enabled` nhận cấu hình tab của group, lấy từ `settings`), xếp theo độ ưu tiên
+    (số lớn làm trước; cùng ưu tiên thì theo thứ tự trong bảng). Độ ưu tiên < 0 không được đưa vào danh sách."""
     settings = settings or {}
-    tasks = []
-    for definition in registry or []:
-        if definition.group not in activities or definition.group in skip:
-            continue
-        if not definition.enabled(settings.get(definition.group, {})):
-            continue
-        priority = by_key.get(definition.key, DEFAULT_PRIORITY)
-        if priority < 0:
-            continue
-        tasks.append(Task(key=definition.key, group=definition.group, priority=priority,
-                          must_finish=definition.key in must_keys, once=definition.once,
-                          repeat=definition.repeat, run=definition.run))
-    return tasks
+    tasks = [task for task in (REGISTRY if registry is None else registry)
+             if task.group in activities and task.group not in skip
+             and task.enabled(settings.get(task.group, {})) and task.priority >= 0]
+    return sorted(tasks, key=lambda task: -task.priority)

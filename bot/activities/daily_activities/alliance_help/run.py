@@ -1,17 +1,16 @@
 """
-run.py — Daily Activities "Alliance Help": một lần thử theo giờ (worker gọi, bot/worker/policies.py):
+run.py — Daily Activities "Alliance Help": một lần thử theo giờ (worker gọi, bot/worker/tasks.py):
 1. Màn chính -> Liên minh -> dòng "Alliance Help" -> màn Alliance Help.
 2. "No records" (không ai cần giúp) -> Back, sang nhiệm vụ khác: KHÔNG kiểm tra Activity, chưa xong.
 3. Có "Help All" -> bấm -> Back -> kiểm tra dòng / thẻ Activity như Alliance Donation
-   (../hourly.py check_done, không bấm Go): xong -> TaskResult(done=True), trong ngày không kiểm tra lại.
+   (../common.py check_done, không bấm Go): xong -> TaskResult(done=True), trong ngày không kiểm tra lại.
 Đường tới Liên minh giống King's Path Donate (event/kings_path/donate/alliance.py _open_science), đích là dòng
 "Alliance Help" (thấy ngay, không cần cuộn).
 """
 from ....common import click_images, delay, exit_images, find_first, go_home
 from ...event.kings_path.donate.constants import ALLIANCE_BUTTON, OUT_ALLIANCE
 from ...result import NOT_DONE, TaskResult
-from ..common import Task
-from ..hourly import check_done
+from ..common import Task, check_done
 from .constants import (
     ACTIONS,
     DONE_IMAGES,
