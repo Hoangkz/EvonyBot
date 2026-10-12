@@ -65,7 +65,6 @@ def run(bot, settings: dict) -> TaskResult:
         for key, name, _, _ in pending:
             if key in ctx["finished"] and key not in before:
                 bot.record(f"{NAME}: xong {name}")
-                bot.yield_to_boss()
         if result == c.NOT_FOUND or (result == c.STOP and ctx["finished"] == before):
             misses += 1
             if misses >= c.TASK_SEARCH_TRIES:

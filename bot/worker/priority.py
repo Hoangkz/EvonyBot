@@ -1,5 +1,5 @@
 """priority.py — bảng nhiệm vụ của worker: mỗi dòng có độ ưu tiên và `run` là việc thực hiện nhiệm vụ đó, import thẳng từ
-bot/activities: một hàm trơn `run(ctx, cấu hình tab)`, hoặc một dict {run, enabled, done, every} do code của nhiệm vụ dựng sẵn. Dòng không có `run` (Bubble, Join Monster War, gift_*, việc chưa làm) không vào danh sách nhiệm vụ."""
+bot/activities: một hàm trơn `run(ctx, cấu hình tab)`, hoặc một dict {run, enabled, done, every} do code của nhiệm vụ dựng sẵn. Dòng không có `run` (Bubble, Join Monster War, việc chưa làm) không vào danh sách nhiệm vụ."""
 from ..activities.daily_activities.monster_killing import TASK as daily_monster_killing
 from ..activities.daily_activities.resource_collecting import TASK as daily_resource_collecting
 from ..activities.daily_activities.offering import TASK as daily_offering
@@ -48,7 +48,7 @@ from ..activities.open_gift_box.run import run as open_gift_box
 from ..activities import join_monster_war
 
 DATA ={
-    "_doc": "Độ ưu tiên của từng nhiệm vụ cho bộ chọn nhiệm vụ của worker (chưa dùng). Nhóm = activity (nút Select Activity / tab UI). key = key nhiệm vụ trong settings / daily_done. Ưu tiên cao hơn làm trước; cùng ưu tiên thì xoay vòng. Mặc định 1. Bubble và Join Boss cũng là nhiệm vụ nhưng có luật riêng (bot/worker/TODO.md mục 1): bubble luôn cao nhất, Join Boss chạy giữa mỗi 2 nhiệm vụ thường. Các key gift_* có ưu tiên -100 thấp nhất và hiện được Daily Activities gọi sau khi mọi nhiệm vụ đã chọn cùng Activity Rewards hoàn tất. Mọi nhiệm vụ của nhóm Daily Activities (có run) đều must_finish: làm tới xong rồi mới tới nhiệm vụ khác, không giới hạn 120 giây, không bị Bubble / Auto Times Out / Join Boss ngắt. Thêm \"must_finish\": true vào nhiệm vụ cần làm tới xong: đã bắt đầu thì không bị Bubble / Join Boss / giới hạn 120 giây ngắt (chỉ Stop), xong rồi mới tới Bubble và Join Boss; khi cả activity còn chạy nguyên khối thì mọi nhiệm vụ của nhóm phải có cờ này.",
+    "_doc": "Độ ưu tiên của từng nhiệm vụ cho bộ chọn nhiệm vụ của worker (chưa dùng). Nhóm = activity (nút Select Activity / tab UI). key = key nhiệm vụ trong settings / daily_done. Ưu tiên cao hơn làm trước; cùng ưu tiên thì xoay vòng. Mặc định 1. Bubble và Join Boss cũng là nhiệm vụ nhưng có luật riêng (bot/worker/TODO.md mục 1): bubble luôn cao nhất, Join Boss chạy giữa mỗi 2 nhiệm vụ thường. Các key gift_* (bot/activities/gift_claims) không có dòng ở đây: Daily Activities gọi chúng sau khi mọi nhiệm vụ đã chọn cùng Activity Rewards hoàn tất. Mọi nhiệm vụ của nhóm Daily Activities (có run) đều must_finish: làm tới xong rồi mới tới nhiệm vụ khác, không giới hạn 120 giây, không bị Bubble / Auto Times Out / Join Boss ngắt. Thêm \"must_finish\": true vào nhiệm vụ cần làm tới xong: đã bắt đầu thì không bị Bubble / Join Boss / giới hạn 120 giây ngắt (chỉ Stop), xong rồi mới tới Bubble và Join Boss; khi cả activity còn chạy nguyên khối thì mọi nhiệm vụ của nhóm phải có cờ này.",
     "Bubble": [
         {
             "key": "bubble", 
@@ -309,19 +309,14 @@ DATA ={
 
         },
         { 
-            "key": "daily_alliance_science",
-            "label": "Alliance Science",
-            "priority": 393 
-        },
-        { 
             "key": "daily_alliance_research",
             "label": "Alliance Research",
-            "priority": 392 
+            "priority": -392 
         },
         { 
             "key": "daily_alliance_technology",
             "label": "Alliance Technology",
-            "priority": 391 
+            "priority": -391 
         },
         { 
             "key": "daily_black_market",
@@ -401,71 +396,6 @@ DATA ={
             "label": "Nhận quà cuối ngày (sau khi Daily và thưởng Activity xong)",
             "priority": 200,
 
-        },
-        { 
-            "key": "gift_dragon_battle",
-            "label": "Nhận quà: Dragon Battle",
-            "priority": -100 
-        },
-        { 
-            "key": "gift_grace_of_star_trail",
-            "label": "Nhận quà: Grace of Star Trail",
-            "priority": -100 
-        },
-        { 
-            "key": "gift_limited_offer",
-            "label": "Nhận quà: Limited Offer",
-            "priority": -100 
-        },
-        { 
-            "key": "gift_speedup_sprint",
-            "label": "Nhận quà: Speedup Sprint",
-            "priority": -100 
-        },
-        { 
-            "key": "gift_super_blazon_sale",
-            "label": "Nhận quà: Super Blazon Sale",
-            "priority": -100 
-        },
-        { 
-            "key": "gift_sulis_wishing",
-            "label": "Nhận quà: Sulis Wishing Pool",
-            "priority": -100 
-        },
-        { 
-            "key": "gift_super_value_weekly_card",
-            "label": "Nhận quà: Super Value Weekly Card",
-            "priority": -100 
-        },
-        { 
-            "key": "gift_successive_purchase_benefits",
-            "label": "Nhận quà: Successive Purchase Benefits",
-            "priority": -100 
-        },
-        { 
-            "key": "gift_login_gifts",
-            "label": "Nhận quà: Login Gifts",
-            "priority": -100 
-        },
-        { 
-            "key": "gift_empire_depot",
-            "label": "Nhận quà: Empire Depot",
-            "priority": -100 
-        },
-        { 
-            "key": "gift_lucky_raffle",
-            "label": "Nhận quà: Lucky Raffle",
-            "priority": -100 
-        },
-        { 
-            "key": "gift_city_growth_plan",
-            "label": "Nhận quà: City Growth Plan Stage 1",
-            "priority": -100 
-        },
-        { 
-            "key": "gift_event_center_limited",
-            "label": "Nhận quà: Event Center Limited (bỏ Invite Friends/Facebook và Activities)",
-            "priority": -100 
         }
     ],
     "Black Market": [
@@ -474,7 +404,6 @@ DATA ={
             "run": black_market_market,
             "label": "Black Market: mua ở Market",
             "priority": 0,
-
             "once": True 
         }
     ],
@@ -484,6 +413,6 @@ DATA ={
             "run": battlefield_shop,
             "label": "Battlefield Shop",
             "priority": -1,
-}
+        }
     ]
 }

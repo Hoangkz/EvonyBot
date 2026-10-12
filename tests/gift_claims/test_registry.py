@@ -45,15 +45,12 @@ class GiftClaimRegistryTests(unittest.TestCase):
         self.assertTrue(all(cv2.imread(str(folder / name)) is not None
                             for name in expected))
 
-    def test_every_module_has_unique_lowest_priority(self):
-        daily = {item["key"]: item["priority"] for item in DATA["Daily Activities"]}
+    def test_every_module_has_unique_key(self):
         keys = [task.key for task in gift_claims.TASKS]
 
         self.assertEqual(len(keys), len(set(keys)))
-        self.assertEqual(set(keys), {key for key in daily if key.startswith("gift_")})
-        self.assertTrue(all(daily[key] == -100 for key in keys))
-        self.assertLess(-100, min(value for key, value in daily.items()
-                                  if not key.startswith("gift_")))
+        self.assertTrue(all(key.startswith("gift_") for key in keys))
+        self.assertFalse(any(item["key"] in keys for item in DATA["Daily Activities"]))
 
     def test_each_gift_is_attempted_once_and_remembered_for_today(self):
         called = []

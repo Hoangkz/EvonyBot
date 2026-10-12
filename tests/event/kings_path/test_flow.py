@@ -11,7 +11,6 @@ from bot.activities import event
 from bot.activities.event.constants import KINGS_PATH_ICON
 from bot.activities.event.kings_path import donate, heal, patrol, path_task, wheel
 from bot.activities.event.kings_path.wheel.constants import SPINS_100
-from bot.context.errors import YieldToBoss
 from tests.flow import Step, back, end, run_flow, swipe, tap, tap_at
 from tests.event import CLAIM_LOGIN_REWARD, OPEN_VOYAGE
 from bot.activities.event import common as event_common

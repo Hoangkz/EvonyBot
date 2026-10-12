@@ -24,11 +24,6 @@ Cập nhật: 2026-10-11. Xong mục nào thì xoá mục đó. Flow hiện tạ
   `Xong: <key>`) xen kẽ Join Boss; Crazy Eggs hẹn lại đúng giờ; Black Market chạy 1 lần. Lần chạy thật 2026-10-11 là của
   thiết kế cũ (cả activity một khối).
 - [ ] **Chạy `tests/event`** (flow test Event dùng hàm `run` cũ) — chưa chạy lại sau khi sửa.
-- [ ] **Hàm `run` cũ của Event / Daily** ([event/run.py](../activities/event/run.py),
-  [daily_activities/common.py](../activities/daily_activities/common.py)): chỉ còn các flow test cũ gọi, worker không gọi.
-  Khi chuyển flow test sang gọi thẳng hàm của từng nhiệm vụ thì xoá (và xoá `ACTIVITIES["Event"]`, `["Daily Activities"]`).
-- [ ] **`yield_to_boss` / `YieldToBoss`**: không còn cần cho Event (mỗi nhiệm vụ là một nhiệm vụ riêng, xong là quay lại
-  Join Boss). Chỉ `event_center/three_day` còn gọi; bỏ khi tách nhiệm vụ con của event 3 ngày.
 - [ ] **Ground Troop không đọc được số lượng huấn luyện** (`cannot read train count`, thấy khi chạy thật 2026-10-11):
   nhiệm vụ kết thúc mà không đánh dấu xong. Xem [gather_troops/ground_troop](../activities/event/gather_troops/ground_troop).
 - [ ] **Quà cuối Daily** (`gift_*`, ưu tiên -100): đang chạy bên trong nhiệm vụ `daily_rewards` (một khối dài, bị ngắt ở
@@ -37,7 +32,7 @@ Cập nhật: 2026-10-11. Xong mục nào thì xoá mục đó. Flow hiện tạ
 
 ## 3. Daily Activities (để sau, khi người dùng yêu cầu)
 
-- [ ] Viết các nhiệm vụ có trong `priority.py` nhưng chưa có code: `daily_alliance_science`, `daily_alliance_research`,
+- [ ] Viết các nhiệm vụ có trong `priority.py` nhưng chưa có code: `daily_alliance_research`,
   `daily_alliance_technology`, `daily_greet_champion` (khi viết thì thêm một dòng vào priority.py (hàm làm việc ở thư mục việc đó); priority.py tự lấy).
 - [ ] `daily_general_enhancing`: người dùng ghi "Cần làm thêm".
 - [ ] Đổi key daily_done từ nhãn ("Offering") sang dạng `daily_<tên>` + migration trong `database.py` (`KEY_RENAMES`, giống
