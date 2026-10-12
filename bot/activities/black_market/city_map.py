@@ -3,7 +3,7 @@ city_map.py — (chỉ activity Black Market; Event / nhiệm vụ Daily vẫn �
 activity Black Market) từ chỗ camera đang đứng, không cần nút Go của nhiệm vụ.
 
 Ô đất trong thành ở cùng chỗ trên mọi tài khoản (chỉ khác ô nào xây công trình gì; Thành chính / Đền thờ / Tường thành /
-Battlefield / Art Hall / Defense Force đứng yên). Toạ độ bản đồ = toạ độ "ngón tay" tính từ Thành chính ở giữa màn
+Battlefield / Art Hall / Trap Factory đứng yên). Toạ độ bản đồ = toạ độ "ngón tay" tính từ Thành chính ở giữa màn
 (CENTER): công trình b ở toạ độ V_b nghĩa là từ Thành chính ở giữa, vuốt tổng cộng V_b (ngón tay, px) thì b vào giữa.
 Vuốt chậm (SWIPE_TIME) thì nội dung dịch gần đúng bằng cú vuốt.
 
@@ -25,7 +25,7 @@ from ..event.city_building import (
     BARRACKS,
     BATTLEFIELD,
     BUILDING_THRESHOLD,
-    DEFENSE_FORCE,
+    TRAP_FACTORY,
     DRAGON_CLIFF,
     EMBASSY,
     FORGE,
@@ -52,9 +52,9 @@ from ..event.city_building import (
     _candidates,
 )
 
-from .city_tour import DATA as TOUR
+from .city_tour import DATA as TOUR, FIXED
 # Công trình nhận ra khi quét / đi (có ảnh mẫu trong Images/Event/Building/civ<N>/ hoặc ảnh tự học).
-BUILDINGS = (KEEP, MARKET, HOSPITAL, FORGE, BARRACKS, STABLES, ARCHER_CAMP, WORKSHOP, DEFENSE_FORCE, ACADEMY, SHRINE,
+BUILDINGS = (KEEP, MARKET, HOSPITAL, FORGE, BARRACKS, STABLES, ARCHER_CAMP, WORKSHOP, TRAP_FACTORY, ACADEMY, SHRINE,
              ART_HALL, BATTLEFIELD, PASTURE, WALLS, EMBASSY, PRISON, TAVERN, RESEARCH_FACTORY, HOLY_PALACE, ICE_LAND,
              RALLY_SPOT, VICTORY_COLUMN, TRIUMPHAL_ARCH, WATCHTOWER, ARCHER_TOWER, DRAGON_CLIFF, SUBORDINATE_CITY,
              WONDER, WAR_HALL)
@@ -185,6 +185,8 @@ def scan(bot, name: str) -> dict:
             _, (ux, uy) = centre(bot, middle[0], middle[1])
             cam[0] += ux
             cam[1] += uy
+    for building, view in FIXED.items():      # công trình cố định: không quét, thêm sẵn toạ độ đã đo
+        city_map.setdefault(building, list(view))
     bot.record(f"{name}: city scanned, {len(city_map)} buildings: {', '.join(sorted(city_map))}")
     return city_map
 

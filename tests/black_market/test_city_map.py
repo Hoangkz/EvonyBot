@@ -80,7 +80,7 @@ class CityMapTest(unittest.TestCase):
 
     def test_scan_records_every_plot(self):
         """Thành giả có công trình đúng ở toạ độ các ô của city_tour.py: quét từ Thành chính ghi đủ, đúng toạ độ."""
-        names = ["academy", "defense_force", "barracks", "archer_camp", "workshop", "stables", "hospital", "market",
+        names = ["academy", "trap_factory", "barracks", "archer_camp", "workshop", "stables", "hospital", "market",
                  "war_hall", "embassy", "tavern", "prison", "forge"]
         world = {"keep": (0, 0)}
         for name, plot in zip(names, city_map.TOUR):
@@ -89,7 +89,9 @@ class CityMapTest(unittest.TestCase):
         bot = self._patch(city)
         with mock.patch.object(city_map, "BUILDINGS", tuple(world)):
             found = city_map.scan(bot, "BM")
-        self.assertEqual(set(found), set(world))
+        self.assertEqual(set(found) - set(city_map.FIXED), set(world))
+        for name, view in city_map.FIXED.items():
+            self.assertEqual(found[name], view)
         for name, view in world.items():
             self.assertLessEqual(abs(found[name][0] - view[0]) + abs(found[name][1] - view[1]), 4, name)
 

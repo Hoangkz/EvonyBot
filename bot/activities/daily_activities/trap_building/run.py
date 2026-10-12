@@ -9,7 +9,7 @@ Luồng mới (after_go, sau khi open_task bấm Go): ../train.py train_after_go
 import math
 
 from ....common import delay
-from ...event.city_building import DEFENSE_FORCE
+from ...event.city_building import TRAP_FACTORY
 from ...event.gather_troops.defense_force.constants import BUILD, SPEEDUP_TITLE
 from ..common import Task, replace_text
 from ..train import train_after_go
@@ -40,7 +40,7 @@ def handle(bot, action, pos, screen):
 def after_go(bot) -> bool:
     """Luồng mới, sau khi open_task bấm Go: xây bẫy đang hiện khi vào màn Train bẫy cho đủ TRAP_GOAL (số mặc
     định mỗi mẻ, không nhập số). True nếu xong (đã đánh dấu xong hôm nay)."""
-    return train_after_go(bot, TASK, DEFENSE_FORCE, BUILD, lambda batch: math.ceil(TRAP_GOAL / batch),
+    return train_after_go(bot, TASK, TRAP_FACTORY, BUILD, lambda batch: math.ceil(TRAP_GOAL / batch),
                           speedup_title=SPEEDUP_TITLE)
 
 
