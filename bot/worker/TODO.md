@@ -32,18 +32,20 @@ Cập nhật: 2026-10-11. Xong mục nào thì xoá mục đó. Flow hiện tạ
 
 ## 3. Daily Activities (để sau, khi người dùng yêu cầu)
 
-- [ ] Viết các nhiệm vụ có trong `priority.py` nhưng chưa có code: `daily_alliance_research`,
-  `daily_alliance_technology`, `daily_greet_champion` (khi viết thì thêm một dòng vào priority.py (hàm làm việc ở thư mục việc đó); priority.py tự lấy).
-- [ ] `daily_general_enhancing`: người dùng ghi "Cần làm thêm".
-- [ ] Đổi key daily_done từ nhãn ("Offering") sang dạng `daily_<tên>` + migration trong `database.py` (`KEY_RENAMES`, giống
-  Gather Troops) cho `daily_done` và cột `daily_activities`. Hiện `Task.key` (key priority.py) và nhãn (key daily_done)
-  tách riêng nên chưa gấp.
+- [ ] `daily_general_enhancing` ("Cần làm thêm"): chạy thử thật `after_go`; giao diện mới (tab Cultivate Once / Quick Cultivate)
+  cần ảnh nút Gold Cultivate / Cancel; ảnh `Done.png`. Chi tiết: [general_enhancing/TODO.md](../activities/daily_activities/general_enhancing/TODO.md).
+- [x] Key daily_done của Daily Activities đã đổi từ nhãn ("Offering") sang `Task.key` (`daily_offering`); không migration (DB
+  local, xoá được). Cột `daily_activities` (cấu hình tab) vẫn khoá theo nhãn.
 
 ## 4. Khác
 
-- [ ] **Dọn dẹp event khi hết hạn**: hàm xoá key của event (kể cả `<nhiệm vụ>_complete` của mọi nhiệm vụ Event —
-  `event/common.py` `mark_complete`, không tự hết hạn) trong `daily_done` khi event kết thúc, để vòng mới làm lại.
-  Người dùng tự làm sau.
+- [ ] **Event không còn trong game → bỏ qua cả ngày** (người dùng tự làm sau). Event chỉ kéo dài 7 ngày (VD King's Path:
+  ngày 1 làm nhiệm vụ ngày 1 … ngày 7 hết; ngày 8 tìm không thấy). Khi một nhiệm vụ Event vào tìm mà không thấy event đó:
+  lưu vào DB (`daily_done`) dấu "event X không có hôm nay" (kèm ngày, VD 08/10/2026) cho **mọi nhiệm vụ của event đó** →
+  hôm đó các nhiệm vụ King's Path không chạy nữa (không tìm lại từng nhiệm vụ). Sang ngày mới (qua mốc reset server) dấu
+  tự hết hạn như mọi key `daily_done`, lại kiểm tra tiếp; không có thì đánh dấu lại, có thì làm bình thường.
+  Liên quan: hàm xoá key của event (kể cả `<nhiệm vụ>_complete`, `event/common.py` `mark_complete`, không tự hết hạn) khi
+  event kết thúc, để vòng event mới làm lại.
 - [ ] Commit các thay đổi chưa commit: bảng nhiệm vụ (`priority.py`, `tasks.py`, `bot_worker.py`), Crazy Eggs
   trong Daily (ô giờ ở tab, `activated.png`, đủ 4 quả vỡ), giờ reset chọn ở màn Home, test mới / sửa.
 - [ ] Crazy Eggs còn việc riêng: [crazy_eggs/TODO.md](../activities/event_center/crazy_eggs/TODO.md) (mục 4 "Tích hợp" đã

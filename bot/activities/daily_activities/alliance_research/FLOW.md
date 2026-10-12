@@ -39,4 +39,4 @@ flowchart TD
   (tia sét xanh), rồi Finish All -> Confirm. Không bấm Instant Finish (tốn kim cương).
 - Popup Finish All có ô tích "You can use corresponding common speedups...": chưa tích thì tích trước khi Confirm.
 - Back về thành tới khi hết màn Technology / Speedup / Academy.
-- Ảnh test: `tests/daily_activities/research_technologies/screens/`.
+- Ảnh test: `tests/daily_activities/alliance_research/screens/`.

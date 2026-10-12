@@ -3,7 +3,7 @@ constants.py — ảnh của nhiệm vụ Daily Activities "Research technologie
 """
 from ..constants import ROOT, OPEN
 
-KEY = "daily_research_technologies"   # key nhiệm vụ trong bot/worker/priority.py
+KEY = "daily_alliance_research"   # key nhiệm vụ trong bot/worker/priority.py
 LABEL = "Research"   # ô tích ở tab Daily Activities, key daily_done
 FOLDER = "ActivitiesResearch"
 FOLDER_PATH = f"{ROOT}/{FOLDER}"

@@ -155,7 +155,7 @@ Mỗi nhiệm vụ có file `FLOW.md` riêng trong thư mục của nó (thứ t
 | Wheel of Fortune | [wheel_of_fortune/FLOW.md](wheel_of_fortune/FLOW.md) |
 | Patrol | [patrol/FLOW.md](patrol/FLOW.md) |
 | Material Composing | [material_composing/FLOW.md](material_composing/FLOW.md) |
-| Research technologies | [research_technologies/FLOW.md](research_technologies/FLOW.md) |
+| Research technologies | [alliance_research/FLOW.md](alliance_research/FLOW.md) |
 
 ## 6. General: mua thể lực và mua búa
 

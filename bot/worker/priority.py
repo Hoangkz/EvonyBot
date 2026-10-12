@@ -17,8 +17,8 @@ from ..activities.daily_activities.general_enhancing import TASK as daily_genera
 from ..activities.daily_activities.wheel_of_fortune import TASK as daily_wheel_of_fortune
 from ..activities.daily_activities.patrol import TASK as daily_patrol
 from ..activities.daily_activities.material_composing import TASK as daily_material_composing
-from ..activities.daily_activities.research_technologies import TASK as daily_research_technologies
-from ..activities.daily_activities.research_technologies.run import after_go as research_technologies_after_go
+from ..activities.daily_activities.alliance_research import TASK as daily_alliance_research
+from ..activities.daily_activities.alliance_research.run import after_go as alliance_research_after_go
 from ..activities.daily_activities.greet_champion import TASK as daily_greet_champion
 from ..activities.daily_activities.greet_champion.run import after_go as greet_champion_after_go
 from ..activities.daily_activities.trade_carriage import TASK as daily_trade_carriage
@@ -101,7 +101,7 @@ DATA ={
             "label": "Alliance Capacity: donate Alliance Science",
             "priority": 777,
             "once": True,   # chỉ làm 1 lần (mỗi lần Start): xong thì không lưu gì vào DB, không làm lại khi sang ngày mới
-}
+    }
     ],
     "Event": [
         { 
@@ -214,7 +214,7 @@ DATA ={
             "must_finish": True,
             "label": "General: Buy Stamina + Hammers",
             "priority": 668,
-},
+    },
         { 
             "key": "daily_offering",
             "run": daily_job(daily_offering, target="Offer Gems"),
@@ -228,8 +228,7 @@ DATA ={
             "run": daily_job(daily_resource_gathering),
             "must_finish": True,
             "label": "Resource Gathering",
-            "priority": 665, "note": "Phải chạy ngay sau Offering (bàn tay nổi trong thành)",
-
+            "priority": -665, "note": "Phải chạy ngay sau Offering (bàn tay nổi trong thành)",
         },
         { 
             "key": "daily_resource_tax",
@@ -289,15 +288,14 @@ DATA ={
             "note": "Như Alliance Donation (theo giờ, ô chọn 0-4h, mặc định 4h), chạy ngay sau Alliance Donation",
 
         },
-        { 
+
+                { 
             "key": "daily_alliance_research",
-            "label": "Alliance Research",
-            "priority": -392 
-        },
-        { 
-            "key": "daily_alliance_technology",
-            "label": "Alliance Technology",
-            "priority": -391 
+            "run": daily_job(daily_alliance_research, after_go=alliance_research_after_go),
+            "must_finish": True,
+            "label": "Research",
+            "priority": 392,
+            "note": "Học viện: nghiên cứu 1 công nghệ xanh bất kỳ, tốn thời gian thì Speed Up bằng vật phẩm",
         },
         { 
             "key": "daily_black_market",
@@ -364,15 +362,7 @@ DATA ={
             "priority": 383,
 
         },
-        { 
-            "key": "daily_research_technologies",
-            "run": daily_job(daily_research_technologies, after_go=research_technologies_after_go),
-            "must_finish": True,
-            "label": "Research",
-            "priority": 382,
-            "note": "Học viện: nghiên cứu 1 công nghệ xanh bất kỳ, tốn thời gian thì Speed Up bằng vật phẩm",
 
-        },
         {
             "key": "daily_trade_carriage",
             "run": daily_job(daily_trade_carriage, after_go=trade_carriage_after_go),

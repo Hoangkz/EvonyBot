@@ -1,5 +1,5 @@
 """
-Test Daily Activities / Research technologies (bot/activities/daily_activities/research_technologies/):
+Test Daily Activities / Research technologies (bot/activities/daily_activities/alliance_research/):
 nhận nhãn "Lv N / M" xanh trên màn Academy và nút Research xanh / xám ở màn Technology.
 
 Ảnh trong screens/ là ảnh chụp nguyên màn giả lập 396x704 (2026-10-13): 07 màn Academy tab Advancement,
@@ -10,7 +10,7 @@ import unittest
 from pathlib import Path
 
 import cv2
-from bot.activities.daily_activities.research_technologies.run import green_levels
+from bot.activities.daily_activities.alliance_research.run import green_levels
 
 SCREENS = Path(__file__).parent / "screens"
 

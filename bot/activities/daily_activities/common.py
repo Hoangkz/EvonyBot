@@ -85,7 +85,7 @@ MONSTER_KILLING = "Monster Killing"   # nhãn nhiệm vụ đánh quái (run_tas
 
 @dataclass(frozen=True)
 class Task:
-    label: str          # tên nhiệm vụ (ô tích ở tab Daily Activities; worker dùng làm key "xong hôm nay")
+    label: str          # tên nhiệm vụ (ô tích ở tab Daily Activities); key "xong hôm nay" trong daily_done là `key`
     folder: str         # thư mục ảnh dưới DailyActivites/
     done: tuple[str, ...]                    # ảnh "đã xong"
     actions: tuple[tuple[str, str], ...]     # (ảnh, action) theo thứ tự ưu tiên
@@ -727,17 +727,20 @@ def hourly_hours(settings: dict, consts) -> int:
         return 0
 
 
+_KEY_BY_LABEL: dict[str, str] = {}   # nhãn ô tích ở tab -> key daily_done; daily_job / hourly_job điền khi dựng việc
+
+
 def selected_labels(settings: dict) -> set[str]:
     """Nhãn các việc Daily đã tích: ô tích (giá trị bool True) của tab Daily Activities, trừ mục General. Việc theo giờ là ô chọn
     giờ (số), không phải ô tích."""
     return {name for name, value in settings.items() if name != GENERAL and isinstance(value, bool) and value}
 
 
-def record_result(ctx, key: str, label: str, result: TaskResult):
-    """Lưu kết quả vào DB: xong thì "xong hôm nay" (nhãn) và mục tiêu đã đạt (`<key>_reached_<mục tiêu>`)."""
+def record_result(ctx, key: str, result: TaskResult):
+    """Lưu kết quả vào DB: xong thì "xong hôm nay" (`key`) và mục tiêu đã đạt (`<key>_reached_<mục tiêu>`)."""
     if not result.done:
         return
-    ctx.mark_daily_done(label)
+    ctx.mark_daily_done(key)
     if result.reached is not None:
         ctx.mark_daily_done(f"{key}_reached_{result.reached}")
 
@@ -769,6 +772,8 @@ def daily_job(task: Task, target: str | None = None, after_go=None) -> dict:
     """Một việc Daily. `target`: tên ô cấu hình của tab chứa mục tiêu (VD "Offer Gems") — xong khi mục tiêu đã đạt lưu trong DB >=
     số ở ô đó, nên tăng số ở tab là tự thành chưa xong, giảm lại là xong. Việc làm trong game không cần biết điều này.
     `after_go`: luồng mới — open_task_or_finish bấm Go rồi `after_go(bot)` làm phần sau Go (không dùng run_task / handler cũ)."""
+    _KEY_BY_LABEL[task.label] = task.key
+
     @save_errors(task.key)   # lỗi thì lưu `<key>_error` vào DB
     def run(ctx, settings):
         ctx.log(f"Daily Activities: {task.label}")
@@ -779,10 +784,10 @@ def daily_job(task: Task, target: str | None = None, after_go=None) -> dict:
             if open_task_or_finish(ctx, task):
                 after_go(ctx)
             result = take(ctx) or NOT_DONE
-        record_result(ctx, task.key, task.label, result)   # xong thì lưu "xong hôm nay" (nhãn) vào DB
+        record_result(ctx, task.key, result)   # xong thì lưu "xong hôm nay" (key) vào DB
 
     def done(ctx, settings):
-        return ctx.is_daily_done(task.label) and _reached_enough(
+        return ctx.is_daily_done(task.key) and _reached_enough(
             ctx, f"{task.key}_reached_", _int(settings.get(target)) if target else 0)
 
     return {"run": run, "enabled": lambda settings: settings.get(task.label) is True, "done": done}
@@ -792,22 +797,24 @@ def hourly_job(task: Task, attempt, consts) -> dict:
     """Việc Daily theo giờ (Alliance Donation / Help): `attempt(ctx)` là một lần thử; `consts` là module constants của việc
     (INTERVAL_KEY / INTERVAL_DEFAULT: ô chọn giờ ở tab UI; TRIED_KEY: key lưu giờ vừa làm)."""
 
+    _KEY_BY_LABEL[task.label] = task.key
+
     @save_errors(task.key)   # lỗi thì lưu `<key>_error` vào DB
     def run(ctx, settings):
         ctx.log(f"Daily Activities: {task.label} (every {hourly_hours(settings, consts)}h)")
-        record_result(ctx, task.key, task.label, attempt(ctx))   # xong thì lưu "xong hôm nay" vào DB
+        record_result(ctx, task.key, attempt(ctx))   # xong thì lưu "xong hôm nay" vào DB
         # Lưu giờ vừa làm vào DB (`<key>_tried`): worker chỉ so giờ này để biết tới giờ làm lại chưa. Bị ngắt / lỗi giữa
         # chừng thì tới đây không chạy tới, chưa lưu giờ: lượt sau làm tiếp.
         ctx.mark_daily_done(consts.TRIED_KEY)
 
     hours = lambda settings: hourly_hours(settings, consts)
     return {"run": run, "enabled": lambda settings: hours(settings) > 0,
-            "done": lambda ctx, settings: ctx.is_daily_done(task.label), "every": hours}
+            "done": lambda ctx, settings: ctx.is_daily_done(task.key), "every": hours}
 
 
 def daily_selected_done(ctx, settings: dict) -> bool:
-    """Mọi việc Daily đã tích (trừ việc theo giờ) đã xong hôm nay — đọc từ DB."""
-    return all(ctx.is_daily_done(label) for label in selected_labels(settings))
+    """Mọi việc Daily đã tích (trừ việc theo giờ) đã xong hôm nay — đọc từ DB (key của nhiệm vụ)."""
+    return all(ctx.is_daily_done(_KEY_BY_LABEL.get(label, label)) for label in selected_labels(settings))
 
 
 @save_errors("daily_rewards")

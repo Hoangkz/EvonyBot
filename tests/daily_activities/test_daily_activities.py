@@ -110,10 +110,10 @@ class DailyGoTests(unittest.TestCase):
         job = daily_job(monster_task)
 
         job["run"](bot, {})
-        self.assertNotIn("Monster Killing", done)
+        self.assertNotIn(monster_task.key, done)
 
         job["run"](bot, {})
-        self.assertIn("Monster Killing", done)
+        self.assertIn(monster_task.key, done)
         self.assertEqual(run_task.call_count, 2)
 
     @mock.patch.object(collecting, "open_daily_activity", return_value=True)

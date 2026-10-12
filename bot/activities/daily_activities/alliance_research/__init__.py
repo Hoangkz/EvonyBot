@@ -1,5 +1,5 @@
 """
-research_technologies — Daily Activities: Research technologies.
+alliance_research — Daily Activities: Research technologies.
 
 - run.py:       `after_go(bot)` + `TASK` (common.Task)
 - constants.py: ảnh riêng của nhiệm vụ
