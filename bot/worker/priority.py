@@ -8,7 +8,10 @@ from ..activities.daily_activities.resource_tax import TASK as daily_resource_ta
 from ..activities.daily_activities.gold_levy import TASK as daily_gold_levy
 from ..activities.daily_activities.troop_training import TASK as daily_troop_training
 from ..activities.daily_activities.troop_healing import TASK as daily_troop_heading
+from ..activities.daily_activities.troop_healing.run import after_go as troop_healing_after_go
+from ..activities.daily_activities.troop_training.run import after_go as troop_training_after_go
 from ..activities.daily_activities.trap_building import TASK as daily_trap_buiding
+from ..activities.daily_activities.trap_building.run import after_go as trap_building_after_go
 from ..activities.daily_activities.black_market import TASK as daily_black_market
 from ..activities.daily_activities.general_enhancing import TASK as daily_general_enhancing
 from ..activities.daily_activities.wheel_of_fortune import TASK as daily_wheel_of_fortune
@@ -268,7 +271,7 @@ DATA ={
         },
         { 
             "key": "daily_troop_training",
-            "run": daily_job(daily_troop_training),
+            "run": daily_job(daily_troop_training, after_go=troop_training_after_go),
             "must_finish": True,
             "label": "Troop Training",
             "priority": 397,
@@ -276,7 +279,7 @@ DATA ={
         },
         { 
             "key": "daily_troop_heading",
-            "run": daily_job(daily_troop_heading),
+            "run": daily_job(daily_troop_heading, after_go=troop_healing_after_go),
             "must_finish": True,
             "label": "Troop Heading",
             "priority": 396,
@@ -284,7 +287,7 @@ DATA ={
         },
         { 
             "key": "daily_trap_buiding",
-            "run": daily_job(daily_trap_buiding),
+            "run": daily_job(daily_trap_buiding, after_go=trap_building_after_go),
             "must_finish": True,
             "label": "Trap Buiding",
             "priority": 395,
@@ -392,10 +395,8 @@ DATA ={
         {
             "key": "daily_gift_claims",
             "run": daily_gift_claims,
-            "must_finish": True,
             "label": "Nhận quà cuối ngày (sau khi Daily và thưởng Activity xong)",
             "priority": 200,
-
         }
     ],
     "Black Market": [

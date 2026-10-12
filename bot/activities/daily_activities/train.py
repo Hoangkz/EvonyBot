@@ -35,6 +35,7 @@ from ..event.gather_troops.train_troop.constants import (
     TRAIN_WAIT,
 )
 from ..event.gather_troops.train_troop.run import (
+    TRAIN_TAP_TRIES,
     _confirm_finish_all,
     _find_training_speedup,
     _open_building_menu,
@@ -66,7 +67,8 @@ def train_after_go(bot, task: Task, building: str, menu_icon: str, batches: Call
     thresholds = {menu_icon: TRAIN_THRESHOLD, SPEED_UP: TRAIN_THRESHOLD}
     _open_building_menu(bot, name, building, menu_icon, also=also)
     times = None        # số mẻ cần bấm Train (None = chưa tính)
-    started = 0         # số mẻ đã bấm Train
+    started = 0         # số mẻ đã train (nút đã đổi thành "Training Speedup")
+    pending = 0         # số lần bấm Train mà nút chưa đổi (mẻ chưa tính)
     settings_done = False
     from_menu = False   # màn speedup mở từ menu công trình (mẻ có sẵn, không tính)
     for _ in range(MAX_STEPS):
@@ -95,6 +97,11 @@ def train_after_go(bot, task: Task, building: str, menu_icon: str, batches: Call
             speedup = _find_training_speedup(bot, screen)
             if speedup is not None:
                 # Mẻ đang train (có sẵn trước khi làm, hoặc mẻ vừa bấm): mở màn speedup.
+                if pending:
+                    # Chỉ tính mẻ khi nút đã đổi thành "Training Speedup" (đếm theo lần bấm sẽ dư / thiếu).
+                    started += 1
+                    pending = 0
+                    bot.log(f"{name}: Train batch {started}/{times}")
                 bot.tap(*speedup, delay=BUTTON_WAIT)
                 continue
             if times is None:
@@ -112,9 +119,12 @@ def train_after_go(bot, task: Task, building: str, menu_icon: str, batches: Call
                 mark_task_done(bot, task)
                 bot.back(delay=1)   # đóng màn Train
                 return True
+            if pending >= TRAIN_TAP_TRIES:
+                bot.record(f"{name}: Train tapped {pending} times but no batch started, stop")
+                return False
             train = bot.find(TRAIN_BUTTON, screen=screen, region=TRAIN_BUTTON_REGION)
-            started += 1
-            bot.log(f"{name}: Train batch {started}/{times}")
+            pending += 1
+            bot.log(f"{name}: tap Train (batch {started + 1}/{times})")
             bot.tap(*(train or TRAIN_BUTTON_POS), delay=BUTTON_WAIT)
         else:
             bot.sleep(1)

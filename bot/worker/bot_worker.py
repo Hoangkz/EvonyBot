@@ -40,7 +40,7 @@ from ..activities.join_monster_war import IDLE as BOSS_IDLE
 from ..common import get_server
 from ..daily_reset import done_today, last_reset
 from ..context import BotContext, BotInterrupted, TimedOut
-from ..context.errors import BossAvailable, StopRequested
+from ..context.errors import BossAvailable, StopRequested, YieldToBoss
 from .guards import Guards
 from .server_clock import ServerClock
 from .tasks import build_tasks
@@ -291,6 +291,9 @@ class BotWorker(QThread):
             return False    # hết OTHERS_WINDOW giây
         except BossAvailable:
             self.record(f"Tạm dừng: {task.key} (có boss mới, chuyển sang Join Monster War)")
+            return False
+        except YieldToBoss:
+            self.record(f"Tạm dừng: {task.key} (nhường lượt cho Join Monster War)")
             return False
         except StopRequested:
             self.record(f"Dừng: {task.key} (người dùng bấm Stop)")

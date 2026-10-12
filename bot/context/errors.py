@@ -19,6 +19,10 @@ class BossAvailable(BotInterrupted):
     """Yield a secondary activity to a new boss on the same server."""
 
 
+class YieldToBoss(BotInterrupted):
+    """Nhiệm vụ tự nhường lượt cho Join Boss tại điểm an toàn (kể cả nhiệm vụ must_finish); chưa xong, làm tiếp lần sau."""
+
+
 class BubbleDue(BotInterrupted):
     """Bubble sắp hết: dừng activity đang chạy (kể cả Join Boss) để gia hạn trước."""
 

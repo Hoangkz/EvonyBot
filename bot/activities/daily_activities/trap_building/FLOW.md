@@ -17,7 +17,9 @@ Defense Force (`event/gather_troops/defense_force`, xây bẫy).
    Settings, tích ô, Confirm) → Finish All.
 4. Nút Build hiện lại → đánh dấu xong hôm nay, Back đóng màn Train.
 
-## Luồng cũ C# (`common.run_task` + `run.handle`, `run.py` chung vẫn đang dùng)
+Worker chạy luồng này: `priority.py` truyền `after_go` vào `daily_job` (open_task_or_finish → after_go).
+
+## Luồng cũ C# (`common.run_task` + `run.handle`, không còn được worker gọi cho nhiệm vụ này)
 
 1. Mở từ `ActivitiesBuildTrap1.png` rồi `Build.png`.
 2. `BuildInterface.png`: chọn trap tier I hiện tại, nhập 150 và xây.

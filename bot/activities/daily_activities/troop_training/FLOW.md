@@ -22,7 +22,9 @@ Giống King's Path Train Troop (`event/kings_path/train_troop`), dùng lại c�
 6. Đủ mẻ, nút Train hiện lại → đánh dấu xong hôm nay (`mark_task_done`), Back đóng màn Train.
 7. Quá `MAX_STEPS` vòng / không chọn được cấp I / không đọc được số mỗi mẻ → ghi lịch sử, không đánh dấu.
 
-## Luồng cũ C# (`common.run_task` + `run.handle`, `run.py` chung vẫn đang dùng)
+Worker chạy luồng này: `priority.py` truyền `after_go` vào `daily_job` (open_task_or_finish → after_go).
+
+## Luồng cũ C# (`common.run_task` + `run.handle`, không còn được worker gọi cho nhiệm vụ này)
 
 1. Mở từ hàng `TrainTroop.png`.
 2. `Train.png`: bấm vào mục Train chung.

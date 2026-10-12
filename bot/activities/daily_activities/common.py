@@ -765,13 +765,21 @@ def _int(value) -> int:
         return 0
 
 
-def daily_job(task: Task, target: str | None = None) -> dict:
+def daily_job(task: Task, target: str | None = None, after_go=None) -> dict:
     """Một việc Daily. `target`: tên ô cấu hình của tab chứa mục tiêu (VD "Offer Gems") — xong khi mục tiêu đã đạt lưu trong DB >=
-    số ở ô đó, nên tăng số ở tab là tự thành chưa xong, giảm lại là xong. Việc làm trong game không cần biết điều này."""
+    số ở ô đó, nên tăng số ở tab là tự thành chưa xong, giảm lại là xong. Việc làm trong game không cần biết điều này.
+    `after_go`: luồng mới — open_task_or_finish bấm Go rồi `after_go(bot)` làm phần sau Go (không dùng run_task / handler cũ)."""
     @save_errors(task.key)   # lỗi thì lưu `<key>_error` vào DB
     def run(ctx, settings):
         ctx.log(f"Daily Activities: {task.label}")
-        record_result(ctx, task.key, task.label, run_task(ctx, task))   # xong thì lưu "xong hôm nay" (nhãn) vào DB
+        if after_go is None:
+            result = run_task(ctx, task)
+        else:
+            clear(ctx)
+            if open_task_or_finish(ctx, task):
+                after_go(ctx)
+            result = take(ctx) or NOT_DONE
+        record_result(ctx, task.key, task.label, result)   # xong thì lưu "xong hôm nay" (nhãn) vào DB
 
     def done(ctx, settings):
         return ctx.is_daily_done(task.label) and _reached_enough(

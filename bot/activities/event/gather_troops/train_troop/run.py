@@ -278,6 +278,10 @@ class _Plan:
     started: int = 0              # số lần đã bấm Train
     settings_done: bool = False   # đã tích ô trong Speedup Settings (lần đầu vào màn speedup)
     from_menu: bool = False       # màn speedup mở từ menu công trình (Speed Up), không từ màn Train
+    pending: int = 0              # số lần bấm Train mà nút chưa đổi thành "Training Speedup" (mẻ chưa tính)
+
+
+TRAIN_TAP_TRIES = 3   # bấm Train mà nút không đổi quá số lần này thì dừng (VD thiếu tài nguyên)
 
 
 def _plan_batches(bot, plan: _Plan, count: int, name: str, key: str) -> bool:
@@ -305,6 +309,12 @@ def _train_step(bot, plan: _Plan, name: str, key: str):
     speedup = _find_training_speedup(bot, screen)
     train = None if speedup else bot.find(TRAIN_BUTTON, screen=screen, region=TRAIN_BUTTON_REGION)
     if speedup is not None:
+        if plan.pending:
+            # Chỉ tính một mẻ khi nút đã thật sự đổi thành "Training Speedup" (không tính theo số lần bấm:
+            # màn chưa kịp đổi mà bấm lại thì đếm dư, bấm Train không ăn thì cũng đếm dư -> thiếu mẻ).
+            plan.started += 1
+            plan.pending = 0
+            bot.log(f"{name}: Train batch {plan.started}/{plan.times}")
         bot.tap(*speedup, delay=BUTTON_WAIT)
     elif train is None:
         bot.tap(*TRAIN_BUTTON_POS, delay=BUTTON_WAIT)     # không nhận ra nút: bấm chỗ nút
@@ -312,9 +322,12 @@ def _train_step(bot, plan: _Plan, name: str, key: str):
         bot.record(f"{name}: trained {plan.started} batch(es), done")
         mark_target_reached(bot, key)
         return STOP
+    elif plan.pending >= TRAIN_TAP_TRIES:
+        bot.record(f"{name}: Train tapped {plan.pending} times but no batch started, stop")
+        return STOP
     else:
-        plan.started += 1
-        bot.log(f"{name}: Train batch {plan.started}/{plan.times}")
+        plan.pending += 1
+        bot.log(f"{name}: tap Train (batch {plan.started + 1}/{plan.times})")
         bot.tap(*train, delay=BUTTON_WAIT)
     return HANDLED
 
