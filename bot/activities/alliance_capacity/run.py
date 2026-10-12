@@ -9,6 +9,7 @@ xong khi hàm chạy hết một lượt); chỉ lỗi thật mới lưu `allian
 Each loop takes one screenshot, finds the first known image on it (checked in list order) and acts on it.
 """
 from ...common import click_images, delay, exit_images, find_first, go_home
+from ..daily_activities.alliance_donation.constants import TRIED_KEY as DONATION_TRIED_KEY
 from ..result import save_errors
 from .constants import BACK, BOSS, DONATE, DONE, GEMS, OUT_ALLIANCE, SCIENCE, SCROLL, TAP
 
@@ -26,10 +27,10 @@ def run(bot, settings: dict):
         action, pos = find_first(bot, screen, targets, top_left={OUT_ALLIANCE})
 
         if action == DONE:
-            return
+            break
         if action == GEMS:
             if gems_limit != -1 and gems_used >= gems_limit:
-                return
+                break
             bot.tap(*pos)
             gems_used += 1
             delay(bot, 3)
@@ -47,6 +48,8 @@ def run(bot, settings: dict):
             _out_alliance(bot, pos)
         else:
             go_home(bot, screen)
+    # Đã donate lượt free ở Alliance Science: Alliance Donation (Daily) coi như vừa donate, tính giờ chờ từ bây giờ.
+    bot.mark_daily_done(DONATION_TRIED_KEY)
 
 
 def _gems_limit(times: str) -> int:

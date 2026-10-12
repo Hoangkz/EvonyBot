@@ -78,7 +78,9 @@ không ghi vào `Images/` vì thư mục này bị thay mỗi lần cập nhật
 
 - Lưu DB: cột `devices.civilization` (1 .. 7, NULL = chưa biết). `BotWorker` nạp vào `bot.civilization` lúc
   chạy; bot tự xếp thì gọi `bot.set_civilization(n)` → signal `civilization_found` → `Database.set_civilization`.
-- **Đã biết civ N**: chỉ tìm ảnh của civ N (nhanh, không nhầm civ khác).
+- **Đã biết civ N**: tìm ảnh của civ N trước. Không khớp thì tìm ảnh của 6 civ còn lại (người dùng có thể
+  đổi nền văn minh): khớp civ M -> `set_civilization(M)` cập nhật DB, bấm vào chỗ khớp. Cả 7 civ đều
+  không khớp -> bấm giữa, menu đúng icon thì học ảnh vào civ N cũ (như dưới).
 - **Chưa biết**: tìm ảnh của mọi civ; khớp ảnh civ N → gán máy vào civ N (lưu DB).
 - Chưa biết mà không khớp civ nào, menu đúng icon (tự học, `remember_building`):
   - chưa có civ nào → tạo civ 1;

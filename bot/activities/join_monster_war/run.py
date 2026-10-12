@@ -6,6 +6,8 @@ import time
 from ...common import click_images, delay, exit_images, find_first, go_home, wait_gone
 from ...context import TEMPLATE_DIR
 from ...ocr import read_boss_name, read_coords
+from ...ocr._digits import read_chars, split as split_chars
+from ...ocr.read_coords import FONT as COORDS_FONT, MAX_RATIO as COORDS_MAX_RATIO
 from ...ocr.read_power import text as read_power_text
 from . import boss_names
 from .boss_memory import JOINED as MEMORY_JOINED
@@ -483,7 +485,7 @@ class _Boss:
             return None
         x, y = max(pins, key=lambda point: point[0])
         lw, _ = bot.template_size(LOCATION)
-        coords = read_coords(bot.crop(screen, x + lw, y, 90, 18))
+        coords = _coords_after_server(bot.crop(screen, x + lw, y, 140, 18))
         if coords is None or not all(0 <= value <= MAX_MAP_COORD for value in coords):
             return None
         return coords
@@ -761,6 +763,7 @@ class _Boss:
         level, power = boss_names.level(
             boss, tier, lambda: read_power_text(bot.crop(screen, x + POWER_DX, y + POWER_DY, POWER_W, POWER_DH)))
         wanted = boss_names.wanted(self.selected, boss, level)
+        boss_names.log_unknown(screen, coords, text, power, boss, level)
         self.card_boss = "_".join(str(part) for part in (
             boss.name if boss else text, f"lv{level}" if level else None, power) if part)
         bot.log(f"Boss {coords}: {text!r}"
@@ -795,6 +798,21 @@ STAMINA_MULTIPLES = ("200", "300", "400", "500")     # thể lực muốn nhận
 STAMINA_CHOICES = ("ALL", "100", *STAMINA_MULTIPLES)
 STAMINA_CLOSE_WAIT = 10     # giây chờ popup dùng thể lực đóng (kiểm tra mỗi 1 s)
 STAMINA_CLOSE_ROUNDS = 2    # số đợt chờ (Back giữa hai đợt); hết đợt mà chưa đóng thì Back 2 lần
+
+
+def _coords_after_server(image) -> tuple[int, int] | None:
+    """Tọa độ "XXXX:YYYY" (luôn đủ 4 chữ số) ở cuối dòng, bỏ qua tiền tố server nếu có
+    (rally server khác hiện "K:2182 0280:0290")."""
+    chars = split_chars(image, COORDS_MAX_RATIO)
+    colons = [i for i, c in enumerate(chars) if isinstance(c, str) and c == ":"]
+    if not colons:
+        return None
+    i = colons[-1]
+    text = read_chars(chars[max(0, i - 4):i + 5], COORDS_FONT)
+    parts = (text or "").split(":")
+    if len(parts) != 2 or not all(part.isdigit() for part in parts):
+        return None
+    return int(parts[0]), int(parts[1])
 
 
 def _item_stamina(bot, screen) -> int | None:

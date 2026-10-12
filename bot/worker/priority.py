@@ -103,8 +103,6 @@ DATA ={
             "run": event_job("gather_troops", gather_troops_cultivate_generals),
             "label": "Gather Troops: Cultivate Generals",
             "priority": 600,
-
-
         },
         { 
             "key": "gather_troops_ground_troop",
@@ -117,104 +115,78 @@ DATA ={
             "run": event_job("gather_troops", gather_troops_mounted_troop),
             "label": "Gather Troops: Mounted Troop",
             "priority": 551,
-
-
         },
         { 
             "key": "gather_troops_ranged_troop",
             "run": event_job("gather_troops", gather_troops_ranged_troop),
             "label": "Gather Troops: Ranged Troop",
             "priority": 550,
-
-
         },
         { 
             "key": "gather_troops_siege_machine",
             "run": event_job("gather_troops", gather_troops_siege_machine),
             "label": "Gather Troops: Siege Machine",
             "priority": 549,
-
-
         },
         { 
             "key": "gather_troops_defense_force",
             "run": event_job("gather_troops", gather_troops_defense_force),
             "label": "Gather Troops: Defense Force",
             "priority": 548, 
-
-
         },
         { 
             "key": "kings_path_wheel",
             "run": event_job("kings_path", kings_path_wheel),
             "label": "King's Path: Wheel",
             "priority": 559,
-
-
         },
         { 
             "key": "kings_path_black_market",
             "run": event_job("kings_path", kings_path_black_market),
             "label": "King's Path: Black Market",
             "priority": 558,
-
-
         },
         { 
             "key": "kings_path_patrol",
             "run": event_job("kings_path", kings_path_patrol),
             "label": "King's Path: Patrol",
             "priority": 557, "note": "Yêu cầu phải cao hơn King's Path: Donate",
-
-
         },
         { 
             "key": "kings_path_donate",
             "run": event_job("kings_path", kings_path_donate),
             "label": "King's Path: Donate",
             "priority": 556,
-
-
         },
         { 
             "key": "kings_path_city_tax",
             "run": event_job("kings_path", kings_path_city_tax),
             "label": "King's Path: City Tax",
             "priority": 554,
-
-
         },
         { 
             "key": "kings_path_train_troop",
             "run": event_job("kings_path", kings_path_train_troop),
             "label": "King's Path: Train Troop",
             "priority": 553,
-
-
         },
         { 
             "key": "kings_path_heal",
             "run": event_job("kings_path", kings_path_heal),
             "label": "King's Path: Heal",
             "priority": 547,
-
-
         },
         { 
             "key": "kings_path_refine",
             "run": event_job("kings_path", kings_path_refine),
             "label": "King's Path: Refine Equipment",
             "priority": 546,
-
-
         },
         { 
             "key": "gather_troops_claim",
             "run": claim_job("gather_troops"),
             "label": "Gather Troops: nhận thưởng (chấm đỏ + rương mốc)",
             "priority": 500,
-
-
         },
         { 
             "key": "kings_path_claim",

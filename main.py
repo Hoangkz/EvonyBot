@@ -85,7 +85,7 @@ class MainWindow(QMainWindow):
         self.home_view.auto_timeout_changed.connect(self._on_auto_timeout_changed)
         self.bots.daily_task_done.connect(self.db.mark_daily_task_done)
         self.bots.bubble_found.connect(self._on_bubble_found)
-        self.bots.civilization_found.connect(self.db.set_civilization)
+        self.bots.civilization_found.connect(self._on_civilization_found)
         self.bots.city_map_found.connect(self.db.set_city_map)
         self.bots.bubble_disabled.connect(self._on_bubble_disabled)
         self.bots.log_message.connect(self._on_log_message)
@@ -146,6 +146,7 @@ class MainWindow(QMainWindow):
         view.stop_all_requested.connect(self._on_stop_all_requested)
         view.apply_all_requested.connect(self._on_apply_all_requested)
         view.server_changed.connect(self._on_server_changed)
+        view.civilization_changed.connect(self.db.set_civilization)
         view.tab_settings_changed.connect(self.db.save_settings)
         view.tabs.currentChanged.connect(self._on_tab_changed)
 
@@ -273,6 +274,13 @@ class MainWindow(QMainWindow):
         view = self.device_views.get(device_id)
         if view is not None:
             view.initialization_tab.set_settings({"server": server})
+
+    def _on_civilization_found(self, device_id: str, civilization: int):
+        """Bot vừa tự xếp nền văn minh -> lưu DB và hiện lên tab Initialization."""
+        self.db.set_civilization(device_id, civilization)
+        view = self.device_views.get(device_id)
+        if view is not None:
+            view.initialization_tab.set_civilization(civilization)
 
     def _on_bubble_found(self, device_id: str, seconds: int):
         """Bot vừa đọc / gia hạn bubble -> lưu DB và đếm ngược ở tab Initialization."""

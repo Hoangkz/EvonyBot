@@ -30,6 +30,7 @@ class DeviceView(QWidget):
     # onto every other device.
     apply_all_requested = pyqtSignal(str, dict)
     server_changed = pyqtSignal(str, str)   # (device_id, server)
+    civilization_changed = pyqtSignal(str, int)   # (device_id, nền văn minh 1..7, 0 = tự nhận)
     # (device_id, {tab title: settings}) — một tab có `settings_changed` vừa được người dùng sửa.
     tab_settings_changed = pyqtSignal(str, dict)
 
@@ -70,6 +71,10 @@ class DeviceView(QWidget):
         self.initialization_tab.stop_all_clicked.connect(self.stop_all_requested.emit)
         self.initialization_tab.server_changed.connect(
             lambda server: self.server_changed.emit(self.device_id, server)
+        )
+
+        self.initialization_tab.civilization_changed.connect(
+            lambda civilization: self.civilization_changed.emit(self.device_id, civilization)
         )
 
     def _add_tab(self, widget: QWidget, title: str):
