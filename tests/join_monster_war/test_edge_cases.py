@@ -265,10 +265,10 @@ class JoinBossEdgeCaseTests(unittest.TestCase):
         bot.template_size.return_value = (14, 14)
         boss = _Boss(bot, {})
 
-        with mock.patch.object(run_module, "read_coords", return_value=(767, 811)):
+        with mock.patch.object(run_module, "_coords_after_server", return_value=(767, 811)):
             self.assertEqual(boss._read_march_target_coords(SCREEN), (767, 811))
 
-        bot.crop.assert_called_once_with(SCREEN, 288, 266, 90, 18)
+        bot.crop.assert_called_once_with(SCREEN, 288, 266, 140, 18)
 
     def test_pvp_war_without_matching_joined_row_is_not_remembered(self):
         bot = fake_bot()

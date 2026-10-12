@@ -28,6 +28,9 @@ MATCH_CUTOFF = 0.75     # difflib ratio needed to accept a name / tier
 MAX_UNKNOWN = 0.5       # more than this share of "?" in a read: too unsure, not checked
 POWER_TOLERANCE = 1.3   # the power read may be at most this factor off a level's power
 
+# Game đôi khi ghi tên khác trên thẻ: "Senior Bayar Knight" cho Knight Bayard (đảo từ, thiếu "d").
+ALIASES = {"bayar knight": "knight bayard"}
+
 _catalog: dict | None = None
 
 
@@ -97,12 +100,13 @@ def parse(text: str | None) -> tuple[Boss | None, str | None]:
         return None, None
     text = re.sub(r"^\s*\([^)]*\)", "", text)        # bỏ "(Boss)" ở đầu
     # Boss Special (Viking...) ghi nhãn "Lv.1 Viking" thay vì "(Boss) ...": bỏ "Lv.N" ở đầu ("?" = glyph chưa có mẫu).
-    # Số cấp 2 chữ số hay bị tách cách ("1 1") hoặc "?" ("lv.1?" = Lv.10) và dấu "." hay đọc thành chữ ("lvr1?").
-    text = re.sub(r"^\s*(?:lv|l\?|\?v|\?\?)[^\s\d]{0,2}\d(?:\s?[\d?])*\s+", "", text)
+    # Số cấp 2 chữ số hay bị tách cách ("1 1") hoặc "?" ("lv.1?" = Lv.10), số bị đọc thành "g" ("lv.g") và dấu "." hay đọc thành chữ ("lvr1?").
+    text = re.sub(r"^\s*(?:lv|l\?|\?v|\?\?)[^\s\d]{0,2}[\dg?](?:\s?[\dg?])*\s+", "", text)
     # Bỏ loại quân trong ngoặc ở cuối, VD Pan có 3 loại: "Pan (Ranged Troop)" (OCR đọc
     # "pan (panged ?roop)"); ngoặc có thể bị cắt mất ở mép vùng đọc.
     text = re.sub(r"\([^)]*\)?\s*$", "", text).strip()
     bosses, tiers = catalog()["bosses"], catalog()["tiers"]
+    bosses = {**bosses, **{alias: bosses[name] for alias, name in ALIASES.items() if name in bosses}}
     words = text.split()
     if len(words) >= 2:
         tier = _match(words[0], tiers)
@@ -221,13 +225,13 @@ def _too_unknown(text: str) -> bool:
 
 def _match(text: str, choices) -> str | None:
     """The choice (lower case) `text` reads as. A "?" (glyph without a sample,
-    maybe letters touching) stands for 1-3 letters: if exactly one choice fits,
+    maybe letters touching) stands for 1-4 letters: if exactly one choice fits,
     that's it. Otherwise the closest choice by difflib, if close enough."""
     choices = list(choices)
     if _too_unknown(text):
         return None
     if "?" in text:
-        pattern = re.compile("".join(".{1,3}" if ch == "?" else re.escape(ch) for ch in text))
+        pattern = re.compile("".join(".{1,4}" if ch == "?" else re.escape(ch) for ch in text))
         fits = [choice for choice in choices if pattern.fullmatch(choice)]
         if len(fits) == 1:
             return fits[0]
