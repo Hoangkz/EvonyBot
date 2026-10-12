@@ -17,6 +17,12 @@ from ..activities.daily_activities.general_enhancing import TASK as daily_genera
 from ..activities.daily_activities.wheel_of_fortune import TASK as daily_wheel_of_fortune
 from ..activities.daily_activities.patrol import TASK as daily_patrol
 from ..activities.daily_activities.material_composing import TASK as daily_material_composing
+from ..activities.daily_activities.research_technologies import TASK as daily_research_technologies
+from ..activities.daily_activities.research_technologies.run import after_go as research_technologies_after_go
+from ..activities.daily_activities.greet_champion import TASK as daily_greet_champion
+from ..activities.daily_activities.greet_champion.run import after_go as greet_champion_after_go
+from ..activities.daily_activities.trade_carriage import TASK as daily_trade_carriage
+from ..activities.daily_activities.trade_carriage.run import after_go as trade_carriage_after_go
 from ..activities.event.gather_troops.cultivate_generals.run import run as gather_troops_cultivate_generals
 from ..activities.event.gather_troops.ground_troop.run import run as gather_troops_ground_troop
 from ..activities.event.gather_troops.mounted_troop.run import run as gather_troops_mounted_troop
@@ -336,16 +342,18 @@ DATA ={
         },
         { 
             "key": "daily_greet_champion",
+            "run": daily_job(daily_greet_champion, after_go=greet_champion_after_go),
             "label": "Greet Champion",
             "priority": 385, 
-            "must_finish": True 
+            "must_finish": True,
+            "note": "Về thành: bấm trái tim trên Keep (hoặc Keep -> Champion), chào 2 lần",
         },
         { 
             "key": "daily_monster_killing",
             "run": daily_job(daily_monster_killing),
             "must_finish": True,
             "label": "Monster Killing",
-            "priority": 384,
+            "priority": -384,
 
         },
         { 
@@ -357,6 +365,23 @@ DATA ={
 
         },
         { 
+            "key": "daily_research_technologies",
+            "run": daily_job(daily_research_technologies, after_go=research_technologies_after_go),
+            "must_finish": True,
+            "label": "Research",
+            "priority": 382,
+            "note": "Học viện: nghiên cứu 1 công nghệ xanh bất kỳ, tốn thời gian thì Speed Up bằng vật phẩm",
+
+        },
+        {
+            "key": "daily_trade_carriage",
+            "run": daily_job(daily_trade_carriage, after_go=trade_carriage_after_go),
+            "must_finish": True,
+            "label": "Trade Carriage",
+            "priority": 301,
+            "note": "Nhiệm vụ cuối cùng trước nhận thưởng Activity",
+        },
+        {
             "key": "daily_rewards",
             "run": daily_rewards,
             "must_finish": True,

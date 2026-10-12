@@ -10,5 +10,5 @@ daily_activities — "Daily Activities" activity (bố cục giống activity Ev
 - <nhiệm vụ>/:  constants.py (ảnh) + run.py (handler, TASK) — monster_killing, resource_collecting,
                 offering, resource_gathering, resource_tax, gold_levy, troop_training, troop_healing,
                 trap_building, alliance_donation, black_market, general_enhancing, wheel_of_fortune,
-                patrol, material_composing
+                patrol, material_composing, research_technologies, trade_carriage, greet_champion
 """

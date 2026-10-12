@@ -46,10 +46,12 @@ SUPPORTED_TASKS = (
     ("Wheel of Fortune", "Wheel of Fortune"),
     ("Patrol", "Patrol"),
     ("Material Composing", "Material Composing"),
+    ("Research", "Research"),
+    ("Trade Carriage", "Trade Carriage"),
+    ("Greet Champion", "Greet Champion"),
 )
 
 UNSUPPORTED_TASKS = (
-    ("Research", "Research"),
     ("Construction", "Construction"),
     ("PvP Battle", "PvP Battle"),
     ("Troop Killing", "Troop Killing"),
