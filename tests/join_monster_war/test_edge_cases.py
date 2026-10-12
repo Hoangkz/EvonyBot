@@ -221,8 +221,11 @@ class JoinBossEdgeCaseTests(unittest.TestCase):
         boss = _Boss(bot, {})
         boss._read_card_coords = mock.Mock(return_value=None)
 
-        self.assertFalse(boss._join(SCREEN))
+        # Mock để test không ghi ảnh thật vào logs/images của app.
+        with mock.patch.object(run_module.boss_names, "log_march_coords_fail") as saved:
+            self.assertFalse(boss._join(SCREEN))
 
+        saved.assert_called_once_with(SCREEN, "list", "319_300")   # lưu ảnh tọa độ OCR lỗi
         self.assertEqual(boss.screen_blacklist, [(319, 300)])
         bot.tap.assert_not_called()
         bot.report_boss.assert_not_called()

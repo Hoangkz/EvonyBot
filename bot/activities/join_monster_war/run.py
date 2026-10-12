@@ -638,6 +638,7 @@ class _Boss:
                 # thay vì xóa blacklist và lặp vô hạn trên cùng một thẻ OCR lỗi.
                 if coords is None:
                     bot.log(f"Không đọc được tọa độ card tại ({x}, {y}); bỏ qua trong màn hiện tại")
+                    boss_names.log_march_coords_fail(screen, "list", f"{x}_{y}")   # lưu ảnh để thêm mẫu OCR
                     self.screen_blacklist.append((x, y))
                     continue
 
@@ -789,7 +790,7 @@ POLL_INTERVAL = 0.2     # kiểm tra sớm để đa số bước hoàn thành g
 STEP_TARGET = 1.0       # quá mức này ghi SLOW trong log performance
 STEP_TIMEOUT = 2.0      # không bước UI nào chờ lâu hơn 2 giây
 PERF_SUMMARY_EVERY = 10 # mỗi 10 mẫu in p50/p95/max của bước đó
-MAX_MAP_COORD = 2000    # chặn kết quả OCR tọa độ hỏng rõ ràng; cố ý rộng hơn mọi map đang dùng
+MAX_MAP_COORD = 1200    # tọa độ map chỉ từ 0 đến 1200; ngoài khoảng này là OCR hỏng
 _WAIT = {"top_left": {LEAVE_ALLIANCE_POPUP}, "tolerance": SAME_SPOT,
          "timeout": STEP_TIMEOUT, "interval": POLL_INTERVAL}
 

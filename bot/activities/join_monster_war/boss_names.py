@@ -99,9 +99,18 @@ def parse(text: str | None) -> tuple[Boss | None, str | None]:
     if not text:
         return None, None
     text = re.sub(r"^\s*\([^)]*\)", "", text)        # bỏ "(Boss)" ở đầu
+    # Có từ "viking" (kể cả đọc thiếu chữ) thì là Viking, mặc kệ các từ đứng trước ("Lv.10", rác OCR).
+    bosses = catalog()["bosses"]
+    if "viking" in bosses and any(len(word) >= 4 and _match(word, ["viking"])
+                                  for word in text.split()):
+        return bosses["viking"], None
     # Boss Special (Viking...) ghi nhãn "Lv.1 Viking" thay vì "(Boss) ...": bỏ "Lv.N" ở đầu ("?" = glyph chưa có mẫu).
     # Số cấp 2 chữ số hay bị tách cách ("1 1") hoặc "?" ("lv.1?" = Lv.10), số bị đọc thành "g" ("lv.g") và dấu "." hay đọc thành chữ ("lvr1?").
     text = re.sub(r"^\s*(?:lv|l\?|\?v|\?\?)[^\s\d]{0,2}[\dg?](?:\s?[\dg?])*\s+", "", text)
+    # Pan: từ đầu là "pan" (kể cả thiếu chữ) thì là Pan, bỏ hết phần còn lại (loại quân trong ngoặc, OCR hỏng).
+    first = text.split()[0] if text.split() else ""
+    if "pan" in bosses and re.fullmatch(r"[p?][a?][n?]", first) and first.count("?") <= 1:
+        return bosses["pan"], None
     # Bỏ loại quân trong ngoặc ở cuối, VD Pan có 3 loại: "Pan (Ranged Troop)" (OCR đọc
     # "pan (panged ?roop)"); ngoặc có thể bị cắt mất ở mép vùng đọc.
     text = re.sub(r"\([^)]*\)?\s*$", "", text).strip()
@@ -199,15 +208,16 @@ def log_unknown(screen, coords, name_text: str | None, power_text: str | None,
 
 
 def log_march_coords_fail(screen, where: str, label: str | None = None) -> None:
-    """Không đọc được tọa độ đích trên màn March: ghi logs/ocr_unknown.logs và lưu ảnh
-    logs/images/march_<label>.png, `label` = thông tin thẻ đã đọc ở danh sách trước khi
+    """Không đọc được tọa độ (`where` = "march": đích trên màn March; "list": thẻ ở danh sách,
+    `label` = vị trí nút Join): ghi logs/ocr_unknown.logs và lưu ảnh
+    logs/images/<where>_<label>.png, `label` = thông tin thẻ đã đọc ở danh sách trước khi
     Join (tọa độ, tên boss, cấp, lực): cùng thẻ lỗi lại thì ghi đè, không tràn ổ đĩa. Không
     có label (hàm gọi không truyền) thì đặt tên theo thời điểm (không bao giờ ghi đè)."""
     if label:
         name = re.sub(r'[\\/:*"<>|\s?]+', "_", label)
     else:
         name = time.strftime("%Y%m%d_%H%M%S") + f"_{int(time.time() * 1000) % 1000:03d}"
-    image = f"images/march_{name}.png"
+    image = f"images/{where}_{name}.png"
     line = (f"{time.strftime('%Y-%m-%d %H:%M:%S')} march_coords_fail where={where} "
             f"card={label!r} image={image}\n")
     try:
