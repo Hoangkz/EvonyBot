@@ -2,11 +2,12 @@
 run.py — Daily Activities "Gold Levy": handler các action riêng của nhiệm vụ (Thành chính (Keep) -> Levy).
 Vòng lặp chung (mở Activity, dòng Go, cuộn, ảnh xong): ../common.py run_task.
 
-Sau Go: menu tròn của Thành chính -> "Levy" -> popup Levy -> bấm "Free Levy All" -> đánh dấu xong hôm nay
+Sau Go: menu tròn của Thành chính -> "Levy" -> popup Levy -> bấm "Free Levy All" -> báo xong hôm nay
 -> Back đóng popup. Nút đã xám (hết lượt free) cũng coi là xong.
 """
 from ...event.city_building import KEEP
 from ...event.kings_path.building import open_menu
+from ...result import done as report_done
 from ..common import Task, mark_task_done
 from .constants import (
     ACTIONS,
@@ -68,8 +69,8 @@ def after_go(bot) -> bool:
 
 
 def _finish(bot) -> bool:
-    """Đánh dấu xong hôm nay rồi Back tới khi popup Levy đóng."""
-    bot.mark_daily_done(LABEL)
+    """Báo xong hôm nay rồi Back tới khi popup Levy đóng."""
+    report_done(bot, label=LABEL, key=KEY)
     for _ in range(BACKS_AFTER_LEVY):
         screen = bot.screenshot()
         if all(bot.find(path, screen=screen) is None for path in POPUP_BUTTONS):

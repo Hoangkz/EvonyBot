@@ -142,39 +142,6 @@ class OfferPopupTests(unittest.TestCase):
         self.assertFalse(result)
         self.assertEqual(len(taps), 1)   # đóng popup
 
-    def test_done_today_depends_on_quantity(self):
-        """Xong với 6 lượt; tăng lên 10 ở tab UI -> chưa xong; giảm về 5 -> xong."""
-        from unittest import mock
-        from bot.activities.daily_activities.offering.run import is_done_today, mark_done
-        done = {}
-        bot = mock.Mock()
-        bot.is_daily_done.side_effect = lambda k: k in done
-        bot.mark_daily_done.side_effect = lambda k: done.__setitem__(k, "t")
-        bot.daily_keys.side_effect = lambda: list(done)
-        bot.settings = {"Daily Activities": {"Offer Gems": 6}}
-        mark_done(bot, 6)
-        self.assertTrue(is_done_today(bot))
-        bot.settings = {"Daily Activities": {"Offer Gems": 10}}
-        self.assertFalse(is_done_today(bot))
-        bot.settings = {"Daily Activities": {"Offer Gems": 5}}
-        self.assertTrue(is_done_today(bot))
-
-    def test_no_go_marks_done_with_target_zero(self):
-        """Dòng Offer không còn Go / không có trong danh sách (open_task_or_finish đánh dấu mục tiêu 0):
-        xong hôm nay dù đang chọn 30 lượt."""
-        from unittest import mock
-        from bot.activities.daily_activities.common import mark_task_done
-        from bot.activities.daily_activities.offering.run import is_done_today
-        done = {}
-        bot = mock.Mock()
-        bot.is_daily_done.side_effect = lambda k: k in done
-        bot.mark_daily_done.side_effect = lambda k: done.__setitem__(k, "t")
-        bot.daily_keys.side_effect = lambda: list(done)
-        bot.settings = {"Daily Activities": {"Offer Gems": 30}}
-        mark_task_done(bot, offering.TASK, 0)
-        self.assertEqual(set(done), {"Offering", "daily_offering_reached_0"})
-        self.assertTrue(is_done_today(bot))
-
 
 if __name__ == "__main__":
     unittest.main()

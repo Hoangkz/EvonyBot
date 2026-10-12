@@ -12,12 +12,15 @@ known image on it (checked in list order) and acts on it.
 import math
 
 from ...common import click_images, delay, exit_images, find_first, go_home, images_in
+from ..result import save_errors
 from .constants import (ALL_BOXES, BACK, BOX_FOLDERS, BOX_LIST, BOX_BOTTOM, BOX_THRESHOLD, BUTTON_EXTRA_WAITS, CONFIRM, DONE, FRAGMENT, FRAGMENT_NEAR, ITEMS, KEY,
-                        FRAGMENT_PREFIX, LIST_SWIPE, ROW_TOLERANCE, SETUP, TAB_HALF_HEIGHT, TAB_REGIONS, TAP)
+                        FRAGMENT_PREFIX, LIST_SWIPE, MAX, ROW_TOLERANCE, SETUP, TAB_HALF_HEIGHT, TAB_REGIONS, TAP, USE_POPUP)
 
 
+@save_errors(KEY)   # lỗi thì lưu `open_gift_box_error` vào DB
 def run(bot, settings: dict):
-    """`bot` is the device's BotContext; `settings` is the "Open Gift Box" tab's config."""
+    """`bot` is the device's BotContext; `settings` is the "Open Gift Box" tab's config. When every box has been opened
+    it saves KEY ("done today") to the database."""
     boxes = _box_images(settings.get("selection_gift_box", {}))
     if not boxes:
         return
@@ -46,6 +49,17 @@ def run(bot, settings: dict):
                     return
                 bot.tap(*pos)       # Common tab: the list jumps back to the top
                 delay(bot, 2)
+        elif action == USE_POPUP:
+            # Some items do not open the popup with everything selected: press Max first (harmless
+            # when already on max), then Use.
+            max_pos = bot.find(MAX, threshold=BOX_THRESHOLD, screen=screen)
+            if max_pos is not None:
+                bot.tap(*max_pos)
+                delay(bot, 1)
+                screen = bot.screenshot()
+                pos = bot.find(f"{SETUP}/Use2.png", threshold=BOX_THRESHOLD, screen=screen) or pos
+            bot.tap(*pos)
+            delay(bot, 2)
         elif action == TAP:
             bot.tap(*pos)
             delay(bot, 2)
@@ -73,7 +87,7 @@ def _targets() -> list[tuple[str, str]]:
     return [
         (f"{SETUP}/success.png", BACK),
         (f"{SETUP}/Confirm.png", CONFIRM),
-        (f"{SETUP}/Use2.png", TAP),               # quantity popup (already on max): Use; before Open, which
+        (f"{SETUP}/Use2.png", USE_POPUP),         # quantity popup: Max then Use; before Open, which
                                                     # shows through the dimmed list under the popup
         (f"{SETUP}/Open.png", TAP),
         (f"{SETUP}/Use.png", TAP),

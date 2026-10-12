@@ -11,7 +11,7 @@ Flow:
 1. Màn chính -> quà đăng nhập -> nút dưới Event Center -> danh sách event -> icon
    King's Path (run_task). Chưa có ảnh icon (KINGS_PATH_ICON) -> bỏ qua nhiệm vụ.
 2. Màn King's Path vừa mở: đếm ổ khoá trên hàng tab Day. Tab Day của nhiệm vụ còn khoá
-   -> lưu "chưa thể thực hiện" (locked_key, tới lần reset server) và dừng.
+   -> báo "chưa thể thực hiện" (mark_locked; worker bỏ qua tới lần reset server) và dừng.
    Hàng tab Day giống hệt Gather Troops: không thấy tiêu đề "King's Path" (VD nhiệm vụ
    trước dừng ở màn Gather Troops) -> Back.
 3. Tab "Day N" chưa chọn -> bấm.
@@ -38,8 +38,8 @@ from ..common import (
     STOP,
     EventState,
     day_locked,
-    is_done_today,
     mark_complete,
+    mark_locked,
     mark_target_reached,
     read_go_progress,
     run_task,
@@ -87,23 +87,12 @@ class PathTask:
     # Làm nhiệm vụ sau khi bấm Go: (bot, path, done, target) -> None / AGAIN. None = chưa làm.
     after_go: Callable | None = field(default=None, compare=False)
 
-    @property
-    def locked_key(self) -> str:
-        """Lưu trong daily_done khi tab Day còn khoá: bỏ qua tới lần reset server."""
-        return f"{self.key}_locked"
-
 
 def run(bot, task: dict, state: EventState, path: PathTask):
     """`task` là settings của nhiệm vụ: {"value": int, "day": int}."""
     name, key = path.name, path.key
     if not (TEMPLATE_DIR / KINGS_PATH_ICON).exists():
         bot.log(f"{name}: no King's Path icon image yet ({KINGS_PATH_ICON}), skipped")
-        return
-    if is_done_today(bot, key):
-        bot.log(f"{name}: already done")
-        return
-    if bot.is_daily_done(path.locked_key):
-        bot.log(f"{name}: day still locked, skipped until server reset")
         return
     day = int(task.get("day") or path.day)
     target = int(task.get("value") or 0)
@@ -114,7 +103,7 @@ def run(bot, task: dict, state: EventState, path: PathTask):
         progress["entered"] = True
         if day_locked(bot, screen, day):
             bot.record(f"{name}: Day {day} locked, cannot do this task yet")
-            bot.mark_daily_done(path.locked_key)
+            mark_locked(bot, key)
             return STOP
         return None
 

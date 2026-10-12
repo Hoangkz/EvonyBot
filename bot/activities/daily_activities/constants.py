@@ -103,5 +103,6 @@ TICK_DY = 33
 REWARDS = "Activity Rewards"   # key trong daily_done cho bước nhận thưởng cuối
 REWARDS_KEY = "daily_rewards"   # key của bước nhận thưởng cuối trong bot/worker/priority.py
 GENERAL = "General"
-BUY_STAMINA = "General: Buy Stamina"
-BUY_HAMMERS = "General: Buy All Hammers"
+# Mua Stamina + Hammer (nhiệm vụ General): mỗi món có dấu "xong hôm nay" riêng.
+STAMINA_REACHED = "General: Stamina reached"   # f"{STAMINA_REACHED} {N}" = hôm nay đã mua tới cái thứ N (nâng mốc thì mua phần còn lại)
+HAMMER_DONE = "General: Hammer"                 # đã mua hết Hammer hôm nay

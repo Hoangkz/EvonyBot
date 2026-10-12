@@ -20,7 +20,7 @@ from bot.activities import event
 from bot.activities.event.gather_troops import defense_force
 from bot.activities.event.gather_troops.defense_force.constants import LOCKED_KEY
 from tests.flow import Step, back, end, run_flow, tap, tap_at
-from tests.event import setUpModule, tearDownModule  # noqa: F401 (tắt lượt nhận thưởng)
+from tests.event import setUpModule, tearDownModule, run_event_tasks  # noqa: F401 (tắt lượt nhận thưởng)
 
 SCREENS = Path(__file__).parent / "screens"
 KEY = defense_force.KEY
@@ -86,7 +86,7 @@ class DefenseForceFlow(unittest.TestCase):
             Step("04_event_list.png", tap("Event/GatherTroops/icon.png")),
             *TO_FIRST_GO,
         ]
-        device = run_flow(self, event.run, SCREENS, flow, SETTINGS, variants=VARIANTS)
+        device = run_flow(self, run_event_tasks, SCREENS, flow, SETTINGS, variants=VARIANTS)
         self.assertNotIn(LOCKED_KEY, device.daily_done)
         self.assertIn("Defense Force: done 0, remaining 7000", device.logs)
         self.assertIn("Defense Force: train tier 6 (chosen 6), goal 7000, count 7000", device.logs)
@@ -95,18 +95,18 @@ class DefenseForceFlow(unittest.TestCase):
     def test_defense_tab_already_selected(self):
         """Day 4 đang ở tab Defense Force: bấm Go luôn."""
         flow = [*TO_EVENT, *TO_FIRST_GO[2:4]]
-        run_flow(self, event.run, SCREENS, flow, SETTINGS, variants=VARIANTS)
+        run_flow(self, run_event_tasks, SCREENS, flow, SETTINGS, variants=VARIANTS)
 
     def test_day4_locked_saved(self):
         """2 ổ khoá trên hàng tab Day (Day 4, 5 khoá): lưu LOCKED_KEY rồi dừng."""
         flow = [*TO_EVENT, Step("06_day_locked_tmp.png", end())]
-        device = run_flow(self, event.run, SCREENS, flow, SETTINGS, variants=VARIANTS)
+        device = run_flow(self, run_event_tasks, SCREENS, flow, SETTINGS, variants=VARIANTS)
         self.assertIn(LOCKED_KEY, device.daily_done)
 
     def _train_flow(self, settings, *train_steps, flow_to_menu=None):
         """Tới màn Train rồi các bước chọn cấp `train_steps`."""
         flow = [*TO_EVENT, *(flow_to_menu or TO_FIRST_GO[:-1]), *train_steps]
-        device = run_flow(self, event.run, SCREENS, flow, settings, variants=VARIANTS)
+        device = run_flow(self, run_event_tasks, SCREENS, flow, settings, variants=VARIANTS)
         # Không bao giờ bấm "Instant Train" (tốn gems), nút trái đáy màn Train.
         instant = [(i, e) for i, e in device.events
                    if e[0] == "tap" and flow[i].screen.startswith(("train_", "b_"))
@@ -202,22 +202,22 @@ class DefenseForceFlow(unittest.TestCase):
             Step("10_after_go.png", tap_at(*CENTER)),
             *TO_FIRST_GO[4:],
         ]
-        device = run_flow(self, event.run, SCREENS, flow, SETTINGS, variants=VARIANTS)
+        device = run_flow(self, run_event_tasks, SCREENS, flow, SETTINGS, variants=VARIANTS)
         self.assertIn("Defense Force: building already training, Speed Up from menu (not counted)",
                       device.logs)
 
     def test_no_go_marks_done(self):
         flow = [*TO_EVENT, Step("09_day4_defense_force.png?no_go", end())]
-        device = run_flow(self, event.run, SCREENS, flow, SETTINGS, variants=VARIANTS)
+        device = run_flow(self, run_event_tasks, SCREENS, flow, SETTINGS, variants=VARIANTS)
         self.assertIn(KEY, device.daily_done)
 
     def test_already_done_skips(self):
         flow = [Step("03_main.png", end())]
-        run_flow(self, event.run, SCREENS, flow, SETTINGS, daily_done={KEY: "2026-10-01T08:00:00"})
+        run_flow(self, run_event_tasks, SCREENS, flow, SETTINGS, daily_done={KEY: "2026-10-01T08:00:00"})
 
     def test_disabled_skips(self):
         flow = [Step("03_main.png", end())]
-        run_flow(self, event.run, SCREENS, flow, {KEY: {"value": 0, "level": None, "day": 4}})
+        run_flow(self, run_event_tasks, SCREENS, flow, {KEY: {"value": 0, "level": None, "day": 4}})
 
 
 if __name__ == "__main__":

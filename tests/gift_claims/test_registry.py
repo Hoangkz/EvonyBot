@@ -1,7 +1,6 @@
 import tempfile
 import unittest
 from pathlib import Path
-from types import SimpleNamespace
 from unittest import mock
 
 import cv2
@@ -10,9 +9,7 @@ import numpy as np
 from bot.activities import gift_claims
 from bot.activities.gift_claims import common, valuable_event
 from bot.activities.gift_claims.screens import GiftScreen
-from bot.activities.daily_activities.run import _run_gift_claims
 from bot.context.errors import YieldToBoss
-from bot.worker.priority import DATA
 from database import Database
 
 
@@ -65,15 +62,6 @@ class GiftClaimRegistryTests(unittest.TestCase):
         self.assertTrue(all(cv2.imread(str(folder / name)) is not None
                             for name in expected))
 
-    def test_gifts_are_one_lowest_priority_db_task(self):
-        daily = {item["key"]: item["priority"] for item in DATA["Daily Activities"]}
-        keys = {key for key in daily if key.startswith("gift_")}
-
-        self.assertEqual({gift_claims.KEY}, keys)
-        self.assertEqual(-100, daily[gift_claims.KEY])
-        self.assertLess(-100, min(value for key, value in daily.items()
-                                  if not key.startswith("gift_")))
-
     def test_combined_gift_task_is_saved_only_after_both_boundaries_finish(self):
         done = set()
         bot = mock.Mock()
@@ -125,16 +113,6 @@ class GiftClaimRegistryTests(unittest.TestCase):
 
         self.assertIn(gift_claims.KEY, done)
         self.assertNotIn("gift_limited_offer", done)
-
-    def test_post_daily_phase_runs_only_when_worker_enabled_it(self):
-        bot = SimpleNamespace(post_daily_gifts_enabled=False)
-        with mock.patch.object(gift_claims, "run") as run:
-            _run_gift_claims(bot)
-            run.assert_not_called()
-            bot.post_daily_gifts_enabled = True
-            bot.is_daily_done = lambda _key: False
-            _run_gift_claims(bot)
-            run.assert_called_once_with(bot)
 
     def test_claim_template_is_never_tapped_twice_on_an_unchanged_page(self):
         bot = mock.Mock()

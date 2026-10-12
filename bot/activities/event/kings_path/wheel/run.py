@@ -8,7 +8,7 @@ Sau Go (mỗi bước chụp 1 ảnh, xét theo thứ tự):
    hôm nay (mai làm tiếp).
 3. Có nút "10 Spins" -> bấm liên tục (không cần đóng bảng kết quả) tới bước 2.
 """
-from ...common import EventState
+from ...common import EventState, mark_done
 from .. import path_task
 from .constants import (
     BUTTON_WAIT,
@@ -32,7 +32,7 @@ NAME = "Wheel"
 
 def _spin(bot, path, done, target):
     """Sau Go: 100 Spins nếu có; không thì 10 Spins liên tục tới khi hết chip."""
-    spin_wheel(bot, lambda: bot.mark_daily_done(path.key))
+    spin_wheel(bot, lambda: mark_done(bot, path.key))
 
 
 def spin_wheel(bot, done, name: str = NAME, max_spins_10: int | None = None) -> bool:

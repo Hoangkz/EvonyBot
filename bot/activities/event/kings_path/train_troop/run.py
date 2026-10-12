@@ -28,8 +28,8 @@ from ...common import (
     STOP,
     EventState,
     day_locked,
-    is_done_today,
     mark_complete,
+    mark_locked,
     mark_target_reached,
     nearest_go,
     read_go_progress,
@@ -82,7 +82,6 @@ from .constants import (
 from .tier import choose_first_tier
 
 NAME = "Train Troop"
-LOCKED_KEY = f"{KEY}_locked"   # Day 3 còn khoá: bỏ qua tới lần reset server
 
 # Màn King's Path (lần đầu thấy thì kiểm tra Day khoá) / màn sau khi bấm Go (phải bấm Go của
 # chính nhiệm vụ trước).
@@ -96,12 +95,6 @@ def run(bot, task: dict, state: EventState):
     if not (TEMPLATE_DIR / KINGS_PATH_ICON).exists():
         bot.log(f"{NAME}: no event icon image yet ({KINGS_PATH_ICON}), skipped")
         return
-    if is_done_today(bot, KEY):
-        bot.log(f"{NAME}: already done")
-        return
-    if bot.is_daily_done(LOCKED_KEY):
-        bot.log(f"{NAME}: day still locked, skipped until server reset")
-        return
     day = int(task.get("day") or DAY)
     target = int(task.get("value") or 0)   # tổng số lính cần train (mọi cấp)
     done = None   # số đã làm, đọc ở dòng có nút Go (None = chưa đọc / đọc lỗi)
@@ -113,7 +106,7 @@ def run(bot, task: dict, state: EventState):
         progress["entered"] = True
         if day_locked(bot, screen, day):
             bot.record(f"{NAME}: Day {day} locked, cannot do this task yet")
-            bot.mark_daily_done(LOCKED_KEY)
+            mark_locked(bot, KEY)
             return STOP
         return None
 

@@ -23,7 +23,7 @@ from bot.activities.event.gather_troops import mounted_troop
 from bot.activities.event.gather_troops.mounted_troop.constants import LOCKED_KEY
 from bot.context import TEMPLATE_DIR
 from tests.flow import Step, back, end, run_flow, tap, tap_at
-from tests.event import setUpModule, tearDownModule  # noqa: F401 (tắt lượt nhận thưởng)
+from tests.event import setUpModule, tearDownModule, run_event_tasks  # noqa: F401 (tắt lượt nhận thưởng)
 
 SCREENS = Path(__file__).parent / "screens"
 KEY = mounted_troop.KEY
@@ -123,7 +123,7 @@ class MountedTroopFlow(unittest.TestCase):
             Step("04_event_list.png", tap("Event/GatherTroops/icon.png")),
             *TO_FIRST_GO,
         ]
-        device = run_flow(self, event.run, SCREENS, flow, SETTINGS, variants=VARIANTS)
+        device = run_flow(self, run_event_tasks, SCREENS, flow, SETTINGS, variants=VARIANTS)
         self.assertNotIn(LOCKED_KEY, device.daily_done)
         self.assertIn("Mounted Troop: done 0, remaining 20000", device.logs)
         self.assertIn("Mounted Troop: train tier 13 (chosen 13), goal 20000, count 20000",
@@ -136,25 +136,25 @@ class MountedTroopFlow(unittest.TestCase):
             Step("09_day3_ranged_troop.png", tap(f"{MT}/mountedTroop.png")),
             *TO_FIRST_GO[1:3],
         ]
-        run_flow(self, event.run, SCREENS, flow, SETTINGS, variants=VARIANTS)
+        run_flow(self, run_event_tasks, SCREENS, flow, SETTINGS, variants=VARIANTS)
 
     def test_day3_locked_saved(self):
         """3 ổ khoá trên hàng tab Day (Day 3..5 khoá): lưu LOCKED_KEY rồi dừng."""
         flow = [*TO_EVENT, Step("06_day_locked_tmp.png?day3_locked", end())]
-        device = run_flow(self, event.run, SCREENS, flow, SETTINGS, variants=VARIANTS)
+        device = run_flow(self, run_event_tasks, SCREENS, flow, SETTINGS, variants=VARIANTS)
         self.assertIn(LOCKED_KEY, device.daily_done)
 
     def test_later_days_locked_day3_open(self):
         """Chỉ Day 4, Day 5 khoá (2 ổ khoá): Day 3 đã mở, không lưu LOCKED_KEY (ảnh tạm
         King's Path có "Claim All" nên bước kế là bấm Claim All)."""
         flow = [*TO_EVENT, Step("06_day_locked_tmp.png", tap("Event/claimAll.png"))]
-        device = run_flow(self, event.run, SCREENS, flow, SETTINGS, variants=VARIANTS)
+        device = run_flow(self, run_event_tasks, SCREENS, flow, SETTINGS, variants=VARIANTS)
         self.assertNotIn(LOCKED_KEY, device.daily_done)
 
     def _train_flow(self, settings, *train_steps):
         """Tới màn Train rồi các bước chọn cấp `train_steps`."""
         flow = [*TO_EVENT, *TO_FIRST_GO[:-1], *train_steps]
-        device = run_flow(self, event.run, SCREENS, flow, settings, variants=VARIANTS)
+        device = run_flow(self, run_event_tasks, SCREENS, flow, settings, variants=VARIANTS)
         # Không bao giờ bấm "Instant Train" (tốn gems), nút trái đáy màn Train.
         instant = [(i, e) for i, e in device.events
                    if e[0] == "tap" and flow[i].screen.startswith(("train_t", "locked_"))
@@ -261,7 +261,7 @@ class MountedTroopFlow(unittest.TestCase):
             Step("10_after_go.png", tap_at(*CENTER)),
             *TO_FIRST_GO[3:],
         ]
-        device = run_flow(self, event.run, SCREENS, flow, SETTINGS, variants=VARIANTS)
+        device = run_flow(self, run_event_tasks, SCREENS, flow, SETTINGS, variants=VARIANTS)
         self.assertIn("Mounted Troop: building already training, Speed Up from menu (not counted)",
                       device.logs)
         self.assertNotIn(LOCKED_KEY, device.daily_done)
@@ -275,7 +275,7 @@ class MountedTroopFlow(unittest.TestCase):
             *TO_EVENT,
             *TO_FIRST_GO,
         ]
-        device = run_flow(self, event.run, SCREENS, flow, SETTINGS, variants=VARIANTS)
+        device = run_flow(self, run_event_tasks, SCREENS, flow, SETTINGS, variants=VARIANTS)
         self.assertIn("Mounted Troop: on_train_screen before Go, back", device.logs)
         self.assertIn("Mounted Troop: done 0, remaining 20000", device.logs)
 
@@ -283,33 +283,33 @@ class MountedTroopFlow(unittest.TestCase):
         """Bắt đầu khi đang ở sẵn màn Gather Troops (Day 3, nhiệm vụ trước để lại): không về
         thành, kiểm tra Day khoá ngay trên màn đó rồi bấm Go luôn."""
         flow = [*TO_FIRST_GO[1:]]
-        device = run_flow(self, event.run, SCREENS, flow, SETTINGS, variants=VARIANTS)
+        device = run_flow(self, run_event_tasks, SCREENS, flow, SETTINGS, variants=VARIANTS)
         self.assertIn("Mounted Troop: done 0, remaining 20000", device.logs)
 
     def test_started_on_gather_troops_day_locked(self):
         """Đang ở sẵn màn Gather Troops mà Day 3 khoá: lưu LOCKED_KEY ngay, không về thành."""
         flow = [Step("08_day3_mounted_troop.png?day345_locked", end())]
-        device = run_flow(self, event.run, SCREENS, flow, SETTINGS, variants=VARIANTS)
+        device = run_flow(self, run_event_tasks, SCREENS, flow, SETTINGS, variants=VARIANTS)
         self.assertIn(LOCKED_KEY, device.daily_done)
 
     def test_no_go_marks_done(self):
         """Tab Mounted Troop không còn Go: đánh dấu xong."""
         flow = [*TO_EVENT, Step("08_day3_mounted_troop.png?no_go", end())]
-        device = run_flow(self, event.run, SCREENS, flow, SETTINGS, variants=VARIANTS)
+        device = run_flow(self, run_event_tasks, SCREENS, flow, SETTINGS, variants=VARIANTS)
         self.assertIn(KEY, device.daily_done)
 
     def test_already_done_skips(self):
         flow = [Step("03_main.png", end())]
-        run_flow(self, event.run, SCREENS, flow, SETTINGS, daily_done={KEY: "2026-10-01T08:00:00"})
+        run_flow(self, run_event_tasks, SCREENS, flow, SETTINGS, daily_done={KEY: "2026-10-01T08:00:00"})
 
     def test_locked_skips_until_reset(self):
         flow = [Step("03_main.png", end())]
-        run_flow(self, event.run, SCREENS, flow, SETTINGS,
+        run_flow(self, run_event_tasks, SCREENS, flow, SETTINGS,
                  daily_done={LOCKED_KEY: "2026-10-01T08:00:00"})
 
     def test_disabled_skips(self):
         flow = [Step("03_main.png", end())]
-        run_flow(self, event.run, SCREENS, flow, {KEY: {"value": 0, "level": None, "day": 3}})
+        run_flow(self, run_event_tasks, SCREENS, flow, {KEY: {"value": 0, "level": None, "day": 3}})
 
 
 if __name__ == "__main__":

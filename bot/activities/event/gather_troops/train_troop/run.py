@@ -14,7 +14,7 @@ Flow:
    menu công trình / màn Train / màn speedup (VD nhiệm vụ trước dừng ở đó) -> Back cho tới
    khi về lại Gather Troops (bắt buộc đi qua dòng Go để biết nhiệm vụ còn cần làm không).
 2. Màn Gather Troops vừa mở: đếm ổ khoá trên hàng tab Day. Tab Day của nhiệm vụ còn khoá
-   -> lưu "chưa thể thực hiện" (locked_key, tới lần reset server) và dừng.
+   -> báo "chưa thể thực hiện" (mark_locked; worker bỏ qua tới lần reset server) và dừng.
 3. Tab "Day N" chưa chọn -> bấm.
 4. Tab phụ của nhiệm vụ (VD "Ground Troop", "Mounted Troop") chưa chọn -> bấm.
 5. Tab phụ đang chọn: tìm nút "Go" đầu tiên (gần tab nhất), đọc số đã làm ở "0 / 500"
@@ -31,7 +31,7 @@ Flow:
    nền văn minh): chọn cấp (troop_tier.choose_tier): đọc cấp vòng đang chọn ở huy hiệu số La Mã
    cạnh tên lính, bấm vòng cách giữa 1 .. 2 ô về phía cấp người dùng chọn rồi đọc lại; cấp chọn
    bị khoá (không có nút "+") thì lấy cấp mở cao nhất dưới nó, mục tiêu đổi theo cấp đó (bảng
-   trong event.py). Cấp 7 cũng khoá -> lưu "chưa thể thực hiện" (locked_key) và dừng.
+   trong event.py). Cấp 7 cũng khoá -> báo "chưa thể thực hiện" (mark_locked) và dừng.
 9. Đọc số lính tối đa một lần train (ô bên phải nút "+"), tính số lần bấm Train
    (VD 10000 / 1500 -> 7 lần).
     Vừa vào màn Train đã có mẻ đang train sẵn (nút là "Training Speedup"): Finish All mẻ đó
@@ -53,8 +53,8 @@ from ...common import (
     STOP,
     EventState,
     day_locked,
-    is_done_today,
     mark_complete,
+    mark_locked,
     mark_target_reached,
     nearest_go,
     read_go_progress,
@@ -128,24 +128,12 @@ class TroopTask:
     title: str | None = None
     title_region: tuple | None = None
 
-    @property
-    def locked_key(self) -> str:
-        """Lưu trong daily_done khi tab Day hoặc cấp 7 còn khoá: bỏ qua nhiệm vụ tới lần
-        reset server kế tiếp."""
-        return f"{self.key}_locked"
-
 
 def run(bot, task: dict, state: EventState, troop: TroopTask):
     """`task` là settings của nhiệm vụ: {"value": int, "level": int, "day": int}."""
-    name, key, locked_key = troop.name, troop.key, troop.locked_key
+    name, key = troop.name, troop.key
     if not (TEMPLATE_DIR / troop.event_icon).exists():
         bot.log(f"{name}: no event icon image yet ({troop.event_icon}), skipped")
-        return
-    if is_done_today(bot, key):
-        bot.log(f"{name}: already done")
-        return
-    if bot.is_daily_done(locked_key):
-        bot.log(f"{name}: day still locked, skipped until server reset")
         return
     day = int(task.get("day") or troop.day)
     target = int(task.get("value") or 0)   # tổng số lính cần train
@@ -166,7 +154,7 @@ def run(bot, task: dict, state: EventState, troop: TroopTask):
         progress["entered"] = True
         if day_locked(bot, screen, day):
             bot.record(f"{name}: Day {day} locked, cannot do this task yet")
-            bot.mark_daily_done(locked_key)
+            mark_locked(bot, key)
             return STOP
         return None
 
@@ -224,7 +212,7 @@ def run(bot, task: dict, state: EventState, troop: TroopTask):
                 tier = choose_tier(bot, troop.tiers, level, troop.lowest)
                 if tier is None:
                     bot.record(f"{name}: tier {troop.lowest} locked, cannot do this task yet")
-                    bot.mark_daily_done(locked_key)
+                    mark_locked(bot, key)
                     return STOP
                 goal = target if tier == level else targets_by_tier.get(tier, 0)
                 count = max(0, goal - (done or 0))

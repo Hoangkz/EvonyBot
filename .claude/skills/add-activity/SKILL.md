@@ -66,7 +66,7 @@ Quy tắc bắt buộc:
 - Tap theo offset từ góc trên-trái: truyền `top_left={ACTION}` cho `find_first`.
 - Giới hạn vùng tìm (nhanh + ít khớp nhầm): `regions={path: (x0, y0, x1, y1)}` theo % màn hình.
 - `return` bình thường = activity hoàn thành (worker bỏ khỏi pending). Activity có thể bị cắt giữa chừng (timeout 120 s / boss mới) và được gọi lại **từ đầu** → phải chạy lại được từ bất kỳ màn hình nào.
-- Việc làm 1 lần/ngày: dùng `bot.is_daily_done(task)` / `bot.mark_daily_done(task)`.
+- Việc làm 1 lần/ngày: NHIỆM VỤ TỰ LƯU kết quả vào DB ngay chỗ biết kết quả (`bot.mark_daily_done(<key>)` khi xong; lỗi thật thì decorator `@save_errors(<key>)` ở `bot/activities/result.py` lưu `<key>_error` + History). Worker KHÔNG ghi gì: chỉ lấy danh sách, kiểm tra đã xong chưa (đọc DB), chưa thì chạy. Khai báo nhiệm vụ bằng MỘT DÒNG trong bảng `bot/worker/priority.py` (`key`, `priority`, `run`: hàm trơn `run(ctx, cấu hình tab)` hoặc dict `{run, enabled, done, every}` dựng cạnh code của nhiệm vụ; `saves: True` nếu hàm tự lưu key của dòng khi xong).
 - Cần cấu hình tab khác: `bot.settings["<Tab Title>"]`.
 - Comment/docstring: tiếng Anh hoặc tiếng Việt như code xung quanh; docstring module ghi rõ "port of C# ..." nếu là port.
 

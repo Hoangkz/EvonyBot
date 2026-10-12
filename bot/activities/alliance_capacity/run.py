@@ -1,14 +1,19 @@
 """
 run.py — "Alliance Capacity" activity (port of C# ScienceNew).
 
-Opens the alliance science screen and donates, paying gems up to the
-tab's "Times" limit. Each loop takes one screenshot, finds the first
-known image on it (checked in list order) and acts on it.
+Flow: Liên minh -> Alliance Science -> donate (giữ nút Donate cho lượt free), chi gem tối đa số lần ở ô "Times" của tab
+("No" = không chi gem, "ALL" = không giới hạn) -> xong thì thoát.
+Chỉ làm MỘT LẦN (mỗi lần Start): dòng trong bảng bot/worker/priority.py có `once`. Làm xong KHÔNG lưu gì vào DB (worker coi là
+xong khi hàm chạy hết một lượt); chỉ lỗi thật mới lưu `alliance_capacity_error` (save_errors).
+
+Each loop takes one screenshot, finds the first known image on it (checked in list order) and acts on it.
 """
 from ...common import click_images, delay, exit_images, find_first, go_home
+from ..result import save_errors
 from .constants import BACK, BOSS, DONATE, DONE, GEMS, OUT_ALLIANCE, SCIENCE, SCROLL, TAP
 
 
+@save_errors("alliance_capacity")   # lỗi thì lưu `alliance_capacity_error` vào DB
 def run(bot, settings: dict):
     """`bot` is the device's BotContext; `settings` is the "Alliance Capacity" tab's config."""
     gems_limit = _gems_limit(settings.get("times", "No"))

@@ -11,8 +11,9 @@ event (tab nhiệm vụ đang chọn, tab Redeem):
    tiên của người dùng (settings three_day_redeem.order): mỗi quà đổi tới khi nút xám; nút xám ở quà
    ưu tiên thì DỪNG hẳn (để dành vé cho quà đó).
    Đổi quà: nhớ vị trí hàng của từng quà, cuộn thẳng tới đó (không cuộn về đầu mỗi quà).
-3. Mọi thứ xong -> lưu daily_done DONE_KEY (đã xong ngày hôm nay): các lần gọi sau trong ngày return
-   ngay, không vào game. Không thấy tab / icon event (hết event) cũng lưu DONE_KEY.
+3. Mọi thứ xong -> trả TaskResult(done=True) (worker lưu DONE_KEY: các lần sau trong ngày không vào game). Không
+   thấy tab / icon event (hết event) cũng done=True. Event có bật không (group 3-Day Event, tab Event) và hôm nay đã
+   xong chưa: nhiệm vụ tự lưu vào DB, worker (bot/worker/tasks.py) chỉ kiểm tra đã xong chưa.
 """
 from types import SimpleNamespace
 
@@ -20,7 +21,9 @@ import numpy as np
 
 from ....ocr import read_progress
 from ....context.templates import TEMPLATE_DIR
-from ...event.common import mark_target_reached
+from ...event.common import mark_done, mark_target_reached
+from ...event.run import record_outcome
+from ...result import NOT_DONE, TaskResult, clear, save_errors, take_all
 from ...event.constants import CONGRATULATIONS, GO_BUTTON, GO_REGION
 from ...event.kings_path.donate.run import _donate as donate_after_go
 from ...event.kings_path.heal.run import _heal as heal_after_go
@@ -37,20 +40,13 @@ TASKS = [
 ]
 
 
-def run(bot, settings: dict):
-    """`settings` là cấu hình tab Event: {key: {...}}."""
-    if not any(key.startswith(c.GROUP_KEY) for key in settings):
-        bot.log(f"{NAME}: no 3-day event settings, skip")   # cấu hình tab Event thiếu group này (VD test)
-        return
-    if not _active(settings):
-        bot.log(f"{NAME}: group not active, skip")
-        return
-    if bot.is_daily_done(c.DONE_KEY):
-        bot.log(f"{NAME}: done today, skip")
-        return
+def run(bot, settings: dict) -> TaskResult:
+    """`settings` là cấu hình tab Event: {key: {...}}. done=True khi xong hôm nay (hoặc event không còn trong Event
+    Center); mục tiêu từng nhiệm vụ con báo trong `outcomes`."""
+    clear(bot)
     if not c.icons():
         bot.log(f"{NAME}: no event icon image in {c.ICONS_DIR}, skip")
-        return
+        return NOT_DONE
     # Nhiệm vụ coi là xong TRONG LƯỢT này (ctx["finished"]) chỉ khi quét danh sách thấy một trong 3 trường hợp (xem
     # _check_task); dấu "đã xong" (daily_done) do donate / heal tự lưu không dùng để bỏ qua việc kiểm tra.
     ctx = {"finished": set(), "go_tries": {}}
@@ -65,12 +61,10 @@ def run(bot, settings: dict):
         before = set(ctx["finished"])
         result = _run_tasks(bot, pending, ctx)
         if result in (TAB_NOT_FOUND, ICON_NOT_FOUND):
-            _missing(bot)
-            return
+            return _missing(bot)
         for key, name, _, _ in pending:
             if key in ctx["finished"] and key not in before:
                 bot.record(f"{NAME}: xong {name}")
-                bot.yield_to_boss()
         if result == c.NOT_FOUND or (result == c.STOP and ctx["finished"] == before):
             misses += 1
             if misses >= c.TASK_SEARCH_TRIES:
@@ -78,7 +72,7 @@ def run(bot, settings: dict):
                 names = ", ".join(name for _, name, _, _ in left)
                 bot.record(f"{NAME}: lỗi: không tìm thấy nhiệm vụ {names} sau {misses} lần, đánh dấu xong hôm nay")
                 for key, *_ in left:
-                    bot.mark_daily_done(key)
+                    mark_done(bot, key)
                     ctx["finished"].add(key)
                 break
             bot.record(f"{NAME}: không kết luận được nhiệm vụ nào ({misses}/{c.TASK_SEARCH_TRIES}), Back rồi làm lại")
@@ -87,10 +81,14 @@ def run(bot, settings: dict):
         misses = 0
     bot.check()
     if _claim_and_redeem(bot, _order(settings)) in (TAB_NOT_FOUND, ICON_NOT_FOUND):
-        _missing(bot)
-        return
+        return _missing(bot)
     bot.record(f"{NAME}: xong hôm nay")
-    bot.mark_daily_done(c.DONE_KEY)
+    return _finished(bot)
+
+
+def _finished(bot) -> TaskResult:
+    """Xong hôm nay (kèm kết quả của các nhiệm vụ con đã báo giữa chừng)."""
+    return TaskResult(done=True, label=c.DONE_KEY, outcomes=tuple(take_all(bot)))
 
 
 def _pending(bot, settings: dict, finished: set) -> list:
@@ -107,14 +105,9 @@ def _pending(bot, settings: dict, finished: set) -> list:
     return pending
 
 
-def _missing(bot):
+def _missing(bot) -> TaskResult:
     bot.record(f"{NAME}: event not found in Event Center, mark done today")
-    bot.mark_daily_done(c.DONE_KEY)
-
-
-def _active(settings: dict) -> bool:
-    group = settings.get(f"{c.GROUP_KEY}_active")
-    return True if group is None else bool(group.get("enabled") if isinstance(group, dict) else group)
+    return _finished(bot)
 
 
 def _target(task) -> int | None:
@@ -354,7 +347,7 @@ def _check_task(bot, screen, task, ctx):
         tries = ctx["go_tries"][key] = ctx["go_tries"].get(key, 0) + 1
         if tries > c.GO_TRIES:
             bot.record(f"{NAME}: {name} cannot reach {target} after {c.GO_TRIES} tries, mark done today")
-            bot.mark_daily_done(key)
+            mark_done(bot, key)
             return _ROW_DONE
         bot.tap(*pos, delay=c.GO_WAIT)
         _wait_settled(bot)
@@ -548,3 +541,24 @@ def _button_green(bot, screen, center) -> bool:
     dx, dy, w, h = c.REDEEM_COLOR_BOX
     area = bot.crop(screen, center[0] + dx, center[1] + dy, w, h).reshape(-1, 3).mean(axis=0)
     return float(area[1] - area[2]) >= c.REDEEM_GREEN_DIFF   # BGR: G - R
+
+
+# ---- Luật của việc (bảng bot/worker/priority.py: "run": JOB) -------------------------------------------------------
+def three_day_active(settings: dict) -> bool:
+    """Tab Event có group 3-Day Event và group đó đang bật (thiếu ô bật = bật)."""
+    if not any(key.startswith(c.GROUP_KEY) for key in settings):
+        return False
+    group = settings.get(f"{c.GROUP_KEY}_active")
+    return True if group is None else bool(group.get("enabled") if isinstance(group, dict) else group)
+
+
+@save_errors("three_day_event")   # lỗi thì lưu `three_day_event_error` vào DB
+def _run_three_day(ctx, settings: dict):
+    result = run(ctx, settings)
+    for outcome in result.outcomes:
+        record_outcome(ctx, settings, outcome)
+    if result.done:
+        ctx.mark_daily_done(c.DONE_KEY)
+
+
+JOB = {"run": _run_three_day, "enabled": three_day_active, "done": lambda ctx, settings: ctx.is_daily_done(c.DONE_KEY)}

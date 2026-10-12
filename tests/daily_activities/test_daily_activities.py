@@ -4,10 +4,16 @@ from unittest import mock
 
 import numpy as np
 
+from bot.activities.result import TaskResult
+from bot.activities.daily_activities.common import daily_job
 from ui.tabs.daily_activities_tab import SUPPORTED_TASKS
 
 _PKG = "bot.activities.daily_activities"
-daily = importlib.import_module(f"{_PKG}.run")          # thứ tự nhiệm vụ, run()
+# Các việc Daily theo thứ tự bản C# (bảng nhiệm vụ của worker: bot/worker/priority.py).
+_ORDER = ("monster_killing", "resource_collecting", "offering", "resource_gathering", "resource_tax", "gold_levy",
+          "troop_training", "troop_healing", "trap_building", "alliance_donation", "alliance_help", "black_market",
+          "general_enhancing", "wheel_of_fortune", "patrol", "material_composing")
+TASKS = tuple(importlib.import_module(f"{_PKG}.{name}").TASK for name in _ORDER)
 common = importlib.import_module(f"{_PKG}.common")      # vòng lặp chung run_task
 const = importlib.import_module(f"{_PKG}.constants")
 collecting = importlib.import_module(f"{_PKG}.resource_collecting.run")
@@ -24,7 +30,7 @@ monster = importlib.import_module(f"{_PKG}.monster_killing.run")
 
 
 def _task(label):
-    return next(task for task in daily.TASKS if task.label == label)
+    return next(task for task in TASKS if task.label == label)
 
 
 class DailyGoTests(unittest.TestCase):
@@ -34,7 +40,7 @@ class DailyGoTests(unittest.TestCase):
         bot = mock.Mock()
         bot.screenshot.return_value = np.zeros((720, 400, 3), dtype=np.uint8)
 
-        self.assertTrue(common.run_task(bot, daily.TASKS[0]))
+        self.assertTrue(common.run_task(bot, TASKS[0]))
 
         self.assertEqual(find_first.call_args.kwargs["top_left"], const.ROW_ANCHORS)
 
@@ -70,7 +76,7 @@ class DailyGoTests(unittest.TestCase):
         bot = mock.Mock()
         bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
 
-        self.assertTrue(common.run_task(bot, daily.TASKS[0]))
+        self.assertTrue(common.run_task(bot, TASKS[0]))
         open_row.assert_called_once()
 
     @mock.patch.object(common, "delay")
@@ -81,48 +87,34 @@ class DailyGoTests(unittest.TestCase):
         bot = mock.Mock()
         bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
 
-        self.assertTrue(common.run_task(bot, daily.TASKS[0]))
+        self.assertTrue(common.run_task(bot, TASKS[0]))
 
         wait.assert_called_once_with(bot, 1)
         home.assert_not_called()
 
     def test_ui_tasks_match_execution_tasks(self):
-        # UI đặt Offering lên đầu; thứ tự chạy vẫn theo daily.TASKS.
+        # UI đặt Offering lên đầu; thứ tự chạy vẫn theo TASKS.
         self.assertEqual(sorted(key for key, _ in SUPPORTED_TASKS),
-                         sorted(task.label for task in daily.TASKS))
+                         sorted(task.label for task in TASKS))
 
-    @mock.patch.object(daily, "collect_activity_rewards")
-    @mock.patch.object(daily, "run_task")
-    def test_monster_is_retried_after_five_other_completed_tasks(self, run_task,
-                                                                 collect_rewards):
-        selected = daily.TASKS[:7]
+    @mock.patch("bot.activities.daily_activities.common.run_task")
+    def test_monster_not_finished_is_not_marked_until_done(self, run_task):
+        """Monster Killing là một nhiệm vụ riêng: đánh 2 lần rồi hoãn (chưa xong) -> chưa lưu xong (worker chuyển xuống
+        cuối danh sách, các nhiệm vụ khác làm trước); lần sau đánh nốt thì lưu xong."""
+        monster_task = next(task for task in TASKS if task.label == "Monster Killing")
         done = set()
-        monster_calls = 0
         bot = mock.Mock()
-        bot._daily_monster_deferred = False
         bot.is_daily_done.side_effect = lambda label: label in done
         bot.mark_daily_done.side_effect = done.add
+        run_task.side_effect = [TaskResult(), TaskResult(done=True)]
+        job = daily_job(monster_task)
 
-        def execute(current_bot, task):
-            nonlocal monster_calls
-            if task.label == "Monster Killing":
-                monster_calls += 1
-                current_bot._daily_monster_deferred = monster_calls == 1
-                return monster_calls > 1
-            return True
+        job["run"](bot, {})
+        self.assertNotIn("Monster Killing", done)
 
-        run_task.side_effect = execute
-        settings = {task.label: True for task in selected}
-
-        with mock.patch.object(daily, "TASKS", selected):
-            daily.run(bot, settings)
-
-        labels = [call.args[1].label for call in run_task.call_args_list]
-        self.assertEqual(labels[:7], [selected[0].label]
-                         + [task.label for task in selected[1:6]]
-                         + [selected[0].label])
-        self.assertEqual(monster_calls, 2)
-        collect_rewards.assert_called_once_with(bot)
+        job["run"](bot, {})
+        self.assertIn("Monster Killing", done)
+        self.assertEqual(run_task.call_count, 2)
 
     @mock.patch.object(collecting, "open_daily_activity", return_value=True)
     def test_resource_collecting_returns_to_daily_after_collection(self, open_activity):
@@ -163,7 +155,7 @@ class DailyGoTests(unittest.TestCase):
             open_when_available=False)
 
     def test_resource_gathering_runs_immediately_after_offering(self):
-        labels = [task.label for task in daily.TASKS]
+        labels = [task.label for task in TASKS]
         self.assertEqual(labels.index("Resource Gathering"), labels.index("Offering") + 1)
 
     @mock.patch.object(gathering, "open_daily_activity", return_value=True)
@@ -252,11 +244,11 @@ class DailyGoTests(unittest.TestCase):
         first.assert_called_once()
 
     def test_individual_task_does_not_claim_rewards_before_completion_check(self):
-        paths = [path for path, _ in common.task_targets(daily.TASKS[0])]
+        paths = [path for path, _ in common.task_targets(TASKS[0])]
         self.assertFalse(any(path.endswith("/Claim_All.png") for path in paths))
 
     def test_every_task_can_open_daily_from_the_current_quest_button(self):
-        targets = common.task_targets(daily.TASKS[0])
+        targets = common.task_targets(TASKS[0])
         self.assertIn(("DailyActivites/UseAllActivities/QuestButtonDaily.png",
                        const.TAP), targets)
         self.assertIn(("DailyActivites/UseAllActivities/QuestButtonCity.png",
@@ -469,7 +461,7 @@ class DailyGoTests(unittest.TestCase):
         bot = mock.Mock()
         bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
 
-        self.assertTrue(common.run_task(bot, daily.TASKS[0]))
+        self.assertTrue(common.run_task(bot, TASKS[0]))
 
         self.assertEqual(scroll_up.call_count, 2)
         scroll_to_top.assert_called_once_with(bot)
@@ -477,7 +469,7 @@ class DailyGoTests(unittest.TestCase):
     def test_every_task_has_priority_key(self):
         from bot.worker.priority import DATA
         keys = {t["key"] for t in DATA["Daily Activities"]}
-        self.assertEqual([t.label for t in daily.TASKS if t.key not in keys], [])
+        self.assertEqual([t.label for t in TASKS if t.key not in keys], [])
 
 
 if __name__ == "__main__":

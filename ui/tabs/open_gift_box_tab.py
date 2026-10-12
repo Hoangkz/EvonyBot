@@ -4,15 +4,16 @@ from Form3_Designer.cs.
 """
 from PyQt5.QtCore import pyqtSignal
 
-from bot.activities.open_gift_box.constants import BOX_FOLDERS
+from bot.activities.open_gift_box.constants import BOX_TYPES
 
 from .tab_placeholder import DesignerTab
 
-# One checkbox per BOX_FOLDERS entry (label -> image folder), shown in that order after
-# "All". To add a type, add one line to BOX_FOLDERS in bot/activities/open_gift_box/constants.py.
-BOX_TYPES = list(BOX_FOLDERS)
+# One checkbox per BOX_TYPES entry (label, image folder, ticked by default), shown in that order
+# after "All". To add a type, add one line to BOX_TYPES in bot/activities/open_gift_box/constants.py.
+BOX_LABELS = [label for label, _, _ in BOX_TYPES]
 ALL_CHECKBOX = "checkBoxAll"
 BOX_CHECKBOXES = [f"checkBox{i}" for i in range(len(BOX_TYPES))]
+BOX_DEFAULTS = [default for _, _, default in BOX_TYPES]
 SELECTION_CHECKBOXES = [ALL_CHECKBOX, *BOX_CHECKBOXES]
 
 COLUMNS, CELL_W, ROW_H = 8, 120, 60
@@ -26,7 +27,7 @@ def _checkbox(index: int, text: str) -> dict:
 DESIGNER_DATA = {
     "buttonOpenBoxApplyALL": {"loc": [935, 16], "size": [132, 43], "text": "Apply ALL", "type": "Button"},
     ALL_CHECKBOX: _checkbox(0, "All"),
-    **{name: _checkbox(i + 1, text) for i, (name, text) in enumerate(zip(BOX_CHECKBOXES, BOX_TYPES))},
+    **{name: _checkbox(i + 1, text) for i, (name, text) in enumerate(zip(BOX_CHECKBOXES, BOX_LABELS))},
     "groupBox7": {"children": ["panelBox"], "loc": [20, 65], "size": [1042, 249],
                   "text": "Selection Gift Box", "type": "GroupBox"},
     "panelBox": {"children": SELECTION_CHECKBOXES,
@@ -46,8 +47,9 @@ class OpenGiftBoxTab(DesignerTab):
     def __init__(self, parent=None):
         super().__init__("tabPage5", DESIGNER_DATA, COMBO_ITEMS, PAGE_SIZE, parent=parent)
         c = self.controls
-        for n in SELECTION_CHECKBOXES:      # all ticked by default
-            c[n].setChecked(True)
+        for n, default in zip(BOX_CHECKBOXES, BOX_DEFAULTS):
+            c[n].setChecked(default)
+        self._sync_all()
         c[ALL_CHECKBOX].clicked.connect(self._toggle_all)
         for n in BOX_CHECKBOXES:
             c[n].clicked.connect(self._sync_all)

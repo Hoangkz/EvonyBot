@@ -6,6 +6,7 @@ from ....ocr import read_offer_cost
 from ....ocr.read_offer_cost import CROP as COST_CROP
 from ...event.city_building import SHRINE
 from ...event.kings_path.building import open_building
+from ...result import done as report_done
 from ..common import Task
 from .constants import (
     ACTIONS,
@@ -64,30 +65,9 @@ def offers_done(costs: list[int], limit: int = 100) -> list[int]:
             if all(offer_total(done, i + 1) == cost for i, cost in enumerate(costs))]
 
 
-def reached_key(times: int) -> str:
-    """Key daily_done: hôm nay đã offer đủ `times` lượt."""
-    return f"{KEY}_reached_{times}"
-
-
 def mark_done(bot, times: int):
-    """Xong hôm nay với số lượng `times` (tăng số lượng ở tab UI thì chưa xong, xem is_done_today)."""
-    bot.mark_daily_done(LABEL)
-    bot.mark_daily_done(reached_key(times))
-
-
-def is_done_today(bot) -> bool:
-    """Đã xong hôm nay VỚI số lượng đang chọn (đã đạt số lượng >= số đang chọn)."""
-    if not bot.is_daily_done(LABEL):
-        return False
-    times = offer_times(bot)
-    if times <= 0:
-        return True
-    prefix = f"{KEY}_reached_"
-    reached = [int(k[len(prefix):]) for k in bot.daily_keys()
-               if k.startswith(prefix) and k[len(prefix):].isdigit() and bot.is_daily_done(k)]
-    # Mục tiêu 0 (common.open_task_or_finish): dòng Offer không còn Go / không có trong danh sách hôm
-    # nay -> xong, không chạy lại dù đang chọn bao nhiêu.
-    return bool(reached) and (0 in reached or max(reached) >= times)
+    """Báo xong hôm nay với số lượng `times` (result.reached = times; worker so với số đang chọn ở tab UI)."""
+    report_done(bot, times, label=LABEL, key=KEY)
 
 
 def offer_times(bot) -> int:
@@ -109,7 +89,7 @@ def after_go(bot) -> bool:
         return False
     if times <= 0:
         bot.log(f"{LABEL}: Offer Gems 0 times, skipped")
-        bot.mark_daily_done(LABEL)   # không lưu reached_0: đó là "dòng Offer không còn Go"
+        report_done(bot, label=LABEL, key=KEY)   # không báo reached: reached 0 là "dòng Offer không còn Go"
         return True
     button = bot.find(OFFER_SCREEN)
     if button is None:

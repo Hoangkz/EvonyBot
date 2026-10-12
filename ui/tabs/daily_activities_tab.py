@@ -9,6 +9,7 @@ from PyQt5.QtWidgets import (QCheckBox, QComboBox, QGridLayout, QGroupBox, QHBox
                              QWidget)
 
 from bot.activities.daily_activities import alliance_donation, alliance_help
+from bot.activities.event_center.crazy_eggs import constants as eggs
 from bot.activities.daily_activities.offering.constants import (
     OFFER_GEMS_CHOICES,
     OFFER_GEMS_DEFAULT,
@@ -64,8 +65,8 @@ GENERAL_KEY = "General"
 HOURLY_TASKS = {
     alliance_donation.constants.INTERVAL_KEY: (
         alliance_donation.constants,
-        "Donate lượt miễn phí ở Alliance Science, chưa xong thì làm lại sau chừng này giờ (không ưu tiên). "
-        "0 = không làm."),
+        "Donate lượt miễn phí ở Alliance Science rồi nhận thưởng; làm lại sau chừng này giờ kể từ lần donate trước "
+        "(mặc định 4h). 0 = không làm."),
     alliance_help.constants.INTERVAL_KEY: (
         alliance_help.constants,
         "Help All ở Alliance Help, chưa xong thì làm lại sau chừng này giờ (không ưu tiên, sau Alliance "
@@ -86,13 +87,21 @@ class DailyActivitiesTab(BaseTab):
         general_grid = QGridLayout(general)
         # Buy Stamina: 0 = không mua.
         self.stamina_quantity = QComboBox()
-        self.stamina_quantity.addItems(["0", "10", "20", "30"])
+        self.stamina_quantity.addItems(["0", "10", "16", "20"])
         self.stamina_quantity.setCurrentText("0")
         self.buy_hammers = QCheckBox("Buy Hammer")
         general_grid.addWidget(QLabel("Buy Stamina"), 0, 0)
         general_grid.addWidget(self.stamina_quantity, 0, 2)
         general_grid.addWidget(self.buy_hammers, 0, 3)
-        general_grid.setColumnStretch(4, 1)
+        # Crazy Eggs: đập trứng lại sau chừng này giờ tới khi đủ 4 quả vỡ; 0 = không làm.
+        self.crazy_eggs = QComboBox()
+        self.crazy_eggs.addItems(_hours_text(h) for h in eggs.INTERVAL_CHOICES)
+        self.crazy_eggs.setCurrentText(_hours_text(eggs.INTERVAL_DEFAULT))
+        self.crazy_eggs.setToolTip("Đập trứng (Event Center > Crazy Eggs), chưa vỡ đủ 4 quả thì làm lại sau chừng này "
+                                   "giờ. 0 = không làm.")
+        general_grid.addWidget(QLabel("Crazy Eggs"), 0, 4)
+        general_grid.addWidget(self.crazy_eggs, 0, 5)
+        general_grid.setColumnStretch(6, 1)
         self.add_row(general)
 
         selection = QGroupBox("Selection Daily")
@@ -171,6 +180,7 @@ class DailyActivitiesTab(BaseTab):
 
         self.buy_hammers.clicked.connect(self.settings_changed)
         self.stamina_quantity.activated.connect(self.settings_changed)
+        self.crazy_eggs.activated.connect(self.settings_changed)
         self.offer_gems.activated.connect(self.settings_changed)
         for combo in self.hourly_combos.values():
             combo.activated.connect(self.settings_changed)
@@ -204,12 +214,13 @@ class DailyActivitiesTab(BaseTab):
             "buy_stamina": quantity > 0,
             "stamina_quantity": quantity,
             "buy_all_hammers": self.buy_hammers.isChecked(),
+            eggs.INTERVAL_KEY: _hours_value(self.crazy_eggs.currentText()),
         }
         return settings
 
     def set_settings(self, data: dict):
         # Avoid writing partially restored state while loading a device.
-        widgets = [self.stamina_quantity, self.buy_hammers, self.offer_gems, *self.hourly_combos.values(),
+        widgets = [self.stamina_quantity, self.buy_hammers, self.crazy_eggs, self.offer_gems, *self.hourly_combos.values(),
                    *self.task_boxes.values(), *self.tax_counts.values(), *self.tax_free.values()]
         blockers = [QSignalBlocker(widget) for widget in widgets]
         try:
@@ -229,6 +240,10 @@ class DailyActivitiesTab(BaseTab):
             if self.stamina_quantity.findText(quantity) >= 0:
                 self.stamina_quantity.setCurrentText(quantity)
             self.buy_hammers.setChecked(bool(general.get("buy_all_hammers", False)))
+            hours = general.get(eggs.INTERVAL_KEY, eggs.INTERVAL_DEFAULT)
+            if hours not in eggs.INTERVAL_CHOICES:
+                hours = eggs.INTERVAL_DEFAULT
+            self.crazy_eggs.setCurrentText(_hours_text(hours))
             # Cấu hình cũ: checkbox Offering + ô Offer Gems riêng; bỏ tích Offering = 0.
             offer = str(data.get(OFFER_GEMS_KEY, OFFER_GEMS_DEFAULT)) if data.get(OFFERING_KEY) else "0"
             if self.offer_gems.findText(offer) >= 0:

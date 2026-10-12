@@ -9,7 +9,7 @@ dưới: Lúa / Gỗ / Đá / Sắt) -> tax_all thu theo group "City Tax" ở ta
    Hết free (nút dòng thành kim cương) thì thu như loại thường.
 2. Các loại còn lại có n > 0: popup -> chỉnh ô số về đúng n -> Tax. Ô số chỉnh bằng "+" / "−" theo
    chênh lệch với số OCR đọc được, đọc lại kiểm tra (SET_TRIES vòng).
-Thu xong (hay lỗi giữa chừng) vẫn đánh dấu xong hôm nay (mark_daily_done) rồi Back tới khi màn Tax đóng:
+Thu xong (hay lỗi giữa chừng) vẫn báo xong hôm nay (result.done) rồi Back tới khi màn Tax đóng:
 không đi lại, tránh thu (tốn kim cương) hai lần.
 Ảnh và phần nhận popup đóng / băng quà / hộp xác nhận kim cương dùng chung với King's Path City Tax.
 """
@@ -33,6 +33,7 @@ from ...event.kings_path.city_tax.constants import (
 from ...event.city_building import MARKET
 from ...event.kings_path.building import open_building
 from ...event.kings_path.city_tax.run import _popup_closed, _row_buttons
+from ...result import done as report_done
 from ..common import Task, mark_task_done
 from .constants import (
     ACTIONS,
@@ -99,8 +100,8 @@ def tax_all(bot) -> bool:
     for name, count, use_free in plan:
         if not _tax_row(bot, TAX_RESOURCES.index(name), count, use_free):
             break
-    # Đánh dấu ngay: lượt sau không vào màn Tax thu lại (tốn kim cương hai lần).
-    bot.mark_daily_done(LABEL)
+    # Báo xong ngay: worker không cho vào màn Tax thu lại (tốn kim cương hai lần).
+    report_done(bot, label=LABEL, key=KEY)
     # Back ngay sau Okay / băng quà có khi bị game bỏ qua -> Back tới khi màn Tax đóng.
     for _ in range(BACKS_AFTER_TAX):
         if bot.find(TAX_SCREEN) is None:

@@ -16,7 +16,7 @@ from pathlib import Path
 from bot.activities import event
 from bot.activities.event.gather_troops import cultivate_generals
 from tests.flow import Step, back, end, run_flow, swipe, tap, tap_at
-from tests.event import setUpModule, tearDownModule  # noqa: F401 (tắt lượt nhận thưởng)
+from tests.event import setUpModule, tearDownModule, run_event_tasks  # noqa: F401 (tắt lượt nhận thưởng)
 
 SCREENS = Path(__file__).parent / "screens"
 KEY = cultivate_generals.KEY
@@ -105,7 +105,7 @@ class EventFlow(unittest.TestCase):
             Step("06_gather_recruit_more.png", tap_at(*FIRST_GO)),
             *TO_CULTIVATE,
         ]
-        device = run_flow(self, event.run, SCREENS, flow, SETTINGS, variants=VARIANTS)
+        device = run_flow(self, run_event_tasks, SCREENS, flow, SETTINGS, variants=VARIANTS)
         self.assertIn(KEY, device.daily_done)   # đủ 1000 -> đánh dấu xong
 
     def test_claim_all_first(self):
@@ -116,7 +116,7 @@ class EventFlow(unittest.TestCase):
             Step("06_gather_recruit_more.png", tap_at(*FIRST_GO)),
             *TO_CULTIVATE,
         ]
-        run_flow(self, event.run, SCREENS, flow, SETTINGS, variants=VARIANTS)
+        run_flow(self, run_event_tasks, SCREENS, flow, SETTINGS, variants=VARIANTS)
 
     def test_claim_all_stuck_backs_after_10_taps(self):
         """Lỗi game: bấm Claim All mà nút không mất. Bấm 10 lần liên tiếp, lần 11 bấm Back
@@ -128,7 +128,7 @@ class EventFlow(unittest.TestCase):
             Step("06_gather_recruit_more.png", tap_at(*FIRST_GO)),
             *TO_CULTIVATE,
         ]
-        device = run_flow(self, event.run, SCREENS, flow, SETTINGS, variants=VARIANTS)
+        device = run_flow(self, run_event_tasks, SCREENS, flow, SETTINGS, variants=VARIANTS)
         self.assertIn("Event: Claim All still there after 10 taps, back", device.logs)
 
     def test_progress_unknown_does_not_use_gems(self):
@@ -140,7 +140,7 @@ class EventFlow(unittest.TestCase):
             *TO_QUICK_CULTIVATE,
             Step("11_quick_cultivate.png", end()),
         ]
-        device = run_flow(self, event.run, SCREENS, flow, SETTINGS, variants=VARIANTS)
+        device = run_flow(self, run_event_tasks, SCREENS, flow, SETTINGS, variants=VARIANTS)
         self.assertNotIn(KEY, device.daily_done)
 
     def test_cultivate_button_4_columns(self):
@@ -152,18 +152,18 @@ class EventFlow(unittest.TestCase):
             *TO_QUICK_CULTIVATE[2:],
             *x100_loop(300),
         ]
-        run_flow(self, event.run, SCREENS, flow, SETTINGS, variants=VARIANTS)
+        run_flow(self, run_event_tasks, SCREENS, flow, SETTINGS, variants=VARIANTS)
 
     def test_favorite_already_ticked(self):
         """Tim lọc đã tích sẵn: không bấm tim, kéo xuống cuối và mở tướng luôn."""
         flow = [*TO_GENERALS, *TO_QUICK_CULTIVATE, *x100_loop(300)]
-        run_flow(self, event.run, SCREENS, flow, SETTINGS, variants=VARIANTS)
+        run_flow(self, run_event_tasks, SCREENS, flow, SETTINGS, variants=VARIANTS)
 
     def test_started_on_gather_troops_continues_there(self):
         """Đang ở sẵn màn Gather Troops (tab Recruit More): không về thành, bấm Go luôn."""
         flow = [TO_RECRUIT_MORE[-1], Step("06_gather_recruit_more.png", tap_at(*FIRST_GO)),
                 *TO_QUICK_CULTIVATE, *x100_loop(300)]
-        device = run_flow(self, event.run, SCREENS, flow, SETTINGS, variants=VARIANTS)
+        device = run_flow(self, run_event_tasks, SCREENS, flow, SETTINGS, variants=VARIANTS)
         self.assertIn(KEY, device.daily_done)
 
     def test_started_mid_flow_goes_back_to_event(self):
@@ -176,7 +176,7 @@ class EventFlow(unittest.TestCase):
             *TO_QUICK_CULTIVATE,
             *x100_loop(300),
         ]
-        device = run_flow(self, event.run, SCREENS, flow, SETTINGS, variants=VARIANTS)
+        device = run_flow(self, run_event_tasks, SCREENS, flow, SETTINGS, variants=VARIANTS)
         self.assertIn("Cultivate Generals: on_generals_list before Go, back", device.logs)
         self.assertIn(KEY, device.daily_done)
 
@@ -187,18 +187,18 @@ class EventFlow(unittest.TestCase):
             *TO_RECRUIT_MORE[1:],
             Step("06_gather_recruit_more.png?no_go", end()),
         ]
-        device = run_flow(self, event.run, SCREENS, flow, SETTINGS, variants=VARIANTS)
+        device = run_flow(self, run_event_tasks, SCREENS, flow, SETTINGS, variants=VARIANTS)
         self.assertIn(KEY, device.daily_done)
 
     def test_already_done_skips(self):
         """Đã đánh dấu xong từ lần reset server gần nhất: không làm gì."""
         flow = [Step("03_main.png", end())]
-        run_flow(self, event.run, SCREENS, flow, SETTINGS, daily_done={KEY: "2026-10-01T08:00:00"})
+        run_flow(self, run_event_tasks, SCREENS, flow, SETTINGS, daily_done={KEY: "2026-10-01T08:00:00"})
 
     def test_disabled_skips(self):
         """Ô Cultivate Generals không tích: không làm gì."""
         flow = [Step("03_main.png", end())]
-        run_flow(self, event.run, SCREENS, flow, {KEY: {"enabled": False, "day": 1}})
+        run_flow(self, run_event_tasks, SCREENS, flow, {KEY: {"enabled": False, "day": 1}})
 
     def test_gather_troops_not_found(self):
         """Danh sách event không có Gather Troops: cuộn xuống 4 lần rồi BACK, bỏ nhiệm vụ."""
@@ -209,7 +209,7 @@ class EventFlow(unittest.TestCase):
                  *[swipe(50, 80, 50, 50) for _ in range(4)], back()),
             Step("03_main.png?claimed", end()),
         ]
-        run_flow(self, event.run, SCREENS, flow, SETTINGS, variants=VARIANTS)
+        run_flow(self, run_event_tasks, SCREENS, flow, SETTINGS, variants=VARIANTS)
 
 
 if __name__ == "__main__":

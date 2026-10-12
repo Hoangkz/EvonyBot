@@ -13,7 +13,7 @@ toàn bộ khi người dùng yêu cầu** (người dùng chốt), kể cả kh
 
 | Sửa ở | Chạy |
 | --- | --- |
-| `bot/worker/` (bot_worker, scheduler, tasks, server_clock, boss_board), `bot/daily_reset.py`, `main.py` | `tests.worker.test_scheduler tests.worker.test_boss_notifications tests.bubble.test_bubble tests.worker.test_server_clock` |
+| `bot/worker/` (bot_worker, tasks, priority, guards, server_clock, boss_board), `bot/daily_reset.py`, `main.py` | `tests.worker.test_scheduler tests.worker.test_boss_notifications tests.bubble.test_bubble tests.worker.test_server_clock` |
 | `bot/common/bubble.py` | `tests.bubble` |
 | `bot/common/wait_gone.py` | `tests.common.test_wait_gone` |
 | `bot/context/screen.py` | `tests.common.test_screen` |

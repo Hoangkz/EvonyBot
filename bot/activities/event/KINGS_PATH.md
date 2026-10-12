@@ -60,7 +60,7 @@ Nguyên tắc:
 
 ## 3. Bảng nhiệm vụ → cách làm
 
-"Tái dùng" = đã có logic trong [daily_activities/run.py](../daily_activities/run.py) (chỉ cần tách handler ra dùng chung, vì ở đó nó đi vào qua màn Daily Activities chứ không qua nút Go của event).
+"Tái dùng" = đã có logic trong [daily_activities/common.py](../daily_activities/common.py) (chỉ cần tách handler ra dùng chung, vì ở đó nó đi vào qua màn Daily Activities chứ không qua nút Go của event).
 
 | Ngày | Nhiệm vụ | Cách làm | Mức |
 | --- | --- | --- | --- |
@@ -105,7 +105,7 @@ Lưu DB: máy mới lưu mặc định; mỗi lần mở app ghi lại tab Event
 ## 5. Các bước làm
 
 1. **Chụp ảnh**: màn King's Path thật (vào event, từng Day, dòng Go/Claim, tiêu đề từng nhiệm vụ, mốc thưởng). Cắt template bằng skill `template-images` vào `Images/Event/KingsPath/`.
-2. **Tách handler dùng chung** từ `daily_activities/run.py` sang `bot/common/` (tax, heal, train, donate, wheel, black market, patrol, attack monster) — Daily Activities gọi lại y như cũ.
+2. **Tách handler dùng chung** từ `daily_activities/common.py` sang `bot/common/` (tax, heal, train, donate, wheel, black market, patrol, attack monster) — Daily Activities gọi lại y như cũ.
 3. **Khung Event**: mở event, duyệt Day/tab phụ, Claim, đọc tiêu đề → gọi handler, back về, blacklist dòng lỗi.
 4. **Nhiệm vụ Ngày 1–4** bằng handler tái dùng.
 5. **Nhiệm vụ mới**: Produce RSS, Alliance Help, Gather outside, Refine Equipment.

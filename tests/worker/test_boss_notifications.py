@@ -1,12 +1,15 @@
 import threading
 import unittest
 from types import SimpleNamespace
+from unittest import mock
 
 from bot.context import BotContext
-from bot.context.errors import BossAvailable, StopRequested, YieldToBoss
+from bot.context.errors import BossAvailable, StopRequested
+from bot.worker import bot_worker
 from bot.worker.boss_board import BossBoard
 from bot.worker.bot_worker import BOSS_IDLE, JOIN_BOSS, BotWorker
 from bot.worker.server_clock import ServerClock
+from bot.worker.tasks import Task
 
 
 class BossNotificationTests(unittest.TestCase):
@@ -54,56 +57,25 @@ class BossNotificationTests(unittest.TestCase):
 
         def run_activity(activity, settings):
             calls.append(activity)
-            if activity == JOIN_BOSS:
-                self.assertFalse(worker.ctx._boss_interrupt_enabled)
-                self.assertIsNone(worker.ctx._deadline)
-                if calls.count(JOIN_BOSS) == 3:
-                    worker._stop.set()   # đủ kịch bản: vòng lặp (sống tới khi Stop) dừng
-                return BOSS_IDLE
+            self.assertFalse(worker.ctx._boss_interrupt_enabled)
+            self.assertIsNone(worker.ctx._deadline)
+            if calls.count(JOIN_BOSS) == 3:
+                worker._stop.set()   # đủ kịch bản: vòng lặp (sống tới khi Stop) dừng
+            return BOSS_IDLE
+
+        def run_secondary(ctx, settings):
+            calls.append("secondary")
             if calls.count("secondary") == 1:
                 board.publish("a", "1", (10, 20))
-                worker.ctx.check()
+                ctx.check()
 
         worker._run_activity = run_activity
-        with self.assertRaises(StopRequested):
+        with mock.patch.object(bot_worker, "build_tasks",
+                               return_value=[Task("secondary", "G", 1, run=run_secondary)]),                 self.assertRaises(StopRequested):
             worker._run_tasks()
         self.assertEqual(calls, [JOIN_BOSS, "secondary", JOIN_BOSS, "secondary", JOIN_BOSS])
         self.assertFalse(worker.ctx._boss_interrupt_enabled)
         self.assertIsNone(worker.ctx._deadline)
-
-    def test_yield_to_boss_only_in_boss_window(self):
-        """yield_to_boss(): ngoài lượt activity phụ (không bật ngắt boss) không làm gì; trong lượt
-        thì nhường (YieldToBoss)."""
-        ctx = BotContext(SimpleNamespace(serial="b"), threading.Event(), None, lambda _: None)
-        ctx.yield_to_boss()
-        ctx._boss_interrupt_enabled = True
-        with self.assertRaises(YieldToBoss):
-            ctx.yield_to_boss()
-
-    def test_task_done_returns_to_boss_and_retries_activity(self):
-        """Activity phụ xong 1 nhiệm vụ (yield_to_boss) -> worker kiểm tra boss ngay, rồi gọi lại
-        activity đó (chưa bỏ khỏi danh sách chờ)."""
-        worker = BotWorker("b", [JOIN_BOSS, "secondary"], {
-            "Initialization": {"server": "1"}
-        }, server_clock=ServerClock("known"))
-        worker.ctx = BotContext(SimpleNamespace(serial="b"), worker._stop, None, worker.log)
-        calls = []
-
-        def run_activity(activity, settings):
-            calls.append(activity)
-            if activity == JOIN_BOSS:
-                if calls.count(JOIN_BOSS) == 3:
-                    worker._stop.set()
-                return BOSS_IDLE
-            if calls.count("secondary") == 1:
-                worker.ctx.yield_to_boss()
-
-        worker._run_activity = run_activity
-        with self.assertRaises(StopRequested):
-            worker._run_tasks()
-        self.assertEqual(calls, [JOIN_BOSS, "secondary", JOIN_BOSS, "secondary", JOIN_BOSS])
-        self.assertFalse(worker.ctx._boss_interrupt_enabled)
-
 
 if __name__ == "__main__":
     unittest.main()

@@ -11,8 +11,9 @@ from unittest import mock
 from bot.common import NotEnoughGems
 from bot.context import BotContext
 from bot.context.errors import BossAvailable, BubbleDue, StopRequested
-from bot.worker import bot_worker
-from bot.worker.bot_worker import BUBBLE_RENEW_BEFORE, BUBBLE_RETRY, BotWorker
+from bot.worker import bot_worker, guards
+from bot.worker.bot_worker import BotWorker
+from bot.worker.guards import BUBBLE_RENEW_BEFORE, BUBBLE_RETRY
 from bot.worker.server_clock import ServerClock
 
 
@@ -45,7 +46,7 @@ class FakeGame:
         return result
 
     def patch(self):
-        return mock.patch.object(bot_worker, "keep_bubble", self.keep)
+        return mock.patch.object(guards, "keep_bubble", self.keep)
 
 
 class BubbleFlowTests(unittest.TestCase):
@@ -53,7 +54,7 @@ class BubbleFlowTests(unittest.TestCase):
         worker = make_worker(bubble=False)
         game = FakeGame([10])
         with game.patch():
-            self.assertFalse(worker._ensure_bubble())
+            self.assertFalse(worker.guards.bubble.ensure())
         self.assertEqual(game.calls, [])
         self.assertIsNone(worker.ctx._bubble_due_at)
 
@@ -61,9 +62,9 @@ class BubbleFlowTests(unittest.TestCase):
         worker = make_worker()
         game = FakeGame([5 * 3600])
         with game.patch():
-            self.assertTrue(worker._ensure_bubble())
+            self.assertTrue(worker.guards.bubble.ensure())
             # Còn nhiều thời gian: activity sau không vào game xem lại.
-            self.assertFalse(worker._ensure_bubble())
+            self.assertFalse(worker.guards.bubble.ensure())
         self.assertEqual(game.calls, ["3d"])
         self.assertEqual(worker.found, [5 * 3600])
         self.assertAlmostEqual(worker.ctx._bubble_due_at - time.monotonic(),
@@ -73,8 +74,8 @@ class BubbleFlowTests(unittest.TestCase):
         worker = make_worker()
         game = FakeGame([1800])     # vẫn còn <= 2 tiếng: dùng không được
         with game.patch():
-            worker._ensure_bubble()
-            worker._ensure_bubble()
+            worker.guards.bubble.ensure()
+            worker.guards.bubble.ensure()
         self.assertEqual(game.calls, ["3d"])
         self.assertEqual(worker.found, [1800])
         self.assertAlmostEqual(worker.ctx._bubble_due_at - time.monotonic(), BUBBLE_RETRY, delta=2)
@@ -83,8 +84,8 @@ class BubbleFlowTests(unittest.TestCase):
         worker = make_worker()
         game = FakeGame([None])
         with game.patch():
-            worker._ensure_bubble()
-            worker._ensure_bubble()
+            worker.guards.bubble.ensure()
+            worker.guards.bubble.ensure()
         self.assertEqual(game.calls, ["3d"])
         self.assertEqual(worker.found, [])
         self.assertAlmostEqual(worker.ctx._bubble_due_at - time.monotonic(), BUBBLE_RETRY, delta=2)
@@ -95,11 +96,11 @@ class BubbleFlowTests(unittest.TestCase):
         worker.bubble_disabled.connect(disabled.append)
         game = FakeGame([NotEnoughGems()])
         with game.patch():
-            self.assertTrue(worker._ensure_bubble())
-            self.assertFalse(worker._ensure_bubble())   # đã bỏ tích: không vào game nữa
+            self.assertTrue(worker.guards.bubble.ensure())
+            self.assertFalse(worker.guards.bubble.ensure())   # đã bỏ tích: không vào game nữa
         self.assertEqual(game.calls, ["3d"])
         self.assertEqual(disabled, ["b"])
-        self.assertFalse(worker.bubble_enabled)
+        self.assertFalse(worker.guards.bubble.enabled)
         self.assertFalse(worker.settings["Initialization"]["bubble"])
         self.assertIsNone(worker.ctx._bubble_due_at)
 
@@ -107,7 +108,7 @@ class BubbleFlowTests(unittest.TestCase):
         worker = make_worker()
         game = FakeGame([StopRequested()])
         with game.patch(), self.assertRaises(StopRequested):
-            worker._ensure_bubble()
+            worker.guards.bubble.ensure()
 
     def test_bubble_due_interrupts_activity_then_reruns_it(self):
         worker = make_worker()
@@ -118,7 +119,7 @@ class BubbleFlowTests(unittest.TestCase):
             runs.append(ctx._bubble_due_at is not None)
             if len(runs) == 1:
                 # Giả lập đã tới lúc bubble còn 2 tiếng giữa activity.
-                worker._bubble_next_check = ctx._bubble_due_at = time.monotonic() - 1
+                worker.guards.bubble.next_check = ctx._bubble_due_at = time.monotonic() - 1
                 ctx.check()
             return "done"
 
@@ -139,7 +140,7 @@ class BubbleFlowTests(unittest.TestCase):
         worker = make_worker(bubble_until=until)
         game = FakeGame([])
         with game.patch():
-            self.assertFalse(worker._ensure_bubble())
+            self.assertFalse(worker.guards.bubble.ensure())
         self.assertEqual(game.calls, [])
         self.assertAlmostEqual(worker.ctx._bubble_due_at - time.monotonic(),
                                5 * 3600 - BUBBLE_RENEW_BEFORE, delta=5)
@@ -149,7 +150,7 @@ class BubbleFlowTests(unittest.TestCase):
         worker = make_worker(bubble_until=until)
         game = FakeGame([24 * 3600])
         with game.patch():
-            self.assertTrue(worker._ensure_bubble())
+            self.assertTrue(worker.guards.bubble.ensure())
         self.assertEqual(game.calls, ["3d"])
 
     def test_database_keeps_bubble_until_and_migrates_old_db(self):

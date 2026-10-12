@@ -42,6 +42,7 @@ from ...common import click_images, delay, exit_images, find_first, go_home, ima
 from ...context.templates import TEMPLATE_DIR
 from ...ocr import read_progress
 from ...ocr.read_progress import run_two_lines as read_progress_two_lines
+from ..result import TaskResult, report
 from . import constants
 from .constants import (
     BACK,
@@ -128,75 +129,28 @@ class EventState:
     claim_all_taps: int = 0    # số lần bấm Claim All liên tiếp (xem CLAIM_ALL_MAX_TAPS)
 
 
-# ---- Nhiệm vụ đã đạt mục tiêu ------------------------------------------------------------
-# Đạt mục tiêu (target reached / hết nút Go / làm đủ số cần) -> lưu "<key>_complete" trong
-# daily_done: không hết hạn ở lần reset server, event/run.py bỏ qua nhiệm vụ luôn (hàm dọn dẹp
-# khi event hết hạn sẽ xoá — TODO). Chỉ hết lượt / hết tài nguyên trong ngày thì vẫn
-# mark_daily_done(key) như cũ (mai kiểm tra tiếp).
-#
-# Hai kiểu xong:
-# - mark_complete: hết nút Go (đã làm tới mốc cao nhất của nhiệm vụ) -> "<key>_complete", xong hẳn
-#   dù người dùng chọn mục tiêu nào.
-# - mark_target_reached: đạt số lượng người dùng chọn (ô chọn: settings Event {key: {"value": N}})
-#   mà vẫn còn Go -> "<key>_complete_<N>" và "<key>_reached_<N>" (đạt N hôm nay). Người dùng tăng
-#   mục tiêu (N -> M > N) thì không còn key ứng với M -> nhiệm vụ chạy lại (is_complete /
-#   is_done_today). Ô tích (không có số): như mark_complete.
-def task_target(bot, key: str) -> int | None:
-    """Mục tiêu người dùng chọn cho nhiệm vụ `key` (tab Event, "value"), hoặc None (ô tích)."""
-    task = (getattr(bot, "settings", None) or {}).get("Event", {}).get(key)
-    value = task.get("value") if isinstance(task, dict) else None
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return None
-
-
-def complete_key(key: str, target: int | None = None) -> str:
-    return f"{key}_complete" if target is None else f"{key}_complete_{target}"
-
-
-def reached_key(key: str, target: int) -> str:
-    return f"{key}_reached_{target}"
-
-
-def is_complete(bot, key: str) -> bool:
-    """Xong cả vòng event: hết Go (xong hẳn), hoặc đã đạt mục tiêu HIỆN TẠI của nhiệm vụ."""
-    target = task_target(bot, key)
-    return bool(bot.done_at(complete_key(key))
-                or (target is not None and bot.done_at(complete_key(key, target))))
+# ---- Báo kết quả nhiệm vụ cho worker ------------------------------------------------------
+# Nhiệm vụ BÁO kết quả giữa chừng (bot/activities/result.py); chỗ chạy nhiệm vụ (event/run.py event_job) lưu vào daily_done ngay; worker chỉ quyết định
+# bỏ qua nhiệm vụ đã xong / đã đạt mục tiêu / Day khoá, và đọc lại mục tiêu người dùng chọn.
+# - mark_done: hết lượt / hết tài nguyên trong ngày (mai kiểm tra tiếp).
+# - mark_complete: hết nút Go (đã làm tới mốc cao nhất của nhiệm vụ) -> xong hẳn dù người dùng chọn mục tiêu nào.
+# - mark_target_reached: đạt số lượng người dùng chọn (ô chọn: settings Event {key: {"value": N}}) mà vẫn còn Go;
+#   người dùng tăng mục tiêu thì worker cho chạy lại. Ô tích (không có số): như mark_complete.
+# - mark_locked: Day / cấp lính còn khoá, chưa thể làm (worker bỏ qua tới lần reset server).
+def mark_done(bot, key: str):
+    report(bot, TaskResult(done=True, key=key))
 
 
 def mark_complete(bot, key: str):
-    """Hết nút Go: xong hôm nay (đếm cho claim.py) và xong hẳn cả vòng event (mọi mục tiêu)."""
-    bot.mark_daily_done(key)
-    bot.mark_daily_done(complete_key(key))
+    report(bot, TaskResult(done=True, complete=True, key=key))
 
 
 def mark_target_reached(bot, key: str):
-    """Đạt số lượng người dùng chọn (vẫn còn Go): xong hôm nay và xong vòng event VỚI mục tiêu
-    này; tăng mục tiêu thì chưa xong. Ô tích (không có số): như mark_complete."""
-    target = task_target(bot, key)
-    if target is None:
-        mark_complete(bot, key)
-        return
-    bot.mark_daily_done(key)
-    bot.mark_daily_done(complete_key(key, target))
-    bot.mark_daily_done(reached_key(key, target))
+    report(bot, TaskResult(done=True, target_reached=True, key=key))
 
 
-def is_done_today(bot, key: str) -> bool:
-    """Nhiệm vụ đã xong hôm nay (daily_done `key`), TRỪ khi hôm nay xong là vì đạt một mục tiêu nhỏ
-    hơn mục tiêu hiện tại (người dùng vừa tăng lên) -> chưa xong, chạy lại. Xong vì hết lượt / hết
-    tài nguyên trong ngày (không có "<key>_reached_*" hôm nay) vẫn tính là xong."""
-    if not bot.is_daily_done(key):
-        return False
-    target = task_target(bot, key)
-    if target is None or bot.done_at(complete_key(key)):
-        return True
-    prefix = f"{key}_reached_"
-    reached = [int(k[len(prefix):]) for k in bot.daily_keys()
-               if k.startswith(prefix) and k[len(prefix):].isdigit() and bot.is_daily_done(k)]
-    return not reached or max(reached) >= target
+def mark_locked(bot, key: str):
+    report(bot, TaskResult(locked=True, key=key))
 
 
 def run_task(bot, state: EventState, name: str, event_icon: str, handle=None, *,

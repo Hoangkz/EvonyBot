@@ -6,10 +6,12 @@ Battlefield): the shop, then Open Gift Box and/or the Black Market when
 from ...common import delay
 from .. import open_gift_box
 from .. import black_market
+from ..result import save_errors
 from .shop import Shop
 # TODO: cần làm lại.
 
 
+@save_errors("battlefield_shop")   # lỗi thì lưu `battlefield_shop_error` vào DB
 def run(bot, settings: dict):
     """`bot` is the device's BotContext; `settings` is the "Battlefield Shop" tab's config."""
     Shop(bot, _to_int(settings.get("quantity_to_refresh"), -1)).run()

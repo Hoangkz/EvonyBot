@@ -15,7 +15,11 @@ import cv2
 
 from ...common import click_images, delay, exit_images, find_first, go_home
 from ...context.templates import TEMPLATE_DIR
+from .. import gift_claims
+from ..result import NOT_DONE, TaskResult, clear, done, save_errors, take
 from .constants import (
+    GENERAL,
+    REWARDS,
     ACTIVITY_LIST,
     ACTIVITY_TAB,
     BACK,
@@ -81,7 +85,7 @@ MONSTER_KILLING = "Monster Killing"   # nhãn nhiệm vụ đánh quái (run_tas
 
 @dataclass(frozen=True)
 class Task:
-    label: str          # tên nhiệm vụ (ô tích ở tab Daily Activities, key daily_done)
+    label: str          # tên nhiệm vụ (ô tích ở tab Daily Activities; worker dùng làm key "xong hôm nay")
     folder: str         # thư mục ảnh dưới DailyActivites/
     done: tuple[str, ...]                    # ảnh "đã xong"
     actions: tuple[tuple[str, str], ...]     # (ảnh, action) theo thứ tự ưu tiên
@@ -90,8 +94,10 @@ class Task:
     key: str = ""   # key nhiệm vụ trong bot/worker/priority.py (VD "daily_offering")
 
 
-def run_task(bot, task: Task) -> bool:
-    """True khi thấy ảnh Finish của task (đã hoàn thành trong ngày)."""
+def run_task(bot, task: Task) -> TaskResult:
+    """Vòng lặp chung của một nhiệm vụ Daily. TaskResult(done=True) khi thấy ảnh Finish của task (đã hoàn thành
+    trong ngày) hoặc handler đã báo xong (result.done); handler dừng mà chưa xong -> NOT_DONE."""
+    clear(bot)
     targets = task_targets(task)
     last_scroll_pos = None
     scroll_stalls = 0
@@ -104,7 +110,7 @@ def run_task(bot, task: Task) -> bool:
         action, pos = find_first(bot, screen, active_targets, top_left=ROW_ANCHORS,
                                  position_cache=image_positions(bot), fallback_full=True)
         if action == DONE:
-            return True
+            return take(bot) or TaskResult(done=True)
         if action == BACK:
             bot.back(delay=1)
         elif action == TAP:
@@ -128,7 +134,7 @@ def run_task(bot, task: Task) -> bool:
         elif action == OPEN:
             row_state = open_task_row(bot, screen, pos, task.after_open_tap, task.folder)
             if row_state == ROW_COMPLETE:
-                return True
+                return TaskResult(done=True)
         elif action in (OPEN_MONSTER_FIRST, OPEN_MONSTER_SECOND):
             if action == OPEN_MONSTER_SECOND:
                 # Supports resuming after the first 2-kill task was already
@@ -146,15 +152,15 @@ def run_task(bot, task: Task) -> bool:
                     bot._daily_monster_deferred = True
                     bot.log("Daily Activities: Monster Killing deferred after 2 attacks")
                     delay(bot, 2)
-                    return False
-                return True
+                    return NOT_DONE
+                return TaskResult(done=True)
         elif action == VERIFY_COLLECTING:
             # ClaimCollecting is the real Resource Collecting task. The
             # Research technologies row is only a shortcut to Collection.
             row_state = open_task_row(bot, screen, pos, None, task.folder,
                                       open_when_available=False)
             if row_state == ROW_COMPLETE:
-                return True
+                return TaskResult(done=True)
             if row_state == ROW_OPENED:
                 bot.log("Daily Activities: Resource Collecting still has Go")
                 scroll_to_top(bot)
@@ -170,7 +176,7 @@ def run_task(bot, task: Task) -> bool:
             # opens Evony's Quit dialog and hides every Daily control.
             delay(bot, 1)
         elif task.handler(bot, action, pos, screen):
-            return False
+            return take(bot) or NOT_DONE
 
 
 @lru_cache(maxsize=None)
@@ -651,24 +657,18 @@ def _same_list(before, after) -> bool:
     return float(cv2.matchTemplate(a, b, cv2.TM_CCOEFF_NORMED).max()) >= LIST_END_SAME
 
 
-# ---- Đánh dấu xong hôm nay -------------------------------------------------------------------
-def reached_key(task: Task, target: int) -> str:
-    """Key daily_done: hôm nay nhiệm vụ đã xong với mục tiêu `target` (0 = không còn gì để làm)."""
-    return f"{task.key}_reached_{target}"
-
-
+# ---- Báo xong hôm nay (chỗ chạy việc, common.py daily_job, lưu vào DB ngay) --------------------------------------
 def mark_task_done(bot, task: Task, target: int = 0):
-    """Xong hôm nay (daily_done nhãn nhiệm vụ) kèm mục tiêu `target`."""
-    bot.mark_daily_done(task.label)
-    bot.mark_daily_done(reached_key(task, target))
+    """Luồng bên trong báo nhiệm vụ đã xong hôm nay, kèm mục tiêu `target` (result.done). Không ghi gì vào DB."""
+    return done(bot, target, label=task.label, key=task.key)
 
 
 def open_task_or_finish(bot, task: Task) -> bool:
     """open_task cho `task`. True khi đã bấm Go (làm tiếp phần sau Go).
-    - Dòng không còn Go mà thấy rõ Claim / tích V (TASK_DONE) -> đánh dấu xong hôm nay, mục tiêu 0.
+    - Dòng không còn Go mà thấy rõ Claim / tích V (TASK_DONE) -> báo xong hôm nay, mục tiêu 0.
     - Lướt hết (kể cả LIST_RETRIES lần thử lại) không thấy (TASK_NOT_FOUND) -> bỏ qua lượt này, KHÔNG
-      đánh dấu (có thể cuộn trượt; lần chạy sau tìm lại).
-    - Không nhận ra nút / thiếu ảnh thẻ (TASK_UNKNOWN), không mở được bảng Activity -> không đánh dấu."""
+      báo xong (có thể cuộn trượt; lần chạy sau tìm lại).
+    - Không nhận ra nút / thiếu ảnh thẻ (TASK_UNKNOWN), không mở được bảng Activity -> không báo xong."""
     result = open_task(bot, task_titles(task), task_cards(task), done_cards=task_done_cards(task))
     if result == TASK_OPENED:
         return True
@@ -678,3 +678,149 @@ def open_task_or_finish(bot, task: Task) -> bool:
     elif result == TASK_NOT_FOUND:
         bot.record(f"Daily Activities: {task.label} not found after {LIST_RETRIES + 1} tries, skipped")
     return False
+
+
+# ---- Một lần thử của việc Daily theo giờ (Alliance Donation / Help) ------------------------------------------------
+# Khung chung: 1. kiểm tra trước: mở danh sách Activity, xem dòng / thẻ của việc (open_task tap_go=False, không bấm Go); xong
+# (hết Go / Claim / tích V / thẻ Completed) thì dừng, trong ngày không đi kiểm tra lại; 2. chưa xong thì làm việc thật
+# (`act(bot)`: donate lượt free, Help All); không làm được gì thì chưa xong (lần sau thử lại); 3. có làm thì kiểm tra lại.
+# Khi nào thử và lưu kết quả vào DB: hourly_job bên dưới.
+def try_task(bot, task: Task, act) -> TaskResult:
+    """Một lần thử việc theo giờ `task`."""
+    if check_done(bot, task):
+        return TaskResult(done=True, reached=0)
+    if not act(bot):
+        return NOT_DONE
+    if check_done(bot, task):
+        return TaskResult(done=True, reached=0)
+    bot.log(f"{task.label}: Activity row not done yet, try later")
+    return NOT_DONE
+
+
+def check_done(bot, task: Task) -> bool:
+    """Mở danh sách Activity xem dòng / thẻ của `task` (không bấm Go), rồi Back đóng bảng. True nếu dòng đã xong
+    (hết Go)."""
+    result = open_task(bot, task_titles(task), task_cards(task), done_cards=task_done_cards(task),
+                       tap_go=False)
+    bot.back(delay=1)   # đóng bảng Activity
+    if result != TASK_DONE:
+        bot.log(f"{task.label}: Activity row not done ({result})")
+        return False
+    bot.record(f"{task.label}: Activity row done, done for today")
+    return True
+
+
+# =============================================================================================
+# Luật của các việc Daily cho bảng bot/worker/priority.py: dict {run, enabled, done, every}. Nhiệm vụ TỰ LƯU kết quả vào DB
+# (daily_done) ngay chỗ chạy; worker chỉ kiểm tra `done` (đọc DB) rồi chạy hoặc bỏ qua.
+# =============================================================================================
+
+def hourly_hours(settings: dict, consts) -> int:
+    """Số giờ giữa hai lần làm một việc theo giờ (ô chọn ở tab UI, luôn lưu khoá; thiếu khoá -> 0 = không làm, mặc định 4h
+    do UI đặt). Cấu hình cũ (ô tích): True -> INTERVAL_DEFAULT, False -> 0."""
+    value = settings.get(consts.INTERVAL_KEY, 0)
+    if isinstance(value, bool):
+        return consts.INTERVAL_DEFAULT if value else 0
+    try:
+        return max(0, int(value))
+    except (TypeError, ValueError):
+        return 0
+
+
+def selected_labels(settings: dict) -> set[str]:
+    """Nhãn các việc Daily đã tích: ô tích (giá trị bool True) của tab Daily Activities, trừ mục General. Việc theo giờ là ô chọn
+    giờ (số), không phải ô tích."""
+    return {name for name, value in settings.items() if name != GENERAL and isinstance(value, bool) and value}
+
+
+def record_result(ctx, key: str, label: str, result: TaskResult):
+    """Lưu kết quả vào DB: xong thì "xong hôm nay" (nhãn) và mục tiêu đã đạt (`<key>_reached_<mục tiêu>`)."""
+    if not result.done:
+        return
+    ctx.mark_daily_done(label)
+    if result.reached is not None:
+        ctx.mark_daily_done(f"{key}_reached_{result.reached}")
+
+
+def _reached(ctx, prefix: str) -> list[int]:
+    """Các mốc N đã lưu hôm nay dưới dạng key `<prefix><N>` trong daily_done (VD "daily_offering_reached_6")."""
+    return [int(k[len(prefix):]) for k in ctx.daily_keys()
+            if k.startswith(prefix) and k[len(prefix):].isdigit() and ctx.is_daily_done(k)]
+
+
+def _reached_enough(ctx, prefix: str, target: int) -> bool:
+    """Đã đạt mục tiêu `target`: chưa lưu mốc nào (xong theo cách khác) hoặc mốc 0 (không còn gì để làm) hoặc mốc lớn nhất >=
+    mục tiêu. `target` <= 0 thì luôn đủ."""
+    if target <= 0:
+        return True
+    marks = _reached(ctx, prefix)
+    return not marks or 0 in marks or max(marks) >= target
+
+
+def _int(value) -> int:
+    """Số nguyên >= 0 từ giá trị ô cấu hình (sai kiểu / trống -> 0)."""
+    try:
+        return max(0, int(value))
+    except (TypeError, ValueError):
+        return 0
+
+
+def daily_job(task: Task, target: str | None = None) -> dict:
+    """Một việc Daily. `target`: tên ô cấu hình của tab chứa mục tiêu (VD "Offer Gems") — xong khi mục tiêu đã đạt lưu trong DB >=
+    số ở ô đó, nên tăng số ở tab là tự thành chưa xong, giảm lại là xong. Việc làm trong game không cần biết điều này."""
+    @save_errors(task.key)   # lỗi thì lưu `<key>_error` vào DB
+    def run(ctx, settings):
+        ctx.log(f"Daily Activities: {task.label}")
+        record_result(ctx, task.key, task.label, run_task(ctx, task))   # xong thì lưu "xong hôm nay" (nhãn) vào DB
+
+    def done(ctx, settings):
+        return ctx.is_daily_done(task.label) and _reached_enough(
+            ctx, f"{task.key}_reached_", _int(settings.get(target)) if target else 0)
+
+    return {"run": run, "enabled": lambda settings: settings.get(task.label) is True, "done": done}
+
+
+def hourly_job(task: Task, attempt, consts) -> dict:
+    """Việc Daily theo giờ (Alliance Donation / Help): `attempt(ctx)` là một lần thử; `consts` là module constants của việc
+    (INTERVAL_KEY / INTERVAL_DEFAULT: ô chọn giờ ở tab UI; TRIED_KEY: key lưu giờ vừa làm)."""
+
+    @save_errors(task.key)   # lỗi thì lưu `<key>_error` vào DB
+    def run(ctx, settings):
+        ctx.log(f"Daily Activities: {task.label} (every {hourly_hours(settings, consts)}h)")
+        record_result(ctx, task.key, task.label, attempt(ctx))   # xong thì lưu "xong hôm nay" vào DB
+        # Lưu giờ vừa làm vào DB (`<key>_tried`): worker chỉ so giờ này để biết tới giờ làm lại chưa. Bị ngắt / lỗi giữa
+        # chừng thì tới đây không chạy tới, chưa lưu giờ: lượt sau làm tiếp.
+        ctx.mark_daily_done(consts.TRIED_KEY)
+
+    hours = lambda settings: hourly_hours(settings, consts)
+    return {"run": run, "enabled": lambda settings: hours(settings) > 0,
+            "done": lambda ctx, settings: ctx.is_daily_done(task.label), "every": hours}
+
+
+def daily_selected_done(ctx, settings: dict) -> bool:
+    """Mọi việc Daily đã tích (trừ việc theo giờ) đã xong hôm nay — đọc từ DB."""
+    return all(ctx.is_daily_done(label) for label in selected_labels(settings))
+
+
+@save_errors("daily_rewards")
+def _run_rewards(ctx, settings):
+    """Nhận thưởng Activity (dòng nhiệm vụ + rương điểm); chỉ lưu "đã nhận" khi mọi việc Daily đã tích đều xong."""
+    collect_activity_rewards(ctx)
+    if daily_selected_done(ctx, settings):
+        ctx.mark_daily_done(REWARDS)
+
+
+@save_errors("daily_gift_claims")
+def _run_gifts(ctx, settings):
+    """Nhận quà cuối ngày: chỉ khi mọi việc Daily đã tích và thưởng Activity đã xong (chưa thì worker xếp xuống cuối)."""
+    if daily_selected_done(ctx, settings) and ctx.is_daily_done(REWARDS):
+        gift_claims.run(ctx)
+
+
+def _any_selected(settings: dict) -> bool:
+    return bool(selected_labels(settings))
+
+
+REWARDS_JOB = {"run": _run_rewards, "enabled": _any_selected, "done": lambda ctx, settings: ctx.is_daily_done(REWARDS)}
+GIFTS_JOB = {"run": _run_gifts, "enabled": _any_selected,
+             "done": lambda ctx, settings: ctx.is_daily_done(gift_claims.KEY)}

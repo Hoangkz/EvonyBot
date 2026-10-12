@@ -13,9 +13,10 @@ nên không cần ảnh popup thẻ.
 import unittest
 from pathlib import Path
 
-from bot.activities.daily_activities.alliance_help.constants import HELP_ALL, HELP_ROW, LABEL, TRIED_KEY
+from bot.activities.daily_activities.alliance_help.constants import HELP_ALL, HELP_ROW, KEY, LABEL
 from bot.activities.daily_activities.alliance_help.run import help_all
 from bot.activities.daily_activities.constants import MAIN_MORE, OLD_MENU_ACTIVITY
+from bot.activities.daily_activities.common import record_result
 from tests.daily_activities import SCROLL
 from tests.flow import Step, back, end, run_flow, tap, tap_at
 
@@ -35,7 +36,9 @@ TO_GRID = [
 
 
 def _help_all(bot, _settings):
-    return help_all(bot)
+    result = help_all(bot)
+    record_result(bot, KEY, LABEL, result)   # như worker: xong thì lưu "xong hôm nay"
+    return bool(result)
 
 
 class AllianceHelpFlow(unittest.TestCase):
@@ -52,7 +55,6 @@ class AllianceHelpFlow(unittest.TestCase):
         ]
         device = run_flow(self, _help_all, SCREENS, flow, {})
         self.assertIn(LABEL, device.daily_done)
-        self.assertIn(TRIED_KEY, device.daily_done)
 
     def test_no_records_skips_without_saving(self):
         """Không ai cần giúp ("No records" trước khi bấm): Back, dừng — không kiểm tra Activity, không lưu gì."""
@@ -77,7 +79,6 @@ class AllianceHelpFlow(unittest.TestCase):
         ]
         device = run_flow(self, _help_all, SCREENS, flow, {})
         self.assertNotIn(LABEL, device.daily_done)
-        self.assertIn(TRIED_KEY, device.daily_done)
 
 
 if __name__ == "__main__":

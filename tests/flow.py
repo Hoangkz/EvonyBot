@@ -19,7 +19,10 @@ import numpy as np
 from PIL import Image
 
 from bot.activities.event import city_building, constants as event_constants
+from bot.activities.result import take_all
 from bot.context import TEMPLATE_DIR, BotContext, StopRequested, TimedOut
+from bot.activities.daily_activities.common import record_result
+from bot.activities.event.run import record_outcome
 
 TAP_THRESHOLD = 0.8     # điểm khớp tối thiểu để coi template có trên ảnh
 STUCK_SECONDS = 120     # giây giả tối đa cho mỗi bước trước khi coi là kẹt
@@ -283,6 +286,15 @@ class FlowContext(BotContext):
 
 
 # ---- chạy ------------------------------------------------------------
+def _record_outcome(ctx):
+    """Như worker: kết quả nhiệm vụ báo giữa chừng (bot.activities.result) -> ghi vào daily_done."""
+    for outcome in take_all(ctx):
+        if outcome.label:   # Daily Activities / Crazy Eggs / 3-Day Event
+            record_result(ctx, outcome.key, outcome.label, outcome)
+        elif outcome.key:   # Event: xong / hết Go / đạt mục tiêu / Day khoá
+            record_outcome(ctx, ctx.settings.get("Event", {}), outcome)
+
+
 def run_flow(testcase, run, screens_dir: Path, flow: list[Step], settings: dict, *,
              ctx_settings: dict | None = None, daily_done: dict | None = None,
              setup=None, variants: dict | None = None) -> FlowDevice:
@@ -341,6 +353,7 @@ def run_flow(testcase, run, screens_dir: Path, flow: list[Step], settings: dict,
         except StopRequested:
             if not device.finished:
                 testcase.fail(f"StopRequested ngoài dự kiến ở {device.where()}")
+            _record_outcome(ctx)
             return device
         except TimedOut:
             testcase.fail(f"kẹt ở {device.where()}: đã làm {device.done}/{len(device.step.actions)} "
@@ -348,6 +361,7 @@ def run_flow(testcase, run, screens_dir: Path, flow: list[Step], settings: dict,
         except FlowError as e:
             testcase.fail(str(e))
 
+    _record_outcome(ctx)
     step = device.step
     if step.end is None or device.done < len(step.actions):
         testcase.fail(f"activity return sớm ({result!r}) ở {device.where()}")

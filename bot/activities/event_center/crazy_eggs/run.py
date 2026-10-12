@@ -11,21 +11,27 @@ Hết đập thường (không còn quả nào có búa, hoặc hết búa: bấ
 have enough Hammers" -> Cancel; hoặc bấm mà số quả có búa không giảm) thì dùng búa vàng mỗi ngày 1 lần cho quả 2 nếu quả 2 đang chờ: bấm quả 2 -> Confirm,
 lưu daily_done LUCKY_KEY. Rồi kết thúc.
 
-Đã đánh dấu xong hôm nay (DONE_KEY) thì return ngay, không vào game. Đánh dấu DONE_KEY (lưu DB)
-rồi kết thúc khi không thấy tab Activities / icon Crazy Eggs sau ATTEMPTS lần thử và
-AFTER_RESTART_ATTEMPTS lần thử sau khi tắt / mở lại game (run_task_with_retry).
+Trả TaskResult(done=True) khi cả 4 quả đã vỡ (4 nhãn "Activated"), hoặc rồi kết thúc khi không thấy tab Activities / icon Crazy Eggs sau ATTEMPTS lần thử và
+AFTER_RESTART_ATTEMPTS lần thử sau khi tắt / mở lại game (run_task_with_retry) cũng là done=True.
+Đã xong hôm nay chưa, hẹn đập lại sau mấy giờ: nhiệm vụ tự lưu vào DB, worker (bot/worker/tasks.py) chỉ kiểm tra đã xong chưa.
 
 Quả đã nhận hết vật phẩm thì vỡ: animation (cả màn tối, tiêu đề mờ -> bấm (50 %, 95 %) để bỏ
 qua), rồi popup thưởng thêm "Congratulations on activating the egg!" -> BACK; nhãn thành
 "Activated": không còn búa nên đập thường tự bỏ qua.
 """
+from ...result import NOT_DONE, TaskResult, clear, done, save_errors, take
 from ..common import HANDLED, ICON_NOT_FOUND, TAB_NOT_FOUND, run_task_with_retry
 from ..constants import ACTIVITIES
 from .constants import (
+    ACTIVATED,
+    ACTIVATED_THRESHOLD,
     CONGRATS_POPUPS,
     DIM_MAX_TAPS,
     DONE,
     DONE_KEY,
+    INTERVAL_KEY,
+    TRIED_KEY,
+    EGG_COUNT,
     EGG_TAP_DELAY,
     COLUMN_SPLIT,
     HAMMER,
@@ -53,11 +59,10 @@ from .constants import (
 )
 
 
-def run(bot, settings: dict):
-    """`bot` is the device's BotContext; `settings` chưa dùng (để thống nhất với activity)."""
-    if bot.is_daily_done(DONE_KEY):
-        bot.log("Crazy Eggs: done today, skip")
-        return
+def run(bot, settings: dict) -> TaskResult:
+    """`bot` is the device's BotContext; `settings` chưa dùng (để thống nhất với activity). done=True khi đủ 4 quả vỡ
+    (hoặc không thấy event)."""
+    clear(bot)
     # before_tap: số quả có búa ngay trước lần bấm gần nhất; lucky_tapped: đã bấm quả 2 để
     # dùng búa vàng trong lượt này; no_hammers: đã gặp hộp thoại "not enough Hammers".
     state = {"before_tap": None, "lucky_tapped": False, "no_hammers": False}
@@ -72,7 +77,8 @@ def run(bot, settings: dict):
                                  icon_threshold=ICON_THRESHOLD)
     if result in (TAB_NOT_FOUND, ICON_NOT_FOUND):
         bot.record(f"Crazy Eggs: {result} even after restarting game, mark done today")
-        bot.mark_daily_done(DONE_KEY)
+        done(bot, label=DONE_KEY)
+    return take(bot) or NOT_DONE
 
 
 def _crack(bot, state: dict) -> bool:
@@ -123,6 +129,9 @@ def _crack(bot, state: dict) -> bool:
             continue
         bot.record("Crazy Eggs: out of hammers" if hammers else "Crazy Eggs: no egg left to crack")
         if not _use_lucky(bot, screen, state):
+            if len(bot.find_all(ACTIVATED, threshold=ACTIVATED_THRESHOLD, screen=screen)) >= EGG_COUNT:
+                bot.record("Crazy Eggs: all eggs activated, done today")
+                done(bot, label=DONE_KEY)
             return True
 
 
@@ -208,3 +217,33 @@ def _ordered(bot, screen) -> list[tuple[int, tuple[int, int]]]:
     hits = bot.find_all(HAMMER, threshold=HAMMER_THRESHOLD, screen=screen)
     pairs = [(_egg_number(screen, pos), pos) for pos in hits]
     return sorted(pairs, key=lambda pair: ORDER.index(pair[0]))
+
+
+# ---- Luật của việc (bảng bot/worker/priority.py: "run": JOB) -------------------------------------------------------
+# Việc theo giờ (ô chọn 0 / 1h .. 4h ở mục General của tab Daily Activities): đập một lần rồi worker lưu giờ đã đập vào DB, mỗi
+# vòng lặp chỉ so giờ đó. Đủ 4 quả vỡ thì lưu DONE_KEY (xong hôm nay).
+GENERAL = "General"   # mục General của tab Daily Activities
+
+
+def crazy_eggs_hours(settings: dict) -> int:
+    """Số giờ giữa hai lần đập trứng (ô chọn ở mục General của tab UI; thiếu khoá / sai kiểu -> 0 = không làm)."""
+    general = settings.get(GENERAL, {})
+    if not isinstance(general, dict):
+        return 0
+    try:
+        return max(0, int(general.get(INTERVAL_KEY, 0)))
+    except (TypeError, ValueError):
+        return 0
+
+
+@save_errors("crazy_eggs")   # lỗi thì lưu `crazy_eggs_error` vào DB
+def _run_crazy_eggs(ctx, settings: dict):
+    ctx.log(f"Daily General: Crazy Eggs (every {crazy_eggs_hours(settings)}h)")
+    if run(ctx, {}).done:
+        ctx.mark_daily_done(DONE_KEY)   # đủ 4 quả vỡ: lưu "xong hôm nay" vào DB
+    # Lưu giờ vừa đập vào DB: worker chỉ so giờ này để biết tới giờ đập lại chưa. Bị ngắt / lỗi giữa chừng thì chưa lưu giờ.
+    ctx.mark_daily_done(TRIED_KEY)
+
+
+JOB = {"run": _run_crazy_eggs, "enabled": lambda settings: crazy_eggs_hours(settings) > 0,
+       "done": lambda ctx, settings: ctx.is_daily_done(DONE_KEY), "every": crazy_eggs_hours}
