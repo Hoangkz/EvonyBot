@@ -16,10 +16,14 @@ quà dùng một task chung. DB chỉ lưu `gift_claims` sau khi cả khu 1 và 
 4. Bấm một dấu đỏ chưa xét và nhận diện màn vừa mở bằng tiêu đề cố định.
 5. Nếu là màn cha có carousel hoặc danh sách, duyệt toàn bộ dấu đỏ trong màn cha.
 6. Trong mỗi màn con, xử lý theo thứ tự:
-   - bấm nút điều hướng cố định như Sprint Package, Stockpile hoặc Scores;
+   - bấm nút điều hướng/phần thưởng cố định như Rewards, Star Trail Gift,
+     Sprint Package, Stockpile hoặc Scores;
    - tìm các nút nhận thật: Claim, Free, Claim Free, Claimable, Daily Free,
      Claim All;
-   - nếu không có nút cố định, dò một điểm lấp lánh trong vùng nội dung an toàn;
+   - nếu thấy nút X của popup/mục không nhận được thì dùng Back để thoát, không
+     bấm trực tiếp vào X;
+   - dò điểm lấp lánh trong vùng nội dung an toàn tối đa 4 lần, kể cả khi một
+     frame không thấy sáng; sau 4 lần không có quà xác minh thì kết thúc mục;
    - không bấm vùng mua hàng, thanh tài nguyên hoặc phần thưởng trả phí.
 7. Xác minh từng lần nhận bằng một trong các điều kiện:
    - xuất hiện Congratulations;
@@ -30,6 +34,8 @@ quà dùng một task chung. DB chỉ lưu `gift_claims` sau khi cả khu 1 và 
    dấu đỏ, ngoại trừ Facebook hoặc màn được quy định bỏ qua.
    Trên carousel, mỗi dấu đỏ chỉ thuộc tab có tâm gần nó nhất; dấu của tab bên
    cạnh không được dùng để kết luận tab vừa xử lý vẫn còn đỏ.
+   Mục đã được mở, kiểm tra nút cố định và sparkle đủ 4 lần được coi là đã xét;
+   badge trang trí hoặc badge không tự tắt không được làm luồng lặp vô hạn.
 10. Hết 120 giây thì dừng tại điểm kiểm tra gần nhất, nhường Boss và tiếp tục
     các mục chưa xét ở lát sau.
 11. Nếu một màn từng còn đỏ nhưng không xuất hiện trong lần quét lại đầy đủ cả
@@ -43,15 +49,35 @@ quà dùng một task chung. DB chỉ lưu `gift_claims` sau khi cả khu 1 và 
 - Super Value Return: luôn kiểm tra Login Gifts một lần; Empire Depot và Lucky
   Raffle dùng Claimable; City Growth Plan ưu tiên Claim All rồi chỉ nhận cột
   miễn phí bên trái.
-- Login Gifts: ưu tiên rương phát sáng, sau đó kiểm tra từng hàng cột miễn phí;
-  chỉ tính khi có Congratulations.
+- Login Gifts: chỉ bấm rương vàng/phát sáng được nhận diện trong cột miễn phí;
+  không dò mù các hàng. Chỉ tính khi có Congratulations.
 - Back to Territory: với mỗi tab đỏ trên carousel, duyệt tiếp toàn bộ badge đỏ
   ở hàng Day và Daily Login/Stamina/Daily Activity bên dưới; quét dọc danh sách
   để nhận tất cả nút Claim trùng nhau. Chỉ sau đó mới dò sparkle; một sparkle
   không sinh Congratulations thì dừng tab đó. Nếu lát 120 giây ngắt giữa tab,
   tab đó chưa được ghi nhớ và phải được mở lại ở lát sau.
-- Event Center: chỉ quét danh sách Limited; bỏ Bacchus Tavern, Activities và
-  mọi mục Facebook. Sau mỗi event phải quay lại danh sách trước khi cuộn tiếp.
+- Event Center: ưu tiên quét đủ ba nhóm theo thứ tự Limited, Activities rồi
+  Competition. Precious Blazon Exchange và Hypnos' Dream chỉ mở Rewards khi
+  thấy đúng phần chữ Rewards; Dwarf's Treasure tương tự với chữ Daily Free.
+  Mỗi nút đặc biệt được tìm tối đa bốn lần rồi bỏ qua. Trong Activities, nếu
+  thấy hàng Facebook kèm dấu đỏ thì không mở Facebook và coi nhóm đã DONE.
+  Competition kiểm tra các nút nhận cố định trước, sau đó thử tối đa bốn điểm
+  sparkle; sparkle chỉ thành công khi xuất hiện Congratulations. Bacchus Tavern
+  vẫn được nhận diện và bỏ qua. Sau mỗi event phải quay lại danh sách trước khi
+  cuộn tiếp. Sau một vòng quét đầy đủ, badge mua hàng/khóa vẫn đỏ nhưng event đã
+  có checkpoint và đã thử đủ bốn lần được ghi `skip/done`; badge mới chưa từng
+  xử lý vẫn chặn DONE.
+- Revelation of Horus và Sealed Imperial Treasury được nhận diện theo tiêu đề,
+  bỏ qua ngay và coi là DONE. Activities tạm thời bỏ qua toàn bộ theo cấu hình.
+- Grace of Star Trail bấm icon `Star Trail Gift`, chờ màn con rồi bấm tiếp icon
+  đồng xu có chữ `Claim`; chỉ bước thứ hai mới tính là nhận xu. Dwarf's Treasure
+  dùng crop gồm cả rương `Daily Free` để tâm ảnh nằm trong vùng bấm thật.
+- Limited chủ động tìm dòng Grace of Star Trail một lần ngay cả khi dòng ngoài
+  không có badge đỏ. Việc cuộn danh sách dừng sớm khi ảnh ổn định ở biên; các
+  nhóm đã DONE được checkpoint để lát 120 giây sau không quét lại.
+- Màn xoay vòng chưa có tiêu đề cố định: vẫn tìm toàn bộ nút chữ nhận trong
+  vùng nội dung, sau đó kiểm tra sparkle đủ bốn lần. Nếu không có kết quả nhận
+  thì coi là badge mua hàng và bỏ qua, không để chặn task chung.
 
 ## Hợp đồng kết quả
 

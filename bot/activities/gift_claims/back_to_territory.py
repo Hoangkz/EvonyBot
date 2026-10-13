@@ -2,7 +2,8 @@
 import cv2
 import numpy as np
 
-from .common import (GiftTask, ClaimReport, claim_fixed_controls, claim_sparkle,
+from .common import (GiftTask, ClaimReport, TEXT_CLAIM_CONTROLS, back_if_close_x,
+                     claim_fixed_controls, claim_sparkles,
                      close_congratulations, find, find_all, return_home)
 
 KEY = "gift_back_to_territory"
@@ -15,15 +16,7 @@ SPARKLE_REWARDS = (0, 45, 100, 82)
 INNER_NAV = (0, 41, 100, 61)
 REWARD_LIST = (0, 58, 100, 96)
 MAX_SWIPES = 8
-FIXED_CLAIMS = (
-    "Common/button_claim_text",
-    "GeneralVault/button_daily_free",
-    "SuccessivePurchaseBenefits/button_daily_free_text",
-    "SuccessivePurchaseBenefits/button_daily_free",
-    "Common/button_claimable", "Common/button_claimable_alt",
-    "LimitedOffer/button_free", "SpeedupSprint/button_free",
-    "SuperBlazonSale/button_free", "CityGrowthPlan/button_claim_all",
-)
+FIXED_CLAIMS = TEXT_CLAIM_CONTROLS
 
 
 def _dots(bot, screen):
@@ -112,21 +105,11 @@ def _claim_current_inner_tab(bot) -> int:
     for _ in range(5):
         bot.swipe_percent(50, 62, 50, 84, duration=0.35, delay=0.35)
 
-    # Multiple Day cards can glow at once. A false sparkle is tapped at most
-    # once because the loop continues only after Congratulations is verified.
-    for _ in range(7):
-        bot.check()
-        screen = bot.screenshot()
-        if find(bot, PAGE, screen, threshold=0.72,
-                region=(0, 0, 100, 13)) is None:
-            break
-        sparkle = claim_sparkle(bot, region=SPARKLE_REWARDS)
-        if not sparkle.acted:
-            break
-        if not sparkle.claimed:
-            bot.log("Gift Claims: Back to Territory sparkle không sinh quà; dừng tab này")
-            break
-        claimed += sparkle.verified
+    if back_if_close_x(bot):
+        return claimed
+    sparkle = claim_sparkles(bot, region=SPARKLE_REWARDS, attempts=4)
+    claimed += sparkle.verified
+    if sparkle.claimed:
         bot.record("Gift Claims: Back to Territory nhận quà sparkle (Congratulations)")
     if claimed == 0:
         bot.log("Gift Claims: Back to Territory chưa có phần thưởng nhận được")

@@ -8,7 +8,8 @@ from dataclasses import dataclass, field
 
 from ...context.errors import YieldToBoss
 from . import back_to_territory, event_center, lobby, super_value_return, valuable_event
-from .common import return_home
+from .common import (TEXT_CLAIM_CONTROLS, back_if_close_x,
+                     claim_fixed_controls, claim_sparkles, return_home)
 from .screens import GiftScreen
 
 KEY = "gift_claims"
@@ -83,7 +84,6 @@ def _dispatch(bot, screen_name: GiftScreen, progress: GiftProgress):
             progress.unresolved_parents.discard(screen_name)
         else:
             progress.unresolved_parents.add(screen_name)
-            progress.event_center_done.clear()
         return
 
     if screen_name == GiftScreen.BACK_TO_TERRITORY:
@@ -94,7 +94,6 @@ def _dispatch(bot, screen_name: GiftScreen, progress: GiftProgress):
             progress.unresolved_parents.discard(screen_name)
         else:
             progress.unresolved_parents.add(screen_name)
-            progress.back_to_territory_done.clear()
         return_home(bot)
         return
 
@@ -104,12 +103,30 @@ def _dispatch(bot, screen_name: GiftScreen, progress: GiftProgress):
         return_home(bot)
         return
 
-    # Some right-rail dots perform an immediate lobby action and have no title
-    # (Back to Territory, Follow Us, rotating timer icons...). They were still
-    # clicked exactly once in this pass; record them as an unverified outcome.
-    progress.outcomes.append(f"unidentified:{screen_name.value}")
-    bot.record(f"Gift Claims: đã bấm dấu đỏ nhưng không nhận diện được {screen_name.value}")
-    progress.unresolved_parents.add(GiftScreen.UNKNOWN)
+    if screen_name in (GiftScreen.REVELATION_OF_HORUS,
+                        GiftScreen.SEALED_IMPERIAL_TREASURY):
+        bot.record(f"Gift Claims: {screen_name.value} - bỏ qua và coi là DONE")
+        progress.outcomes.append(f"skipped:{screen_name.value}")
+        progress.unresolved_parents.discard(screen_name)
+        return_home(bot)
+        return
+
+    # Rotating timer icons do not have a stable captured title. They still use
+    # the same safe lower-area contract: exact reward words first, then four
+    # bounded sparkle samples. A persistent purchase badge must not block the
+    # whole daily task after those checks have been exhausted.
+    fixed = claim_fixed_controls(bot, TEXT_CLAIM_CONTROLS, max_taps=16,
+                                 region=(0, 18, 100, 88))
+    if not back_if_close_x(bot):
+        sparkle = claim_sparkles(bot, region=(5, 18, 90, 82), attempts=4)
+    else:
+        sparkle = None
+    verified = fixed.verified + (sparkle.verified if sparkle is not None else 0)
+    progress.outcomes.append(f"unidentified_checked:{verified}")
+    bot.record("Gift Claims: màn xoay vòng chưa có tiêu đề cố định đã được "
+               "kiểm tra nút chữ và sparkle đủ 4 lần; đánh dấu bỏ qua nếu "
+               "không có kết quả nhận")
+    progress.unresolved_parents.discard(GiftScreen.UNKNOWN)
     return_home(bot)
 
 
@@ -172,7 +189,7 @@ def run(bot) -> bool:
     verified = sum(1 for item in progress.outcomes
                    if not item.startswith("unidentified:"))
     unknown = sum(1 for item in progress.outcomes
-                  if item.startswith("unidentified:"))
+                  if item.startswith("unidentified_checked:"))
     bot.record(f"Gift Claims: HOÀN THÀNH một task chung; "
                f"{verified} luồng đã kiểm tra, {unknown} dấu đỏ không có màn cố định")
     delattr(bot, "_gift_claims_progress")

@@ -2,23 +2,15 @@
 from dataclasses import dataclass
 
 from . import city_growth_plan, empire_depot, login_gifts, lucky_raffle
-from .common import (ClaimReport, claim_fixed_controls, claim_sparkle, find,
-                     find_all, return_home)
+from .common import (ClaimReport, TEXT_CLAIM_CONTROLS, back_if_close_x,
+                     claim_fixed_controls, claim_sparkles, find, find_all,
+                     return_home)
 
 PAGE = "SuperValueReturn/title"
 DOT = "SuperValueReturn/notification_dot"
 MAX_SWIPES = 8
 LOWER_CONTENT = (0, 20, 100, 88)
-COMMON_LOWER_CLAIMS = (
-    "Common/button_claim_text",
-    "Common/button_claimable", "Common/button_claimable_alt",
-    "LimitedOffer/button_free", "SpeedupSprint/button_free",
-    "SuperBlazonSale/button_free",
-    "SuccessivePurchaseBenefits/button_daily_free_text",
-    "SuccessivePurchaseBenefits/button_daily_free",
-    "CityGrowthPlan/button_claim_all", "EmpireDepot/button_claimable",
-    "LuckyRaffle/button_claimable",
-)
+COMMON_LOWER_CLAIMS = TEXT_CLAIM_CONTROLS
 
 
 @dataclass(frozen=True)
@@ -65,13 +57,19 @@ def _dots(bot, screen):
     return find_all(bot, DOT, screen, threshold=0.65, region=(0, 7, 100, 19))
 
 
-def _verify_clean(bot) -> bool:
+def _verify_clean(bot, ignored_keys=()) -> bool:
     """Verify that no red tab remains anywhere in the parent carousel."""
     for direction in (-1, 1):
         for step in range(MAX_SWIPES + 1):
             bot.check()
-            if _dots(bot, bot.screenshot()):
-                return False
+            screen = bot.screenshot()
+            dots = _dots(bot, screen)
+            tabs = [(spec, find(bot, spec.tab, screen, threshold=0.70,
+                                region=(0, 7, 100, 20))) for spec in SPECS]
+            for dot in dots:
+                owner = _owner_for_dot(dot, tabs)
+                if owner is None or owner[0].task.key not in ignored_keys:
+                    return False
             if step < MAX_SWIPES:
                 if direction < 0:
                     bot.swipe_percent(85, 14, 20, 14, duration=0.5, delay=1)
@@ -121,9 +119,10 @@ def run_opened(bot, due_keys: set[str], *, handled: set[str] | None = None
                     bot.tap(max(0, dot[0] - 25), min(screen.shape[0] - 1, dot[1] + 16),
                             delay=1)
                     report = claim_fixed_controls(
-                        bot, COMMON_LOWER_CLAIMS, region=LOWER_CONTENT)
-                    if not report.acted:
-                        claim_sparkle(bot, region=LOWER_CONTENT)
+                        bot, COMMON_LOWER_CLAIMS, max_taps=16,
+                        region=LOWER_CONTENT)
+                    if not back_if_close_x(bot):
+                        claim_sparkles(bot, region=LOWER_CONTENT, attempts=4)
                     bot.log("Gift Claims: Super Value Return đã xử lý phần dưới "
                             "của tab đỏ chưa nhận diện")
                     continue
@@ -142,10 +141,17 @@ def run_opened(bot, due_keys: set[str], *, handled: set[str] | None = None
                     claimed = int(bool(city_growth_plan.claim_opened(bot)))
                     report = ClaimReport(claimed, claimed)
                 else:
-                    claims = tuple(dict.fromkeys((*spec.claims, *COMMON_LOWER_CLAIMS)))
-                    report = claim_fixed_controls(bot, claims, region=LOWER_CONTENT)
-                    if not report.acted:
-                        report = claim_sparkle(bot, region=LOWER_CONTENT)
+                    fixed = claim_fixed_controls(
+                        bot, COMMON_LOWER_CLAIMS, max_taps=16,
+                        region=LOWER_CONTENT)
+                    if back_if_close_x(bot):
+                        report = fixed
+                    else:
+                        sparkle = claim_sparkles(bot, region=LOWER_CONTENT,
+                                                 attempts=4)
+                        report = ClaimReport(
+                            fixed.attempted + sparkle.attempted,
+                            fixed.verified + sparkle.verified)
 
                 after = bot.screenshot()
                 after_dots = _dots(bot, after)
@@ -159,7 +165,8 @@ def run_opened(bot, due_keys: set[str], *, handled: set[str] | None = None
                                 "claimed_remaining" if report.claimed else
                                 "visited_remaining" if report.acted else "remaining")
                 attempted_this_run.add(key)
-                if cleared or not spec.requires_dot:
+                if (cleared or not spec.requires_dot
+                        or key not in (login_gifts.KEY, city_growth_plan.KEY)):
                     handled.add(key)
                 bot.log(f"Gift Claims: {spec.task.label} - dấu đỏ "
                         f"{'đã mất' if cleared else 'vẫn còn'} sau xử lý")
@@ -171,7 +178,7 @@ def run_opened(bot, due_keys: set[str], *, handled: set[str] | None = None
             else:
                 bot.swipe_percent(20, 14, 85, 14, duration=0.5, delay=1)
 
-    clean = _verify_clean(bot)
+    clean = _verify_clean(bot, handled)
     bot.record("Gift Claims: Super Value Return - "
                + ("DONE, phần trên đã hết dấu đỏ" if clean
                   else "chưa DONE, phần trên vẫn còn dấu đỏ"))

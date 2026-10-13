@@ -19,6 +19,25 @@ MAX_HOME_STEPS = 7
 MAX_TAB_SWIPES = 7
 EVENT_CENTER_WAIT_ATTEMPTS = 6
 EVENT_CENTER_LAUNCHERS = ("EventCenter/launcher_side", "EventCenter/launcher")
+FIXED_CONTROL_THRESHOLDS = {
+    # The text is rendered over animated event art.  On the real 396x704 MEmu
+    # frame the user-provided crop scores about 0.65, while the surrounding
+    # icon/background changes between events.
+    "Common/button_daily_free_text": 0.62,
+    "Common/button_free_text": 0.70,
+    "Common/button_claim_all_text": 0.70,
+}
+
+# Only tight text crops may drive a generic reward tap. Large module images
+# remain useful for page identification, but their centre may not be a button.
+TEXT_CLAIM_CONTROLS = (
+    "Common/button_claim_text",
+    "Common/button_claim_all_text",
+    "Common/button_claimable",
+    "Common/button_claimable_alt",
+    "Common/button_daily_free_text",
+    "Common/button_free_text",
+)
 
 
 @dataclass(frozen=True)
@@ -273,30 +292,30 @@ def claim_fixed_controls(bot, templates: tuple[str, ...], *, max_taps: int = 6,
                          initial_wait_attempts: int = 2, region=None) -> ClaimReport:
     """Tap only fixed reward controls and verify every successful claim.
 
-    A tap is verified by the common Congratulations popup or by the exact
-    control disappearing. If the same control remains, stop this child flow;
-    this prevents purchase/navigation controls from being treated as rewards.
+    A tap is verified by Congratulations or by that control disappearing near
+    the tapped point. Multiple identical buttons are handled one-by-one. A
+    stubborn/non-reward control is skipped locally so another real reward on
+    the same page can still be claimed.
     """
-    attempted_names = set()
-    attempted_positions = []
+    blocked_positions: list[tuple[int, int]] = []
     attempted_count = verified_count = waits = 0
     while attempted_count < max_taps:
         bot.check()
         before = bot.screenshot()
         hit = None
         for name in templates:
-            if name in attempted_names:
-                continue
-            pos = find(bot, name, before, threshold=0.76, region=region)
-            if pos is None:
-                continue
-            tolerance = 42 * before.shape[1] / REFERENCE_WIDTH
-            if any((pos[0] - old[0]) ** 2 + (pos[1] - old[1]) ** 2
-                   <= tolerance ** 2 for old in attempted_positions):
-                attempted_names.add(name)
-                continue
-            hit = name, pos
-            break
+            threshold = FIXED_CONTROL_THRESHOLDS.get(name, 0.76)
+            tolerance = 30 * before.shape[1] / REFERENCE_WIDTH
+            positions = find_all(bot, name, before, threshold=threshold,
+                                 region=region or (0, 0, 100, 100))
+            for pos in positions:
+                if any((pos[0] - old[0]) ** 2 + (pos[1] - old[1]) ** 2
+                       <= tolerance ** 2 for old in blocked_positions):
+                    continue
+                hit = name, pos, len(positions)
+                break
+            if hit is not None:
+                break
         if hit is None:
             if attempted_count == 0 and waits < initial_wait_attempts:
                 waits += 1
@@ -304,9 +323,7 @@ def claim_fixed_controls(bot, templates: tuple[str, ...], *, max_taps: int = 6,
                 continue
             break
 
-        name, pos = hit
-        attempted_names.add(name)
-        attempted_positions.append(pos)
+        name, pos, before_count = hit
         attempted_count += 1
         bot.record(f"Gift Claims: tap fixed claim {name}")
         bot.tap(*pos, delay=1)
@@ -317,13 +334,21 @@ def claim_fixed_controls(bot, templates: tuple[str, ...], *, max_taps: int = 6,
             continue
 
         after = bot.screenshot()
-        if find(bot, name, after, threshold=0.76, region=region) is None:
+        threshold = FIXED_CONTROL_THRESHOLDS.get(name, 0.76)
+        tolerance = 30 * after.shape[1] / REFERENCE_WIDTH
+        remaining = find_all(bot, name, after, threshold=threshold,
+                             region=region or (0, 0, 100, 100))
+        if (len(remaining) < before_count or
+                not any((candidate[0] - pos[0]) ** 2 +
+                        (candidate[1] - pos[1]) ** 2 <= tolerance ** 2
+                        for candidate in remaining)):
             verified_count += 1
             bot.record(f"Gift Claims: verified control disappeared after {name}")
             continue
 
-        bot.log(f"Gift Claims: {name} vẫn còn và không có Congratulations; dừng")
-        break
+        blocked_positions.append(pos)
+        bot.log(f"Gift Claims: {name} vẫn còn và không có Congratulations; "
+                "bỏ qua đúng vị trí này và tìm nút khác")
     return ClaimReport(attempted_count, verified_count)
 
 
@@ -384,5 +409,37 @@ def claim_sparkle(bot, *, region=(0, 20, 100, 88)) -> ClaimReport:
     if not verified:
         bot.log("Gift Claims: sparkle không sinh Congratulations; không tính là đã nhận")
     return ClaimReport(1, verified)
+
+
+def claim_sparkles(bot, *, region=(0, 20, 100, 88), attempts=4) -> ClaimReport:
+    """Check an intermittent glow several times, then stop the child safely.
+
+    Animated reward highlights are not visible in every frame.  Four bounded
+    samples make them much harder to miss while ensuring a decorative glow can
+    never keep the task in an infinite loop.
+    """
+    attempted = verified = 0
+    for index in range(attempts):
+        bot.check()
+        report = claim_sparkle(bot, region=region)
+        attempted += report.attempted
+        verified += report.verified
+        if report.claimed:
+            bot.record(f"Gift Claims: sparkle lần {index + 1}/{attempts} đã nhận quà")
+        else:
+            bot.log(f"Gift Claims: sparkle lần {index + 1}/{attempts} không có quà xác minh")
+    bot.record(f"Gift Claims: đã kiểm tra sparkle đủ {attempts} lần; kết thúc mục hiện tại")
+    return ClaimReport(attempted, verified)
+
+
+def back_if_close_x(bot, screen=None) -> bool:
+    """Use Android Back when an opened reward panel exposes the supplied X."""
+    screen = bot.screenshot() if screen is None else screen
+    if find(bot, "Common/button_close_x", screen, threshold=0.78,
+            region=(0, 0, 100, 35)) is None:
+        return False
+    bot.record("Gift Claims: thấy nút X; dùng Back để thoát mục")
+    bot.back(delay=0.8)
+    return True
 
 

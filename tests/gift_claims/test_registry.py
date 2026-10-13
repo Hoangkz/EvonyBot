@@ -18,8 +18,10 @@ class GiftClaimRegistryTests(unittest.TestCase):
         folder = Path(__file__).parents[2] / "Images" / "GiftClaims"
         expected = {
             "EventCenter/launcher.png", "EventCenter/launcher_side.png",
+            "Common/button_close_x.png", "Common/button_daily_free_text.png",
             "Common/button_claim_text.png", "Common/button_claimable.png",
-            "Common/button_claimable_alt.png",
+            "Common/button_claimable_alt.png", "Common/button_free_text.png",
+            "Common/button_claim_all_text.png",
             "BackToTerritory/title.png", "BackToTerritory/button_claim.png",
             "FollowUs/title.png",
             "FollowUs/facebook_icon.png",
@@ -33,6 +35,8 @@ class GiftClaimRegistryTests(unittest.TestCase):
             "DragonBattle/reward.png", "DragonBattle/list_row.png",
             "GraceOfStarTrail/title.png", "GraceOfStarTrail/list_row.png",
             "GraceOfStarTrail/button_star_trail_gift.png",
+            "GraceOfStarTrail/button_star_trail_gift_alt.png",
+            "GraceOfStarTrail/button_star_trail_gift_current.png",
             "GraceOfStarTrail/button_claim.png", "LimitedOffer/tab.png",
             "LimitedOffer/button_free.png", "SpeedupSprint/tab.png",
             "RefiningStoneSprint/tab.png",
@@ -56,6 +60,15 @@ class GiftClaimRegistryTests(unittest.TestCase):
             "CityGrowthPlan/tab.png", "CityGrowthPlan/button_claim_all.png",
             "CityGrowthPlan/detail_popup.png", "CityGrowthPlan/claimed.png",
             "EventCenter/title.png",
+            "EventCenter/facebook_activity.png",
+            "PreciousBlazonExchange/title.png",
+            "PreciousBlazonExchange/button_rewards.png",
+            "DwarfsTreasure/title.png",
+            "DwarfsTreasure/button_daily_free.png",
+            "HypnosDream/title.png",
+            "HypnosDream/button_rewards.png",
+            "RevelationOfHorus/title.png",
+            "SealedImperialTreasury/title.png",
         }
         actual = {path.relative_to(folder).as_posix() for path in folder.rglob("*.png")}
         self.assertEqual(expected, actual)
@@ -148,6 +161,25 @@ class GiftClaimRegistryTests(unittest.TestCase):
         self.assertLess(abs(point[0] - 123), 5)
         self.assertLess(abs(point[1] - 303), 5)
 
+    def test_sparkle_check_stops_after_four_unverified_samples(self):
+        bot = mock.Mock()
+        with mock.patch.object(common, "claim_sparkle",
+                               return_value=common.ClaimReport()) as claim:
+            report = common.claim_sparkles(bot, attempts=4)
+
+        self.assertEqual(common.ClaimReport(), report)
+        self.assertEqual(4, claim.call_count)
+
+    def test_x_control_uses_back_instead_of_tapping_x(self):
+        bot = mock.Mock()
+        screen = np.zeros((704, 396, 3), dtype=np.uint8)
+        bot.screenshot.return_value = screen
+        with mock.patch.object(common, "find", return_value=(13, 13)):
+            self.assertTrue(common.back_if_close_x(bot))
+
+        bot.back.assert_called_once_with(delay=0.8)
+        bot.tap.assert_not_called()
+
     def test_claim_helper_waits_for_delayed_button_content(self):
         bot = mock.Mock()
         bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
@@ -167,7 +199,8 @@ class GiftClaimRegistryTests(unittest.TestCase):
         def find_named(_bot, name, *_args, **_kwargs):
             return None if name == "LoginGifts/congratulations" else (100, 200)
 
-        with mock.patch.object(common, "find", side_effect=find_named):
+        with (mock.patch.object(common, "find", side_effect=find_named),
+              mock.patch.object(common, "find_all", return_value=[(100, 200)])):
             report = common.claim_fixed_controls(
                 bot, ("Example/button",), initial_wait_attempts=0)
 
@@ -183,13 +216,46 @@ class GiftClaimRegistryTests(unittest.TestCase):
                 return (198, 320)
             return (100, 200)
 
-        with mock.patch.object(common, "find", side_effect=find_named):
+        with (mock.patch.object(common, "find", side_effect=find_named),
+              mock.patch.object(common, "find_all",
+                                side_effect=([(100, 200)], []))):
             report = common.claim_fixed_controls(
                 bot, ("Example/button",), initial_wait_attempts=0)
 
         self.assertEqual(1, report.attempted)
         self.assertEqual(1, report.verified)
         bot.back.assert_called_once_with(delay=0.8)
+
+    def test_fixed_claim_taps_every_identical_visible_button(self):
+        bot = mock.Mock()
+        bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
+        first, second = (100, 200), (100, 300)
+        with (mock.patch.object(common, "find", return_value=None),
+              mock.patch.object(common, "find_all", side_effect=(
+                  [first, second], [second], [second], [], []))):
+            report = common.claim_fixed_controls(
+                bot, ("Common/button_claim_text",), max_taps=6,
+                initial_wait_attempts=0)
+
+        self.assertEqual((2, 2), (report.attempted, report.verified))
+        self.assertEqual([mock.call(*first, delay=1), mock.call(*second, delay=1)],
+                         bot.tap.call_args_list)
+
+    def test_stubborn_control_does_not_block_another_claim(self):
+        bot = mock.Mock()
+        bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
+        stuck, claim = (100, 200), (100, 300)
+        with (mock.patch.object(common, "find", return_value=None),
+              mock.patch.object(common, "find_all", side_effect=(
+                  [stuck, claim], [stuck, claim],
+                  [stuck, claim], [stuck], [stuck]))):
+            report = common.claim_fixed_controls(
+                bot, ("Common/button_free_text",), max_taps=6,
+                initial_wait_attempts=0)
+
+        self.assertEqual((2, 1), (report.attempted, report.verified))
+        self.assertEqual([mock.call(*stuck, delay=1), mock.call(*claim, delay=1)],
+                         bot.tap.call_args_list)
 
     def test_valuable_navigation_is_not_registered_as_claim_control(self):
         specs = {spec.task.key: spec for spec in valuable_event.SPECS}

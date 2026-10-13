@@ -5,6 +5,8 @@ import time
 
 import cv2
 import numpy as np
+from adbutils.errors import AdbError
+from PIL import UnidentifiedImageError
 
 from .templates import DEFAULT_THRESHOLD, TEMPLATE_DIR
 
@@ -12,9 +14,30 @@ from .templates import DEFAULT_THRESHOLD, TEMPLATE_DIR
 class ScreenMixin:
     def screenshot(self) -> np.ndarray:
         """Current screen as a BGR image (OpenCV format)."""
-        self.check()
-        image = self.device.screenshot().convert("RGB")
-        return cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
+        last_error = None
+        for attempt in range(3):
+            self.check()
+            try:
+                image = self.device.screenshot().convert("RGB")
+                return cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
+            except (AdbError, UnidentifiedImageError, OSError) as exc:
+                last_error = exc
+                if attempt == 2:
+                    raise
+                # MEmu occasionally returns a truncated PNG and briefly marks
+                # its TCP device offline during long image-heavy scans.  Give
+                # it one lightweight reconnect and retry instead of aborting
+                # the complete two-minute task.
+                serial = getattr(self.device, "serial", "")
+                client = getattr(self.device, "_client", None)
+                if attempt == 1 and client is not None and ":" in serial:
+                    try:
+                        client.disconnect(serial)
+                        client.connect(serial, timeout=3)
+                    except Exception:
+                        pass
+                time.sleep(0.5)
+        raise last_error  # pragma: no cover - loop either returns or raises
 
     def _template(self, name: "str | np.ndarray") -> np.ndarray:
         """A template by path under Images/, or an image passed through as-is

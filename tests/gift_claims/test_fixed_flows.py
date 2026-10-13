@@ -93,6 +93,28 @@ class FixedGiftFlowTests(unittest.TestCase):
 
         self.assertEqual(GiftScreen.EVENT_CENTER, result)
         self.assertEqual([(380, 200), (380, 235), (380, 275)], attempted)
+
+    def test_zone_two_prioritizes_event_center_badge(self):
+        bot = mock.Mock()
+        screen = np.zeros((704, 396, 3), dtype=np.uint8)
+        bot.screenshot.return_value = screen
+        attempted = []
+
+        def find_all_named(_bot, name, *_args, **_kwargs):
+            if name == "EventCenter/launcher_side":
+                return [(350, 270)]
+            return []
+
+        with (mock.patch.object(lobby, "return_home", return_value=True),
+              mock.patch.object(lobby, "red_dots",
+                                return_value=[(380, 180), (380, 275)]),
+              mock.patch.object(lobby, "find_all", side_effect=find_all_named),
+              mock.patch.object(lobby, "identify",
+                                return_value=GiftScreen.EVENT_CENTER)):
+            result = lobby.open_next(bot, lobby.RIGHT, attempted)
+
+        self.assertEqual(GiftScreen.EVENT_CENTER, result)
+        self.assertEqual((380, 275), attempted[0])
         bot.tap.assert_called_once_with(355, 291, delay=1)
 
     def test_red_dot_detector_separates_bottom_then_right(self):
@@ -136,7 +158,7 @@ class FixedGiftFlowTests(unittest.TestCase):
         self.assertFalse(specs[login_gifts.KEY].requires_dot)
         self.assertTrue(specs[empire_depot.KEY].requires_dot)
 
-    def test_login_gifts_includes_sparkling_sixth_day_row(self):
+    def test_login_gifts_never_probes_rows_without_a_glowing_chest(self):
         bot = mock.Mock()
         bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
 
@@ -148,8 +170,7 @@ class FixedGiftFlowTests(unittest.TestCase):
               mock.patch.object(login_gifts, "_tap_reward", return_value=False) as tap):
             self.assertEqual(0, login_gifts.claim_opened(bot))
 
-        self.assertTrue(any(abs(call.args[1][1] - round(704 * 0.92)) <= 1
-                            for call in tap.call_args_list))
+        tap.assert_not_called()
         bot.swipe_percent.assert_called_once()
 
     def test_login_gift_confirms_and_closes_congratulations(self):
@@ -173,14 +194,14 @@ class FixedGiftFlowTests(unittest.TestCase):
               mock.patch.object(back_to_territory, "_claim_visible_login_rewards",
                                 return_value=common.ClaimReport()),
               mock.patch.object(back_to_territory, "_inner_dots", return_value=[]),
-              mock.patch.object(back_to_territory, "find", return_value=(198, 25)),
-              mock.patch.object(back_to_territory, "claim_sparkle",
-                                side_effect=(common.ClaimReport(1, 1),
-                                             common.ClaimReport(1, 1),
-                                             common.ClaimReport())) as sparkle):
+              mock.patch.object(back_to_territory, "back_if_close_x",
+                                return_value=False),
+              mock.patch.object(back_to_territory, "claim_sparkles",
+                                return_value=common.ClaimReport(2, 2)) as sparkle):
             self.assertEqual(2, back_to_territory.claim_opened(bot))
 
-        self.assertEqual(3, sparkle.call_count)
+        sparkle.assert_called_once_with(bot, region=back_to_territory.SPARKLE_REWARDS,
+                                        attempts=4)
 
     def test_back_to_territory_detects_red_tabs_below_carousel(self):
         screen = np.zeros((704, 396, 3), dtype=np.uint8)
@@ -212,6 +233,294 @@ class FixedGiftFlowTests(unittest.TestCase):
                 gift_claims.run(bot)
 
         bot.mark_daily_done.assert_not_called()
+
+    def test_event_center_keeps_finished_rows_across_boss_resume(self):
+        bot = mock.Mock()
+        progress = gift_claims.GiftProgress()
+        progress.event_center_done.add(b"finished-row")
+        with mock.patch.object(event_center, "run_opened", return_value=False):
+            gift_claims._dispatch(bot, GiftScreen.EVENT_CENTER, progress)
+
+        self.assertEqual({b"finished-row"}, progress.event_center_done)
+
+    def test_back_to_territory_keeps_finished_tabs_across_boss_resume(self):
+        bot = mock.Mock()
+        progress = gift_claims.GiftProgress()
+        progress.back_to_territory_done.add(b"finished-tab")
+        with (mock.patch.object(back_to_territory, "run_opened", return_value=False),
+              mock.patch.object(gift_claims, "return_home")):
+            gift_claims._dispatch(bot, GiftScreen.BACK_TO_TERRITORY, progress)
+
+        self.assertEqual({b"finished-tab"}, progress.back_to_territory_done)
+
+    def test_event_center_finds_inner_red_tab_and_excludes_purchase_edge(self):
+        screen = np.zeros((704, 396, 3), dtype=np.uint8)
+        cv2.circle(screen, (313, 68), 8, (0, 40, 190), thickness=-1)
+        cv2.circle(screen, (365, 110), 8, (0, 40, 190), thickness=-1)
+        self.assertEqual([(313, 68)], event_center._inner_red_dots(screen))
+
+        after = screen.copy()
+        after[575:583, 364:372] = 255
+        self.assertIsNone(common.sparkle_point(
+            screen, after, region=event_center.SPARKLE_SAFE))
+
+    def test_event_center_persistent_inner_badge_is_processed_once(self):
+        screen = np.zeros((704, 396, 3), dtype=np.uint8)
+        bot = mock.Mock()
+        bot.screenshot.return_value = screen
+        with (mock.patch.object(event_center, "identify",
+                                return_value=GiftScreen.UNKNOWN),
+              mock.patch.object(event_center, "_inner_red_dots",
+                                return_value=[(313, 68)]),
+              mock.patch.object(event_center, "_inner_tab_signature",
+                                side_effect=(f"animated-{i}".encode()
+                                             for i in range(100))),
+              mock.patch.object(event_center, "_process_current_event_content",
+                                return_value=(common.ClaimReport(), False)) as process):
+            event_center._process_opened_event(bot)
+
+        process.assert_called_once_with(bot)
+        self.assertEqual(2, bot.swipe_percent.call_count)
+
+    def test_event_center_tab_signature_tolerates_small_animation_changes(self):
+        original = bytes([0b10101010] * 16)
+        animated = bytearray(original)
+        animated[0] ^= 0b00000111
+        animated[5] ^= 0b00000001
+        self.assertTrue(event_center._signature_seen(bytes(animated), {original}))
+
+        different = bytes([0b01010101] * 16)
+        self.assertFalse(event_center._signature_seen(different, {original}))
+
+    def test_event_center_row_signature_ignores_animated_right_artwork(self):
+        first = np.zeros((704, 396, 3), dtype=np.uint8)
+        second = first.copy()
+        first[200:264, 280:396] = 255
+        second[200:264, 280:396] = (0, 0, 180)
+        self.assertEqual(event_center._row_signature(first, 232),
+                         event_center._row_signature(second, 232))
+
+    def test_event_center_category_row_tolerates_small_animation_changes(self):
+        original = bytes([0b11001100] * 24)
+        animated = bytearray(original)
+        animated[2] ^= 0b00000111
+        animated[11] ^= 0b00000001
+        visited = {event_center._category_signature("competition", original)}
+        self.assertTrue(event_center._category_seen(
+            "competition", bytes(animated), visited))
+        self.assertFalse(event_center._category_seen(
+            "limited", bytes(animated), visited))
+
+    def test_event_center_special_rewards_is_tapped_and_verified(self):
+        bot = mock.Mock()
+        bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
+
+        def find_named(_bot, name, *_args, **_kwargs):
+            if name == "PreciousBlazonExchange/button_rewards":
+                return (49, 235)
+            return None
+
+        with (mock.patch.object(event_center, "identify",
+                                return_value=GiftScreen.PRECIOUS_BLAZON_EXCHANGE),
+              mock.patch.object(event_center, "find", side_effect=find_named),
+              mock.patch.object(event_center, "close_congratulations",
+                                return_value=True)):
+            report = event_center._tap_special_navigation(bot)
+
+        self.assertEqual(common.ClaimReport(1, 1), report)
+        bot.tap.assert_called_once_with(49, 235, delay=1)
+
+    def test_event_center_missing_special_control_stops_after_four_checks(self):
+        bot = mock.Mock()
+        bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
+        with mock.patch.object(event_center, "find", return_value=None):
+            report = event_center._tap_special_navigation(bot, attempts=4)
+
+        self.assertEqual(common.ClaimReport(), report)
+        self.assertEqual(4, bot.screenshot.call_count)
+        self.assertEqual(3, bot.sleep.call_count)
+        bot.tap.assert_not_called()
+
+    def test_event_center_unresponsive_rewards_is_tapped_only_four_times(self):
+        bot = mock.Mock()
+        bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
+        with (mock.patch.object(event_center, "identify",
+                                return_value=GiftScreen.HYPNOS_DREAM),
+              mock.patch.object(event_center, "find", return_value=(357, 164)),
+              mock.patch.object(event_center, "close_congratulations",
+                                return_value=False)):
+            report = event_center._tap_special_navigation(bot, attempts=4)
+
+        self.assertEqual(common.ClaimReport(4, 0), report)
+        self.assertEqual(4, bot.tap.call_count)
+
+    def test_event_center_disappearing_rewards_is_verified(self):
+        bot = mock.Mock()
+        bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
+        with (mock.patch.object(event_center, "identify",
+                                return_value=GiftScreen.HYPNOS_DREAM),
+              mock.patch.object(event_center, "find",
+                                side_effect=((357, 164), None)),
+              mock.patch.object(event_center, "close_congratulations",
+                                return_value=False)):
+            report = event_center._tap_special_navigation(bot, attempts=4)
+
+        self.assertEqual(common.ClaimReport(1, 1), report)
+        bot.tap.assert_called_once_with(357, 164, delay=1)
+
+    def test_dwarf_daily_free_disappearance_is_verified_during_transition(self):
+        bot = mock.Mock()
+        bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
+        with (mock.patch.object(event_center, "identify",
+                               side_effect=(GiftScreen.DWARFS_TREASURE, None)),
+              mock.patch.object(event_center, "find",
+                                side_effect=((356, 180), None)),
+              mock.patch.object(event_center, "close_congratulations",
+                                return_value=False)):
+            report = event_center._tap_special_navigation(bot, attempts=4)
+
+        self.assertEqual(common.ClaimReport(1, 1), report)
+        bot.tap.assert_called_once_with(356, 180, delay=1)
+
+    def test_star_trail_gift_is_tapped_and_verified(self):
+        bot = mock.Mock()
+        bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
+        with (mock.patch.object(event_center, "find",
+                                side_effect=((360, 90), (40, 240), None)),
+              mock.patch.object(event_center, "close_congratulations",
+                                return_value=False)):
+            report = event_center._tap_reward_navigation(bot)
+
+        self.assertEqual(common.ClaimReport(2, 1), report)
+        self.assertEqual([mock.call(360, 90, delay=1),
+                          mock.call(40, 240, delay=1)], bot.tap.call_args_list)
+
+    def test_star_trail_coin_claim_uses_exact_user_crop(self):
+        claim = cv2.imread(str(IMAGES / "GiftClaims" / "GraceOfStarTrail" /
+                               "button_claim.png"))
+        self.assertEqual((49, 41), claim.shape[:2])
+
+    def test_grace_row_is_checked_without_an_outer_red_dot(self):
+        bot = mock.Mock()
+        screen = np.zeros((704, 396, 3), dtype=np.uint8)
+        bot.screenshot.return_value = screen
+        visited = set()
+        with (mock.patch.object(event_center, "find", return_value=(120, 220)),
+              mock.patch.object(event_center, "_row_dots", return_value=[]),
+              mock.patch.object(event_center, "_process_opened_event") as process,
+              mock.patch.object(event_center, "_back_to_list", return_value=True),
+              mock.patch.object(event_center, "_list_signature", return_value=b"same"),
+              mock.patch.object(event_center, "_verify_clean", return_value=True)):
+            self.assertTrue(event_center._scan_category(bot, "limited", visited))
+
+        process.assert_called_once_with(bot)
+        self.assertIn(event_center.FORCED_EVENT_PREFIX + b"grace_of_star_trail",
+                      visited)
+
+    def test_grace_opened_page_uses_exact_star_trail_control(self):
+        bot = mock.Mock()
+        bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
+        expected = common.ClaimReport(1, 1)
+        with (mock.patch.object(event_center, "identify",
+                               return_value=GiftScreen.GRACE_OF_STAR_TRAIL),
+              mock.patch.object(event_center, "_process_current_event_content",
+                                return_value=(expected, False)) as process):
+            self.assertEqual(expected, event_center._process_opened_event(bot))
+        process.assert_called_once_with(bot)
+
+    def test_event_center_scans_categories_in_required_order(self):
+        bot = mock.Mock()
+        screen = np.zeros((704, 396, 3), dtype=np.uint8)
+        bot.screenshot.return_value = screen
+        with (mock.patch.object(event_center, "find", return_value=(198, 25)),
+              mock.patch.object(event_center, "_select_category",
+                                return_value=True) as select,
+              mock.patch.object(event_center, "_scan_category",
+                                return_value=True) as scan,
+              mock.patch.object(event_center, "return_home")):
+            self.assertTrue(event_center.run_opened(bot, set()))
+
+        self.assertEqual([mock.call(bot, "limited", 18),
+                          mock.call(bot, "competition", 82)],
+                         select.call_args_list)
+        self.assertEqual([call.args[1] for call in scan.call_args_list],
+                         ["limited", "competition"])
+
+    def test_event_center_skips_categories_completed_before_boss_yield(self):
+        bot = mock.Mock()
+        bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
+        handled = {event_center._category_done_key("limited"),
+                   event_center._category_done_key("activities")}
+        with (mock.patch.object(event_center, "find", return_value=(198, 25)),
+              mock.patch.object(event_center, "_select_category",
+                                return_value=True) as select,
+              mock.patch.object(event_center, "_scan_category",
+                                return_value=True) as scan,
+              mock.patch.object(event_center, "return_home")):
+            self.assertTrue(event_center.run_opened(bot, handled))
+
+        select.assert_called_once_with(bot, "competition", 82)
+        scan.assert_called_once_with(bot, "competition", handled)
+        self.assertIn(event_center._category_done_key("competition"), handled)
+
+    def test_event_center_special_templates_are_tightly_cropped(self):
+        rewards = cv2.imread(str(IMAGES / "GiftClaims" /
+                                 "PreciousBlazonExchange" / "button_rewards.png"))
+        daily = cv2.imread(str(IMAGES / "GiftClaims" /
+                               "DwarfsTreasure" / "button_daily_free.png"))
+        hypnos = cv2.imread(str(IMAGES / "GiftClaims" /
+                                "HypnosDream" / "button_rewards.png"))
+        self.assertLessEqual(rewards.shape[0], 22)
+        self.assertLessEqual(hypnos.shape[0], 18)
+        self.assertEqual((70, 74), daily.shape[:2])
+
+    def test_star_trail_current_icon_is_a_clickable_crop(self):
+        icon = cv2.imread(str(IMAGES / "GiftClaims" / "GraceOfStarTrail" /
+                              "button_star_trail_gift_current.png"))
+        self.assertEqual((75, 68), icon.shape[:2])
+        self.assertEqual("GraceOfStarTrail/button_star_trail_gift_current",
+                         event_center.REWARD_NAVIGATION[0])
+
+    def test_revelation_and_sealed_treasury_are_immediate_skips(self):
+        bot = mock.Mock()
+        for name in (GiftScreen.REVELATION_OF_HORUS,
+                     GiftScreen.SEALED_IMPERIAL_TREASURY):
+            with (self.subTest(screen=name),
+                  mock.patch.object(event_center, "identify", return_value=name),
+                  mock.patch.object(event_center, "_process_current_event_content") as process):
+                self.assertEqual(common.ClaimReport(),
+                                 event_center._process_opened_event(bot))
+                process.assert_not_called()
+
+    def test_generic_claim_templates_are_text_only(self):
+        for name in common.TEXT_CLAIM_CONTROLS:
+            image = cv2.imread(str(IMAGES / "GiftClaims" / f"{name}.png"))
+            with self.subTest(template=name):
+                self.assertIsNotNone(image)
+                self.assertLessEqual(image.shape[0], 35)
+                self.assertLessEqual(image.shape[1], 110)
+
+    def test_activities_facebook_with_red_category_is_done(self):
+        screen = np.zeros((704, 396, 3), dtype=np.uint8)
+        template = cv2.imread(str(IMAGES / "GiftClaims" / "EventCenter" /
+                                  "facebook_activity.png"))
+        height, width = template.shape[:2]
+        screen[104:104 + height, 18:18 + width] = template
+        cv2.circle(screen, (253, 64), 8, (0, 40, 190), thickness=-1)
+        self.assertTrue(event_center._activities_facebook_red(self.bot, screen))
+
+    def test_event_center_checkpointed_persistent_badge_is_skip_done(self):
+        bot = mock.Mock()
+        bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
+        signature = bytes([0] * 24)
+        visited = {event_center._category_signature("limited", signature)}
+        with (mock.patch.object(event_center, "_row_dots", return_value=[]),
+              mock.patch.object(event_center, "_verify_clean", return_value=False)):
+            clean = event_center._scan_category(bot, "limited", visited)
+
+        self.assertTrue(clean)
+        self.assertTrue(any("skip/done" in call.args[0]
+                            for call in bot.record.call_args_list))
 
     def test_each_child_module_owns_its_image_folder(self):
         folders = {
@@ -256,21 +565,26 @@ class FixedGiftFlowTests(unittest.TestCase):
         run_valuable.assert_called_once()
         bot.mark_daily_done.assert_called_once_with(gift_claims.KEY)
 
-    def test_unknown_inner_screen_is_not_saved_as_complete(self):
+    def test_unknown_rotating_screen_is_checked_then_skipped(self):
         bot = mock.Mock()
         bot.is_daily_done.return_value = False
         with (mock.patch.object(lobby, "open_next",
                                 side_effect=(GiftScreen.UNKNOWN,
                                              GiftScreen.VALUABLE_EVENT,
-                                             None, None, None, None)),
+                                             None, None)),
               mock.patch.object(gift_claims, "return_home") as return_home,
+              mock.patch.object(gift_claims, "claim_fixed_controls",
+                                return_value=common.ClaimReport()) as fixed,
+              mock.patch.object(gift_claims, "back_if_close_x", return_value=False),
+              mock.patch.object(gift_claims, "claim_sparkles",
+                                return_value=common.ClaimReport()) as sparkle,
               mock.patch.object(valuable_event, "run_opened",
                                 return_value=({limited_offer.KEY: "no_dot"}, True)) as run):
-            with self.assertRaises(YieldToBoss):
-                gift_claims.run(bot)
-            gift_claims.run(bot)
+            self.assertTrue(gift_claims.run(bot))
 
         return_home.assert_called_once_with(bot)
+        fixed.assert_called_once()
+        sparkle.assert_called_once_with(bot, region=(5, 18, 90, 82), attempts=4)
         run.assert_called_once()
         bot.mark_daily_done.assert_called_once_with(gift_claims.KEY)
 
