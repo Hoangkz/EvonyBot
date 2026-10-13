@@ -32,6 +32,8 @@ DESIGNER_DATA = {
     "checkBoxBubble": {"loc": [13, 62], "size": [75, 28], "text": "Bubble", "type": "CheckBox"},
     "comboBoxBubbleType": {"loc": [90, 62], "size": [60, 28], "type": "ComboBox"},
     "labelBubbleTime": {"loc": [158, 62], "size": [100, 28], "type": "Label"},
+    "labelCivilization": {"loc": [300, 62], "size": [90, 28], "text": "Civilization:", "type": "Label"},
+    "comboBoxCivilization": {"loc": [392, 62], "size": [130, 28], "type": "ComboBox"},
     "labelID": {"loc": [506, 18], "size": [200, 32], "text": "labelID", "type": "Label"},
     "labelServer": {"loc": [13, 22], "size": [60, 28], "text": "Server:", "type": "Label"},
     "textBoxServer": {"loc": [75, 22], "size": [200, 28], "type": "TextBox"},
@@ -39,7 +41,7 @@ DESIGNER_DATA = {
         "children": ["button9", "buttonStopAll", "buttonInitializationApplyAll", "buttonStart",
                      "labelID",
                      "labelServer", "textBoxServer", "checkBoxBubble", "labelBubbleTime",
-                     "comboBoxBubbleType",
+                     "comboBoxBubbleType", "labelCivilization", "comboBoxCivilization",
                      "groupBox2"],
         "loc": [4, 31], "size": [1088, 609], "text": "Initialization", "type": "TabPage",
     },
@@ -47,7 +49,11 @@ DESIGNER_DATA = {
 # Loại bubble (khiên) có thể dùng.
 BUBBLE_TYPES = ["8h", "24h", "3d", "7d"]
 DEFAULT_BUBBLE_TYPE = "24h"
-COMBO_ITEMS = {"comboBoxBubbleType": BUBBLE_TYPES}
+# Nền văn minh: số 1..7 (devices.civilization) = vị trí trong danh sách; mục đầu = chưa biết (bot tự nhận).
+CIVILIZATIONS = ["Europe", "China", "Japan", "Korea", "America", "Russia", "Arabia"]
+CIVILIZATION_UNKNOWN = "(auto)"
+COMBO_ITEMS = {"comboBoxBubbleType": BUBBLE_TYPES,
+               "comboBoxCivilization": [CIVILIZATION_UNKNOWN, *CIVILIZATIONS]}
 PAGE_SIZE = (1088, 609)
 
 # Original button.Tag values in the C# form matched the activity's
@@ -102,6 +108,7 @@ class InitializationTab(DesignerTab):
     stop_all_clicked = pyqtSignal()      # Stop All: dừng mọi bot đang chạy
     server_changed = pyqtSignal(str)   # server mới sau khi nhập xong
     settings_changed = pyqtSignal()    # bật/tắt bubble hoặc đổi loại bubble
+    civilization_changed = pyqtSignal(int)   # người dùng chọn nền văn minh (1..7, 0 = tự nhận)
 
     def __init__(self, device_id="", parent=None):
         super().__init__("tabPage1", DESIGNER_DATA, COMBO_ITEMS, PAGE_SIZE, parent=parent)
@@ -115,6 +122,11 @@ class InitializationTab(DesignerTab):
         c["textBoxServer"].setPlaceholderText("(tuỳ chọn)")
         c["textBoxServer"].editingFinished.connect(
             lambda: self.server_changed.emit(c["textBoxServer"].text().strip()))
+
+        # Nền văn minh của thiết bị: riêng từng máy (lưu cột devices.civilization, Apply ALL không copy). activated chỉ
+        # phát khi người dùng chọn, không phát khi set_civilization đổi bằng code.
+        c["comboBoxCivilization"].activated.connect(
+            lambda index: self.civilization_changed.emit(index))
 
         # Bubble: tích để bot giữ khiên, chọn loại 8h/24h/3d/7d để dùng.
         c["comboBoxBubbleType"].setCurrentText(DEFAULT_BUBBLE_TYPE)
@@ -172,6 +184,11 @@ class InitializationTab(DesignerTab):
     def set_device_id(self, device_id: str):
         self.controls["labelID"].setText(device_id)
 
+    def set_civilization(self, civilization):
+        """Hiện nền văn minh (1..7); None / 0 / ngoài khoảng = chưa biết."""
+        index = civilization if isinstance(civilization, int) and 0 < civilization <= len(CIVILIZATIONS) else 0
+        self.controls["comboBoxCivilization"].setCurrentIndex(index)
+
     def _update_bubble_enabled(self, enabled: bool):
         self.controls["comboBoxBubbleType"].setEnabled(enabled)
 
@@ -220,6 +237,8 @@ class InitializationTab(DesignerTab):
             self.controls["textBoxServer"].setText(data["server"] or "")
         if "bubble" in data:
             self.controls["checkBoxBubble"].setChecked(bool(data["bubble"]))
+        if "civilization" in data:
+            self.set_civilization(data["civilization"])
         if "bubble_until" in data:
             # Thời điểm bubble hết đã lưu trong DB -> đếm ngược tiếp khi mở app.
             self.set_bubble_remaining(seconds_until(data["bubble_until"]))

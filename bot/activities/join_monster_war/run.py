@@ -6,13 +6,16 @@ import time
 from ...common import click_images, delay, exit_images, find_first, go_home, wait_gone
 from ...context import TEMPLATE_DIR
 from ...ocr import read_boss_name, read_coords
+from ...ocr._digits import read_chars, split as split_chars
+from ...ocr.read_coords import FONT as COORDS_FONT, MAX_RATIO as COORDS_MAX_RATIO
 from ...ocr.read_power import text as read_power_text
 from . import boss_names
 from .boss_memory import JOINED as MEMORY_JOINED
 from .boss_memory import BossMemory
 from .constants import (ALLIANCE_ICON, ASSISTANT_GENERAL, BACK, BOSS_MONSTER, CHOOSE_DEVELOPMENT,
                         FAVORITE_OFF, FAVORITE_ON,
-                        GENERAL_SEARCH, IDLE, JB, JOIN, JOIN_LIST, JOIN_MAX_Y, JOIN_MIN_Y, MAIN_GENERAL,
+                        GENERAL_SEARCH, IDLE, JB, MONSTER_TICKED_REGION, MONSTER_TICKED_THRESHOLD,
+                        MONSTER_TICK_TRIES, MONSTER_WAR_TAP, JOIN, JOIN_LIST, JOIN_MAX_Y, JOIN_MIN_Y, MAIN_GENERAL,
                         JOIN_THRESHOLD, JOINED, JOINED_BUTTON, JOINED_OVERLAP, LEAVE_ALLIANCE_POPUP,
                         LIST_END_MAX_LIGHT, LIST_END_REGION, LISTBOSS, LOCATION, MARCH, MARCH_SCREEN,
                         NO_BOSS, NOT_ENOUGH_STAMINA, OUT_OF_STAMINA, PRESET_COUNT, PRESET_DX,
@@ -59,6 +62,9 @@ class _Boss:
         self.exit_when_idle = settings.get("exit_when_idle", False)  # Worker bật khi còn activity khác
         self.idle_scrolls = 0                               # Số lần cuộn liên tiếp mà không thấy boss mới
         self.next_screen = None                             # Ảnh mới nhất (sau khi cuộn / wait_gone), dùng cho vòng lặp kế tiếp
+        self.war_y = None                                   # Tọa độ y hàng "War" (đáy vùng cố định phía trên danh sách)
+        self.layout_changed = False                         # Vừa cuộn nhẹ để xem lực: ảnh và vị trí nút đã cũ
+        self.monster_taps = 0                               # Số lần đã bấm tích ô "Monster War" trong lượt chạy này
         self.war_taps = 0                                   # Số lần đã bấm bỏ tích ô "War" trong lượt chạy này
         if getattr(bot, "join_boss_perf", None) is None:
             bot.join_boss_perf = {}
@@ -153,7 +159,8 @@ class _Boss:
             self.previous = action
 
             # Danh sách War mà ô "War" (rally đánh người chơi) đang tích -> bấm bỏ tích trước
-            if self._on_war_list(screen, action) and self._untick_war(screen):
+            if (self._on_war_list(screen, action)
+                    and (self._tick_monster_war(screen) or self._untick_war(screen))):
                 continue
 
             if action == OUT_OF_STAMINA:
@@ -230,6 +237,28 @@ class _Boss:
             return True
         return action == NO_BOSS and self.bot.find(PVP_WAR, screen=screen, region=REGIONS[PVP_WAR]) is not None
 
+    def _tick_monster_war(self, screen) -> bool:
+        """Ô "Monster War" chưa tích (không có rally boss nào hiện) -> bấm tích rồi chờ dấu tích hiện
+        (ảnh xác nhận dùng cho vòng lặp kế tiếp). True nếu đã bấm. Giới hạn MONSTER_TICK_TRIES lần
+        mỗi lượt chạy như ô War."""
+        bot = self.bot
+        if self.monster_taps >= MONSTER_TICK_TRIES:
+            return False
+        if bot.find(WAR_TICKED, threshold=MONSTER_TICKED_THRESHOLD, screen=screen,
+                    region=MONSTER_TICKED_REGION) is not None:
+            return False
+        self.monster_taps += 1
+        bot.log("Tích ô Monster War (để thấy rally đánh boss)")
+        bot.tap(*MONSTER_WAR_TAP)
+        shot, ticked = self._poll_screen(
+            "tick_monster_war",
+            lambda image: bot.find(WAR_TICKED, threshold=MONSTER_TICKED_THRESHOLD, screen=image,
+                                   region=MONSTER_TICKED_REGION) is not None,
+        )
+        if ticked:
+            self.next_screen = shot
+        return True
+
     def _untick_war(self, screen) -> bool:
         """Ô "War" đang tích -> bấm bỏ tích rồi chờ dấu tích mất (ảnh xác nhận được
         dùng cho vòng lặp kế tiếp). True nếu đã bấm. Mỗi lượt chạy bấm tối đa
@@ -240,6 +269,7 @@ class _Boss:
         pos = bot.find(WAR_TICKED, screen=screen, region=REGIONS[WAR_TICKED])
         if pos is None:
             return False
+        self.war_y = pos[1]
         self.war_taps += 1
         bot.log("Bỏ tích ô War (chỉ giữ rally đánh boss)")
         bot.tap(*pos)
@@ -483,7 +513,7 @@ class _Boss:
             return None
         x, y = max(pins, key=lambda point: point[0])
         lw, _ = bot.template_size(LOCATION)
-        coords = read_coords(bot.crop(screen, x + lw, y, 90, 18))
+        coords = _coords_after_server(bot.crop(screen, x + lw, y, 140, 18))
         if coords is None or not all(0 <= value <= MAX_MAP_COORD for value in coords):
             return None
         return coords
@@ -611,7 +641,8 @@ class _Boss:
         """Tap nút Join của boss đầu tiên cần tham gia; True nếu đã tap."""
         bot = self.bot
         jw, jh = bot.template_size(JOIN)
-        
+        self.layout_changed = False
+
         # 1. Tìm các nút Join hợp lệ trong dải Y
         points, _ = self._join_buttons(screen)
         
@@ -636,6 +667,7 @@ class _Boss:
                 # thay vì xóa blacklist và lặp vô hạn trên cùng một thẻ OCR lỗi.
                 if coords is None:
                     bot.log(f"Không đọc được tọa độ card tại ({x}, {y}); bỏ qua trong màn hiện tại")
+                    boss_names.log_march_coords_fail(screen, "list", f"{x}_{y}")   # lưu ảnh để thêm mẫu OCR
                     self.screen_blacklist.append((x, y))
                     continue
 
@@ -647,7 +679,14 @@ class _Boss:
 
             # 4. Boss không được tích chỉ bị blacklist trên màn hình hiện tại. Sau khi cuộn hoặc
             # mở lại Join Boss, tên/cấp sẽ được OCR lại.
-            if not self._boss_is_wanted(screen, x, y, coords):
+            wanted = self._boss_is_wanted(screen, x, y, coords)
+            if self.layout_changed:
+                # Đã cuộn nhẹ để xem lực: vị trí các nút trên ảnh này không còn đúng.
+                # Không Join lúc này: quét lại ảnh mới, thẻ đó giờ đã hiện đủ thanh lực.
+                self.layout_changed = False
+                self.screen_blacklist.clear()
+                return False
+            if not wanted:
                 self.screen_blacklist.append((x, y))
                 continue
 
@@ -731,10 +770,14 @@ class _Boss:
             self.next_screen = fresh
             self.screen_blacklist = [point]
             return None
-        if coords is None and not self._boss_is_wanted(fresh, *point, coords):
-            self.next_screen = fresh
-            self.screen_blacklist = [point]
-            return None
+        if coords is None:
+            wanted = self._boss_is_wanted(fresh, *point, coords)
+            if self.layout_changed:      # vừa cuộn nhẹ để xem lực: next_screen đã là ảnh mới
+                return None
+            if not wanted:
+                self.next_screen = fresh
+                self.screen_blacklist = [point]
+                return None
 
         return point
 
@@ -748,6 +791,44 @@ class _Boss:
         # Hạ tiêu chuẩn Red xuống > 160 và G/B < 110 để tránh lệch màu giữa các máy giả lập
         return int(((r > 160) & (g < 110) & (b < 110)).sum()) > 5
 
+    def _list_top(self) -> int:
+        """y thấp nhất mà nội dung danh sách còn thấy được: dưới hàng "War" cố định ở đầu màn."""
+        return (self.war_y if self.war_y is not None else WAR_ROW_Y) + LIST_TOP_BELOW_WAR
+
+    def _read_power(self, screen, x, y, coords):
+        """Chữ lực của thẻ có nút Join ở (x, y). Thanh lực nằm cao hơn nút Join ~180 px nên thẻ
+        sát mép trên có thể bị hàng War che mất: cuộn nhẹ danh sách xuống vừa đủ để lộ ra, chụp lại,
+        tìm lại đúng thẻ (theo tọa độ) rồi mới đọc. Cuộn xong thì ảnh cũ không dùng được nữa
+        (layout_changed): _join quét lại từ ảnh mới."""
+        bot = self.bot
+        top = self._list_top()
+        py = y + POWER_DY
+        if py < top:
+            shift = top - py + POWER_PEEK_MARGIN
+            bot.log(f"Boss {coords}: thanh lực bị che, cuộn nhẹ {shift}px để đọc lực")
+            height = screen.shape[0]
+            bot.swipe_percent(50, 40, 50, 40 + 100 * shift / height, duration=0.8)
+            delay(bot, SCROLL_SETTLE)
+            screen = bot.screenshot()
+            self.next_screen = screen
+            self.layout_changed = True
+            point = self._find_card(screen, coords, y + shift)
+            if point is None:
+                return None
+            x, y = point
+            py = y + POWER_DY
+            if py < top:
+                return None
+        return read_power_text(bot.crop(screen, x + POWER_DX, py, POWER_W, POWER_DH))
+
+    def _find_card(self, screen, coords, expected_y):
+        """Nút Join của thẻ có tọa độ `coords` (không có tọa độ thì thẻ gần y dự kiến nhất)."""
+        points, _ = self._join_buttons(screen)
+        points = sorted(points, key=lambda p: abs(p[1] - expected_y))
+        if coords is None or not CAN_READ_COORDS:
+            return points[0] if points else None
+        return next((p for p in points if self._read_card_coords(screen, *p) == coords), None)
+
     def _boss_is_wanted(self, screen, x, y, coords) -> bool:
         """Đọc nhãn tên "(Boss) [tier] <tên>" của thẻ có nút Join ở góc (x, y),
         tìm cấp (từ tier; không có tier thì từ lực của boss) và kiểm tra boss
@@ -759,8 +840,9 @@ class _Boss:
         text = read_boss_name(bot.crop(screen, x + NAME_DX, y + NAME_DY, NAME_W, NAME_DH))
         boss, tier = boss_names.parse(text)
         level, power = boss_names.level(
-            boss, tier, lambda: read_power_text(bot.crop(screen, x + POWER_DX, y + POWER_DY, POWER_W, POWER_DH)))
+            boss, tier, lambda: self._read_power(screen, x, y, coords))
         wanted = boss_names.wanted(self.selected, boss, level)
+        boss_names.log_unknown(screen, coords, text, power, boss, level)
         self.card_boss = "_".join(str(part) for part in (
             boss.name if boss else text, f"lv{level}" if level else None, power) if part)
         bot.log(f"Boss {coords}: {text!r}"
@@ -777,6 +859,9 @@ class _Boss:
 NAME_DX, NAME_DY, NAME_W, NAME_DH = -95, -90, 168, 30
 # Lực của boss (số bên phải thanh trên cùng của thẻ, sau biểu tượng kiếm).
 POWER_DX, POWER_DY, POWER_W, POWER_DH = -18, -180, 85, 20   # số dài (147.5M) bắt đầu từ x-14
+# Hàng "War" cố định ở đầu màn (y ~105-127; biết chính xác khi đã gặp ô War, xem war_y). Thanh lực
+# phải nằm dưới nó mới thấy được; thiếu thì cuộn nhẹ thêm chừng đó + POWER_PEEK_MARGIN px.
+WAR_ROW_Y, LIST_TOP_BELOW_WAR, POWER_PEEK_MARGIN = 116, 22, 20
 
 SCROLLS_EACH_WAY = 3                  # mỗi chu kỳ: 3 lần cuộn xuống rồi 3 lần cuộn lên
 IDLE_SCROLLS = 2 * SCROLLS_EACH_WAY   # cuộn hết 1 chu kỳ (6 lần) mà không thấy boss mới -> rảnh
@@ -786,7 +871,7 @@ POLL_INTERVAL = 0.2     # kiểm tra sớm để đa số bước hoàn thành g
 STEP_TARGET = 1.0       # quá mức này ghi SLOW trong log performance
 STEP_TIMEOUT = 2.0      # không bước UI nào chờ lâu hơn 2 giây
 PERF_SUMMARY_EVERY = 10 # mỗi 10 mẫu in p50/p95/max của bước đó
-MAX_MAP_COORD = 2000    # chặn kết quả OCR tọa độ hỏng rõ ràng; cố ý rộng hơn mọi map đang dùng
+MAX_MAP_COORD = 1200    # tọa độ map chỉ từ 0 đến 1200; ngoài khoảng này là OCR hỏng
 _WAIT = {"top_left": {LEAVE_ALLIANCE_POPUP}, "tolerance": SAME_SPOT,
          "timeout": STEP_TIMEOUT, "interval": POLL_INTERVAL}
 
@@ -795,6 +880,21 @@ STAMINA_MULTIPLES = ("200", "300", "400", "500")     # thể lực muốn nhận
 STAMINA_CHOICES = ("ALL", "100", *STAMINA_MULTIPLES)
 STAMINA_CLOSE_WAIT = 10     # giây chờ popup dùng thể lực đóng (kiểm tra mỗi 1 s)
 STAMINA_CLOSE_ROUNDS = 2    # số đợt chờ (Back giữa hai đợt); hết đợt mà chưa đóng thì Back 2 lần
+
+
+def _coords_after_server(image) -> tuple[int, int] | None:
+    """Tọa độ "XXXX:YYYY" (luôn đủ 4 chữ số) ở cuối dòng, bỏ qua tiền tố server nếu có
+    (rally server khác hiện "K:2182 0280:0290")."""
+    chars = split_chars(image, COORDS_MAX_RATIO)
+    colons = [i for i, c in enumerate(chars) if isinstance(c, str) and c == ":"]
+    if not colons:
+        return None
+    i = colons[-1]
+    text = read_chars(chars[max(0, i - 4):i + 5], COORDS_FONT)
+    parts = (text or "").split(":")
+    if len(parts) != 2 or not all(part.isdigit() for part in parts):
+        return None
+    return int(parts[0]), int(parts[1])
 
 
 def _item_stamina(bot, screen) -> int | None:

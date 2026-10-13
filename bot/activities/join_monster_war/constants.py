@@ -67,6 +67,12 @@ REGIONS = {
 # danh sách chỉ còn rally đánh boss. Ô "Monster War" giống hệt nên chỉ tìm trong
 # REGIONS[WAR_TICKED]. Điểm khớp: đang tích 1.00, đã bỏ tích ~0.67.
 WAR_UNTICK_TRIES = 3                # số lần bấm tối đa mỗi lượt chạy, tránh bấm qua bấm lại
+# Ô "Monster War" (cạnh ô "War", cùng hình): phải đang tích mới thấy rally đánh boss. Không thấy dấu tích
+# (không tích: khớp ~0,6; tích: 0,82-0,92) thì bấm vào tâm ô (đo trên 396x704: ô x37-61, y104-132).
+MONSTER_TICKED_REGION = (0, 12, 30, 21)
+MONSTER_TICKED_THRESHOLD = 0.78
+MONSTER_WAR_TAP = (49, 118)
+MONSTER_TICK_TRIES = 3             # số lần bấm tối đa mỗi lượt chạy
 
 # Hàng preset trên màn March (% màn hình): ô i (1-8) có tâm x = PRESET_X0 + (i - 1) * PRESET_DX,
 # y = PRESET_Y. Đo trên 396x704: tâm x 41, 86, 130, 175, 220, 265, 310, 354; y 77.

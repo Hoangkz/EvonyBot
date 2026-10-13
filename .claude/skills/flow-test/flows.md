@@ -230,7 +230,7 @@ Settings: `{"gather_troops_siege_machine": {"value": 20000, "level": 13, "day": 
 | ------------------- | --------------------------------------------------------------- | --------------------------------------------------------- |
 | 07 / 07_gather_day3 | Gather Troops, tab Day 1 / Day 3                                | `tap("Event/GatherTroops/SiegeMachine/day4.png")`         |
 | 08                  | Day 4, tab Siege Machine (mặc định, `siegeMachineSelected.png`) | OCR "0 / 500", `tap_at(335, 344)`                         |
-| 09                  | Day 4, tab Defense Force đang chọn                              | `tap("Event/GatherTroops/SiegeMachine/siegeMachine.png")` |
+| 09                  | Day 4, tab Trap Factory đang chọn                              | `tap("Event/GatherTroops/SiegeMachine/siegeMachine.png")` |
 | train_tNN           | Màn Train xe công thành (`SiegeMachine/Tier/<cấp>.png`, I..XV)  | giống Ground Troop; `train_t13` OCR 20812 / lần           |
 
 - `06_day_locked_tmp.png` (Day 4, 5 khoá) dùng thẳng, không cần biến thể: lưu `gather_troops_siege_machine_locked`.
@@ -238,21 +238,21 @@ Settings: `{"gather_troops_siege_machine": {"value": 20000, "level": 13, "day": 
 - `10_after_go.png` / `11_train_menu.png`: xưởng (Workshop) thật.
 - Xưởng đang có mẻ train (áp dụng cho mọi loại lính, flow chung): bấm giữa sau Go → `11_speed_up_menu.png` (menu có Speed Up / Instant Finish / Cancel / View, không có Train; icon View khớp nhầm `train.png` 0,92) → `tap(".../Train/speedUp.png")` → `speedup_workshop.png` (Speedup Settings → Confirm → Finish All) → `12_after_finish_all.png` (về thành) → `tap_at(198, 352)` lần nữa → `11_train_menu.png` → Train như thường.
 
-### Defense Force — `tests/event/gather_troops/defense_force/`
+### Trap Factory — `tests/event/gather_troops/trap_factory/`
 
-Settings: `{"gather_troops_defense_force": {"value": 7000, "level": 6, "day": 4}}`. Flow chung `train_troop` (TroopTask có `lowest=3`, `menu_icon=build.png`, `speedup_title` riêng), khác lính ở:
+Settings: `{"gather_troops_trap_factory": {"value": 7000, "level": 6, "day": 4}}`. Flow chung `train_troop` (TroopTask có `lowest=3`, `menu_icon=build.png`, `speedup_title` riêng), khác lính ở:
 
 | #                  | Màn hình                                                                                                        | Action                                                                                                                    |
 | ------------------ | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| 08                 | Day 4, tab Siege Machine (mặc định)                                                                             | `tap("Event/GatherTroops/DefenseForce/defenseForce.png")`                                                                 |
-| 09                 | Day 4, tab Defense Force                                                                                        | OCR "0 / 1,000", `tap_at(335, 344)`                                                                                       |
-| 10 / 11_build_menu | Thành, Trap Factory / menu có "Build" (không có Train)                                                          | `tap_at(198, 352)` / `tap(".../DefenseForce/build.png")`                                                                  |
+| 08                 | Day 4, tab Siege Machine (mặc định)                                                                             | `tap("Event/GatherTroops/TrapFactory/trapFactory.png")`                                                                 |
+| 09                 | Day 4, tab Trap Factory                                                                                        | OCR "0 / 1,000", `tap_at(335, 344)`                                                                                       |
+| 10 / 11_build_menu | Thành, Trap Factory / menu có "Build" (không có Train)                                                          | `tap_at(198, 352)` / `tap(".../TrapFactory/build.png")`                                                                  |
 | 11_speed_up_menu   | Trap Factory đang xây (Speed Up)                                                                                | như lính: Speed Up → `speedup_trap.png` ("Trap Building Speedup") → Finish All → về thành → bấm giữa lại                  |
-| train*<cấp>*<loại> | Màn Train bẫy: mỗi cấp 4 vòng Trap, Rock, Abatis, Fire Arrow (ảnh `DefenseForce/Tier/<cấp>_<loại>.png`, I..VII) | `troop_tier` lấy ảnh khớp cao nhất mỗi vòng; khoá theo từng loại, một cấp khoá khi cả 4 loại khoá; loại nào mở cũng train |
+| train*<cấp>*<loại> | Màn Train bẫy: mỗi cấp 4 vòng Trap, Rock, Abatis, Fire Arrow (ảnh `TrapFactory/Tier/<cấp>_<loại>.png`, I..VII) | `troop_tier` lấy ảnh khớp cao nhất mỗi vòng; khoá theo từng loại, một cấp khoá khi cả 4 loại khoá; loại nào mở cũng train |
 
 - Tài khoản A (`train_*`): Rock VII → bấm vòng trái nhất (Fire Arrow VI, Rock VI, ..., Rock IV) → bấm Fire Arrow III → train cấp 3.
 - Tài khoản B (`b_*`): cấp IV khoá hết, Fire Arrow III khoá → train cấp III bằng loại khác. Bước cuối dùng `b_train_3_abatis.png` thay cho Fire Arrow III ở giữa (chưa có ảnh đúng).
-- Chưa có ảnh tài khoản khoá cả cấp III (→ `gather_troops_defense_force_locked`).
+- Chưa có ảnh tài khoản khoá cả cấp III (→ `gather_troops_trap_factory_locked`).
 
 ### Quy tắc chung các nhiệm vụ Gather Troops (Cultivate Generals + 5 nhiệm vụ train)
 

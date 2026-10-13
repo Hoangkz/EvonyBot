@@ -3,7 +3,7 @@
 Code: [city_building.py](city_building.py). Dùng bởi King's Path ([kings_path/building.py](kings_path/building.py))
 và Gather Troops ([gather_troops/train_troop/run.py](gather_troops/train_troop/run.py) `_open_building_menu`).
 Activity Black Market (không qua nút Go) dùng thêm bản đồ thành theo thiết bị:
-[../black_market/city_map.py](../black_market/city_map.py). Event / nhiệm vụ Daily vẫn đi bằng nút Go.
+[../../city/city_map.py](../../city/city_map.py). Event / nhiệm vụ Daily vẫn đi bằng nút Go.
 Daily Activities chưa dùng.
 
 ## 1. Vấn đề
@@ -23,7 +23,7 @@ Hình công trình **khác nhau theo nền văn minh** của tài khoản (7 lo�
 | KP Refine | `forge` | Craft |
 | KP Train Troop | `troop` (tìm cả `barracks`, `archer_camp`, `stables`, `workshop`) | Train / Speed Up |
 | GT Ground / Ranged / Mounted / Siege | `barracks` / `archer_camp` / `stables` / `workshop` | Train / Speed Up |
-| GT Defense Force | `defense_force` | Build / Speed Up |
+| GT Trap Factory | `trap_factory` | Build / Speed Up |
 
 Có mẫu nhưng chưa nối vào nhiệm vụ nào: `academy`, `shrine`, `keep` (Daily: Resource Collecting, Offering,
 Gold Levy), `pasture`, `art_hall`, `battlefield`.
@@ -78,7 +78,9 @@ không ghi vào `Images/` vì thư mục này bị thay mỗi lần cập nhật
 
 - Lưu DB: cột `devices.civilization` (1 .. 7, NULL = chưa biết). `BotWorker` nạp vào `bot.civilization` lúc
   chạy; bot tự xếp thì gọi `bot.set_civilization(n)` → signal `civilization_found` → `Database.set_civilization`.
-- **Đã biết civ N**: chỉ tìm ảnh của civ N (nhanh, không nhầm civ khác).
+- **Đã biết civ N**: tìm ảnh của civ N trước. Không khớp thì tìm ảnh của 6 civ còn lại (người dùng có thể
+  đổi nền văn minh): khớp civ M -> `set_civilization(M)` cập nhật DB, bấm vào chỗ khớp. Cả 7 civ đều
+  không khớp -> bấm giữa, menu đúng icon thì học ảnh vào civ N cũ (như dưới).
 - **Chưa biết**: tìm ảnh của mọi civ; khớp ảnh civ N → gán máy vào civ N (lưu DB).
 - Chưa biết mà không khớp civ nào, menu đúng icon (tự học, `remember_building`):
   - chưa có civ nào → tạo civ 1;

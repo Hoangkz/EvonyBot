@@ -7,8 +7,8 @@
 
 - [ ] **Lực có chữ số `0`**
   - VD: Pumpkin Monster 708.5K, Achelois 187.7M...
-  -  Còn thiếu `0`, nên boss không có tier có lực chứa `0` sẽ không suy ra được cấp và bị bỏ qua.
-  - Việc cần làm: thêm mẫu (`add_sample Power`), thêm thẻ vào `CARDS` trong `test_boss_names.py`.
+  - Đã thêm mẫu `0_2.png` (từ "250.5M", Screenshot_20261013-035556): đọc ra 250500000. Mới có 2 mẫu `0` (1 mẫu cũ).
+  - Còn lại: thêm thẻ lực có `0` vào `CARDS` trong `test_boss_names.py` (cần ảnh thẻ có nút Join đúng cỡ bot cắt), thêm mẫu `0` từ các thẻ khác nếu đọc sai.
 - [x] **Tier Legendary**: đã có mẫu `L` hoa, `ry` (`war_legendary_cerberus_bayar.png`).
 - [ ] **Tier Mythical / Excellent / Supreme / Grand**
   - Font `Name` còn thiếu `x` và có thể thêm vài chữ khác.

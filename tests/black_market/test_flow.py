@@ -6,7 +6,7 @@ theo Quantity Buy / Refresh / số dư.
 Ảnh dùng chung, không chép (ảnh chụp nguyên màn hình giả lập 396x704): bm_* ở tests/event/kings_path/screens/.
 - bm_screen: ô 1 gói 50k gỗ (giá 40.000 lương thực), ô 4 Chips 100 x2 (giá 150.000 quặng), còn lại EXP / boost.
 - bm_screen_3: ô 2 gói 100k quặng (giá 80.000 gỗ); ô 5, 6 gói 500k giá kim cương.
-Mở Chợ từ màn thành (black_market/city_map.py), ảnh chụp 21943 trong screens/ của thư mục này:
+Mở Chợ từ màn thành (bot/city/city_map.py), ảnh chụp 21943 trong screens/ của thư mục này:
 - city_forge: Lò rèn ở giữa (197, 345); city_market: Chợ ở giữa (197, 337); city_market_edge: Chợ lệch (251, 317);
   market_menu: menu Chợ (icon "Black Market" (165, 226)).
 """
@@ -20,13 +20,13 @@ from tests.daily_activities import KP, TESTS_DIR
 from tests.flow import Step, back, end, run_flow, swipe, tap, tap_at, tap_pct
 
 BM = "black_market/screens/"
-# Bản đồ thành 21943 (toạ độ quét thật, black_market/city_map.py scan).
+# Bản đồ thành 21943 (toạ độ quét thật, bot/city/city_map.py scan).
 CITY_MAP = {"keep": [0, 0], "forge": [-412, -268], "market": [285, -715]}
 
 SCREENS = TESTS_DIR
 # Package black_market có hàm `run` trùng tên module -> lấy module qua sys.modules.
 RUN = sys.modules["bot.activities.black_market.run"]
-CM = sys.modules["bot.activities.black_market.city_map"]
+CM = sys.modules["bot.city.city_map"]
 
 
 def _settings(**kw):
@@ -137,6 +137,12 @@ class BlackMarketFlow(unittest.TestCase):
 
 class OpenMarketFlow(unittest.TestCase):
     """Mở Black Market từ màn thành (_market): Chợ trên màn / bản đồ thành của máy."""
+
+    def setUp(self):
+        # Ảnh test là ảnh tĩnh nên màn hình không đổi sau cú vuốt: coi như đã đổi để bot không vuốt lại bằng điểm đầu khác.
+        patcher = mock.patch.object(CM, "_moved", return_value=True)
+        patcher.start()
+        self.addCleanup(patcher.stop)
 
     @staticmethod
     def _swipe_pct(finger):

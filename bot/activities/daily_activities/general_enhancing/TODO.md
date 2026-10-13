@@ -7,5 +7,5 @@ Flow: [FLOW.md](FLOW.md). Việc chung của Daily Activities: [../TODO.md](../T
    ~~`test_flow`~~ (đã có: `tests/daily_activities/general_enhancing/test_flow.py` — 5 lần Gold Cultivate, không ra
    kết quả thì dừng); **giao diện mới** (màn tướng có tab Cultivate Once / Quick Cultivate — chưa biết nút Gold Cultivate
    ở đâu, ảnh `GoldCultivate.png` / `CultivateCancel.png` chỉ cắt từ giao diện cũ); nối vào `run.py` chung.
-2. `test_flow.py` + `screens/` trong `tests/daily_activities/general_enhancing/`.
+2. ~~`test_flow.py` + `screens/`~~: đã có (xem mục 1).
 3. Ảnh `Done.png` (bản cũ: thẻ đã nhận, tích xanh "Completed"): người dùng chụp sau khi làm xong.

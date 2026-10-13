@@ -72,7 +72,7 @@ class OfferingFlow(unittest.TestCase):
                 Step("04b_activity_offer_second.png?no_go", end(result=False))]
         device = run_flow(self, lambda bot, _s: open_task_or_finish(bot, offering.TASK), SCREENS, flow,
                           {}, variants={"no_go": hide_go})
-        self.assertNotIn("Offering", device.daily_done)
+        self.assertNotIn("daily_offering", device.daily_done)
 
     def test_after_go_opens_offer_screen(self):
         """Sau Go: Đền thờ ở giữa (khớp ảnh mẫu civ 1) -> bấm vào nó -> menu -> Offer -> màn Offer ->
@@ -93,7 +93,7 @@ class OfferingFlow(unittest.TestCase):
         device = run_flow(self, _open_and_after_go, SCREENS, flow, {},
                           ctx_settings={"Daily Activities": {"Offer Gems": 6}})
         self.assertEqual(device.ctx.civilization, 1, "chưa biết civ: khớp mẫu Đền thờ civ 1 -> gán civ 1")
-        self.assertIn("Offering", device.daily_done)
+        self.assertIn("daily_offering", device.daily_done)
         self.assertIn("daily_offering_reached_6", device.daily_done)
 
     def test_offer_gems_zero_does_not_spend_gems(self):

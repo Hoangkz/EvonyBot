@@ -6,7 +6,7 @@ Phần dùng chung (mở Quests → Activity, tìm dòng, bấm Go, state machin
 ## Luồng mới (`run.after_go`, sau khi `common.open_task` bấm Go)
 
 Code chung với Troop Training: [../train.py](../train.py) `train_after_go`; ảnh / bước giống Gather Troops
-Defense Force (`event/gather_troops/defense_force`, xây bẫy).
+Trap Factory (`event/gather_troops/trap_factory`, xây bẫy).
 
 1. Go → về thành, **Trap Factory** ở giữa → bấm → menu: "Build" → màn Train bẫy. Đang có mẻ xây ("Speed Up")
    → Trap Building Speedup → Finish All mẻ đó trước (không tính) → mở lại menu.

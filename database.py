@@ -109,7 +109,7 @@ def _reset_old_layout(conn: sqlite3.Connection):
 # Key nhiệm vụ đã đổi tên (bot/worker/priority.py): key cũ -> key mới. Đổi trong cột `event`
 # (cấu hình tab Event) và `daily_done` (kể cả "<key>_locked") của DB cũ, để không mất cấu hình / tiến độ.
 KEY_RENAMES = {old: f"gather_troops_{old}" for old in
-               ("ground_troop", "mounted_troop", "ranged_troop", "siege_machine", "defense_force")}
+               ("ground_troop", "mounted_troop", "ranged_troop", "siege_machine", "trap_factory")}
 
 # Gift claims used to persist every inner module separately. They are now one
 # resumable task (``gift_claims``), so stale child keys must not keep appearing
@@ -297,7 +297,7 @@ class Database:
         ))
 
     def set_city_map(self, serial: str, city_map: str):
-        """Lưu bản đồ thành của thiết bị (JSON {công trình: [x, y]}, bot quét thành; activities/black_market/city_map.py)."""
+        """Lưu bản đồ thành của thiết bị (JSON {công trình: [x, y]}, bot quét thành; bot/city/city_map.py)."""
         now = _now()
         self._write(lambda conn: conn.execute(
             "UPDATE devices SET city_map = ?, updated_at = ? WHERE serial = ?",

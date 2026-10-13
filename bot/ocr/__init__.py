@@ -7,6 +7,7 @@ per reader, each exposing `run(image)`:
 - read_number: digits -> int
 - read_coords: "X:Y" map coordinate -> (x, y)
 - read_server: "S. 1257" (sau "Empire Name:") -> "1257"
+- read_boss_count: số boss chờ ở huy hiệu đỏ của icon listboss (màn thành) -> 3
 - read_boss_name: "(Boss) Peryton" trên thẻ rally -> "(boss) peryton"
 - read_power: lực boss "6.5M" trên thẻ rally -> 6500000
 - read_progress: tiến độ nhiệm vụ event "300 / 500" -> 300 (số đã làm)
@@ -19,6 +20,7 @@ per reader, each exposing `run(image)`:
 - read_balance: số dư vàng / kim cương ở màn Black Market "2,199,030" -> 2199030 (read_gold / read_gems cắt theo icon)
 """
 from .read_balance import run as read_balance
+from .read_boss_count import run as read_boss_count
 from .read_boss_name import run as read_boss_name
 from .read_bubble_time import run as read_bubble_time
 from .read_coords import run as read_coords
@@ -32,5 +34,5 @@ from .read_server import run as read_server
 from .read_tax_count import run as read_tax_count
 from .read_train_count import run as read_train_count
 
-__all__ = ["read_balance", "read_boss_name", "read_bubble_time", "read_coords", "read_heal_count", "read_milestone", "read_number", "read_offer_cost", "read_power", "read_progress",
+__all__ = ["read_balance", "read_boss_count", "read_boss_name", "read_bubble_time", "read_coords", "read_heal_count", "read_milestone", "read_number", "read_offer_cost", "read_power", "read_progress",
            "read_server", "read_tax_count", "read_train_count"]

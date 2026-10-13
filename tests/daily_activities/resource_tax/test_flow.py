@@ -72,7 +72,7 @@ class ResourceTaxFlow(unittest.TestCase):
         ]
         device = run_flow(self, _open_and_after_go, SCREENS, flow, {},
                           ctx_settings=_tax_settings(Food=7, free="Stone"))
-        self.assertIn("Resource Tax", device.daily_done)
+        self.assertIn("daily_resource_tax", device.daily_done)
 
     def test_after_go_nothing_selected(self):
         """Không chọn loại nào (mọi loại 0, không Free): tới màn Tax rồi Back, không bấm dòng nào;
@@ -83,7 +83,7 @@ class ResourceTaxFlow(unittest.TestCase):
             Step("01_main.png", end(result=True)),
         ]
         device = run_flow(self, _open_and_after_go, SCREENS, flow, {}, ctx_settings=_tax_settings())
-        self.assertIn("Resource Tax", device.daily_done)
+        self.assertIn("daily_resource_tax", device.daily_done)
 
 
 if __name__ == "__main__":

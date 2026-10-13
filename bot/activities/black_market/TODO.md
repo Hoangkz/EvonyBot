@@ -4,7 +4,7 @@ Danh mục vật phẩm: [items.py](items.py) (ảnh icon `Images/Black Market/I
 [ui/tabs/black_market_tab.py](../../../ui/tabs/black_market_tab.py) — dựng từ items.py.
 
 1. ~~**Viết lại vòng mua**~~ / ~~**mở Chợ ở mọi chỗ trong thành**~~: xong ([run.py](run.py), bản đồ thành
-   [city_map.py](city_map.py), luồng: [FLOW.md](FLOW.md)). Ảnh mẫu 14 công trình mới (Embassy, Tavern, Prison...,
+   [bot/city/city_map.py](../../city/city_map.py), luồng: [FLOW.md](FLOW.md)). Ảnh mẫu 14 công trình mới (Embassy, Tavern, Prison...,
    civ 1 .. 7) đã có. Còn: ảnh mẫu Học viện 21943, War Hall civ 2 .. 7 (civ 1 đã có), Prison 21943 (mẫu civ 1 chỉ
    0,48), Bunker; chạy thử cả `_market` qua Gold Levy
    (Go thật) + lưu DB trong app.
@@ -13,3 +13,5 @@ Danh mục vật phẩm: [items.py](items.py) (ảnh icon `Images/Black Market/I
 3. **Danh mục tài khoản thường**: items.py thống kê từ 21913 (VIP); tài khoản thường món trả vàng nhiều hơn (giá
    100.000 .. ~1.700.000), cần chạy lại thống kê để thêm icon / món còn thiếu.
 4. ~~`FLOW.md` + flow test~~: [FLOW.md](FLOW.md), `tests/black_market/test_flow.py` (8 test).
+
+Bản đồ thành / route công trình (quét khi rảnh, civ khác): việc còn lại ở [bot/city/TODO.md](../../city/TODO.md).

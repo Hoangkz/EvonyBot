@@ -221,8 +221,11 @@ class JoinBossEdgeCaseTests(unittest.TestCase):
         boss = _Boss(bot, {})
         boss._read_card_coords = mock.Mock(return_value=None)
 
-        self.assertFalse(boss._join(SCREEN))
+        # Mock để test không ghi ảnh thật vào logs/images của app.
+        with mock.patch.object(run_module.boss_names, "log_march_coords_fail") as saved:
+            self.assertFalse(boss._join(SCREEN))
 
+        saved.assert_called_once_with(SCREEN, "list", "319_300")   # lưu ảnh tọa độ OCR lỗi
         self.assertEqual(boss.screen_blacklist, [(319, 300)])
         bot.tap.assert_not_called()
         bot.report_boss.assert_not_called()
@@ -265,10 +268,10 @@ class JoinBossEdgeCaseTests(unittest.TestCase):
         bot.template_size.return_value = (14, 14)
         boss = _Boss(bot, {})
 
-        with mock.patch.object(run_module, "read_coords", return_value=(767, 811)):
+        with mock.patch.object(run_module, "_coords_after_server", return_value=(767, 811)):
             self.assertEqual(boss._read_march_target_coords(SCREEN), (767, 811))
 
-        bot.crop.assert_called_once_with(SCREEN, 288, 266, 90, 18)
+        bot.crop.assert_called_once_with(SCREEN, 288, 266, 140, 18)
 
     def test_pvp_war_without_matching_joined_row_is_not_remembered(self):
         bot = fake_bot()
@@ -357,6 +360,77 @@ class JoinBossEdgeCaseTests(unittest.TestCase):
 
         self.assertEqual(boss.memory.status((500, 600)), JOINED)
         self.assertIn("đã hành quân tới boss", bot.record.call_args.args[0])
+
+    def test_power_below_war_row_is_read_without_scrolling(self):
+        bot = fake_bot()
+        bot.swipe_percent = mock.Mock()
+        boss = _Boss(bot, {})
+
+        with mock.patch.object(run_module, "read_power_text", return_value="85.6m"):
+            self.assertEqual(boss._read_power(SCREEN, 319, 331, (1, 2)), "85.6m")   # lực ở y=151
+
+        bot.swipe_percent.assert_not_called()
+        self.assertFalse(boss.layout_changed)
+
+    def test_power_hidden_under_war_row_scrolls_a_little_then_reads(self):
+        bot = fake_bot()
+        bot.swipe_percent = mock.Mock()
+        boss = _Boss(bot, {})
+        boss._find_card = mock.Mock(return_value=(319, 340))   # thẻ đã dịch xuống sau khi cuộn
+
+        with mock.patch.object(run_module, "read_power_text", return_value="85.6m"):
+            # Join ở y=290 -> thanh lực y=110, nằm trong hàng War (đáy 116 + 22 = 138).
+            self.assertEqual(boss._read_power(SCREEN, 319, 290, (1, 2)), "85.6m")
+
+        bot.swipe_percent.assert_called_once()
+        self.assertTrue(boss.layout_changed)            # ảnh cũ không dùng được nữa
+        self.assertIs(boss.next_screen, SCREEN)
+        boss._find_card.assert_called_once_with(SCREEN, (1, 2), 290 + 48)
+
+    def test_power_still_hidden_after_scroll_gives_no_power(self):
+        bot = fake_bot()
+        bot.swipe_percent = mock.Mock()
+        boss = _Boss(bot, {})
+        boss._find_card = mock.Mock(return_value=(319, 290))   # không dịch được (đã ở đầu danh sách)
+
+        with mock.patch.object(run_module, "read_power_text") as read:
+            self.assertIsNone(boss._read_power(SCREEN, 319, 290, (1, 2)))
+
+        read.assert_not_called()
+
+    def test_war_row_position_found_at_untick_moves_the_visible_limit(self):
+        boss = _Boss(fake_bot(), {})
+        self.assertEqual(boss._list_top(), 116 + 22)
+        boss.war_y = 120
+        self.assertEqual(boss._list_top(), 120 + 22)
+
+    def test_unticked_monster_war_box_is_ticked(self):
+        bot = fake_bot()          # find luôn None: không thấy dấu tích ở ô Monster War
+        boss = _Boss(bot, {})
+        boss._poll_screen = mock.Mock(return_value=(SCREEN, True))
+
+        self.assertTrue(boss._tick_monster_war(SCREEN))
+
+        bot.tap.assert_called_once_with(*run_module.MONSTER_WAR_TAP)
+        self.assertIs(boss.next_screen, SCREEN)
+
+    def test_ticked_monster_war_box_is_left_alone(self):
+        bot = fake_bot()
+        bot.find.return_value = (49, 118)
+        boss = _Boss(bot, {})
+
+        self.assertFalse(boss._tick_monster_war(SCREEN))
+
+        bot.tap.assert_not_called()
+
+    def test_monster_war_box_is_tapped_at_most_a_few_times(self):
+        bot = fake_bot()
+        boss = _Boss(bot, {})
+        boss._poll_screen = mock.Mock(return_value=(SCREEN, False))
+
+        taps = [boss._tick_monster_war(SCREEN) for _ in range(run_module.MONSTER_TICK_TRIES + 2)]
+
+        self.assertEqual(taps, [True] * run_module.MONSTER_TICK_TRIES + [False] * 2)
 
 
 if __name__ == "__main__":

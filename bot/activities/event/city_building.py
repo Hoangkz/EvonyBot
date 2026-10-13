@@ -12,7 +12,9 @@ nằm trong Images/Event/Building/civ<N>/<công trình>/ — dùng cùng ảnh h
 
 Flow (tap_building rồi remember_building):
 1. Tìm ảnh học của công trình ở vùng giữa (tối đa BUILDING_TIMEOUT giây): máy đã biết nền văn
-   minh -> chỉ ảnh của nền văn minh đó; chưa biết -> ảnh của mọi nền văn minh (khớp civ N thì
+   minh -> ảnh của nền văn minh đó trước; không khớp thì xét ảnh của các nền văn minh còn lại
+   (người dùng có thể đổi nền văn minh): khớp civ M -> cập nhật DB sang civ M; cả MAX_CIVS đều
+   không khớp thì làm như bước 2 và học ảnh vào nền văn minh cũ; chưa biết -> ảnh của mọi nền văn minh (khớp civ N thì
    gán máy vào civ N) và ảnh tạm của máy (pending). Thấy -> bấm vào chỗ khớp (không học thêm),
    làm tiếp các bước sau. Tài liệu đầy đủ: CITY_BUILDING.md.
 2. Không thấy (hoặc chưa có ảnh): chờ camera đứng yên, GIỮ LEARN_FRAMES ảnh màn hình -> bấm giữa.
@@ -45,7 +47,7 @@ BARRACKS = "barracks"            # Doanh trại: lính bộ
 STABLES = "stables"              # Chuồng ngựa: lính kỵ
 ARCHER_CAMP = "archer_camp"      # Trại cung: lính xa
 WORKSHOP = "workshop"            # Xưởng: xe công thành
-DEFENSE_FORCE = "defense_force"  # Công trình làm bẫy (Defense Force)
+TRAP_FACTORY = "trap_factory"  # Công trình làm bẫy (Trap Factory)
 ACADEMY = "academy"              # Học viện (Daily: Resource Collecting -> Collection)
 SHRINE = "shrine"                # Đền thờ (Daily: Offering)
 KEEP = "keep"                    # Thành chính (Daily: Gold Levy)
@@ -144,14 +146,18 @@ def _load(path: Path):
     return cv2.imdecode(np.fromfile(str(path), np.uint8), cv2.IMREAD_COLOR)
 
 
-def _candidates(bot, buildings) -> list[tuple[int | None, np.ndarray]]:
+def _candidates(bot, buildings, others: bool = False) -> list[tuple[int | None, np.ndarray]]:
     """[(nền văn minh của ảnh, ảnh)] để tìm: máy đã biết nền văn minh -> chỉ ảnh của nó; chưa
-    biết -> ảnh của mọi nền văn minh và ảnh tạm của máy (nền văn minh None)."""
+    biết -> ảnh của mọi nền văn minh và ảnh tạm của máy (nền văn minh None). `others`: máy đã
+    biết nền văn minh thì trả ảnh của các nền văn minh CÒN LẠI (người dùng có thể đã đổi); chưa
+    biết thì trả rỗng."""
     civ = getattr(bot, "civilization", None)
+    if others and not civ:
+        return []
     paths = []
-    for owner in ([civ] if civ else _known_civs()):
+    for owner in ([c for c in _known_civs() if c != civ] if others else [civ] if civ else _known_civs()):
         paths += [(owner, path) for name in buildings for path in _civ_samples(owner, name)]
-    if not civ:
+    if not civ and not others:
         paths += [(None, path) for name in buildings for path in _samples(_pending_dir(bot) / name)]
     found = []
     for owner, path in paths:
@@ -245,18 +251,25 @@ def stable_crop(frames: list) -> np.ndarray:
     return np.median(np.stack([f[y:y + bh, x:x + bw] for f in frames]), 0).astype(np.uint8)
 
 
-def _find_known(bot, candidates):
+def _best_match(bot, candidates, screen):
+    """(điểm, nền văn minh, tâm) của ảnh khớp cao nhất trên `screen` từ mức BUILDING_THRESHOLD, hoặc None."""
+    best = None
+    for owner, image in candidates:
+        score, pos = bot.best_match(image, screen=screen, region=BUILDING_REGION)
+        if pos is not None and score >= BUILDING_THRESHOLD and (best is None or score > best[0]):
+            best = (score, owner, pos)
+    return best
+
+
+def _find_known(bot, candidates, others=()):
     """Chụp liên tục tới khi thấy một ảnh học (tối đa BUILDING_TIMEOUT giây). Trả (ảnh màn hình,
     nền văn minh của ảnh khớp, tâm chỗ khớp), hoặc (None, None, None). Nhiều ảnh cùng khớp thì lấy
-    chỗ khớp cao nhất."""
+    chỗ khớp cao nhất. `others`: ảnh của các nền văn minh còn lại, chỉ xét khi `candidates` (nền
+    văn minh đã lưu) không khớp: khớp -> người dùng đã đổi nền văn minh."""
     elapsed = 0.0
     while True:
         screen = bot.screenshot()
-        best = None
-        for owner, image in candidates:
-            score, pos = bot.best_match(image, screen=screen, region=BUILDING_REGION)
-            if pos is not None and score >= BUILDING_THRESHOLD and (best is None or score > best[0]):
-                best = (score, owner, pos)
+        best = _best_match(bot, candidates, screen) or _best_match(bot, others, screen)
         if best is not None:
             return screen, best[1], best[2]
         if elapsed >= BUILDING_TIMEOUT:
@@ -292,15 +305,17 @@ def tap_building(bot, name: str, building: str, delay: float, also=()) -> Buildi
     để thử. Chờ `delay` giây. Trả BuildingTap để người gọi kiểm tra menu xong thì gọi
     remember_building."""
     candidates = _candidates(bot, (building, *also))
-    screen, owner, pos = _find_known(bot, candidates) if candidates else (None, None, None)
+    others = _candidates(bot, (building, *also), others=True)
+    screen, owner, pos = (_find_known(bot, candidates, others) if candidates or others
+                          else (None, None, None))
     if screen is not None:
         bot.log(f"{name}: building recognized at {pos}, tapping it")
-        if owner is not None and not getattr(bot, "civilization", None):
-            _assign(bot, name, owner)
+        if owner is not None and owner != getattr(bot, "civilization", None):
+            _assign(bot, name, owner)   # chưa biết nền văn minh, hoặc người dùng đã đổi: cập nhật DB
         bot.tap(*pos, delay=delay)
         return BuildingTap(building, [screen], True)
-    if candidates:
-        bot.log(f"{name}: learned building not found, tapping center to check")
+    if candidates or others:
+        bot.log(f"{name}: learned building not found in any civilization, tapping center to check")
     else:
         bot.log(f"{name}: building not learned yet, tapping center to check")
     frames = _settled_frames(bot)

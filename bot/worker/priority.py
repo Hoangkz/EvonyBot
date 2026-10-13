@@ -17,12 +17,18 @@ from ..activities.daily_activities.general_enhancing import TASK as daily_genera
 from ..activities.daily_activities.wheel_of_fortune import TASK as daily_wheel_of_fortune
 from ..activities.daily_activities.patrol import TASK as daily_patrol
 from ..activities.daily_activities.material_composing import TASK as daily_material_composing
+from ..activities.daily_activities.alliance_research import TASK as daily_alliance_research
+from ..activities.daily_activities.alliance_research.run import after_go as alliance_research_after_go
+from ..activities.daily_activities.greet_champion import TASK as daily_greet_champion
+from ..activities.daily_activities.greet_champion.run import after_go as greet_champion_after_go
+from ..activities.daily_activities.trade_carriage import TASK as daily_trade_carriage
+from ..activities.daily_activities.trade_carriage.run import after_go as trade_carriage_after_go
 from ..activities.event.gather_troops.cultivate_generals.run import run as gather_troops_cultivate_generals
 from ..activities.event.gather_troops.ground_troop.run import run as gather_troops_ground_troop
 from ..activities.event.gather_troops.mounted_troop.run import run as gather_troops_mounted_troop
 from ..activities.event.gather_troops.ranged_troop.run import run as gather_troops_ranged_troop
 from ..activities.event.gather_troops.siege_machine.run import run as gather_troops_siege_machine
-from ..activities.event.gather_troops.defense_force.run import run as gather_troops_defense_force
+from ..activities.event.gather_troops.trap_factory.run import run as gather_troops_trap_factory
 from ..activities.event.kings_path.city_tax.run import run as kings_path_city_tax
 from ..activities.event.kings_path.patrol.run import run as kings_path_patrol
 from ..activities.event.kings_path.donate.run import run as kings_path_donate
@@ -95,7 +101,7 @@ DATA ={
             "label": "Alliance Capacity: donate Alliance Science",
             "priority": 777,
             "once": True,   # chỉ làm 1 lần (mỗi lần Start): xong thì không lưu gì vào DB, không làm lại khi sang ngày mới
-}
+    }
     ],
     "Event": [
         { 
@@ -103,8 +109,6 @@ DATA ={
             "run": event_job("gather_troops", gather_troops_cultivate_generals),
             "label": "Gather Troops: Cultivate Generals",
             "priority": 600,
-
-
         },
         { 
             "key": "gather_troops_ground_troop",
@@ -117,104 +121,78 @@ DATA ={
             "run": event_job("gather_troops", gather_troops_mounted_troop),
             "label": "Gather Troops: Mounted Troop",
             "priority": 551,
-
-
         },
         { 
             "key": "gather_troops_ranged_troop",
             "run": event_job("gather_troops", gather_troops_ranged_troop),
             "label": "Gather Troops: Ranged Troop",
             "priority": 550,
-
-
         },
         { 
             "key": "gather_troops_siege_machine",
             "run": event_job("gather_troops", gather_troops_siege_machine),
             "label": "Gather Troops: Siege Machine",
             "priority": 549,
-
-
         },
         { 
-            "key": "gather_troops_defense_force",
-            "run": event_job("gather_troops", gather_troops_defense_force),
-            "label": "Gather Troops: Defense Force",
+            "key": "gather_troops_trap_factory",
+            "run": event_job("gather_troops", gather_troops_trap_factory),
+            "label": "Gather Troops: Trap Factory",
             "priority": 548, 
-
-
         },
         { 
             "key": "kings_path_wheel",
             "run": event_job("kings_path", kings_path_wheel),
             "label": "King's Path: Wheel",
             "priority": 559,
-
-
         },
         { 
             "key": "kings_path_black_market",
             "run": event_job("kings_path", kings_path_black_market),
             "label": "King's Path: Black Market",
             "priority": 558,
-
-
         },
         { 
             "key": "kings_path_patrol",
             "run": event_job("kings_path", kings_path_patrol),
             "label": "King's Path: Patrol",
             "priority": 557, "note": "Yêu cầu phải cao hơn King's Path: Donate",
-
-
         },
         { 
             "key": "kings_path_donate",
             "run": event_job("kings_path", kings_path_donate),
             "label": "King's Path: Donate",
             "priority": 556,
-
-
         },
         { 
             "key": "kings_path_city_tax",
             "run": event_job("kings_path", kings_path_city_tax),
             "label": "King's Path: City Tax",
             "priority": 554,
-
-
         },
         { 
             "key": "kings_path_train_troop",
             "run": event_job("kings_path", kings_path_train_troop),
             "label": "King's Path: Train Troop",
             "priority": 553,
-
-
         },
         { 
             "key": "kings_path_heal",
             "run": event_job("kings_path", kings_path_heal),
             "label": "King's Path: Heal",
             "priority": 547,
-
-
         },
         { 
             "key": "kings_path_refine",
             "run": event_job("kings_path", kings_path_refine),
             "label": "King's Path: Refine Equipment",
             "priority": 546,
-
-
         },
         { 
             "key": "gather_troops_claim",
             "run": claim_job("gather_troops"),
             "label": "Gather Troops: nhận thưởng (chấm đỏ + rương mốc)",
             "priority": 500,
-
-
         },
         { 
             "key": "kings_path_claim",
@@ -236,7 +214,7 @@ DATA ={
             "must_finish": True,
             "label": "General: Buy Stamina + Hammers",
             "priority": 668,
-},
+    },
         { 
             "key": "daily_offering",
             "run": daily_job(daily_offering, target="Offer Gems"),
@@ -250,8 +228,7 @@ DATA ={
             "run": daily_job(daily_resource_gathering),
             "must_finish": True,
             "label": "Resource Gathering",
-            "priority": 665, "note": "Phải chạy ngay sau Offering (bàn tay nổi trong thành)",
-
+            "priority": -665, "note": "Phải chạy ngay sau Offering (bàn tay nổi trong thành)",
         },
         { 
             "key": "daily_resource_tax",
@@ -311,15 +288,14 @@ DATA ={
             "note": "Như Alliance Donation (theo giờ, ô chọn 0-4h, mặc định 4h), chạy ngay sau Alliance Donation",
 
         },
-        { 
+
+                { 
             "key": "daily_alliance_research",
-            "label": "Alliance Research",
-            "priority": -392 
-        },
-        { 
-            "key": "daily_alliance_technology",
-            "label": "Alliance Technology",
-            "priority": -391 
+            "run": daily_job(daily_alliance_research, after_go=alliance_research_after_go),
+            "must_finish": True,
+            "label": "Research",
+            "priority": 392,
+            "note": "Học viện: nghiên cứu 1 công nghệ xanh bất kỳ, tốn thời gian thì Speed Up bằng vật phẩm",
         },
         { 
             "key": "daily_black_market",
@@ -364,16 +340,18 @@ DATA ={
         },
         { 
             "key": "daily_greet_champion",
+            "run": daily_job(daily_greet_champion, after_go=greet_champion_after_go),
             "label": "Greet Champion",
             "priority": 385, 
-            "must_finish": True 
+            "must_finish": True,
+            "note": "Về thành: bấm trái tim trên Keep (hoặc Keep -> Champion), chào 2 lần",
         },
         { 
             "key": "daily_monster_killing",
             "run": daily_job(daily_monster_killing),
             "must_finish": True,
             "label": "Monster Killing",
-            "priority": 384,
+            "priority": -384,
 
         },
         { 
@@ -384,7 +362,16 @@ DATA ={
             "priority": 383,
 
         },
-        { 
+
+        {
+            "key": "daily_trade_carriage",
+            "run": daily_job(daily_trade_carriage, after_go=trade_carriage_after_go),
+            "must_finish": True,
+            "label": "Trade Carriage",
+            "priority": 301,
+            "note": "Nhiệm vụ cuối cùng trước nhận thưởng Activity",
+        },
+        {
             "key": "daily_rewards",
             "run": daily_rewards,
             "must_finish": True,

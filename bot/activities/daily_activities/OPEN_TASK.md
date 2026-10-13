@@ -44,7 +44,7 @@ Mỗi vòng chụp màn hình rồi làm **một** việc (tối đa `OPEN_ACTIV
 
 ## 3. Bản MỚI — danh sách Activity (`_search_list`)
 
-Lặp, mỗi vòng một ảnh chụp (tối đa `LIST_MAX_SCROLLS` = 12 lần cuộn):
+Lặp, mỗi vòng một ảnh chụp (tối đa `LIST_MAX_SCROLLS` = 25 lần cuộn):
 
 1. **Claim All** (`CLAIM_ALL`) còn sáng (`_active_claim_all`: nút xám cũng khớp ảnh mẫu 0,86 nên xét thêm độ bão hoà
    màu ≥ `CLAIM_ALL_MIN_SATURATION`) → bấm (không hiện popup). Bấm mà Claim All vẫn còn (lỗi game) → bỏ qua Claim

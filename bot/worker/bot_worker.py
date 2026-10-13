@@ -23,6 +23,8 @@ Thứ tự ưu tiên: Bubble > Auto Times Out > Join Boss > nhiệm vụ.
   (bị ngắt giữa chừng không tính là một lần thử).
 - Danh sách rỗng hoặc cả danh sách đều chưa xong: nghỉ ngắn (IDLE_WAIT) rồi xét lại (thread vẫn sống).
 - Chỉ chọn mỗi Join Boss: chạy Join Boss liên tục như trước.
+- Hết nhiệm vụ (kể cả việc theo giờ chưa tới giờ) và Join Boss rảnh, máy chưa có bản đồ thành: quét 13 ô route công trình (city_map.scan_city),
+  lưu DB; mỗi lượt Start thử một lần, boss mới ngắt giữa chừng thì lần rảnh sau quét lại.
 """
 import json
 import os
@@ -36,7 +38,10 @@ from types import SimpleNamespace
 from PyQt5.QtCore import QThread, pyqtSignal
 
 from ..activities import ACTIVITIES
+from ..city.city_map import scan_city
 from ..activities.join_monster_war import IDLE as BOSS_IDLE
+from ..activities.join_monster_war.constants import LISTBOSS
+from ..ocr.read_boss_count import crop as boss_count_crop, run as read_boss_count
 from ..common import get_server
 from ..daily_reset import done_today, last_reset
 from ..context import BotContext, BotInterrupted, TimedOut
@@ -48,6 +53,8 @@ from .status import STATUS_ERROR, STATUS_RUNNING, STATUS_STOPPED
 
 JOIN_BOSS = "Join Monster War"
 OTHERS_WINDOW = 120   # giây tối đa cho 1 nhiệm vụ khi có Join Boss (không có Join Boss: không giới hạn)
+# Icon listboss: ảnh mẫu cắt phần giữa avatar, bỏ viền vàng (viền vàng sáng lên khi có boss mới nên ảnh mẫu có viền sẽ khớp kém).
+BOSS_ICON_REGION = (80, 20, 100, 90)   # % màn hình: cột icon bên phải
 MAX_ATTEMPTS = 6       # số lần tối đa mỗi ngày một nhiệm vụ chạy hết một lượt mà vẫn chưa xong (quá thì bỏ qua tới ngày mới)
 IDLE_WAIT = 5         # giây nghỉ khi không còn nhiệm vụ nào tới lượt
 
@@ -112,6 +119,7 @@ class BotWorker(QThread):
         self.server_clock = server_clock if server_clock is not None else ServerClock()
         # {task: done_at} lấy từ DB; task chỉ tính là xong nếu done_at sau mốc reset gần nhất.
         self.daily_done = dict(daily_done or {})
+        self._boss_count = None   # số boss lần đọc trước khi tìm route (OCR huy hiệu listboss); None = chưa đọc
         # Bubble + Auto Times Out (guards.py): ưu tiên hơn mọi nhiệm vụ. Auto Times Out: hàm trả số phút chọn ở màn Home
         # (đọc lại mỗi lần, đổi là dùng ngay; 0 = tắt).
         self.guards = Guards(
@@ -199,6 +207,7 @@ class BotWorker(QThread):
         ran_once = set()   # nhiệm vụ `once` đã chạy xong: không làm lại khi sang ngày mới (chỉ khi Start lại)
         attempts = {}      # key -> số lần chạy hết một lượt mà vẫn chưa xong hôm nay (tối đa MAX_ATTEMPTS)
         stalled = 0        # số nhiệm vụ liên tiếp chạy xong một lượt mà vẫn chưa xong
+        scan_tried = False  # đã thử quét bản đồ thành trong lượt Start này (rảnh mới quét, xem nhánh `not pending` bên dưới)
         while not self._stop.is_set():
             if boss:
                 self._ensure_server()
@@ -221,6 +230,16 @@ class BotWorker(QThread):
             pending = [t for t in order if not skip(t)]
             if task is None:
                 if not pending:
+                    # Không còn nhiệm vụ nào (kể cả việc theo giờ chưa tới giờ) và Join Boss vừa báo rảnh: chưa có bản đồ thành
+                    # thì tìm route các công trình (city_map.scan_city: tìm Thành chính trước rồi quét từng ô, lưu DB); cứ 3 cú
+                    # vuốt kiểm tra số boss, tăng thì vào Join Boss tới khi rảnh rồi vuốt tiếp. Mỗi lượt Start thử một lần.
+                    if boss and not self.ctx.city_map and not scan_tried:
+                        scan_tried = True
+                        self.record("Rảnh (hết nhiệm vụ, Join Boss rảnh): tìm route các công trình")
+                        self.activity_changed.emit(self.serial, JOIN_BOSS)
+                        self._boss_count = None
+                        self.guards.call(None, scan_city, self.ctx, "City scan", self._watch_boss_count)
+                        continue
                     self.guards.call(None, self.ctx.sleep, IDLE_WAIT)
                     continue
                 task = pending[0]
@@ -244,6 +263,33 @@ class BotWorker(QThread):
                 if stalled >= len(pending):   # cả danh sách đều chưa xong: nghỉ chút rồi mới vòng lại
                     stalled = 0
                     self.guards.call(None, self.ctx.sleep, IDLE_WAIT)
+
+    def _read_boss_count(self) -> int | None:
+        """Số boss đang chờ trên màn thành: 0 nếu không thấy icon listboss, None nếu thấy mà không đọc được số."""
+        screen = self.ctx.screenshot()
+        icon = self.ctx.find(LISTBOSS, screen=screen, center=False, region=BOSS_ICON_REGION)
+        if icon is None:
+            return 0
+        return read_boss_count(boss_count_crop(screen, icon))
+
+    def _watch_boss_count(self, bot):
+        """Gọi lúc scan_city bắt đầu và cứ 3 cú vuốt: so số boss (OCR huy hiệu icon listboss) với lần đọc trước. Bằng thì vuốt
+        tiếp; giảm thì ghi đè số cũ; tăng thì có boss mới: vào Join Boss tới khi rảnh (Join Boss dừng hẳn thì thôi theo dõi),
+        rồi đọc lại số làm mốc và vuốt tiếp."""
+        count = self._read_boss_count()
+        if count is None:
+            return
+        previous = self._boss_count
+        if previous is None or count <= previous:
+            self._boss_count = count
+            return
+        self.record(f"Tìm route: số boss tăng {previous} -> {count}, vào Join Boss")
+        self.activity_changed.emit(self.serial, JOIN_BOSS)
+        self._ensure_server()
+        self._check_boss()      # chạy Join Boss tới khi rảnh (hoặc dừng hẳn: thôi, vuốt tiếp)
+        again = self._read_boss_count()
+        self._boss_count = again if again is not None else count
+        self.record("Join Boss rảnh, tiếp tục tìm route")
 
     def _is_done(self, task, ran) -> bool:
         """Nhiệm vụ đã xong hôm nay: theo dấu trong DB (`done`), hoặc (không có dấu) đã chạy hết một lượt."""
