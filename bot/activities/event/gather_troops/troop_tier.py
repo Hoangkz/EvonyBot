@@ -16,7 +16,7 @@ Hình lính trên vòng tròn khác nhau theo nền văn minh nên KHÔNG dùng 
 - Train được hay khoá: nút "+" (TRAIN_PLUS) của vòng đang chọn.
 
 - Lính (Ground / Mounted / Ranged / Siege): mỗi cấp một vòng. Cấp khoá luôn là các cấp cao nhất.
-- Bẫy (Defense Force): mỗi cấp 4 vòng liền nhau (4 loại bẫy), loại nào cũng được. Khoá theo
+- Bẫy (Trap Factory): mỗi cấp 4 vòng liền nhau (4 loại bẫy), loại nào cũng được. Khoá theo
   từng loại (VD Fire Arrow III khoá mà Trap IV mở) -> một cấp chỉ coi là khoá khi cả 4 loại đều
   khoá.
 
@@ -78,7 +78,7 @@ def tier_images(folder: str) -> dict[int, str]:
 
 def kind_images(folder: str, kinds: list[str]) -> dict[int, list[str]]:
     """{cấp: [ảnh loại 1, ...]} từ thư mục ảnh <cấp>_<loại>.png, loại theo thứ tự `kinds`
-    (thứ tự trên hàng vòng tròn). VD Event/GatherTroops/DefenseForce/Tier/3_trap.png."""
+    (thứ tự trên hàng vòng tròn). VD Event/GatherTroops/TrapFactory/Tier/3_trap.png."""
     found = {}
     for path in images_in(folder):
         level, kind = path.rsplit("/", 1)[-1].rsplit(".", 1)[0].split("_")

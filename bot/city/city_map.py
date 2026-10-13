@@ -1,5 +1,5 @@
 """
-city_map.py — (chỉ activity Black Market; Event / nhiệm vụ Daily vẫn đi bằng nút Go) bản đồ thành theo từng thiết bị: biết công trình nào ở đâu để đi tới bất kỳ công trình nào (VD Chợ cho
+city_map.py — (Event / nhiệm vụ Daily vẫn đi bằng nút Go; dùng cho Black Market và tìm route khi rảnh) bản đồ thành theo từng thiết bị: biết công trình nào ở đâu để đi tới bất kỳ công trình nào (VD Chợ cho
 activity Black Market) từ chỗ camera đang đứng, không cần nút Go của nhiệm vụ.
 
 Ô đất trong thành ở cùng chỗ trên mọi tài khoản (chỉ khác ô nào xây công trình gì; Thành chính / Đền thờ / Tường thành /
@@ -16,8 +16,10 @@ Mỗi bước kiểm tra còn ở màn thành (city_screen: hộp thoát game ->
 """
 import math
 
-from ..daily_activities.constants import MAIN_MORE
-from ..event.city_building import (
+import numpy as np
+
+from ..activities.daily_activities.constants import MAIN_MORE
+from ..activities.event.city_building import (
     ACADEMY,
     ARCHER_CAMP,
     ARCHER_TOWER,
@@ -52,7 +54,7 @@ from ..event.city_building import (
     _candidates,
 )
 
-from .city_tour import DATA as TOUR, FIXED
+from .city_tour import ANCHOR_SHIFT, DATA as TOUR, FIXED, ROUTES, SUPPORTED_CIVS
 # Công trình nhận ra khi quét / đi (có ảnh mẫu trong Images/Event/Building/civ<N>/ hoặc ảnh tự học).
 BUILDINGS = (KEEP, MARKET, HOSPITAL, FORGE, BARRACKS, STABLES, ARCHER_CAMP, WORKSHOP, TRAP_FACTORY, ACADEMY, SHRINE,
              ART_HALL, BATTLEFIELD, PASTURE, WALLS, EMBASSY, PRISON, TAVERN, RESEARCH_FACTORY, HOLY_PALACE, ICE_LAND,
@@ -67,6 +69,12 @@ TOLERANCE = 25               # px lệch giữa màn cho phép; hơn thì kéo b
 PLOT_RADIUS = (110, 110)     # công trình của ô đang quét: cách giữa màn không quá chừng ấy (mỗi trục)
 CENTER_TRIES = 2             # số cú kéo bù tối đa
 GOTO_TRIES = 3               # số lượt (tìm mốc -> vuốt) tối đa khi đi tới công trình
+SEARCH_LIMIT = 40           # số cú vuốt tối đa khi dò mốc (find_keep)
+BOSS_CHECK_EVERY = 3         # cứ chừng ấy cú vuốt thì gọi bot.swipe_watch (kiểm tra boss mới, xem scan_city)
+TO_CITY = "CityMap/toCity.png"   # nút góc dưới phải khi đang ở bản đồ thế giới (hình toà thành): bấm để về thành
+TO_CITY_WAIT = 4             # giây chờ game chuyển về màn thành sau khi bấm
+TO_CITY_TRIES = 3
+HOME_BACKS = 6               # số lần Back tối đa để về màn thành (scan_city)
 CITY_BACKS = 3               # số lần Back tối đa để đóng popup che màn thành
 EXIT_DIALOG = "en/exitGame.png"     # "Are you sure you want to exit the game?" (Back ở màn thành mở hộp này)
 EXIT_CANCEL = "en/exitCancel.png"
@@ -118,19 +126,56 @@ def split(finger) -> list[tuple[int, int]]:
     return [(round(fx / n), round(fy / n))] * n if n else []
 
 
+def _swiped(bot):
+    """Sau mỗi cú vuốt: cứ BOSS_CHECK_EVERY cú thì gọi bot.swipe_watch() nếu có (scan_city gán; xem đó)."""
+    watch = getattr(bot, "swipe_watch", None)
+    if watch is None:
+        return
+    bot.swipe_count = getattr(bot, "swipe_count", 0) + 1
+    if bot.swipe_count % BOSS_CHECK_EVERY == 0:
+        watch(bot)
+
+
+# Điểm đầu thay thế khi một cú vuốt không làm màn hình đổi (điểm đầu trúng icon / rương / dấu hỏi nên game coi là bấm): dịch điểm
+# đầu và cuối cùng một độ, giữ nguyên hướng và độ dài.
+RETRY_SHIFTS = [(0, 0), (0, -110), (0, 110), (-70, -60), (70, 60)]
+MOVED_DIFF = 6               # độ khác nhau trung bình (0-255) của hai ảnh (bỏ thanh trên / dưới) coi là màn hình đã đổi
+
+
+def _moved(before, after) -> bool:
+    """Màn hình có đổi giữa `before` và `after` không (vùng giữa, bỏ thanh trên và nút dưới)."""
+    return float(np.abs(before[130:560].astype(np.int16) - after[130:560].astype(np.int16)).mean()) > MOVED_DIFF
+
+
+def _swipe_checked(bot, start, end):
+    """Vuốt từ `start` tới `end`; nếu màn hình không đổi thì vuốt lại bằng điểm đầu khác (RETRY_SHIFTS) vì có thể điểm đầu trúng
+    icon trong thế giới (game coi là bấm). Không kiểm tra được (ảnh không phải ma trận, VD test) thì vuốt một lần."""
+    before = city_screen(bot)
+    checkable = isinstance(before, np.ndarray)
+    for dx, dy in RETRY_SHIFTS:
+        x1, y1, x2, y2 = start[0] + dx, start[1] + dy, end[0] + dx, end[1] + dy
+        if (dx, dy) != (0, 0) and not all(8 <= x <= 388 and 135 <= y <= 555 for x, y in ((x1, y1), (x2, y2))):
+            continue      # điểm đầu thay thế phải nằm trong vùng vuốt an toàn (cú gốc luôn được vuốt đúng như đo)
+        bot.swipe(x1, y1, x2, y2, duration=SWIPE_TIME, delay=SWIPE_WAIT)
+        if not checkable:
+            break
+        after = bot.screenshot()
+        if _moved(before, after):
+            break
+        bot.log(f"city swipe did not move the screen, retry with another start point ({dx}, {dy})")
+    _swiped(bot)
+
+
 def swipe(bot, finger):
     """Một cú vuốt chậm `finger` (ngón tay, px) đối xứng quanh SWIPE_CENTER."""
-    city_screen(bot)
     cx, cy = SWIPE_CENTER
     fx, fy = finger
-    bot.swipe(int(cx - fx / 2), int(cy - fy / 2), int(cx + fx / 2), int(cy + fy / 2),
-              duration=SWIPE_TIME, delay=SWIPE_WAIT)
+    _swipe_checked(bot, (int(cx - fx / 2), int(cy - fy / 2)), (int(cx + fx / 2), int(cy + fy / 2)))
 
 
 def swipe_from_to(bot, start, end):
     """Một cú vuốt chậm đúng điểm đầu / cuối (cú đo sẵn trong city_tour.py)."""
-    city_screen(bot)
-    bot.swipe(*start, *end, duration=SWIPE_TIME, delay=SWIPE_WAIT)
+    _swipe_checked(bot, start, end)
 
 
 def _offset(pos):
@@ -138,10 +183,13 @@ def _offset(pos):
 
 
 def centre(bot, building: str, pos):
-    """Kéo bù `building` (đang ở `pos`) vào giữa màn. Trả (vị trí mới, cú vuốt tổng đã dùng)."""
+    """Kéo bù `building` (đang ở `pos`) vào giữa màn (công trình trong ANCHOR_SHIFT: tới tâm riêng của nó). Trả (vị trí mới,
+    cú vuốt tổng đã dùng)."""
     used = [0, 0]
+    shift = ANCHOR_SHIFT.get(building, (0, 0))
     for _ in range(CENTER_TRIES):
         dx, dy = _offset(pos)
+        dx, dy = dx - shift[0], dy - shift[1]
         if abs(dx) <= TOLERANCE and abs(dy) <= TOLERANCE:
             break
         finger = (max(-MAX_SWIPE[0], min(MAX_SWIPE[0], -dx)), max(-MAX_SWIPE[1], min(MAX_SWIPE[1], -dy)))
@@ -224,3 +272,114 @@ def goto(bot, name: str, building: str, city_map: dict):
             swipe(bot, move)
     score, pos = locate(bot, city_screen(bot), building)
     return pos if pos is not None and score >= BUILDING_THRESHOLD else None
+
+
+def spiral_swipes(limit: int = SEARCH_LIMIT) -> list[tuple[int, int]]:
+    """Các cú vuốt (ngón tay dx, dy) đi vòng xoáy vuông quanh chỗ đang đứng: phải 1, xuống 1, trái 2, lên 2, phải 3, xuống 3...
+    Ô ngang = 1 cú MAX_SWIPE[0] (240 px, màn rộng 396 nên hai bước liền kề chồng nhau); ô dọc = 2 cú MAX_SWIPE[1] (520 px, màn
+    cao 704). Vòng xoáy phủ kín một vùng quanh chỗ đứng (không như đường vuông thưa), dừng ở `limit` cú. Mô phỏng: từ mọi chỗ
+    trong thành thấy một trong bốn mốc cố định sau tối đa ~19 cú."""
+    moves, dirs, length, turn = [], [(1, 0), (0, 1), (-1, 0), (0, -1)], 1, 0
+    while len(moves) < limit:
+        for _ in range(2):
+            ux, uy = dirs[turn % 4]
+            for _ in range(length):
+                moves += [(ux * MAX_SWIPE[0], 0)] if ux else [(0, uy * MAX_SWIPE[1])] * 2
+            turn += 1
+        length += 1
+    return moves[:limit]
+
+
+def civ_of(bot, screen) -> int | None:
+    """Nền văn minh của thành đang hiện: bot.civilization nếu đã biết, không thì civ của ảnh mẫu (Thành chính / công trình cố định)
+    khớp nhất trên `screen` (từ BUILDING_THRESHOLD). None nếu chưa biết."""
+    civ = getattr(bot, "civilization", None)
+    if civ:
+        return civ
+    best_score, best_civ = BUILDING_THRESHOLD, None
+    for owner, image in _candidates(bot, (KEEP, *FIXED)):
+        score, pos = bot.best_match(image, screen=screen)
+        if owner and pos is not None and score >= best_score:
+            best_score, best_civ = score, owner
+    return best_civ
+
+
+def find_keep(bot, name: str) -> bool:
+    """Đưa Thành chính vào giữa màn (bước đầu của quét route: các ô sau đều đi từ Thành chính). Mọi nhiệm vụ đã xong nên không
+    còn nút Go để nhờ game kéo Thành chính vào giữa, phải tự tìm:
+    1. Thấy Thành chính -> kéo bù vào giữa.
+    2. Thấy một công trình cố định (FIXED: Tường thành / Research Factory / Tavern) -> kéo nó vào giữa màn rồi vuốt đúng
+       đường cố định về Thành chính (ROUTES, đo sẵn) -> kéo bù Thành chính vào giữa.
+    3. Không thấy mốc nào -> dò vòng xoáy (spiral_swipes, mỗi cú xong kiểm tra lại), thấy một mốc là dừng và về Thành chính ngay.
+    Trả False nếu dò hết mà không thấy, hoặc đi xong mà không thấy Thành chính."""
+    for move in [None, *spiral_swipes()]:
+        if move is not None:
+            swipe(bot, move)
+        screen = city_screen(bot)
+        found = visible(bot, screen, [KEEP, *FIXED])
+        if not found:
+            continue
+        civ = civ_of(bot, screen)
+        if civ is not None and civ not in SUPPORTED_CIVS:
+            bot.record(f"{name}: civ {civ} has no route data yet (only civ {', '.join(map(str, SUPPORTED_CIVS))}), skip city scan")
+            return False
+        if KEEP in found:
+            return centre(bot, KEEP, found[KEEP])[0] is not None
+        anchor = next(b for b in FIXED if b in found)
+        pos, _ = centre(bot, anchor, found[anchor])
+        bot.log(f"{name}: {anchor} found, fixed route to the Keep: {len(ROUTES[(anchor, KEEP)])} swipe(s)")
+        for finger in ROUTES[(anchor, KEEP)]:
+            swipe(bot, finger)
+        score, keep = locate(bot, city_screen(bot), KEEP)
+        if keep is None or score < BUILDING_THRESHOLD:
+            bot.log(f"{name}: Keep not recognised after the fixed route, keep searching")
+            continue
+        centre(bot, KEEP, keep)
+        return True
+    return False
+
+
+def ensure_city(bot, name: str):
+    """Đang ở bản đồ thế giới (có nút toà thành ở góc dưới phải, TO_CITY) thì bấm nút đó để về thành (camera thành đặt về chỗ
+    mặc định của game, bước tìm Thành chính lo phần còn lại)."""
+    for _ in range(TO_CITY_TRIES):
+        button = bot.find(TO_CITY)
+        if button is None:
+            return
+        bot.log(f"{name}: on the world map, tap the city button")
+        bot.tap(*button, delay=TO_CITY_WAIT)
+
+
+def scan_city(bot, name: str, watch=None) -> bool:
+    """Quét route công trình rồi lưu bản đồ thành vào DB (bot.set_city_map; không lưu file). Gọi khi hết nhiệm vụ và Join Boss
+    rảnh, máy chưa có bản đồ. Ở vị trí bất kỳ:
+    0. ensure_city: đang ở bản đồ thế giới thì bấm nút về thành.
+    1. find_keep: tìm Thành chính (thấy Thành chính / một công trình cố định thì đi thẳng tới Thành chính; không thấy gì thì dò
+       vòng xoáy quanh chỗ đứng).
+    2. scan: đi từng ô route (city_tour.py), ghi toạ độ công trình nhận ra.
+    3. lưu bản đồ vào DB.
+    `watch(bot)`: gọi lúc bắt đầu và cứ BOSS_CHECK_EVERY cú vuốt (kiểm tra boss mới, worker làm: số boss tăng thì vào Join Boss
+    tới khi rảnh rồi mới vuốt tiếp). Trả True khi đã quét và lưu; False khi chưa quét được (không tìm được Thành chính...)."""
+    bot.swipe_watch = watch
+    bot.swipe_count = 0
+    try:
+        ensure_city(bot, name)
+        for _ in range(HOME_BACKS):
+            if bot.find(MAIN_MORE) is not None:
+                break
+            bot.back(delay=1)
+        if bot.find(MAIN_MORE) is None:
+            bot.record(f"{name}: scan city: not at the city screen")
+            return False
+        if watch is not None:
+            watch(bot)      # ghi số boss ban đầu
+        if not find_keep(bot, name):
+            bot.record(f"{name}: scan city: cannot find the Keep (no Keep / fixed building found), skip")
+            return False
+        found = scan(bot, name)
+        if not found:
+            return False
+        bot.set_city_map(found)
+        return True
+    finally:
+        bot.swipe_watch = None

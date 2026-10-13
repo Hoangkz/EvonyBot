@@ -1,7 +1,7 @@
 """
-Flow test Event / Gather Troops / Defense Force (xây bẫy)
-(bot/activities/event/gather_troops/defense_force/, flow chung ở ../train_troop/): giống
-Siege Machine (Day 4) nhưng tab phụ bên phải "Defense Force", xưởng bẫy (Trap Factory, menu
+Flow test Event / Gather Troops / Trap Factory (xây bẫy)
+(bot/activities/event/gather_troops/trap_factory/, flow chung ở ../train_troop/): giống
+Siege Machine (Day 4) nhưng tab phụ bên phải "Trap Factory", xưởng bẫy (Trap Factory, menu
 có "Build" thay "Train"), màn "Trap Building Speedup", cấp thấp nhất 3 và mỗi cấp có 4 loại
 bẫy liền nhau trên hàng (Trap, Rock, Abatis, Fire Arrow — loại nào cũng được).
 
@@ -17,22 +17,22 @@ from pathlib import Path
 import cv2
 
 from bot.activities import event
-from bot.activities.event.gather_troops import defense_force
-from bot.activities.event.gather_troops.defense_force.constants import LOCKED_KEY
+from bot.activities.event.gather_troops import trap_factory
+from bot.activities.event.gather_troops.trap_factory.constants import LOCKED_KEY
 from tests.flow import Step, back, end, run_flow, tap, tap_at
 from tests.event import setUpModule, tearDownModule, run_event_tasks  # noqa: F401 (tắt lượt nhận thưởng)
 
 SCREENS = Path(__file__).parent / "screens"
-KEY = defense_force.KEY
+KEY = trap_factory.KEY
 SETTINGS = {KEY: {"value": 7000, "level": 6, "day": 4}}
 
 LOGIN_GIFT_ICON = (361, 148)
 LOGIN_REWARD = (37, 197)       # hộp quà dưới chữ "Login Gifts" (56, 141) + (-19, 56)
 EVENT_BUTTON = (361, 280)   # nút event: đuôi ruy băng cột phải (331, 308) + (30, -28)
 
-FIRST_GO = (335, 344)          # nút Go gần tab Defense Force nhất (dòng "0 / 1,000")
+FIRST_GO = (335, 344)          # nút Go gần tab Trap Factory nhất (dòng "0 / 1,000")
 CENTER = (198, 352)            # giữa màn hình: xưởng bẫy sau khi bấm Go
-DF = "Event/GatherTroops/DefenseForce"
+DF = "Event/GatherTroops/TrapFactory"
 TRAIN_DIR = "Event/GatherTroops/Train"
 TRAIN_BUTTON = f"{TRAIN_DIR}/trainButton.png"
 TIER_Y = 452
@@ -41,12 +41,12 @@ TO_EVENT = [
     Step("03_main.png?claimed", tap_at(*EVENT_BUTTON)),
     Step("04_event_list.png", tap("Event/GatherTroops/icon.png")),
 ]
-# Gather Troops (Day 1) -> Day 4 (mở ở tab Siege Machine) -> tab Defense Force -> Go đầu tiên
+# Gather Troops (Day 1) -> Day 4 (mở ở tab Siege Machine) -> tab Trap Factory -> Go đầu tiên
 # -> xưởng bẫy -> menu "Build" -> màn Train (Rock VI ở giữa, mở) -> bấm Train (hết kịch bản).
 TO_FIRST_GO = [
     Step("07_gather_day1.png", tap("Event/GatherTroops/SiegeMachine/day4.png")),
-    Step("08_day4_siege_machine.png", tap(f"{DF}/defenseForce.png")),
-    Step("09_day4_defense_force.png", tap_at(*FIRST_GO)),
+    Step("08_day4_siege_machine.png", tap(f"{DF}/trapFactory.png")),
+    Step("09_day4_trap_factory.png", tap_at(*FIRST_GO)),
     Step("10_after_go.png", tap_at(*CENTER)),
     Step("11_build_menu.png", tap(f"{DF}/build.png")),
     Step("train_6_rock.png", tap(TRAIN_BUTTON)),
@@ -75,9 +75,9 @@ VARIANTS = {
 }
 
 
-class DefenseForceFlow(unittest.TestCase):
+class TrapFactoryFlow(unittest.TestCase):
     def test_main_flow(self):
-        """Nhận quà đăng nhập, Event Center -> Gather Troops -> Day 4 -> tab Defense Force ->
+        """Nhận quà đăng nhập, Event Center -> Gather Troops -> Day 4 -> tab Trap Factory ->
         OCR "0 / 1,000" -> Go -> xưởng bẫy -> Build -> Rock VI (cấp 6 mở) -> Train."""
         flow = [
             Step("01_main_login_gift.png", tap_at(*LOGIN_GIFT_ICON)),
@@ -88,12 +88,12 @@ class DefenseForceFlow(unittest.TestCase):
         ]
         device = run_flow(self, run_event_tasks, SCREENS, flow, SETTINGS, variants=VARIANTS)
         self.assertNotIn(LOCKED_KEY, device.daily_done)
-        self.assertIn("Defense Force: done 0, remaining 7000", device.logs)
-        self.assertIn("Defense Force: train tier 6 (chosen 6), goal 7000, count 7000", device.logs)
-        self.assertIn("Defense Force: 13102 per batch -> 1 batch(es)", device.logs)
+        self.assertIn("Trap Factory: done 0, remaining 7000", device.logs)
+        self.assertIn("Trap Factory: train tier 6 (chosen 6), goal 7000, count 7000", device.logs)
+        self.assertIn("Trap Factory: 13102 per batch -> 1 batch(es)", device.logs)
 
     def test_defense_tab_already_selected(self):
-        """Day 4 đang ở tab Defense Force: bấm Go luôn."""
+        """Day 4 đang ở tab Trap Factory: bấm Go luôn."""
         flow = [*TO_EVENT, *TO_FIRST_GO[2:4]]
         run_flow(self, run_event_tasks, SCREENS, flow, SETTINGS, variants=VARIANTS)
 
@@ -129,7 +129,7 @@ class DefenseForceFlow(unittest.TestCase):
             Step("train_4_rock.png", tap_at(20, TIER_Y)),         # Fire Arrow III (cấp 3)
             Step("train_3_fireArrow.png", tap(TRAIN_BUTTON)),
         )
-        self.assertIn("Defense Force: train tier 3 (chosen 3), goal 1000, count 1000", device.logs)
+        self.assertIn("Trap Factory: train tier 3 (chosen 3), goal 1000, count 1000", device.logs)
 
     def test_level_visible_taps_nearest_kind(self):
         """Fire Arrow III ở giữa, chọn cấp 4: thấy Trap IV, Rock IV -> bấm Trap IV (gần giữa
@@ -140,7 +140,7 @@ class DefenseForceFlow(unittest.TestCase):
             Step("train_3_fireArrow.png", tap_at(279, TIER_Y)),
             Step("train_4_trap.png", tap(TRAIN_BUTTON)),
         )
-        self.assertIn("Defense Force: train tier 4 (chosen 4), goal 3000, count 3000", device.logs)
+        self.assertIn("Trap Factory: train tier 4 (chosen 4), goal 3000, count 3000", device.logs)
 
     def test_locked_per_kind_falls_back_to_lower_level(self):
         """Tài khoản B, chọn cấp 4. Rock IV ở giữa khoá (không có "+"), Trap IV / Abatis IV có
@@ -155,7 +155,7 @@ class DefenseForceFlow(unittest.TestCase):
             Step("b_locked_4_rock.png", tap_at(20, TIER_Y)),         # Fire Arrow III (khoá)
             Step("b_train_3_abatis.png", tap(TRAIN_BUTTON)),
         )
-        self.assertIn("Defense Force: train tier 3 (chosen 4), goal 2000, count 2000", device.logs)
+        self.assertIn("Trap Factory: train tier 3 (chosen 4), goal 2000, count 2000", device.logs)
         self.assertNotIn(LOCKED_KEY, device.daily_done)
 
     def test_existing_building_finished_first(self):
@@ -170,9 +170,9 @@ class DefenseForceFlow(unittest.TestCase):
             Step("speedup_trap.png", tap(f"{TRAIN_DIR}/finishAll.png")),
             Step("b_train_3_abatis.png", tap(TRAIN_BUTTON)),
         )
-        self.assertIn("Defense Force: troops already training, finishing them first (not counted)",
+        self.assertIn("Trap Factory: troops already training, finishing them first (not counted)",
                       device.logs)
-        self.assertIn("Defense Force: Train batch 1/1", device.logs)
+        self.assertIn("Trap Factory: Train batch 1/1", device.logs)
 
     def test_train_speedup_finish_all(self):
         """Cấp 6, mỗi lần tối đa 13102 (OCR) -> 7000 bẫy cần 1 lần: Train -> Training
@@ -203,11 +203,11 @@ class DefenseForceFlow(unittest.TestCase):
             *TO_FIRST_GO[4:],
         ]
         device = run_flow(self, run_event_tasks, SCREENS, flow, SETTINGS, variants=VARIANTS)
-        self.assertIn("Defense Force: building already training, Speed Up from menu (not counted)",
+        self.assertIn("Trap Factory: building already training, Speed Up from menu (not counted)",
                       device.logs)
 
     def test_no_go_marks_done(self):
-        flow = [*TO_EVENT, Step("09_day4_defense_force.png?no_go", end())]
+        flow = [*TO_EVENT, Step("09_day4_trap_factory.png?no_go", end())]
         device = run_flow(self, run_event_tasks, SCREENS, flow, SETTINGS, variants=VARIANTS)
         self.assertIn(KEY, device.daily_done)
 

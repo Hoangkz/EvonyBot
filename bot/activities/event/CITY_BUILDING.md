@@ -3,7 +3,7 @@
 Code: [city_building.py](city_building.py). Dùng bởi King's Path ([kings_path/building.py](kings_path/building.py))
 và Gather Troops ([gather_troops/train_troop/run.py](gather_troops/train_troop/run.py) `_open_building_menu`).
 Activity Black Market (không qua nút Go) dùng thêm bản đồ thành theo thiết bị:
-[../black_market/city_map.py](../black_market/city_map.py). Event / nhiệm vụ Daily vẫn đi bằng nút Go.
+[../../city/city_map.py](../../city/city_map.py). Event / nhiệm vụ Daily vẫn đi bằng nút Go.
 Daily Activities chưa dùng.
 
 ## 1. Vấn đề
@@ -23,7 +23,7 @@ Hình công trình **khác nhau theo nền văn minh** của tài khoản (7 lo�
 | KP Refine | `forge` | Craft |
 | KP Train Troop | `troop` (tìm cả `barracks`, `archer_camp`, `stables`, `workshop`) | Train / Speed Up |
 | GT Ground / Ranged / Mounted / Siege | `barracks` / `archer_camp` / `stables` / `workshop` | Train / Speed Up |
-| GT Defense Force (Trap Factory) | `trap_factory` | Build / Speed Up |
+| GT Trap Factory | `trap_factory` | Build / Speed Up |
 
 Có mẫu nhưng chưa nối vào nhiệm vụ nào: `academy`, `shrine`, `keep` (Daily: Resource Collecting, Offering,
 Gold Levy), `pasture`, `art_hall`, `battlefield`.

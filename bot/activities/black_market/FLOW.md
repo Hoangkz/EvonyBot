@@ -25,12 +25,10 @@ Món `buy_with_gems: true` trong items.py (Stamina 50, các loại đá, Tactic 
    vào giữa màn (`_market`), dừng ở cách đầu tiên được:
    1. Chợ có trên màn (ảnh mẫu civ / ảnh tự học) -> kéo vào giữa.
    2. Máy đã có **bản đồ thành** (DB, cột `devices.city_map`) -> tìm trên màn một công trình đã có trong bản đồ -> vuốt
-      thẳng (chia đều vài cú) tới Chợ -> kéo bù ([city_map.py](city_map.py) `goto`).
-   3. Go nhiệm vụ Daily **mua Black Market**, không có thì **Tax** (game kéo Chợ vào giữa) — không quét.
-   4. Go nhiệm vụ Daily **Gold Levy** (game kéo Thành chính vào giữa): chưa có bản đồ -> **quét thành** (`scan`: đi vòng
-      13 ô theo [city_tour.py](city_tour.py), kéo bù mỗi ô, ghi mọi công trình nhận ra được) -> lưu DB
-      -> đi thẳng tới Chợ.
-   5. Không nhiệm vụ nào còn Go -> **không làm Black Market**, ghi log.
+      thẳng (chia đều vài cú) tới Chợ -> kéo bù ([bot/city/city_map.py](../../city/city_map.py) `goto`).
+   3. Go nhiệm vụ Daily **mua Black Market**, không có thì **Tax** (game kéo Chợ vào giữa).
+   4. Không cách nào được -> **không làm Black Market**, ghi log. Activity **không quét thành**: bản đồ thành do worker quét khi rảnh
+      ([bot/city/FLOW.md](../../city/FLOW.md)).
    Bấm Chợ -> menu -> icon "Black Market" (ảnh mẫu chỉ túi tiền, ngưỡng 0,8) -> chờ tiêu đề.
 2. **Mỗi bước chụp 1 ảnh**:
    1. Số dư (OCR `read_gems` / `read_gold`): kim cương < 50 -> dừng; vàng < 2.000.000 và `check_gold` -> dừng.
@@ -53,3 +51,5 @@ Món `buy_with_gems: true` trong items.py (Stamina 50, các loại đá, Tactic 
 
 Máy 21913 (2026-10-05): từ màn thành -> nhận ra Chợ (civ 1) -> Black Market -> Refresh 3 lần, mua 2 gói 5M (đá,
 lương thực, giá 1.763.000 vàng) -> dừng ở giới hạn Refresh.
+
+Bản đồ thành và route công trình (quét khi rảnh, hướng dẫn đo cho nền văn minh khác): [bot/city/FLOW.md](../../city/FLOW.md).

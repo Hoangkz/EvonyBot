@@ -13,7 +13,7 @@ import sys
 import unittest
 from unittest import mock
 
-from bot.activities.daily_activities.black_market.constants import BUY_GOAL, LABEL
+from bot.activities.daily_activities.black_market.constants import BUY_GOAL, KEY, LABEL
 from bot.activities.daily_activities.black_market.run import TASK, after_go
 from bot.activities.daily_activities.common import _search_list, open_task_or_finish, task_titles
 from bot.activities.daily_activities.constants import TASK_OPENED
@@ -78,7 +78,7 @@ class BlackMarketFlow(unittest.TestCase):
         ]
         device = run_flow(self, _after_go, SCREENS, flow, {})
         self.assertIn(f"{LABEL}: bought 3 / 3, done", device.logs)
-        self.assertIn(LABEL, device.daily_done)
+        self.assertIn(KEY, device.daily_done)
 
     def test_refresh_then_buy(self):
         """Vào màn đã mua hết bộ -> Instant Refresh -> bộ mới -> mua đủ 3 lần."""
@@ -91,7 +91,7 @@ class BlackMarketFlow(unittest.TestCase):
         ]
         device = run_flow(self, _after_go, SCREENS, flow, {}, variants=VARIANTS)
         self.assertIn(f"{LABEL}: all bought, Instant Refresh (0 / 3)", device.logs)
-        self.assertIn(LABEL, device.daily_done)
+        self.assertIn(KEY, device.daily_done)
 
     def test_no_refresh_stops_not_done(self):
         """Mua được 1 lần, hết hàng mà không có Instant Refresh -> Back, dừng, không đánh dấu xong."""
@@ -102,13 +102,13 @@ class BlackMarketFlow(unittest.TestCase):
             Step(f"{KP}bm_city.png", end(result=False)),
         ]
         device = run_flow(self, _after_go, SCREENS, flow, {}, variants=VARIANTS)
-        self.assertNotIn(LABEL, device.daily_done)
+        self.assertNotIn(KEY, device.daily_done)
 
     def test_open_task_completed_card(self):
         """Giao diện cũ: lưới Activity -> cuộn -> thẻ Black Market "Completed" -> xong hôm nay, không bấm Go (return False)."""
         flow = old_grid_completed("33_old_grid_end_black_market_completed.png")
         device = run_flow(self, lambda bot, _s: open_task_or_finish(bot, TASK), SCREENS, flow, {})
-        self.assertIn(LABEL, device.daily_done)
+        self.assertIn(KEY, device.daily_done)
 
     def test_list_gray_claim_all_not_tapped(self):
         """Giao diện mới (21913): Claim All xám (không có gì để nhận, vẫn khớp ảnh mẫu 0,86) -> không bấm; dòng
@@ -130,7 +130,7 @@ class BlackMarketFlow(unittest.TestCase):
         with mock.patch.object(KP_RUN, "read_gold", return_value=gold),                 mock.patch.object(KP_RUN, "read_gems", return_value=gems):
             device = run_flow(self, _after_go, SCREENS, flow, {})
         self.assertIn(f"{LABEL}: {reason} (0 / 3), stop", device.logs)
-        self.assertNotIn(LABEL, device.daily_done)
+        self.assertNotIn(KEY, device.daily_done)
 
     def test_low_gold_stops(self):
         """Vàng 1.999.999 < 2.000.000 -> dừng."""

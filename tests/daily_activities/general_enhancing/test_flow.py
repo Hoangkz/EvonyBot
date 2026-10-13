@@ -13,6 +13,7 @@ from bot.activities.daily_activities.general_enhancing.constants import (
     CULTIVATE_CANCEL,
     CULTIVATE_GOAL,
     GOLD_CULTIVATE,
+    KEY,
     LABEL,
 )
 from bot.activities.daily_activities.general_enhancing.run import after_go
@@ -47,7 +48,7 @@ class GeneralEnhancingFlow(unittest.TestCase):
             Step("05_generals_heart_off.png", end(result=True)),
         ]
         device = run_flow(self, _after_go, SCREENS, flow, {})
-        self.assertIn(LABEL, device.daily_done)
+        self.assertIn(KEY, device.daily_done)
         self.assertIn(f"{LABEL}: Gold Cultivate x{CULTIVATE_GOAL}, done", device.logs)
 
     def test_gold_cultivate_no_result_stops(self):
@@ -58,7 +59,7 @@ class GeneralEnhancingFlow(unittest.TestCase):
             Step("08_cultivate.png", end(result=False)),
         ]
         device = run_flow(self, _after_go, SCREENS, flow, {})
-        self.assertNotIn(LABEL, device.daily_done)
+        self.assertNotIn(KEY, device.daily_done)
 
 
 if __name__ == "__main__":

@@ -4,9 +4,8 @@ run.py — activity "Black Market": `run(bot, settings)` (settings của tab Bla
  "items": {item id: bool}} — danh mục vật phẩm: items.py.
 
 1. Mở màn Black Market: đang ở đó thì thôi; không thì Back về màn chính -> đưa Chợ vào giữa (_market): Chợ trên màn ->
-   bản đồ thành của máy (DB, city_map.py: đi từ công trình đã biết đang thấy) -> Go nhiệm vụ mua Black Market /
-   Tax -> Go nhiệm vụ Gold Levy (Thành chính; chưa có bản đồ thì quét thành, lưu DB) -> không nhiệm vụ nào có Go: không
-   làm, ghi log -> bấm Chợ -> icon "Black Market".
+   bản đồ thành của máy (DB, bot/city/city_map.py: đi từ công trình đã biết đang thấy) -> Go nhiệm vụ mua Black Market /
+   Tax -> không nhiệm vụ nào có Go: không làm, ghi log (bản đồ thành do worker quét khi rảnh, activity không quét) -> bấm Chợ -> icon "Black Market".
 2. Mỗi bước chụp 1 ảnh:
    - số dư (OCR): kim cương < GEMS_MIN -> dừng; vàng < GOLD_MIN và tích CheckGold -> dừng;
    - đủ Quantity Buy -> dừng;
@@ -34,11 +33,10 @@ from ..event.kings_path.black_market.constants import (
     SLOTS,
     TITLE,
 )
-from ..event.city_building import BUILDING_THRESHOLD, KEEP, MARKET
-from .city_map import centre, city_screen, goto, locate, scan
+from ..event.city_building import BUILDING_THRESHOLD, MARKET
+from ...city.city_map import centre, city_screen, goto, locate
 from ..daily_activities.black_market import TASK as BLACK_MARKET_TASK
 from ..daily_activities.common import open_task, task_cards, task_titles
-from ..daily_activities.gold_levy import TASK as GOLD_LEVY_TASK
 from ..daily_activities.resource_tax import TASK as RESOURCE_TAX_TASK
 from ..daily_activities.constants import TASK_OPENED
 from ..event.kings_path.black_market.run import _refresh
@@ -129,9 +127,9 @@ def _open(bot) -> bool:
 def _market(bot):
     """Đưa Chợ vào giữa màn, trả vị trí (None + ghi log nếu không được):
     1. Chợ có trên màn -> kéo vào giữa.
-    2. Máy đã có bản đồ thành (bot.city_map, DB) -> đi từ công trình đã biết đang thấy trên màn (city_map.goto).
-    3. Không được: Go nhiệm vụ mua Black Market / Tax (game kéo Chợ vào giữa); không có thì Go nhiệm vụ Gold Levy (về
-       Thành chính): chưa có bản đồ -> quét thành, lưu DB (bot.set_city_map) -> đi thẳng tới Chợ.
+    2. Máy đã có bản đồ thành trong DB (bot.city_map, do worker quét khi rảnh: bot/city/city_map.scan_city) -> đi từ công trình đã
+       biết đang thấy trên màn (city_map.goto). Activity này KHÔNG quét thành: chưa có bản đồ thì bỏ qua bước này.
+    3. Không được: Go nhiệm vụ mua Black Market / Tax (game kéo Chợ vào giữa).
     4. Không nhiệm vụ nào còn Go -> không làm Black Market."""
     score, pos = locate(bot, city_screen(bot), MARKET)
     if pos is not None and score >= BUILDING_THRESHOLD:
@@ -141,24 +139,12 @@ def _market(bot):
         pos = goto(bot, NAME, MARKET, city_map)
         if pos is not None:
             return pos
+        bot.record(f"{NAME}: cannot reach the Market with the city map")
     pos = _market_by_task(bot)
     if pos is not None:
         return pos
-    if not _keep_by_levy(bot):
-        bot.record(f"{NAME}: no Black Market / Tax / Gold Levy task with Go, skip Black Market")
-        return None
-    if MARKET not in city_map:
-        city_map = scan(bot, NAME)
-        if not city_map:
-            return None
-        bot.set_city_map(city_map)
-        if MARKET not in city_map:
-            bot.record(f"{NAME}: Market not found while scanning the city")
-            return None
-    pos = goto(bot, NAME, MARKET, city_map)
-    if pos is None:
-        bot.record(f"{NAME}: cannot reach the Market with the city map")
-    return pos
+    bot.record(f"{NAME}: Market not on screen, no city map route in DB and no Black Market / Tax task with Go, skip Black Market")
+    return None
 
 
 def _market_by_task(bot):
@@ -169,11 +155,6 @@ def _market_by_task(bot):
         if pos is not None:
             return pos
     return None
-
-
-def _keep_by_levy(bot) -> bool:
-    """Bấm Go nhiệm vụ Daily Gold Levy -> game kéo Thành chính vào giữa. True nếu đã thấy Thành chính."""
-    return _go_to(bot, GOLD_LEVY_TASK, KEEP) is not None
 
 
 def _go_to(bot, task, building):

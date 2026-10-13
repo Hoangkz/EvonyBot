@@ -290,7 +290,7 @@ def _record_outcome(ctx):
     """Như worker: kết quả nhiệm vụ báo giữa chừng (bot.activities.result) -> ghi vào daily_done."""
     for outcome in take_all(ctx):
         if outcome.label:   # Daily Activities / Crazy Eggs / 3-Day Event
-            record_result(ctx, outcome.key, outcome.label, outcome)
+            record_result(ctx, outcome.key, outcome)
         elif outcome.key:   # Event: xong / hết Go / đạt mục tiêu / Day khoá
             record_outcome(ctx, ctx.settings.get("Event", {}), outcome)
 

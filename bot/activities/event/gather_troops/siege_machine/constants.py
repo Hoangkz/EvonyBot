@@ -14,7 +14,7 @@ LOCKED_KEY = f"{KEY}_locked"   # giống TroopTask.locked_key
 # Tab "Day 4" chưa chọn, tâm (273, 209): khớp 1,00; khi Day 4 đang chọn 0,89 -> ngưỡng 0,95.
 # (Màn Day 1..3 cũng khớp 1,00 — đúng, đó là tab cần bấm.)
 DAY_4 = f"{EV}/GatherTroops/SiegeMachine/day4.png"
-# Tab phụ "Siege Machine" (Day 4, bên trái; bên phải là "Defense Force"), tâm (102, 252):
+# Tab phụ "Siege Machine" (Day 4, bên trái; bên phải là "Trap Factory"), tâm (102, 252):
 #   chưa chọn (SIEGE_MACHINE):          1,00 khi chưa chọn / 0,89 khi đã chọn
 #   đang chọn (SIEGE_MACHINE_SELECTED): 1,00 khi đã chọn   / 0,90 khi chưa chọn
 # -> cả hai ngưỡng 0,95, xét "đang chọn" trước. Màn khác <= 0,50.

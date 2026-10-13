@@ -28,7 +28,7 @@ from ..activities.event.gather_troops.ground_troop.run import run as gather_troo
 from ..activities.event.gather_troops.mounted_troop.run import run as gather_troops_mounted_troop
 from ..activities.event.gather_troops.ranged_troop.run import run as gather_troops_ranged_troop
 from ..activities.event.gather_troops.siege_machine.run import run as gather_troops_siege_machine
-from ..activities.event.gather_troops.defense_force.run import run as gather_troops_defense_force
+from ..activities.event.gather_troops.trap_factory.run import run as gather_troops_trap_factory
 from ..activities.event.kings_path.city_tax.run import run as kings_path_city_tax
 from ..activities.event.kings_path.patrol.run import run as kings_path_patrol
 from ..activities.event.kings_path.donate.run import run as kings_path_donate
@@ -135,9 +135,9 @@ DATA ={
             "priority": 549,
         },
         { 
-            "key": "gather_troops_defense_force",
-            "run": event_job("gather_troops", gather_troops_defense_force),
-            "label": "Gather Troops: Defense Force",
+            "key": "gather_troops_trap_factory",
+            "run": event_job("gather_troops", gather_troops_trap_factory),
+            "label": "Gather Troops: Trap Factory",
             "priority": 548, 
         },
         { 

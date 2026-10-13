@@ -117,10 +117,10 @@ class SiegeMachineFlow(unittest.TestCase):
         run_flow(self, run_event_tasks, SCREENS, flow, SETTINGS, variants=VARIANTS)
 
     def test_defense_tab_selected_opens_siege(self):
-        """Day 4 đang ở tab phụ Defense Force: bấm tab Siege Machine rồi mới Go."""
+        """Day 4 đang ở tab phụ Trap Factory: bấm tab Siege Machine rồi mới Go."""
         flow = [
             *TO_EVENT,
-            Step("09_day4_defense_force.png", tap(f"{SM}/siegeMachine.png")),
+            Step("09_day4_trap_factory.png", tap(f"{SM}/siegeMachine.png")),
             *TO_FIRST_GO[1:3],
         ]
         run_flow(self, run_event_tasks, SCREENS, flow, SETTINGS, variants=VARIANTS)

@@ -18,7 +18,7 @@ import cv2
 from bot.activities.daily_activities import troop_training
 from bot.activities.daily_activities.constants import TASK_DONE
 from bot.activities.daily_activities.common import open_task_or_finish
-from bot.activities.daily_activities.troop_training.constants import LABEL
+from bot.activities.daily_activities.troop_training.constants import LABEL, KEY
 from bot.activities.daily_activities.troop_training.run import after_go
 from tests.daily_activities import (
     CLAIM_ALL_ONCE,
@@ -65,7 +65,7 @@ class TroopTrainingFlow(unittest.TestCase):
         """Giao diện cũ: thẻ Troop Training "Completed" -> xong hôm nay, không bấm Go."""
         device = run_flow(self, lambda bot, _s: open_task_or_finish(bot, troop_training.TASK), TESTS_DIR,
                           old_grid_completed("28_old_grid_end_train_completed.png"), {})
-        self.assertIn(LABEL, device.daily_done)
+        self.assertIn(KEY, device.daily_done)
 
     def test_after_go_one_batch(self):
         """Công trình -> Train -> cấp I -> 1580 mỗi mẻ >= 300 -> 1 mẻ: Train -> Training Speedup -> Speedup Settings
@@ -84,7 +84,7 @@ class TroopTrainingFlow(unittest.TestCase):
         ]
         device = run_flow(self, _after_go, TESTS_DIR, flow, {}, variants=VARIANTS)
         self.assertIn(f"{LABEL}: 1580 per batch -> 1 batch(es)", device.logs)
-        self.assertIn(LABEL, device.daily_done)
+        self.assertIn(KEY, device.daily_done)
         self.assertFalse([c for c in device.shells if c.startswith("input text")])
 
 
