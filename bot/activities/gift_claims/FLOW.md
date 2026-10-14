@@ -6,6 +6,29 @@ Task `gift_claims` chỉ chạy sau Daily Activities và có ưu tiên thấp nh
 quà dùng một task chung. DB chỉ lưu `gift_claims` sau khi cả khu 1 và khu 2 đã
 được kiểm tra xong; tiến độ giữa các lát 120 giây chỉ lưu trong RAM.
 
+## Cấu trúc và điểm chạy hiện tại
+
+```
+gift_claims/
+├── valuable_event/              # Khu ngoài thành, không đi qua Event Center
+│   ├── run.py                   # quét carousel Valuable Event
+│   ├── super_value_return/run.py
+│   ├── login_gifts/run.py
+│   └── <từng event>/run.py
+└── event_center/                # Chỉ các event mở từ Event Center
+    ├── run.py                   # quét Limited / Activities / Competition
+    ├── grace_of_star_trail/run.py
+    ├── dwarfs_treasure/run.py
+    └── <từng event>/run.py
+```
+
+Mỗi event có entry `run(bot)` trong thư mục của chính nó. Chưa có event con nào
+được worker đăng ký thành job/priority riêng. Hiện worker chỉ gọi
+`daily_activities.common._run_gifts()`; sau khi Daily Activities và phần
+Activity Rewards hoàn thành, hàm này gọi một lần `gift_claims.run(ctx)`. Entry
+chung đó quét cả hai khu. Cách chọn/gọi riêng từng `run(bot)` sẽ được thêm sau
+khi có quy tắc điều phối.
+
 ## Trình tự chung
 
 1. Về màn thành phố.
