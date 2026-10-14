@@ -1,4 +1,5 @@
 import unittest
+from importlib import import_module
 from pathlib import Path
 from unittest import mock
 
@@ -6,12 +7,19 @@ import cv2
 import numpy as np
 
 from bot.activities import gift_claims
-from bot.activities.gift_claims import (back_to_territory, empire_depot,
-                                        event_center, limited_offer, login_gifts,
-                                        super_value_return, valuable_event)
 from bot.activities.gift_claims import common, lobby
 from bot.activities.gift_claims.screens import GiftScreen, TITLE_TEMPLATES, identify
 from bot.context.errors import YieldToBoss
+
+event_center = import_module("bot.activities.gift_claims.event_center.run")
+valuable_event = import_module("bot.activities.gift_claims.valuable_event.run")
+back_to_territory = import_module(
+    "bot.activities.gift_claims.valuable_event.back_to_territory.run")
+empire_depot = import_module("bot.activities.gift_claims.valuable_event.empire_depot.run")
+limited_offer = import_module("bot.activities.gift_claims.valuable_event.limited_offer.run")
+login_gifts = import_module("bot.activities.gift_claims.valuable_event.login_gifts.run")
+super_value_return = import_module(
+    "bot.activities.gift_claims.valuable_event.super_value_return.run")
 
 
 ROOT = Path(__file__).parents[2]
