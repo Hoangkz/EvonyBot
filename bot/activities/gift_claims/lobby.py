@@ -17,6 +17,7 @@ REGIONS = {
 MAX_OPENS_PER_BOUNDARY = 16
 OPEN_WAIT_ATTEMPTS = 6
 IGNORED_RIGHT_LAUNCHERS = ("FollowUs/facebook_icon",)
+EVENT_CENTER_LAUNCHERS = ("EventCenter/launcher_side", "EventCenter/launcher")
 
 
 def _red_mask(screen):
@@ -128,6 +129,23 @@ def _ignored_right_dots(bot, screen) -> set[tuple[int, int]]:
     return ignored
 
 
+def _event_center_dot(bot, screen, dots):
+    """Return the right-rail badge attached to Event Center, if visible."""
+    scale = screen.shape[1] / REFERENCE_WIDTH
+    for template in EVENT_CENTER_LAUNCHERS:
+        for icon in find_all(bot, template, screen, threshold=0.68,
+                             region=REGIONS[RIGHT]):
+            candidates = [dot for dot in dots
+                          if abs(dot[0] - icon[0]) <= 55 * scale
+                          and icon[1] - 35 * scale <= dot[1]
+                          <= icon[1] + 40 * scale]
+            if candidates:
+                return min(candidates,
+                           key=lambda dot: abs(dot[0] - icon[0]) +
+                                           abs(dot[1] - icon[1]))
+    return None
+
+
 def open_next(bot, boundary: str, attempted: list[tuple[int, int]]):
     """Open the next unvisited red-dot icon in one boundary."""
     if not return_home(bot):
@@ -137,6 +155,10 @@ def open_next(bot, boundary: str, attempted: list[tuple[int, int]]):
     screen = bot.screenshot()
     dots = red_dots(screen, boundary)
     ignored = _ignored_right_dots(bot, screen) if boundary == RIGHT else set()
+    if boundary == RIGHT:
+        priority = _event_center_dot(bot, screen, dots)
+        if priority is not None:
+            dots = [priority] + [point for point in dots if point != priority]
     dot = None
     for point in dots:
         if _already_attempted(point, attempted, screen.shape[1]):

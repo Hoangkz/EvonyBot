@@ -9,7 +9,7 @@ KEY = "gift_city_growth_plan"
 
 def claim_opened(bot):
     """Try Claim All, then sweep the free left reward column by level."""
-    fixed = claim_fixed_controls(bot, ("CityGrowthPlan/button_claim_all",),
+    fixed = claim_fixed_controls(bot, ("Common/button_claim_all_text",),
                                  initial_wait_attempts=2)
     claimed = fixed.claimed
     # Some variants have no Claim All. The free Rewards column is on the left;

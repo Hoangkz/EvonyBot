@@ -12,24 +12,15 @@ from . import (
     super_blazon_sale,
     super_value_weekly_card,
 )
-from .common import (ClaimReport, claim_fixed_controls, claim_sparkle, find,
-                     find_all, return_home, tap_claims)
+from .common import (ClaimReport, TEXT_CLAIM_CONTROLS, back_if_close_x,
+                     claim_fixed_controls, claim_sparkles, find, find_all,
+                     return_home, tap_claims)
 
 PAGE = "ValuableEvent/title"
 DOT = "ValuableEvent/notification_dot"
 MAX_SWIPES = 8
 LOWER_CONTENT = (0, 20, 100, 88)
-COMMON_LOWER_CLAIMS = (
-    "Common/button_claim_text",
-    "GeneralVault/button_daily_free",
-    "SuccessivePurchaseBenefits/button_daily_free_text",
-    "SuccessivePurchaseBenefits/button_daily_free",
-    "Common/button_claimable", "Common/button_claimable_alt",
-    "LimitedOffer/button_free", "SpeedupSprint/button_free",
-    "SuperBlazonSale/button_free",
-    "CityGrowthPlan/button_claim_all", "EmpireDepot/button_claimable",
-    "LuckyRaffle/button_claimable",
-)
+COMMON_LOWER_CLAIMS = TEXT_CLAIM_CONTROLS
 
 
 @dataclass(frozen=True)
@@ -83,13 +74,19 @@ def _dots(bot, screen):
     return find_all(bot, DOT, screen, threshold=0.65, region=(0, 7, 100, 18))
 
 
-def _verify_clean(bot) -> bool:
+def _verify_clean(bot, ignored_keys=()) -> bool:
     """Verify that no red tab remains anywhere in the parent carousel."""
     for direction in (-1, 1):
         for step in range(MAX_SWIPES + 1):
             bot.check()
-            if _dots(bot, bot.screenshot()):
-                return False
+            screen = bot.screenshot()
+            dots = _dots(bot, screen)
+            tabs = [(spec, find(bot, spec.tab, screen, threshold=0.70,
+                                region=(0, 7, 100, 19))) for spec in SPECS]
+            for dot in dots:
+                owner = _owner_for_dot(dot, tabs)
+                if owner is None or owner[0].task.key not in ignored_keys:
+                    return False
             if step < MAX_SWIPES:
                 if direction < 0:
                     bot.swipe_percent(85, 14, 20, 14, duration=0.5, delay=1)
@@ -107,15 +104,17 @@ def _close_known_popup(bot):
 
 def _process_lower(bot, navigation: tuple[str, ...],
                    claims: tuple[str, ...]) -> tuple[ClaimReport, int]:
-    """Navigate first, then claim fixed controls, then one verified sparkle."""
+    """Navigate, claim fixed controls, then sample glow four bounded times."""
     navigated = (tap_claims(bot, navigation, max_taps=len(navigation),
                             initial_wait_attempts=2, region=LOWER_CONTENT)
                  if navigation else 0)
-    templates = tuple(dict.fromkeys((*claims, *COMMON_LOWER_CLAIMS)))
-    report = claim_fixed_controls(bot, templates, region=LOWER_CONTENT)
-    if not report.acted:
-        report = claim_sparkle(bot, region=LOWER_CONTENT)
-    return report, navigated
+    fixed = claim_fixed_controls(bot, COMMON_LOWER_CLAIMS,
+                                 max_taps=16, region=LOWER_CONTENT)
+    if back_if_close_x(bot):
+        return fixed, navigated
+    sparkle = claim_sparkles(bot, region=LOWER_CONTENT, attempts=4)
+    return ClaimReport(fixed.attempted + sparkle.attempted,
+                       fixed.verified + sparkle.verified), navigated
 
 
 def run_opened(bot, due_keys: set[str], *, handled: set[str] | None = None
@@ -181,7 +180,7 @@ def run_opened(bot, due_keys: set[str], *, handled: set[str] | None = None
                                 "visited_remaining" if report.acted or navigated
                                 else "remaining")
                 attempted_this_run.add(key)
-                if dot_gone:
+                if dot_gone or key != strategic_stockpile.KEY:
                     handled.add(key)
                 screen = after
 
@@ -192,7 +191,7 @@ def run_opened(bot, due_keys: set[str], *, handled: set[str] | None = None
             else:
                 bot.swipe_percent(20, 14, 85, 14, duration=0.5, delay=1)
 
-    clean = _verify_clean(bot)
+    clean = _verify_clean(bot, handled)
     bot.record("Gift Claims: Valuable Event - "
                + ("DONE, phần trên đã hết dấu đỏ" if clean
                   else "chưa DONE, phần trên vẫn còn dấu đỏ"))
