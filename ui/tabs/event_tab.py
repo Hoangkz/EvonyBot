@@ -22,6 +22,8 @@ Settings (lưu ở cột `event` của DB) giữ đủ thông tin mỗi nhiệm 
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtWidgets import QAbstractItemView, QListWidget, QListWidgetItem, QPushButton
 
+from bot.activities.event.cycle import describe
+
 from .event import DATA
 from .tab_placeholder import DesignerTab
 
@@ -115,6 +117,12 @@ class EventTab(DesignerTab):
         for panel, (y, spec) in _REDEEMS.items():
             self._lists[spec["key"]] = self._build_redeem(c[panel], y, spec)
 
+    def showEvent(self, event):
+        """Mở tab: danh sách quà luôn cuộn về đầu để thấy món ưu tiên nhất (thứ tự nạp / chỉ mục chọn có thể làm nó trôi xuống)."""
+        super().showEvent(event)
+        for lst in self._lists.values():
+            lst.scrollToTop()
+
     def _build_redeem(self, panel, y, spec) -> QListWidget:
         """Danh sách quà xếp thứ tự ưu tiên (kéo thả hoặc nút Up / Down) dưới các ô chọn."""
         from PyQt5.QtWidgets import QLabel
@@ -133,6 +141,7 @@ class EventTab(DesignerTab):
             button.setToolTip("Up" if step < 0 else "Down")
             button.clicked.connect(lambda _=False, l=lst, d=step: self._move(l, d))
         lst.setCurrentRow(0)
+        lst.scrollToTop()
         lst.show()
         return lst
 
@@ -203,6 +212,15 @@ class EventTab(DesignerTab):
             saved = (data.get(key) or {}).get("order") if isinstance(data.get(key), dict) else None
             for position, item_id in enumerate(i for i in (saved or []) if self._row_of(lst, i) >= 0):
                 lst.insertItem(position, lst.takeItem(self._row_of(lst, item_id)))
+            lst.scrollToTop()   # món ưu tiên nhất (hàng đầu) phải thấy ngay, không phải cuộn lên
+
+    def set_event_times(self, daily_keys):
+        """Tiêu đề mỗi group hiện thời gian còn lại của event ("Gather Troops — còn 3d 14:22") theo mốc reset bot đã lưu
+        (khoá daily_done `<event>_cycle_reset_...`, xem bot/activities/event/cycle.py); chưa có mốc thì chỉ hiện tên group."""
+        keys = list(daily_keys)
+        for g, group in enumerate(GROUPS):
+            text = describe(keys, group["key"])
+            self.controls[f"groupBoxEvent{g}"].setTitle(group["title"] if text is None else f"{group['title']} — {text}")
 
     @staticmethod
     def _row_of(lst: QListWidget, item_id) -> int:

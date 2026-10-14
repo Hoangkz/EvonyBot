@@ -26,6 +26,11 @@ MAIN_MORE = "Server/listActivity.png"                    # nút "•••" củ
 QUESTS_BUTTON = f"{USE_ALL}/Click_Activities.png"        # nút Quests (cuộn giấy) góc dưới trái
 QUESTS_BUTTON_REGION = (0, 70, 25, 100)                  # % màn hình
 ACTIVITY_TAB = f"{USE_ALL}/Click_Activities1.png"        # chữ tab "Activity" (chọn hay chưa đều khớp)
+# Popup Quests có thể 3 tab (Chapter Quests / Main Quest / Activity) hoặc 2 tab (không Chapter Quests): tab Activity lệch
+# ngang và nền khác nên điểm khớp tụt (2 tab, đang chọn: 0,859; 3 tab: 0,96-1,00). Hàng tab chỉ có 3 chữ khác nhau (tab khác
+# <= 0,45) nên hạ ngưỡng và giới hạn vào hàng tab (% màn hình) vẫn không khớp nhầm.
+ACTIVITY_TAB_THRESHOLD = 0.8
+ACTIVITY_TAB_REGION = (0, 18, 100, 28)
 ACTIVITY_LIST = f"{USE_ALL}/Click_ActivitiesLight.png"   # ngôi sao điểm Activity: đang ở danh sách
 GO_BUTTON = f"{USE_ALL}/Go.png"
 CLAIM_BUTTON = f"{ROOT}/ActivitiesSourceCollecting/Claim.png"   # dòng đã xong, chưa nhận
@@ -34,6 +39,8 @@ CLAIM_ALL = f"{ROOT}/CollectionActivities/Claim_All.png"
 # trung bình trong khung nút (CLAIM_ALL_SIZE, quanh tâm) sáng ~205, xám ~14 -> dưới CLAIM_ALL_MIN_SATURATION là xám, bỏ qua.
 CLAIM_ALL_SIZE = (124, 35)
 CLAIM_ALL_MIN_SATURATION = 100
+CLAIM_ALL_THRESHOLD = 0.75   # ngưỡng khớp mẫu (thấp hơn mặc định: màu quyết định xanh / xám)
+CLAIM_ALL_TAPS = 3           # số lần bấm Claim All tối đa khi vừa mở danh sách
 # Ảnh tiêu đề dòng cắt từ danh sách thật (396x704) trong thư mục ảnh của nhiệm vụ: chỉ phần chữ cố
 # định, bỏ số lượng / "for N time(s)" (khác theo tài khoản, lần). Dòng đúng 1,00; dòng khác <= 0,78.
 # Resource Gathering = dòng "Gather ... resources from resource fields in the City" (thu mỏ trong thành).
@@ -54,6 +61,7 @@ LIST_MAX_SCROLLS = 25
 # Lướt hết danh sách không thấy nhiệm vụ: Back (đóng bảng Activity) rồi mở lại từ đầu, tìm thêm
 # LIST_RETRIES lần (lần cuộn trước có thể trượt qua dòng) rồi mới coi là không có (TASK_NOT_FOUND).
 LIST_RETRIES = 2
+TICK_TRIES = 3   # số lần liên tiếp thấy dấu tích (Back, mở lại danh sách giữa các lần) mới coi nhiệm vụ đã xong
 # Bảng Activity đã mở sẵn (có thể đang ở giữa danh sách): Back rồi mở lại từ đầu. Không bao giờ cuộn lên.
 LIST_END_SAME = 0.99                 # vùng danh sách trước / sau khi cuộn giống cỡ này = hết danh sách
 OPEN_ACTIVITY_TRIES = 8
@@ -94,6 +102,7 @@ TASK_OPENED, TASK_DONE, TASK_NOT_FOUND, TASK_NO_LIST = "opened", "done", "not_fo
 TASK_UNKNOWN = "unknown"
 # open_task(tap_go=False): dòng / popup còn Go (nhiệm vụ chưa xong) nhưng không bấm (chỉ kiểm tra).
 TASK_HAS_GO = "has_go"
+TASK_TICK = "tick"   # nội bộ _search_list: dòng hiện dấu tích (open_task thử lại TICK_TRIES lần rồi mới coi là xong)
 # Dấu tích V của dòng đã nhận thưởng (cắt từ danh sách Activity máy 21913, dòng Tax / Levy / Offer đã xong): khớp
 # 1,00; tích V ở tab Chapter Quests 0,96 (chỉ tìm ngay dưới tiêu đề dòng nên không nhầm). Tích nằm dưới tâm tiêu đề
 # TICK_DY px (đo 32 .. 33), không phải ROW_BUTTON_DY như Go / Claim.

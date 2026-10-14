@@ -8,7 +8,7 @@ nhiệm vụ của từng event theo thứ tự; perform_task chạy một nhi�
 Mỗi nhiệm vụ là một file riêng (gather_troops/..., kings_path/...) với hàm `run(bot, task, state)`; phần đi từ màn
 hình chính tới nút event dùng chung ở common.py. `state` (EventState) giữ quà đăng nhập chỉ nhận 1 lần mỗi lượt.
 """
-from . import claim
+from . import claim, cycle
 from ..result import NOT_DONE, TaskResult, clear, save_errors, take_all
 from .common import EventState
 from .constants import GATHER_TROOPS_ICON, KINGS_PATH_ICON
@@ -68,6 +68,7 @@ def claim_event(bot, event: str, name: str, icon: str):
 # "Xong" luôn tính lại từ các dấu đó (đọc DB) mỗi vòng lặp.
 # =============================================================================================
 _KEY_OF = {run: key for _, _, _, tasks in EVENTS for key, run in tasks}   # hàm làm việc -> key nhiệm vụ
+_EVENT_OF = {key: event for event, _, _, tasks in EVENTS for key, _ in tasks}   # key nhiệm vụ -> key event
 _EVENT_INFO = {event: (name, icon, [key for key, _ in tasks]) for event, name, icon, tasks in EVENTS}
 
 
@@ -117,11 +118,16 @@ def claim_key(event: str, done_count: int) -> str:
 
 
 # ---- Nhiệm vụ đã xong? (đọc DB) ------------------------------------------------------------
+def _fresh(ctx, key: str, done_key: str) -> bool:
+    """Dấu hoàn thành `done_key` còn hiệu lực trong chu kỳ hiện tại của event chứa nhiệm vụ `key` (xem cycle.py): quá ngày
+    reset của event thì dấu cũ hết hiệu lực, nhiệm vụ được làm lại."""
+    return cycle.valid(ctx, _EVENT_OF[key], ctx.done_at(done_key))
+
+
 def is_complete(ctx, settings: dict, key: str) -> bool:
     """Xong cả vòng event: hết Go (xong hẳn), hoặc đã đạt mục tiêu HIỆN TẠI của nhiệm vụ."""
     target = task_target(settings, key)
-    return bool(ctx.done_at(complete_key(key))
-                or (target is not None and ctx.done_at(complete_key(key, target))))
+    return _fresh(ctx, key, complete_key(key)) or (target is not None and _fresh(ctx, key, complete_key(key, target)))
 
 
 def is_done_today(ctx, settings: dict, key: str) -> bool:
@@ -131,7 +137,7 @@ def is_done_today(ctx, settings: dict, key: str) -> bool:
     if not ctx.is_daily_done(key):
         return False
     target = task_target(settings, key)
-    if target is None or ctx.done_at(complete_key(key)):
+    if target is None or _fresh(ctx, key, complete_key(key)):
         return True
     prefix = f"{key}_reached_"
     reached = [int(k[len(prefix):]) for k in ctx.daily_keys()

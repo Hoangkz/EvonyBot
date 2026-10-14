@@ -59,7 +59,7 @@ class DailyGeneralPurchaseTests(unittest.TestCase):
 
         self.assertTrue(general.buy_all_hammers(bot))
 
-        self.assertEqual(bot.taps, [(230, 402), (200, 510)])
+        self.assertEqual(bot.taps, [(250, 400)] * general.HAMMER_MAX_TAPS + [(200, 510)])
 
     @staticmethod
     def _ctx(done):

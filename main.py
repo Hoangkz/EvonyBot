@@ -64,6 +64,12 @@ class MainWindow(QMainWindow):
         self._register_timer.setInterval(0)
         self._register_timer.timeout.connect(self._register_next_device)
 
+        # Tab Event hiện thời gian còn lại của event ở tiêu đề group: đọc mốc reset bot đã lưu trong DB (daily_done) mỗi phút.
+        self._event_timer = QTimer(self)
+        self._event_timer.setInterval(60_000)
+        self._event_timer.timeout.connect(self._refresh_event_times)
+        self._event_timer.start()
+
         self.bots = BotManager(self)
         self.bots.activity_changed.connect(
             lambda serial, activity: self.home_view.update_device(serial, activity=activity)
@@ -84,6 +90,7 @@ class MainWindow(QMainWindow):
         self.bots.auto_timeout_minutes = self.home_view.auto_timeout_minutes
         self.home_view.auto_timeout_changed.connect(self._on_auto_timeout_changed)
         self.bots.daily_task_done.connect(self.db.mark_daily_task_done)
+        self.bots.daily_task_done.connect(lambda serial, _task: self._refresh_event_times(serial))
         self.bots.bubble_found.connect(self._on_bubble_found)
         self.bots.civilization_found.connect(self._on_civilization_found)
         self.bots.city_map_found.connect(self.db.set_city_map)
@@ -167,12 +174,20 @@ class MainWindow(QMainWindow):
             view.append_history(created_at, message)
 
         self.device_views[device_id] = view
+        self._refresh_event_times(device_id)
         view.set_run_counts(*self._run_counts())
         self.stack.addWidget(view)
         self.sidebar.add_device(device_id)
 
+    def _refresh_event_times(self, serial: str | None = None):
+        """Cập nhật tiêu đề group của tab Event (thời gian còn lại của event) cho một thiết bị / mọi thiết bị."""
+        for device_id, view in self.device_views.items():
+            if serial is None or device_id == serial:
+                view.event_tab.set_event_times(self.db.daily_done(device_id))
+
     def _show_device(self, device_id: str):
         view = self.device_views.get(device_id)
+        self._refresh_event_times(device_id)
         if view is not None:
             view.tabs.setCurrentIndex(self._current_tab_index)
             self.stack.setCurrentWidget(view)

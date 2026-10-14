@@ -13,10 +13,14 @@ from ..activities.daily_activities.troop_training.run import after_go as troop_t
 from ..activities.daily_activities.trap_building import TASK as daily_trap_buiding
 from ..activities.daily_activities.trap_building.run import after_go as trap_building_after_go
 from ..activities.daily_activities.black_market import TASK as daily_black_market
+from ..activities.daily_activities.black_market.run import after_go as black_market_after_go
 from ..activities.daily_activities.general_enhancing import TASK as daily_general_enhancing
+from ..activities.daily_activities.general_enhancing.run import after_go as general_enhancing_after_go
 from ..activities.daily_activities.wheel_of_fortune import TASK as daily_wheel_of_fortune
 from ..activities.daily_activities.patrol import TASK as daily_patrol
+from ..activities.daily_activities.patrol.run import after_go as patrol_after_go
 from ..activities.daily_activities.material_composing import TASK as daily_material_composing
+from ..activities.daily_activities.material_composing import after_go as material_composing_after_go
 from ..activities.daily_activities.alliance_research import TASK as daily_alliance_research
 from ..activities.daily_activities.alliance_research.run import after_go as alliance_research_after_go
 from ..activities.daily_activities.greet_champion import TASK as daily_greet_champion
@@ -45,6 +49,8 @@ from ..activities.daily_activities.alliance_donation.run import donate_free
 from ..activities.daily_activities.alliance_help import TASK as alliance_help_task
 from ..activities.daily_activities.alliance_help.run import help_all
 from ..activities.daily_activities.buy_daily.run import JOB as daily_buy_general
+from ..activities.daily_activities.alliance_vip import JOB as daily_alliance_vip
+from ..activities.daily_activities.city_vip import JOB as daily_city_vip
 from ..activities.daily_activities.alliance_donation import constants as alliance_donation_constants
 from ..activities.daily_activities.alliance_help import constants as alliance_help_constants
 from ..activities.daily_activities.common import GIFTS_JOB as daily_gift_claims
@@ -273,14 +279,28 @@ DATA ={
             "note": "Học viện: nghiên cứu 1 công nghệ xanh bất kỳ, tốn thời gian thì Speed Up bằng vật phẩm",
         },
         { 
+            "key": "daily_city_vip",
+            "run": daily_city_vip,
+            "label": "City VIP",
+            "priority": 650,   # cao nhất trong Event (cao nhất 600) và Daily Activities
+            "note": "Nhận VIP ở thành: không có ô tích, chỉ 0h-1h giờ máy tính và khi đã có route công trình trong DB (flow nhận chưa viết)",
+        },
+        { 
+            "key": "daily_alliance_vip",
+            "run": daily_alliance_vip,
+            "label": "Alliance VIP",
+            "priority": 391,
+            "note": "Alliance Shop: mua VIP Monthly rồi Daily (nút xám = coi như đã mua)",
+        },
+        { 
             "key": "daily_black_market",
-            "run": daily_job(daily_black_market),
+            "run": daily_job(daily_black_market, after_go=black_market_after_go),
             "label": "Black Market",
             "priority": 390,
         },
         { 
             "key": "daily_general_enhancing",
-            "run": daily_job(daily_general_enhancing),
+            "run": daily_job(daily_general_enhancing, after_go=general_enhancing_after_go),
             "label": "General Enhancing",
             "priority": 389, 
             "note": "Cần làm thêm",
@@ -293,14 +313,14 @@ DATA ={
         },
         { 
             "key": "daily_patrol",
-            "run": daily_job(daily_patrol),
+            "run": daily_job(daily_patrol, after_go=patrol_after_go),
             "label": "Patrol",
             "priority": 387, 
             "must_finish": True,
         },
         { 
             "key": "daily_material_composing",
-            "run": daily_job(daily_material_composing),
+            "run": daily_job(daily_material_composing, after_go=material_composing_after_go),
             "label": "Material Composing",
             "priority": 386,
         },

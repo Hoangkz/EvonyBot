@@ -13,7 +13,7 @@ Thứ tự ưu tiên: Bubble > Auto Times Out > Join Boss > nhiệm vụ.
 - Auto Times Out (số phút chọn ở màn Home, chung mọi thiết bị): lo ngay sau bubble; chạy đủ số phút kể từ
   lần đóng game trước thì ngắt mọi thứ đang chạy (RestartDue) và đóng game; nhiệm vụ đang dở làm lại.
 - Có chọn Join Boss: mỗi vòng chạy Join Boss (rảnh thì nhường), rồi 1 nhiệm vụ tối đa OTHERS_WINDOW
-  giây; xong nhiệm vụ là quay lại Join Boss ngay. Hết giờ / có boss mới -> nhiệm vụ đang dở chưa xong nên xuống cuối danh sách.
+  giây; xong nhiệm vụ là quay lại Join Boss ngay. Hết giờ / có boss mới -> nhiệm vụ đang dở giữ nguyên vị trí, sau Join Boss làm tiếp.
   Join Boss dừng hẳn (không phải rảnh) -> vẫn chạy tiếp các nhiệm vụ.
 - Nhiệm vụ must_finish (priority.py): đã bắt đầu thì chạy tới xong; Bubble / Auto Times Out / boss mới /
   120 giây không ngắt (chỉ Stop). Xong rồi mới tới Bubble, Auto Times Out và Join Boss.
@@ -154,6 +154,7 @@ class BotWorker(QThread):
             self.ctx.mark_daily_done = self._mark_daily_done
             self.ctx.done_at = self.daily_done.get
             self.ctx.daily_keys = lambda: list(self.daily_done)
+            self.ctx.server_time = lambda: self.server_time
             self.ctx.record = self.record
             # Nền văn minh đã lưu DB (None = chưa biết); bot tự xếp thì lưu lại qua signal.
             self.ctx.civilization = self.settings.get("Initialization", {}).get("civilization") or None
@@ -256,6 +257,8 @@ class BotWorker(QThread):
                 if attempts[task.key] >= MAX_ATTEMPTS:
                     self.record(f"{task.key}: chưa xong sau {MAX_ATTEMPTS} lần thử, bỏ qua tới ngày mới")
                     continue
+            if not completed:
+                continue   # bị ngắt (boss / hết 120 giây): sau Join Boss làm tiếp chính nhiệm vụ này, không đổi sang việc khác
             if task.due is None:
                 order.remove(task)
                 order.append(task)   # chưa xong: chuyển xuống cuối (việc theo giờ thì chờ tới giờ kế tiếp)
@@ -331,7 +334,7 @@ class BotWorker(QThread):
             self._run_one(task)
             self.record(f"Xong: {task.key}")
             return True
-        # Bị ngắt: chưa xong, nhiệm vụ xuống cuối danh sách rồi gọi lại từ đầu hàm run(); worker không lưu điểm thực thi.
+        # Bị ngắt: chưa xong, nhiệm vụ giữ vị trí và được gọi lại từ đầu hàm run() sau Join Boss; worker không lưu điểm thực thi.
         except TimedOut:
             self.record(f"Tạm dừng: {task.key} (hết {OTHERS_WINDOW} giây, quay lại Join Monster War)")
             return False    # hết OTHERS_WINDOW giây
