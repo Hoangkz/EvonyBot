@@ -36,6 +36,16 @@ def target(bot):
         return test_three_day_redeem(bot)
     if os.environ.get("EVONY_TEST") == "three_day":
         return test_three_day(bot)
+    if os.environ.get("EVONY_TEST") == "city_vip":
+        # Route tạm dựng từ FIXED của civ1 (không lưu DB) để thử flow nhận VIP khi máy chưa quét route.
+        from bot.activities.daily_activities import city_vip
+        from bot.city.civ1 import city_tour
+        bot.civilization = 1
+        bot.city_map = {"keep": [0, 0], **city_tour.FIXED}
+        return city_vip.claim_vip(bot)
+    if os.environ.get("EVONY_TEST") == "alliance_vip":
+        from bot.activities.daily_activities import alliance_vip
+        return alliance_vip.buy_vip(bot, True, True)
     if os.environ.get("EVONY_TEST") == "rewards":
         from bot.activities.daily_activities import common
         return common.collect_activity_rewards(bot)

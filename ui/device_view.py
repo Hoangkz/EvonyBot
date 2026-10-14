@@ -55,11 +55,11 @@ class DeviceView(QWidget):
 
         self._add_tab(self.initialization_tab, "Initialization")
         self._add_tab(self.join_monster_war_tab, "Join Monster War")
-        self._add_tab(self.alliance_capacity_tab, "Alliance Capacity")
         self._add_tab(self.daily_activities_tab, "Daily Activities")
-        self._add_tab(self.open_gift_box_tab, "Open Gift Box")
-        self._add_tab(self.black_market_tab, "Black Market")
         self._add_tab(self.event_tab, "Event")
+        self._add_tab(self.open_gift_box_tab, "Open Gift Box")
+        self._add_tab(self.alliance_capacity_tab, "Alliance Capacity")
+        self._add_tab(self.black_market_tab, "Black Market")
         # Logs không có cấu hình: thêm thẳng, không nối Apply ALL / settings.
         self.logs_tab = LogsTab()
         self.tabs.addTab(self.logs_tab, "Logs")

@@ -49,6 +49,8 @@ from ..activities.daily_activities.alliance_donation.run import donate_free
 from ..activities.daily_activities.alliance_help import TASK as alliance_help_task
 from ..activities.daily_activities.alliance_help.run import help_all
 from ..activities.daily_activities.buy_daily.run import JOB as daily_buy_general
+from ..activities.daily_activities.alliance_vip import JOB as daily_alliance_vip
+from ..activities.daily_activities.city_vip import JOB as daily_city_vip
 from ..activities.daily_activities.alliance_donation import constants as alliance_donation_constants
 from ..activities.daily_activities.alliance_help import constants as alliance_help_constants
 from ..activities.daily_activities.common import GIFTS_JOB as daily_gift_claims
@@ -275,6 +277,20 @@ DATA ={
             "label": "Research",
             "priority": 392,
             "note": "Học viện: nghiên cứu 1 công nghệ xanh bất kỳ, tốn thời gian thì Speed Up bằng vật phẩm",
+        },
+        { 
+            "key": "daily_city_vip",
+            "run": daily_city_vip,
+            "label": "City VIP",
+            "priority": 650,   # cao nhất trong Event (cao nhất 600) và Daily Activities
+            "note": "Nhận VIP ở thành: không có ô tích, chỉ 0h-1h giờ máy tính và khi đã có route công trình trong DB (flow nhận chưa viết)",
+        },
+        { 
+            "key": "daily_alliance_vip",
+            "run": daily_alliance_vip,
+            "label": "Alliance VIP",
+            "priority": 391,
+            "note": "Alliance Shop: mua VIP Monthly rồi Daily (nút xám = coi như đã mua)",
         },
         { 
             "key": "daily_black_market",
