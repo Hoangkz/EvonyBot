@@ -27,7 +27,7 @@ class JoinMonsterWarTab(BaseTab):
         apply_layout.setContentsMargins(0, 0, 0, 0)
         apply_layout.addStretch()
         self.apply_all_button = QPushButton("Apply ALL")
-        self.apply_all_button.setFixedSize(132, 43)
+        self.apply_all_button.setObjectName("ApplyAllButton")     # cùng màu / cỡ với Apply ALL của Daily Activities
         self.apply_all_button.clicked.connect(self.on_apply_all)
         apply_layout.addWidget(self.apply_all_button)
         self.add_row(apply_row)

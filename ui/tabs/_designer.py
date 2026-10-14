@@ -77,11 +77,8 @@ def build_tab(root_name, data, combo_items, size):
     maps every original C# control name -> its QWidget instance."""
     page = QWidget()
     page.setFixedSize(*size)
-    # Background phải gắn theo id: một stylesheet đặt thẳng "background: white;"
-    # lên page sẽ cascade xuống mọi nút con và thắng stylesheet toàn cục
-    # (QPushButton:disabled bị bỏ qua -> nút tắt hiện nền trắng, không phân biệt được).
-    page.setObjectName("DesignerPage")
-    page.setStyleSheet("#DesignerPage { background: white; }")
+    page.setProperty("tabPage", True)     # nền trắng chung của mọi tab (theme.py)
+    page.setAttribute(Qt.WA_StyledBackground, True)
     registry = {}
     for child_name in data[root_name].get("children", []):
         if child_name in data:
