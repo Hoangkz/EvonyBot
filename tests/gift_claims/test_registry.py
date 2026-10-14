@@ -1,5 +1,6 @@
 import tempfile
 import unittest
+from importlib import import_module
 from pathlib import Path
 from unittest import mock
 
@@ -14,6 +15,19 @@ from database import Database
 
 
 class GiftClaimRegistryTests(unittest.TestCase):
+    def test_each_event_center_package_exposes_a_run_entry_point(self):
+        names = (
+            "blessing_of_pallas", "dragon_battle", "dwarfs_treasure",
+            "grace_of_star_trail", "hypnos_dream", "poseidons_day",
+            "precious_blazon_exchange", "revelation_of_horus",
+            "sealed_imperial_treasury",
+        )
+        for name in names:
+            with self.subTest(event=name):
+                module = import_module(
+                    f"bot.activities.gift_claims.event_center.{name}")
+                self.assertTrue(callable(module.run))
+
     def test_all_declared_templates_are_readable_images(self):
         folder = Path(__file__).parents[2] / "Images" / "GiftClaims"
         expected = {
@@ -100,7 +114,7 @@ class GiftClaimRegistryTests(unittest.TestCase):
             return value
 
         with (mock.patch.object(gift_claims.lobby, "open_next", side_effect=open_next),
-              mock.patch.object(gift_claims.valuable_event, "run_opened",
+              mock.patch.object(gift_claims.valuable_event._run, "run_opened",
                                 side_effect=(TimedOut(), ({}, True)))):
             with self.assertRaises(TimedOut):
                 gift_claims.run(bot)

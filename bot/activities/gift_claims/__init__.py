@@ -5,9 +5,18 @@ their progress lives on ``BotContext`` while the worker yields to Join Boss and
 is discarded after the whole two-boundary scan completes.
 """
 from dataclasses import dataclass, field
+from importlib import import_module
 
 from ...context.errors import YieldToBoss
-from . import back_to_territory, event_center, lobby, super_value_return, valuable_event
+from . import event_center, lobby, valuable_event
+# Compatibility aliases for callers that previously imported a specific
+# non-Event-Center claim flow from ``gift_claims``.  Implementations live in
+# ``valuable_event/``; only the public entry points remain here.
+back_to_territory = import_module(f"{__name__}.valuable_event.back_to_territory.run")
+empire_depot = import_module(f"{__name__}.valuable_event.empire_depot.run")
+limited_offer = import_module(f"{__name__}.valuable_event.limited_offer.run")
+login_gifts = import_module(f"{__name__}.valuable_event.login_gifts.run")
+super_value_return = import_module(f"{__name__}.valuable_event.super_value_return.run")
 from .common import (TEXT_CLAIM_CONTROLS, back_if_close_x,
                      claim_fixed_controls, claim_sparkles, return_home)
 from .screens import GiftScreen
@@ -44,7 +53,7 @@ def _dispatch(bot, screen_name: GiftScreen, progress: GiftProgress):
     """Handle whichever fixed screen the clicked lobby dot actually opened."""
     if screen_name == GiftScreen.VALUABLE_EVENT:
         if screen_name not in progress.completed_parents:
-            outcomes, scanned = valuable_event.run_opened(
+            outcomes, scanned = valuable_event._run.run_opened(
                 bot, valuable_event.KEYS - progress.valuable_done,
                 handled=progress.valuable_done,
             )
@@ -77,7 +86,7 @@ def _dispatch(bot, screen_name: GiftScreen, progress: GiftProgress):
         return
 
     if screen_name == GiftScreen.EVENT_CENTER:
-        clean = event_center.run_opened(bot, progress.event_center_done)
+        clean = event_center._run.run_opened(bot, progress.event_center_done)
         progress.outcomes.append("event_center_clean" if clean else
                                  "event_center_remaining")
         if clean:
