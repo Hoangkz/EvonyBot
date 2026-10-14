@@ -5,8 +5,9 @@ FIXED_NAMES: tên mọi công trình cố định của mọi civ (find_keep tì
 """
 from .civ1 import city_tour as civ1
 from .civ2 import city_tour as civ2
+from .civ3 import city_tour as civ3
 from .civ7 import city_tour as civ7
 
-ALL = {1: civ1, 2: civ2, 7: civ7}
+ALL = {1: civ1, 2: civ2, 3: civ3, 7: civ7}
 TOURS = {civ: tour for civ, tour in ALL.items() if tour.COMPLETE}
 FIXED_NAMES = tuple(dict.fromkeys(name for tour in ALL.values() for name in tour.FIXED))
