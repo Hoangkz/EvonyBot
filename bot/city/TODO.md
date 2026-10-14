@@ -1,12 +1,12 @@
 # Bản đồ thành và route công trình — việc còn lại
 
 
-Luồng + hướng dẫn đo route cho nền văn minh mới: [FLOW.md](FLOW.md). Dữ liệu route mỗi civ một thư mục (`civ<N>/city_tour.py`); hiện **chỉ civ1 đủ** (`tours.TOURS`), civ7 đang đo dở ([civ7/city_tour.py](civ7/city_tour.py): mới có ô 1 Học viện).
+Luồng + hướng dẫn đo route cho nền văn minh mới: [FLOW.md](FLOW.md). Dữ liệu route mỗi civ một thư mục (`civ<N>/city_tour.py`); hiện **chỉ civ1 đủ** (`tours.TOURS`), civ7 / civ2 đang đo dở ([civ7/city_tour.py](civ7/city_tour.py), [civ2/city_tour.py](civ2/city_tour.py): civ2 đã có đủ 13 ô `DATA`, còn `FIXED` / `ROUTES` / `ANCHOR_SHIFT`, ảnh mẫu Embassy / Tavern khớp yếu, ảnh mẫu Prison sai công trình).
 
 0. **Black Market chỉ chạy khi DB có route?** Hiện `_market` bỏ quét (không còn Go Gold Levy rồi quét), vẫn thử Chợ trên màn, bản đồ DB, rồi Go nhiệm vụ mua Black Market / Tax. Nếu muốn Black Market chỉ làm khi DB đã có route thì bỏ luôn bước Go nhiệm vụ.
 1. **Route cho các nền văn minh khác (civ 2 .. 7)**: đã tách mỗi civ một thư mục `bot/city/civ<N>/city_tour.py`, `city_map` chọn bảng
    theo civ qua [tours.py](tours.py) (civ chưa `COMPLETE` thì ghi log "chưa có route", không vuốt). civ7 (máy 21933) đang đo: xong ô 1
-   (Học viện, tổng vuốt (179, 120)); còn ô 2 .. 13, `FIXED` (Walls, Research Factory, Tavern...), `ROUTES`, `ANCHOR_SHIFT`. civ 2 .. 6 chưa có thư mục.
+   (Học viện, tổng vuốt (179, 120)); còn ô 2 .. 13, `FIXED` (Walls, Research Factory, Tavern...), `ROUTES`, `ANCHOR_SHIFT`. civ 3 .. 6 chưa có thư mục.
 2. **Chạy thật cả luồng qua worker**: hết nhiệm vụ + Join Boss rảnh -> `scan_city` -> boss tăng thì vào Join Boss rồi vuốt tiếp
    -> lưu DB (`devices.city_map`). Mới chạy từng phần trên giả lập (21913 quét trọn 13 ô, 30 cú, 21 công trình; 21923 / 21943 từng
    đoạn); phần boss tăng chỉ test bằng mock. Bản đồ quét chưa được lưu vào DB của máy nào.
