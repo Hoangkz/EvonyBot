@@ -34,6 +34,8 @@ class BotContext(FlowMixin, InputMixin, ScreenMixin):
         self.done_at = lambda task: None
         # Mọi key đang có trong daily_done (kể cả ngày cũ), VD tìm "<key>_reached_<mục tiêu>".
         self.daily_keys = lambda: []
+        # Giờ reset server "HH:MM" (màn Home); worker gán BotWorker.server_time.
+        self.server_time = lambda: "14:00"
         # Nền văn minh của tài khoản (1 .. 7, None = chưa biết), bot tự xếp từ ảnh công trình
         # (activities/event/city_building.py); worker gán set_civilization để lưu DB.
         self.civilization: int | None = None

@@ -4,8 +4,8 @@ SERIAL = os.environ.get("EVONY_SERIAL", "127.0.0.1:21933")   # máy đang ở m�
 CIV = int(os.environ.get("EVONY_CIV", "2"))                   # nền văn minh của máy
 import math,sys
 LIM=int(sys.argv[1])
-views = [(1,'academy',(481,123)),(2,'hospital',(564,-24)),(3,'stables',(747,-102)),(4,'barracks',(578,-201)),(5,'archer_camp',(830,-363)),
-         (6,'workshop',(1014,-281)),(7,'war_hall',(454,-518)),(8,'embassy',(142,-662)),(9,'market',(285,-366)),(10,'tavern',(109,-209)),(11,'forge',(13,-472)),(12,'trap_factory',(-163,-395)),(13,'prison',(-309,-246))]
+views = [(1,'academy',(385,84)),(2,'hospital',(665,-45)),(3,'stables',(849,-111)),(4,'barracks',(664,-217)),(5,'archer_camp',(974,-345)),
+         (6,'workshop',(1131,-262)),(7,'war_hall',(345,-677)),(8,'embassy',(178,-715)),(9,'market',(238,-439)),(10,'tavern',(126,-271)),(11,'forge',(-8,-535)),(12,'trap_factory',(-239,-445)),(13,'prison',(-506,-248))]
 rows=[]; prev=(0,0)
 for plot,name,v in views:
     fx,fy=v[0]-prev[0],v[1]-prev[1]

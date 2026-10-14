@@ -13,10 +13,14 @@ from ..activities.daily_activities.troop_training.run import after_go as troop_t
 from ..activities.daily_activities.trap_building import TASK as daily_trap_buiding
 from ..activities.daily_activities.trap_building.run import after_go as trap_building_after_go
 from ..activities.daily_activities.black_market import TASK as daily_black_market
+from ..activities.daily_activities.black_market.run import after_go as black_market_after_go
 from ..activities.daily_activities.general_enhancing import TASK as daily_general_enhancing
+from ..activities.daily_activities.general_enhancing.run import after_go as general_enhancing_after_go
 from ..activities.daily_activities.wheel_of_fortune import TASK as daily_wheel_of_fortune
 from ..activities.daily_activities.patrol import TASK as daily_patrol
+from ..activities.daily_activities.patrol.run import after_go as patrol_after_go
 from ..activities.daily_activities.material_composing import TASK as daily_material_composing
+from ..activities.daily_activities.material_composing import after_go as material_composing_after_go
 from ..activities.daily_activities.alliance_research import TASK as daily_alliance_research
 from ..activities.daily_activities.alliance_research.run import after_go as alliance_research_after_go
 from ..activities.daily_activities.greet_champion import TASK as daily_greet_champion
@@ -274,13 +278,13 @@ DATA ={
         },
         { 
             "key": "daily_black_market",
-            "run": daily_job(daily_black_market),
+            "run": daily_job(daily_black_market, after_go=black_market_after_go),
             "label": "Black Market",
             "priority": 390,
         },
         { 
             "key": "daily_general_enhancing",
-            "run": daily_job(daily_general_enhancing),
+            "run": daily_job(daily_general_enhancing, after_go=general_enhancing_after_go),
             "label": "General Enhancing",
             "priority": 389, 
             "note": "Cần làm thêm",
@@ -293,14 +297,14 @@ DATA ={
         },
         { 
             "key": "daily_patrol",
-            "run": daily_job(daily_patrol),
+            "run": daily_job(daily_patrol, after_go=patrol_after_go),
             "label": "Patrol",
             "priority": 387, 
             "must_finish": True,
         },
         { 
             "key": "daily_material_composing",
-            "run": daily_job(daily_material_composing),
+            "run": daily_job(daily_material_composing, after_go=material_composing_after_go),
             "label": "Material Composing",
             "priority": 386,
         },

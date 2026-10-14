@@ -28,7 +28,8 @@ COST_CROP = (170, 440, 75, 24)   # vùng số kim cương trên nút xanh của 
 COST_FONT = "BuyCost"            # mẫu chữ số Images/OCR/BuyCost (số trên nút xanh, đã lọc màu kem)
 HAMMER_SOLD_OUT = f"{BUY}/HammerSoldOut.png"   # nút giá xám của dòng Hammer ("Daily Limit: 0 / 10"): hết lượt hôm nay
 SOLD_OUT_THRESHOLD = 0.97   # nút giá còn lượt (cam) khớp 0,88 với mẫu xám: phải đặt cao hơn
-PLUS_WAIT = 0.5                  # giây giữa hai lần bấm "+" / "-"
+HAMMER_MAX_TAPS = 10             # số lần bấm "+" khi mua Hammer (giới hạn 10 / ngày)
+PLUS_WAIT = 0.5                # giây giữa hai lần bấm "+" / "-"
 # Giá Stamina (không giới hạn số lượng): (số lượng của bậc, giá kim cương mỗi cái), đo trên popup thật (tests/.../screens/06..24)
 # khi hôm nay đã mua đúng 1 cái (người dùng xác nhận): cái 1-10: 200, 11-16: 400, 17-19: 800, 20-22: 1600, 23-25: 3200, 26-31: 6400. Chỉ mua tới cái 20;
 # các bậc sau chỉ để phân biệt được số đã mua khi giá đang 800 / 1600.
@@ -238,8 +239,10 @@ def buy_all_hammers(bot) -> bool:
                 bot.tap_percent(87.5, 35, delay=2)
                 continue
             _positions(bot)[plus_path] = plus
-            # C# taps left of Plus to choose the maximum/all quantity.
-            bot.tap(plus[0] - 20, plus[1] + 2)
+            # Bấm "+" tới khi chạm tối đa (giới hạn ngày 10; bấm dư ở mức tối đa không sao). Bấm vùng bên trái "+" không
+            # đáng tin: trượt khỏi đầu thanh nên chỉ mua 1 cái.
+            for _ in range(HAMMER_MAX_TAPS):
+                bot.tap(*plus, delay=PLUS_WAIT)
             bot.tap(screen.shape[1] // 2, plus[1] + 110, delay=5)
             return True
         if action == "special_selected":

@@ -43,7 +43,7 @@ from ...context.templates import TEMPLATE_DIR
 from ...ocr import read_progress
 from ...ocr.read_progress import run_two_lines as read_progress_two_lines
 from ..result import TaskResult, report
-from . import constants
+from . import constants, cycle
 from .constants import (
     BACK,
     CLAIM,
@@ -202,6 +202,7 @@ def run_task(bot, state: EventState, name: str, event_icon: str, handle=None, *,
             continue
         failures = 0
         bot.log(f"{name}: event opened")
+        cycle.observe(bot, event_icon)   # chưa có ngày reset / đã quá ngày reset của event thì đọc ngày và lưu mốc reset
         if handle is None or handle(EVENT_OPENED, None, None) == STOP:
             return
 

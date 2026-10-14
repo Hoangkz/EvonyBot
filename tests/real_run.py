@@ -36,6 +36,11 @@ def target(bot):
         return test_three_day_redeem(bot)
     if os.environ.get("EVONY_TEST") == "three_day":
         return test_three_day(bot)
+    if os.environ.get("EVONY_TEST") == "rewards":
+        from bot.activities.daily_activities import common
+        return common.collect_activity_rewards(bot)
+    if os.environ.get("EVONY_TEST") == "open_task":
+        return test_open_task(bot)
     if os.environ.get("EVONY_TEST") == "greet":
         return test_greet_champion(bot)
     return test_trade_carriage(bot)
@@ -49,6 +54,19 @@ def test_trade_carriage(bot):
         return trade_carriage.after_go(bot)
     job = common.daily_job(trade_carriage.TASK, after_go=trade_carriage.after_go)
     return job["run"](bot, {})
+
+
+def test_open_task(bot):
+    """Daily: mở Quests -> Activity -> Claim All (nếu xanh) -> tìm dòng nhiệm vụ, KHÔNG bấm Go (tap_go=False).
+    EVONY_TASK=<tên module> (mặc định black_market). Bắt đầu từ màn chính."""
+    from importlib import import_module
+    from bot.activities.daily_activities import common
+    name = os.environ.get("EVONY_TASK", "black_market")
+    task = import_module(f"bot.activities.daily_activities.{name}").TASK
+    result = common.open_task(bot, common.task_titles(task), common.task_cards(task),
+                              done_cards=common.task_done_cards(task), tap_go=False)
+    bot.log(f"open_task({name}, tap_go=False) -> {result}")
+    return result
 
 
 def test_greet_champion(bot):

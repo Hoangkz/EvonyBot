@@ -22,6 +22,7 @@ import numpy as np
 from ....ocr import read_progress
 from ....context.templates import TEMPLATE_DIR
 from ...event.common import mark_done, mark_target_reached
+from ...event import cycle
 from ...event.run import record_outcome
 from ...result import NOT_DONE, TaskResult, clear, save_errors, take_all
 from ...event.constants import CONGRATULATIONS, GO_BUTTON, GO_REGION
@@ -561,4 +562,10 @@ def _run_three_day(ctx, settings: dict):
         ctx.mark_daily_done(c.DONE_KEY)
 
 
-JOB = {"run": _run_three_day, "enabled": three_day_active, "done": lambda ctx, settings: ctx.is_daily_done(c.DONE_KEY)}
+def _three_day_done(ctx, settings: dict) -> bool:
+    """Hôm nay xong, hoặc event 3 ngày chưa bắt đầu (King's Path còn diễn ra: event này xuất hiện 3 ngày sau khi King's Path hết,
+    xem event/cycle.py) nên chưa cần tìm."""
+    return ctx.is_daily_done(c.DONE_KEY) or cycle.three_day_waiting(ctx)
+
+
+JOB = {"run": _run_three_day, "enabled": three_day_active, "done": _three_day_done}

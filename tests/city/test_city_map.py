@@ -217,11 +217,11 @@ class CityMapTest(unittest.TestCase):
         self.assertEqual(len(set(starts)), 3)
 
     def test_find_keep_skips_a_civilization_without_route_data(self):
-        """Thấy công trình của civ 7 (chưa đo đủ route) -> không vuốt theo bảng civ1, trả None."""
+        """Thấy công trình của civ 4 (chưa đo đủ route) -> không vuốt theo bảng civ1, trả None."""
         world = {"keep": (0, 0), **{b: tuple(v) for b, v in civ1.FIXED.items()}}
         city = FakeCity(world, cam=tuple(civ1.FIXED["walls"]))
         bot = self._patch(city)
-        bot.civilization = 7
+        bot.civilization = 4
         self.assertIsNone(city_map.find_keep(bot, "BM"))
         self.assertEqual(city.swipes, [])
         bot.record.assert_called()
@@ -235,7 +235,7 @@ class CityMapTest(unittest.TestCase):
                         self.assertTrue(0 <= x < W and 0 <= y < H, (civ, plot["plot"]))
 
     def test_only_complete_civs_are_enabled(self):
-        self.assertEqual(set(tours.TOURS), {1})      # civ7 đang đo dở (COMPLETE = False)
+        self.assertEqual(set(tours.TOURS), {1, 2, 3, 5, 7})      # civ4 đang đo dở (COMPLETE = False)
 
 
 if __name__ == "__main__":

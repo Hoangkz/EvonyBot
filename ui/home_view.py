@@ -3,7 +3,7 @@ home_view.py — landing screen: scans ADB ports and lists devices.
 """
 from pathlib import Path
 
-from PyQt5.QtCore import QThread, Qt, QTime, pyqtSignal
+from PyQt5.QtCore import QThread, Qt, QTime, QTimer, pyqtSignal
 from PyQt5.QtWidgets import (
     QAbstractItemView,
     QComboBox,
@@ -142,6 +142,9 @@ class HomeView(QWidget):
         )
         layout.addWidget(self.table, 1)
 
+        # Mở app xong tự kiểm tra bản mới (sau khi cửa sổ đã hiện).
+        QTimer.singleShot(1500, lambda: self._check_update(silent=True))
+
     # ------------------------------------------------------------------
     def _load_devices(self):
         if self._worker is not None and self._worker.isRunning():
@@ -167,20 +170,29 @@ class HomeView(QWidget):
         self.load_button.setText("Load Devices")
 
     # ---- update ------------------------------------------------------
-    def _check_update(self):
+    def _check_update(self, silent: bool = False):
+        """silent=True (kiểm tra lúc mở app): chỉ hiện popup khi có bản mới, im lặng nếu lỗi/đã mới nhất."""
+        if not isinstance(silent, bool):  # clicked(bool) từ nút bấm
+            silent = False
         if self._update_worker is not None and self._update_worker.isRunning():
             return
         self.update_button.setEnabled(False)
         self.update_button.setText("Checking...")
         self._update_worker = UpdateCheckWorker(self)
-        self._update_worker.result.connect(self._on_update_checked)
-        self._update_worker.failed.connect(self._on_update_failed)
+        self._update_worker.result.connect(lambda r: self._on_update_checked(r, silent))
+        self._update_worker.failed.connect(
+            lambda m: self._on_update_failed_silent(m) if silent else self._on_update_failed(m))
         self._update_worker.start()
 
-    def _on_update_checked(self, release: dict | None):
+    def _on_update_failed_silent(self, message: str):
+        self._reset_update_button()
+        print(f"[EvonyBot] Startup update check failed: {message}")
+
+    def _on_update_checked(self, release: dict | None, silent: bool = False):
         self._reset_update_button()
         if release is None:
-            QMessageBox.information(self, "Update", f"You are on the latest version ({__version__}).")
+            if not silent:
+                QMessageBox.information(self, "Update", f"You are on the latest version ({__version__}).")
             return
         answer = QMessageBox.question(
             self, "Update",

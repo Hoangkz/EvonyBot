@@ -48,28 +48,32 @@
 - ô 6 -> 7 vẫn cần 3 cú (người dùng xác nhận): 1 cú dài không tới War Hall.
   Barracks cũng đo từ Bệnh viện ở giữa: 2 cú (55, -147), điểm đầu (163, 413) -> cuối (218, 266) thì Barracks ra (197, 342).
 """
-COMPLETE = False      # bật True khi các route mốc cố định đã chạy thật (hiện Tavern / Rally Spot / Tháp canh <-> Thành chính còn là số tính)
-FIXED = {'walls': [851, -550], 'research_factory': [739, 26], 'tavern': [28, -288], 'archer_tower': [1484, -1090], 'watchtower': [1624, -89],
-         'rally_spot': [-512, -498], 'art_hall': [974, -87], 'pasture': [1151, -131]}
-# walls = 5 cú (180, -110) = (900, -550) trừ ANCHOR_SHIFT (49, 0); research_factory = Bệnh viện [539, 56] + (200, -30); tavern = view ô 10;
-# archer_tower = Walls (900, -550) + (584, -540); watchtower = research_factory + (885, -115); rally_spot = tavern - (540, 210);
-# art_hall = research_factory + (235, -113); pasture = art_hall + (177, -44).
+COMPLETE = True       # đã chạy city_map.scan thật trên 21933: thấy đủ 13 ô + 8 mốc cố định + shrine (lệch so với view <= ~60 px)
+# Đo lại bằng tests/city/measure/auto.py trên 21933 (đi theo ước lượng, tự bù tới lệch <= 12 px, tính cả ANCHOR_SHIFT của Walls), từng đoạn đi + về; rr.py trước đó lệch 50-118 px.
+FIXED = {'walls': [931, -585], 'research_factory': [768, 104], 'tavern': [-1, -252], 'archer_tower': [1509, -1115], 'watchtower': [1701, -42],
+         'rally_spot': [-566, -495], 'art_hall': [1003, -9], 'pasture': [1204, -132]}
+# walls = Thành chính + (980, -585) khi "giữa" tính theo ANCHOR_SHIFT (49, 0) => FIXED = (931, -585); archer_tower = walls + (529, -530); research_factory = (768, 104);
+# watchtower = research_factory + (933, -146); art_hall = research_factory + (235, -113); pasture = art_hall + (201, -123); tavern = 2 cú; rally_spot = 3 cú.
 ANCHOR_SHIFT = {'walls': (49, 0)}
 ROUTES = {
-    ('research_factory', 'keep'): [(-185, -7)] * 4,   # đo thật trên 21933 (tính từ chuỗi route, chạy từ Research Factory ở (203, 320)): Thành chính ra (197, 345), điểm khớp 0,791
-    ('keep', 'research_factory'): [(185, 7)] * 4,     # đảo dấu của chiều về, tổng (740, 28) ~ FIXED['research_factory'] = [739, 26]; chưa chạy thật
-    ('keep', 'walls'):  [(180, -110)] * 5,       # người dùng chỉnh bằng run_route.py (civ1 là (204, -122)): tổng (900, -550) = FIXED walls + ANCHOR_SHIFT
-    ('walls', 'keep'):  [(-180, 110)] * 5,       # đảo dấu của chiều đi
-    ('rally_spot', 'tavern'): [(180, 70)] * 3,        # đo thật trên 21933: Rally Spot ở giữa -> Tavern ra (175, 321), lệch (-22, -24)
-    ('tavern', 'rally_spot'): [(-180, -70)] * 3,      # đo thật: Tavern -> Rally Spot ra (180, 316), lệch (-17, -29)
-    ('walls', 'archer_tower'): [(146, -135)] * 4,       # đo thật trên 21933 bằng tests/city/run_route.py (người dùng xác nhận): từ Tường thành ra Tháp cung thủ, tổng (584, -540)
-    ('watchtower', 'research_factory'): [(-177, 23)] * 5,   # run_route.py trên 21933 (Tháp canh ở (211, 394) lúc bắt đầu): Research Factory ra (263, 363), điểm khớp 0,995
-    ('research_factory', 'watchtower'): [(177, -23)] * 5,   # đảo dấu, chưa chạy thật
-    ('research_factory', 'art_hall'): [(235, -113)],   # giống civ1; run_route.py trên 21933, người dùng xác nhận đúng (Art Hall ra (234, 335), điểm khớp 0,987)
-    ('art_hall', 'research_factory'): [(-235, 113)],   # đảo dấu, chưa chạy thật
-    ('art_hall', 'pasture'): [(177, -44)],   # giống civ1; chạy trên 21933 từ Art Hall (234, 335): Pasture ra (201, 403), điểm khớp 0,976, lệch (4, 58) - hơi thấp, người dùng bảo lưu
-    ('pasture', 'art_hall'): [(-177, 44)],   # đảo dấu, chưa chạy thật
-    ('archer_tower', 'walls'): [(-146, 135)] * 4,       # đảo dấu của chiều đi (người dùng: chiều đi đúng, số (-173, 130) cũ sai), tổng (-584, 540); chưa chạy thật
+    ('keep', 'walls'): [(193, -115)] * 5,                  # đo thật: tổng (980, -585)
+    ('walls', 'keep'): [(-185, 110)] * 5,                  # đo thật: tổng (-963, 576)
+    ('walls', 'archer_tower'): [(193, -190)] * 3,          # đo thật: tổng (529, -530)
+    ('archer_tower', 'walls'): [(-183, 181)] * 3,          # đo thật: tổng (-572, 567)
+    ('keep', 'research_factory'): [(192, 26)] * 4,         # đo thật: tổng (768, 104)
+    ('research_factory', 'keep'): [(-191, -27)] * 4,       # đo thật: tổng (-764, -108)
+    ('research_factory', 'watchtower'): [(233, -37)] * 4,  # đo thật: tổng (933, -146)
+    ('watchtower', 'research_factory'): [(-226, 36)] * 4,  # đo thật: tổng (-902, 142)
+    ('research_factory', 'art_hall'): [(235, -113)],       # đo thật
+    ('art_hall', 'research_factory'): [(-235, 113)],       # đo thật
+    ('art_hall', 'pasture'): [(201, -123)],                # đo thật
+    ('pasture', 'art_hall'): [(-206, 115)],                # đo thật
+    ('keep', 'tavern'): [(0, -137)] * 2,                   # đo thật: tổng (-1, -252)
+    ('tavern', 'keep'): [(0, 134)] * 2,                    # đo thật: tổng (-1, 267)
+    ('keep', 'rally_spot'): [(-183, -160)] * 3,            # đo thật: tổng (-566, -495)
+    ('rally_spot', 'keep'): [(186, 162)] * 3,              # đo thật: tổng (558, 485)
+    ('rally_spot', 'tavern'): [(188, 81)] * 3,             # TÍNH từ hiệu hai mốc (565, 243), chưa chạy thật riêng
+    ('tavern', 'rally_spot'): [(-188, -81)] * 3,
 }
 # Đường về Thành chính của các mốc còn lại (find_keep cần ROUTES[(mốc, 'keep')] cho MỌI mốc trong FIXED): nối các đoạn đã đo, gồm cả chiều ngược.
 ROUTES[('watchtower', 'keep')] = ROUTES[('watchtower', 'research_factory')] + ROUTES[('research_factory', 'keep')]
@@ -80,22 +84,18 @@ ROUTES[('art_hall', 'keep')] = ROUTES[('art_hall', 'research_factory')] + ROUTES
 ROUTES[('keep', 'art_hall')] = ROUTES[('keep', 'research_factory')] + ROUTES[('research_factory', 'art_hall')]
 ROUTES[('pasture', 'keep')] = ROUTES[('pasture', 'art_hall')] + ROUTES[('art_hall', 'keep')]
 ROUTES[('keep', 'pasture')] = ROUTES[('keep', 'art_hall')] + ROUTES[('art_hall', 'pasture')]
-ROUTES[('tavern', 'keep')] = [(-14, 144)] * 2          # TÍNH từ FIXED tavern [28, -288] (view ô 10), CHƯA chạy thật
-ROUTES[('keep', 'tavern')] = [(14, -144)] * 2
-ROUTES[('rally_spot', 'keep')] = ROUTES[('rally_spot', 'tavern')] + ROUTES[('tavern', 'keep')]
-ROUTES[('keep', 'rally_spot')] = ROUTES[('keep', 'tavern')] + ROUTES[('tavern', 'rally_spot')]
 DATA = [
     {'plot': 1, 'swipes': [[[112, 311], [269, 370]], [[180, 280], [202, 341]]], 'view': [179, 120], 'seen_21933': 'academy'},
-    {'plot': 2, 'swipes': [[[100, 246], [280, 214]], [[100, 246], [280, 214]]], 'view': [539, 56], 'seen_21933': 'hospital'},
-    {'plot': 3, 'swipes': [[[134, 404], [247, 275]]], 'view': [652, -73], 'seen_21933': 'stables'},
-    {'plot': 4, 'swipes': [[[196, 418], [183, 261]]], 'view': [639, -230], 'seen_21933': 'barracks'},
-    {'plot': 5, 'swipes': [[[134, 404], [247, 275]]], 'view': [752, -359], 'seen_21933': 'archer_camp'},
-    {'plot': 6, 'swipes': [[[118, 291], [263, 389]]], 'view': [897, -261], 'seen_21933': 'workshop'},
-    {'plot': 7, 'swipes': [[[264, 382], [116, 298]], [[264, 382], [116, 298]], [[264, 382], [116, 298]]], 'view': [453, -513], 'seen_21933': 'war_hall'},
-    {'plot': 8, 'swipes': [[[268, 385], [111, 294]]], 'view': [296, -604], 'seen_21933': 'embassy'},
-    {'plot': 9, 'swipes': [[[231, 255], [148, 425]]], 'view': [213, -434], 'seen_21933': 'market'},
-    {'plot': 10, 'swipes': [[[282, 267], [97, 413]]], 'view': [28, -288], 'seen_21933': 'tavern'},
-    {'plot': 11, 'swipes': [[[238, 412], [141, 269]]], 'view': [-69, -431], 'seen_21933': 'forge'},
-    {'plot': 12, 'swipes': [[[295, 310], [85, 371]]], 'view': [-279, -370], 'seen_21933': 'trap_factory'},
-    {'plot': 13, 'swipes': [[[246, 285], [134, 395]]], 'view': [-391, -260], 'seen_21933': 'prison'},
+    {'plot': 2, 'swipes': [[[103, 356], [278, 325]], [[103, 356], [278, 325]]], 'view': [529, 58], 'seen_21933': 'hospital'},
+    {'plot': 3, 'swipes': [[[132, 406], [248, 275]]], 'view': [645, -73], 'seen_21933': 'stables'},
+    {'plot': 4, 'swipes': [[[183, 419], [197, 262]]], 'view': [659, -230], 'seen_21933': 'barracks'},
+    {'plot': 5, 'swipes': [[[131, 405], [249, 276]]], 'view': [777, -359], 'seen_21933': 'archer_camp'},
+    {'plot': 6, 'swipes': [[[118, 291], [263, 389]]], 'view': [922, -261], 'seen_21933': 'workshop'},
+    {'plot': 7, 'swipes': [[[270, 379], [110, 301]], [[270, 379], [110, 301]], [[270, 379], [110, 301]]], 'view': [441, -496], 'seen_21933': 'war_hall'},
+    {'plot': 8, 'swipes': [[[269, 391], [112, 289]]], 'view': [284, -598], 'seen_21933': 'embassy'},
+    {'plot': 9, 'swipes': [[[235, 249], [145, 432]]], 'view': [194, -415], 'seen_21933': 'market'},
+    {'plot': 10, 'swipes': [[[283, 262], [98, 418]]], 'view': [9, -259], 'seen_21933': 'tavern'},
+    {'plot': 11, 'swipes': [[[230, 407], [150, 273]]], 'view': [-71, -393], 'seen_21933': 'forge'},
+    {'plot': 12, 'swipes': [[[298, 309], [82, 371]]], 'view': [-287, -331], 'seen_21933': 'trap_factory'},
+    {'plot': 13, 'swipes': [[[255, 291], [125, 390]]], 'view': [-417, -232], 'seen_21933': 'prison'},
 ]

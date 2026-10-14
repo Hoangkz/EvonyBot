@@ -7,9 +7,9 @@ tiên 301: nhiệm vụ cuối cùng trước nhận thưởng Activity). Ảnh 
 ```mermaid
 flowchart TD
     A[Go -> ra thẳng màn Trade Carriage] --> B{Có hộp quà trên xe?}
-    B -->|có| C[Bấm hộp quà nhận thưởng] --> B
+    B -->|có| C[Bấm hộp quà, chờ 1 giây: popup nhận quà hiện thì Back; chưa hiện thì chờ thêm tối đa 6 lần, vẫn chưa thì bỏ qua quà] --> B
     B -->|không| D[Bấm Dispatch -> bảng hàng hoá]
-    D -->|không hiện bảng| X[Hết lượt hôm nay: báo xong]
+    D -->|không hiện bảng sau 5 lần bấm Dispatch| X[Hết lượt hôm nay: báo xong]
     D --> E{Còn dòng First Refresh Free?}
     E -->|có| F[Bấm Refresh Goods]
     F --> G{Hiện popup Refresh anyway?}

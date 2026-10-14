@@ -5,6 +5,6 @@ material_composing — Daily Activities: Material Composing.
 - constants.py: ảnh riêng của nhiệm vụ
 """
 from .constants import KEY, LABEL
-from .run import TASK, handle
+from .run import TASK, after_go, handle
 
-__all__ = ["KEY", "LABEL", "TASK", "handle"]
+__all__ = ["KEY", "LABEL", "TASK", "after_go", "handle"]
