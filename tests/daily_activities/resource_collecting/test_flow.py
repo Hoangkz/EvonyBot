@@ -34,7 +34,7 @@ class ResourceCollectingFlow(unittest.TestCase):
         ]
         device = run_flow(self, lambda bot, _s: open_task_or_finish(bot, resource_collecting.TASK),
                           SCREENS, flow, {})
-        self.assertIn("Resource Collecting", device.daily_done)
+        self.assertIn("daily_resource_collecting", device.daily_done)
         self.assertIn("daily_resource_collecting_reached_0", device.daily_done)
 
 

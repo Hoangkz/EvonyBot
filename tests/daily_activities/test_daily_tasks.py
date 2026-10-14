@@ -60,25 +60,25 @@ class DailyTaskTests(unittest.TestCase):
         bot = FakeBot()
         with mock.patch.object(catalog, "run_task", return_value=NOT_DONE):
             DEFS["daily_offering"].run(bot, {"Offering": True})
-        self.assertNotIn("Offering", bot.done)
+        self.assertNotIn("daily_offering", bot.done)
         self.assertFalse(DEFS["daily_offering"].done(bot, {"Offering": True}))
 
     def test_finished_task_marked_done(self):
         bot = FakeBot()
         with mock.patch.object(catalog, "run_task", return_value=TaskResult(done=True)):
             DEFS["daily_offering"].run(bot, {"Offering": True})
-        self.assertIn("Offering", bot.done)
+        self.assertIn("daily_offering", bot.done)
         self.assertTrue(DEFS["daily_offering"].done(bot, {"Offering": True}))
 
     def test_done_is_read_from_the_db(self):
-        bot = FakeBot({"Offering": "2026-10-11T09:00:00"})
+        bot = FakeBot({"daily_offering": "2026-10-11T09:00:00"})
         self.assertTrue(DEFS["daily_offering"].done(bot, {"Offering": True}))
 
     def test_offering_done_follows_the_chosen_quantity(self):
         """Xong với 6 lượt; tăng lên 10 ở tab UI -> chưa xong; giảm về 5 hoặc về 6 -> xong lại (đọc DB mỗi lần)."""
         task = DEFS["daily_offering"]
         bot = FakeBot()
-        catalog.record_result(bot, "daily_offering", "Offering", TaskResult(done=True, reached=6))
+        catalog.record_result(bot, "daily_offering", TaskResult(done=True, reached=6))
         self.assertTrue(task.done(bot, {"Offer Gems": 6}))
         self.assertFalse(task.done(bot, {"Offer Gems": 10}))
         self.assertTrue(task.done(bot, {"Offer Gems": 5}))
@@ -87,8 +87,8 @@ class DailyTaskTests(unittest.TestCase):
     def test_offering_target_zero_is_done_whatever_the_quantity(self):
         """Dòng Offer không còn Go (mục tiêu 0): xong hôm nay dù đang chọn 30 lượt."""
         bot = FakeBot()
-        catalog.record_result(bot, "daily_offering", "Offering", TaskResult(done=True, reached=0))
-        self.assertEqual(set(bot.done), {"Offering", "daily_offering_reached_0"})
+        catalog.record_result(bot, "daily_offering", TaskResult(done=True, reached=0))
+        self.assertEqual(set(bot.done), {"daily_offering", "daily_offering_reached_0"})
         self.assertTrue(DEFS["daily_offering"].done(bot, {"Offer Gems": 30}))
 
     def test_hourly_due_only_after_the_interval(self):
@@ -111,7 +111,7 @@ class DailyTaskTests(unittest.TestCase):
         task = self.hourly_task(mock.Mock(return_value=TaskResult(done=True)))
         task.run(bot, {"Alliance Donation": 4})
         self.assertIn("daily_alliance_donation_tried", bot.done)   # giờ đã làm
-        self.assertIn("Alliance Donation", bot.done)               # xong hôm nay
+        self.assertIn("daily_alliance_donation", bot.done)               # xong hôm nay
         self.assertTrue(task.done(bot, {"Alliance Donation": 4}))
 
     def test_hourly_not_done_saves_only_the_time(self):
@@ -119,7 +119,7 @@ class DailyTaskTests(unittest.TestCase):
         task = self.hourly_task(mock.Mock(return_value=NOT_DONE))
         task.run(bot, {"Alliance Donation": 4})
         self.assertIn("daily_alliance_donation_tried", bot.done)
-        self.assertNotIn("Alliance Donation", bot.done)
+        self.assertNotIn("daily_alliance_donation", bot.done)
         self.assertFalse(task.done(bot, {"Alliance Donation": 4}))
 
     def test_hourly_interrupted_does_not_save_the_time(self):
@@ -140,7 +140,7 @@ class DailyTaskTests(unittest.TestCase):
         self.assertFalse(DEFS["daily_rewards"].done(bot, {"Offering": True}))
 
     def test_rewards_marked_when_all_done(self):
-        bot = FakeBot({"Offering": "x"})
+        bot = FakeBot({"daily_offering": "x"})
         with mock.patch.object(catalog, "collect_activity_rewards"):
             DEFS["daily_rewards"].run(bot, {"Offering": True})
         self.assertIn(catalog.REWARDS, bot.done)
@@ -150,11 +150,11 @@ class DailyTaskTests(unittest.TestCase):
         """Quà cuối ngày chỉ nhận khi mọi việc Daily đã tích và thưởng Activity đã xong (đọc DB)."""
         run = DEFS["daily_gift_claims"].run
         with mock.patch.object(catalog.gift_claims, "run") as gifts:
-            run(FakeBot({"Offering": "x"}), {"Offering": True})
+            run(FakeBot({"daily_offering": "x"}), {"Offering": True})
             gifts.assert_not_called()                                       # thưởng Activity chưa xong
             run(FakeBot({}), {"Offering": True})
             gifts.assert_not_called()                                       # Offering chưa xong
-            run(FakeBot({"Offering": "x", catalog.REWARDS: "x"}), {"Offering": True})
+            run(FakeBot({"daily_offering": "x", catalog.REWARDS: "x"}), {"Offering": True})
             gifts.assert_called_once()
 
 

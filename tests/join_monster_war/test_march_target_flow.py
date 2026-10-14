@@ -207,7 +207,8 @@ class MarchTargetContractTests(unittest.TestCase):
         boss._join_text_is_red = mock.Mock(return_value=False)
         boss._stable_join_target = mock.Mock(return_value=(319, 420))
 
-        self.assertTrue(boss._join(SCREEN))
+        with mock.patch.object(run_module.boss_names, "log_march_coords_fail"):   # không ghi ảnh thật
+            self.assertTrue(boss._join(SCREEN))
 
         self.assertEqual(boss.screen_blacklist, [(319, 300)])
         bot.report_boss.assert_called_once_with((767, 811))

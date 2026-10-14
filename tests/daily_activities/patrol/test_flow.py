@@ -57,7 +57,7 @@ class PatrolFlow(unittest.TestCase):
         device = run_flow(self, _after_go, SCREENS, flow, {}, daily_done=_rounds_done(*range(1, 9)))
         self.assertIn(round_key(9, KEY), device.daily_done)
         self.assertIn(round_key(10, KEY), device.daily_done)
-        self.assertIn(LABEL, device.daily_done)
+        self.assertIn(KEY, device.daily_done)
         self.assertIn(f"{LABEL}: 10 rounds today, done for today", device.logs)
 
     def test_rounds_counted_separately_from_kings_path(self):
@@ -71,7 +71,7 @@ class PatrolFlow(unittest.TestCase):
         device = run_flow(self, _after_go, SCREENS, flow, {},
                           daily_done=_rounds_done(*range(1, 11), key=KP_KEY))
         self.assertIn(f"{LABEL}: Refresh disabled (out of refreshes), done for today", device.logs)
-        self.assertIn(LABEL, device.daily_done)
+        self.assertIn(KEY, device.daily_done)
         self.assertNotIn(round_key(1, KEY), device.daily_done)
 
     def test_after_go_not_confirmed(self):
@@ -84,7 +84,7 @@ class PatrolFlow(unittest.TestCase):
         ]
         device = run_flow(self, _after_go, SCREENS, flow, {})
         self.assertNotIn(round_key(1, KEY), device.daily_done)
-        self.assertNotIn(LABEL, device.daily_done)
+        self.assertNotIn(KEY, device.daily_done)
 
 
 if __name__ == "__main__":

@@ -37,7 +37,7 @@ TO_GRID = [
 
 def _help_all(bot, _settings):
     result = help_all(bot)
-    record_result(bot, KEY, LABEL, result)   # như worker: xong thì lưu "xong hôm nay"
+    record_result(bot, KEY, result)   # như worker: xong thì lưu "xong hôm nay"
     return bool(result)
 
 
@@ -54,7 +54,7 @@ class AllianceHelpFlow(unittest.TestCase):
             Step("11_old_main.png", end(result=True)),
         ]
         device = run_flow(self, _help_all, SCREENS, flow, {})
-        self.assertIn(LABEL, device.daily_done)
+        self.assertIn(KEY, device.daily_done)
 
     def test_no_records_skips_without_saving(self):
         """Không ai cần giúp ("No records" trước khi bấm): Back, dừng — không kiểm tra Activity, không lưu gì."""
@@ -78,7 +78,7 @@ class AllianceHelpFlow(unittest.TestCase):
             Step("11_old_main.png", end(result=False)),
         ]
         device = run_flow(self, _help_all, SCREENS, flow, {})
-        self.assertNotIn(LABEL, device.daily_done)
+        self.assertNotIn(KEY, device.daily_done)
 
 
 if __name__ == "__main__":

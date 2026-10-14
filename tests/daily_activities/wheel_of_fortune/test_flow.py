@@ -7,7 +7,7 @@ thì "10 Spins" đúng 1 lần -> Back -> xong hôm nay (không quay tới hết
 """
 import unittest
 
-from bot.activities.daily_activities.wheel_of_fortune.constants import LABEL
+from bot.activities.daily_activities.wheel_of_fortune.constants import LABEL, KEY
 from bot.activities.daily_activities.wheel_of_fortune.run import after_go
 from bot.activities.event.kings_path.wheel.constants import SPINS_10, SPINS_100
 from tests.daily_activities import KP, TESTS_DIR
@@ -25,7 +25,7 @@ class WheelOfFortuneFlow(unittest.TestCase):
         """Có "100 Spins": bấm -> Back -> xong hôm nay."""
         flow = [Step(f"{KP}wheel_of_fortune.png", tap(SPINS_100), back(), end(result=True))]
         device = run_flow(self, _after_go, SCREENS, flow, {})
-        self.assertIn(LABEL, device.daily_done)
+        self.assertIn(KEY, device.daily_done)
 
     def test_spin_10_once(self):
         """Chỉ có "10 Spins": bấm 1 lần -> Back -> xong hôm nay (không bấm tiếp tới hết chip)."""
@@ -35,7 +35,7 @@ class WheelOfFortuneFlow(unittest.TestCase):
         ]
         device = run_flow(self, _after_go, SCREENS, flow, {})
         self.assertIn(f"{LABEL}: 1 x 10 Spins, back, done", device.logs)
-        self.assertIn(LABEL, device.daily_done)
+        self.assertIn(KEY, device.daily_done)
 
     def test_out_of_chips_first_spin(self):
         """Bấm 10 Spins mà không đủ chip: game mở Purchase Chips -> Back -> xong hôm nay."""
@@ -44,7 +44,7 @@ class WheelOfFortuneFlow(unittest.TestCase):
             Step(f"{KP}wheel_chips_empty.png", back(), end(result=True)),
         ]
         device = run_flow(self, _after_go, SCREENS, flow, {})
-        self.assertIn(LABEL, device.daily_done)
+        self.assertIn(KEY, device.daily_done)
 
 
 if __name__ == "__main__":

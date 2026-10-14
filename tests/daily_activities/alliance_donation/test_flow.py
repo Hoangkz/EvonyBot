@@ -12,7 +12,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from bot.activities.daily_activities.alliance_donation.constants import LABEL, TRIED_KEY
+from bot.activities.daily_activities.alliance_donation.constants import KEY, LABEL, TRIED_KEY
 from bot.activities.event.kings_path.donate.constants import DONATE_BUTTON_2
 from tests.flow import Step, back, end, run_flow, swipe, tap
 
@@ -48,7 +48,7 @@ class AllianceDonationFlow(unittest.TestCase):
         ]
         device, collect = self.run_with_rewards_mocked(flow)
         self.assertIn(TRIED_KEY, device.daily_done)       # đã donate lúc mấy giờ
-        self.assertNotIn(LABEL, device.daily_done)        # không "xong hôm nay": mỗi N giờ lại donate
+        self.assertNotIn(KEY, device.daily_done)        # không "xong hôm nay": mỗi N giờ lại donate
         collect.assert_called_once()                      # ra danh sách nhiệm vụ nhận thưởng
 
     def test_no_free_donation_stops_without_claiming(self):
@@ -61,7 +61,7 @@ class AllianceDonationFlow(unittest.TestCase):
         ]
         device, collect = self.run_with_rewards_mocked(flow)
         self.assertNotIn(TRIED_KEY, device.daily_done)
-        self.assertNotIn(LABEL, device.daily_done)
+        self.assertNotIn(KEY, device.daily_done)
         collect.assert_not_called()
 
 

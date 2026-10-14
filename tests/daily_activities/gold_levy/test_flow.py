@@ -56,7 +56,7 @@ class GoldLevyFlow(unittest.TestCase):
             Step("05_after_go.png", end(result=True)),
         ]
         device = run_flow(self, _open_and_after_go, SCREENS, flow, {})
-        self.assertIn("Gold Levy", device.daily_done)
+        self.assertIn("daily_gold_levy", device.daily_done)
 
     def test_after_go_already_used(self):
         """Free Levy All đã xám ngay khi mở popup (hết lượt free): không bấm, Back đóng popup, vẫn xong."""
@@ -66,7 +66,7 @@ class GoldLevyFlow(unittest.TestCase):
             Step("05_after_go.png", end(result=True)),
         ]
         device = run_flow(self, _open_and_after_go, SCREENS, flow, {})
-        self.assertIn("Gold Levy", device.daily_done)
+        self.assertIn("daily_gold_levy", device.daily_done)
 
 
 if __name__ == "__main__":

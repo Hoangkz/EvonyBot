@@ -67,7 +67,7 @@ DATA ={
                     ]
                 },
                 {
-                    "key": "gather_troops_defense_force", "label": "Defense Force:", "day": 4, "default": 7000,
+                    "key": "gather_troops_trap_factory", "label": "Trap Factory:", "day": 4, "default": 7000,
                     "values": [
                         { "value": 0, "level": None },
                         { "value": 1000, "level": 3 },

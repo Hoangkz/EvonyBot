@@ -22,7 +22,7 @@ from bot.activities.daily_activities.constants import (
     TASK_OPENED,
 )
 from bot.activities.daily_activities.common import open_task_or_finish
-from bot.activities.daily_activities.troop_healing.constants import LABEL
+from bot.activities.daily_activities.troop_healing.constants import KEY, LABEL
 from bot.activities.daily_activities.troop_healing.run import after_go
 from bot.activities.event.gather_troops.train_troop.constants import CHECKBOX_OFF, CONFIRM, FINISH_ALL, SPEEDUP_SETTINGS
 from bot.activities.event.kings_path.heal.constants import (
@@ -79,7 +79,7 @@ class TroopHealingFlow(unittest.TestCase):
         device = run_flow(self, lambda bot, _s: open_task_or_finish(bot, troop_healing.TASK), TESTS_DIR,
                           old_grid_completed("29_old_grid_end_heal_completed.png", "no_heal"), {},
                           variants=OLD_GRID_VARIANTS)
-        self.assertIn(LABEL, device.daily_done)
+        self.assertIn(KEY, device.daily_done)
 
     def test_after_go_heal(self):
         """Bệnh viện rảnh: Heal -> chọn 150 lính dòng cuối -> Heal -> Speed Up -> Finish All -> xong hôm nay."""
@@ -91,7 +91,7 @@ class TroopHealingFlow(unittest.TestCase):
         ]
         device = run_flow(self, _after_go, TESTS_DIR, flow, {})
         self.assertIn("input text 150", device.shells)
-        self.assertIn(LABEL, device.daily_done)
+        self.assertIn(KEY, device.daily_done)
 
     def test_after_go_busy_hospital(self):
         """Bệnh viện đang chữa dở (menu có "Speed Up"): Finish All trước -> mở lại menu -> Heal 150 -> xong."""
@@ -106,7 +106,7 @@ class TroopHealingFlow(unittest.TestCase):
         ]
         device = run_flow(self, _after_go, TESTS_DIR, flow, {})
         self.assertIn(f"{LABEL}: hospital busy, Speed Up first", device.logs)
-        self.assertIn(LABEL, device.daily_done)
+        self.assertIn(KEY, device.daily_done)
 
     def test_after_go_no_wounded(self):
         """Màn Hospital không có lính bị thương: Back, xong hôm nay."""
@@ -118,7 +118,7 @@ class TroopHealingFlow(unittest.TestCase):
         ]
         device = run_flow(self, _after_go, TESTS_DIR, flow, {})
         self.assertIn(f"{LABEL}: no wounded troops, done for today", device.logs)
-        self.assertIn(LABEL, device.daily_done)
+        self.assertIn(KEY, device.daily_done)
 
 
 if __name__ == "__main__":

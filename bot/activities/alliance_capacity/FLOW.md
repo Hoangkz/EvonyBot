@@ -13,7 +13,8 @@ Port của C# `ScienceNew`. Code: [run.py](run.py), hằng số: [constants.py](
 
 - Dòng `alliance_capacity` trong [priority.py](../../worker/priority.py) có `once: True`: chạy **một lần mỗi lần bấm Start**, xong thì
   không đưa lại vào danh sách, kể cả khi sang ngày mới (muốn chạy lại thì Stop rồi Start).
-- Làm xong **không lưu gì vào DB** (worker coi là xong khi hàm `run` chạy hết một lượt). Bị ngắt giữa chừng (hết 120 giây, có boss)
+- Làm xong lưu giờ `daily_alliance_donation_tried` (như Alliance Donation vừa donate) để việc donate theo giờ tính từ lúc này.
+- Ngoài giờ đó **không lưu gì vào DB** (worker coi là xong khi hàm `run` chạy hết một lượt). Bị ngắt giữa chừng (hết 120 giây, có boss)
   thì chưa tính là xong, lượt sau làm lại từ đầu. Lỗi thật thì lưu `alliance_capacity_error` + một dòng History
   (`bot/activities/result.py` `save_errors`).
 

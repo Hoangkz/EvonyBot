@@ -30,10 +30,34 @@ DAILY_DONE: set[str] = set()
 
 def target(bot):
     """Hàm cần test — sửa ở đây."""
-    # EVONY_TEST=redeem: chỉ đổi quà event 3 ngày (đang ở sẵn màn event); mặc định chạy cả event 3 ngày.
+    # EVONY_TEST=redeem: chỉ đổi quà event 3 ngày (đang ở sẵn màn event); three_day: cả event 3 ngày;
+    # mặc định chạy nhiệm vụ Daily Trade Carriage.
     if os.environ.get("EVONY_TEST") == "redeem":
         return test_three_day_redeem(bot)
-    return test_three_day(bot)
+    if os.environ.get("EVONY_TEST") == "three_day":
+        return test_three_day(bot)
+    if os.environ.get("EVONY_TEST") == "greet":
+        return test_greet_champion(bot)
+    return test_trade_carriage(bot)
+
+
+def test_trade_carriage(bot):
+    """Daily Trade Carriage, phần sau Go: đang ở sẵn màn Trade Carriage -> Dispatch tối đa 4 lần.
+    EVONY_FROM_MAIN=1: chạy cả từ màn chính (Quests -> Activity -> Go)."""
+    from bot.activities.daily_activities import common, trade_carriage
+    if not os.environ.get("EVONY_FROM_MAIN"):
+        return trade_carriage.after_go(bot)
+    job = common.daily_job(trade_carriage.TASK, after_go=trade_carriage.after_go)
+    return job["run"](bot, {})
+
+
+def test_greet_champion(bot):
+    """Daily Greet Champion, phần sau Go: đang ở sẵn màn thành chính. EVONY_FROM_MAIN=1: chạy cả từ màn chính."""
+    from bot.activities.daily_activities import common, greet_champion
+    if not os.environ.get("EVONY_FROM_MAIN"):
+        return greet_champion.after_go(bot)
+    job = common.daily_job(greet_champion.TASK, after_go=greet_champion.after_go)
+    return job["run"](bot, {})
 
 
 def main():

@@ -50,7 +50,7 @@ ROW_SETTLE_WAIT = 1
 # cả dòng lên trên thanh.
 ROW_TITLE_MAX_Y = 580
 LIST_SWIPE = (70, 70, 55, 55)        # % màn hình: ngón tay kéo lên = cuộn danh sách xuống
-LIST_MAX_SCROLLS = 12
+LIST_MAX_SCROLLS = 25
 # Lướt hết danh sách không thấy nhiệm vụ: Back (đóng bảng Activity) rồi mở lại từ đầu, tìm thêm
 # LIST_RETRIES lần (lần cuộn trước có thể trượt qua dòng) rồi mới coi là không có (TASK_NOT_FOUND).
 LIST_RETRIES = 2

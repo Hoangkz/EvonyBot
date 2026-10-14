@@ -4,7 +4,7 @@ Flow: [FLOW.md](FLOW.md). Việc chung của Daily Activities: [../TODO.md](../T
 
 1. ~~**Luồng mới sau Go**~~: đã có `after_go` (Trap Factory → Build → bẫy đang hiện, đủ 150 theo số mặc định mỗi mẻ → Finish All).
    Đã chạy thật bản cũ trên 21943 (1 mẻ 6.263 bẫy, Finish All). Còn: nối vào `run.py` chung (xem [../TODO.md](../TODO.md)).
-2. ~~`test_flow.py`~~: `tests/daily_activities/trap_building/test_flow.py` (ảnh Defense Force dùng chung, không có
+2. ~~`test_flow.py`~~: `tests/daily_activities/trap_building/test_flow.py` (ảnh Trap Factory dùng chung, không có
    `screens/` riêng).
 3. ~~Ảnh `Done.png`~~: đã có (21943, `tests/daily_activities/screens/30_old_grid_end_trap_completed.png`; thẻ xong 1,00,
    màn khác <= 0,62).
