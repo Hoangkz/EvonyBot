@@ -14,7 +14,7 @@
   Chưa đo: chiều về Art Hall -> Research Factory (đảo dấu), cú nối qua Tavern <-> Rally Spot. Mốc khác quan sát được: battlefield (1214, -670), shrine (240, -178), holy_palace (-356, -100).
 """
 COMPLETE = False      # bật True khi các route mốc cố định đã chạy thật (xem ghi chú dưới)
-FIXED = {'walls': [910, -586], 'research_factory': [920, 24], 'tavern': [12, -183], 'archer_tower': [1482, -1160], 'watchtower': [1742, 27],
+FIXED = {'walls': [910, -586], 'research_factory': [920, 24], 'tavern': [12, -183], 'archer_tower': [1482, -1160], 'watchtower': [1720, 28],
          'rally_spot': [-517, -522], 'art_hall': [1091, -85], 'pasture': [1250, -173]}
 # Đo trên 21933 (vị trí giống civ1; kéo theo số civ1 rồi chỉnh theo ảnh mẫu giữa màn): walls = keep -> 4 cú (228, -146); research_factory = 4 cú (225, 6);
 # tavern = 1 cú; archer_tower = walls + (572, -574); watchtower = research_factory + (842, 3); art_hall = research_factory + (171, -109);
@@ -29,7 +29,7 @@ ROUTES = {
     ('archer_tower', 'walls'): [(-170, 169)] * 4,             # đo thật: tổng (-678, 677) (lệch chiều đi ~100 px vì camera chạm mép)
     ('keep', 'research_factory'): [(230, 6)] * 4,             # đo thật: 881 .. 919 (chọn 920 vì Art Hall theo đường này lệch -39 với 900); ảnh mẫu ra giữa
     ('research_factory', 'keep'): [(-229, -6)] * 4,           # đo thật: Thành chính ra (196, 345)
-    ('research_factory', 'watchtower'): [(210, 1)] * 4,       # đo thật: tổng (842, 3)
+    ('research_factory', 'watchtower'): [(200, 1)] * 4,       # đo thật (842, 3), chạy lại từ Thành chính lệch +45 nên giảm còn (800, 4)
     ('watchtower', 'research_factory'): [(-200, 4)] * 4,      # đo thật: tổng (-798, 16)
     ('research_factory', 'art_hall'): [(171, -109)],          # đo thật: 1 cú (Art Hall ra (194, 345))
     ('art_hall', 'research_factory'): [(-171, 109)],          # đảo dấu, chưa chạy thật
