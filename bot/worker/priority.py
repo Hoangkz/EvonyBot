@@ -80,7 +80,6 @@ DATA ={
             "run": crazy_eggs,
             "label": "Crazy Eggs",
             "priority": 999,
-
             "group": "Daily Activities"
 }
     ],
@@ -91,7 +90,6 @@ DATA ={
             "saves": True,
             "label": "Open Gift Box",
             "priority": 888,
-
         }
     ],
     "Alliance Capacity": [
@@ -211,24 +209,14 @@ DATA ={
         { 
             "key": "daily_buy_general",
             "run": daily_buy_general,
-            "must_finish": True,
             "label": "General: Buy Stamina + Hammers",
             "priority": 668,
-    },
+        },
         { 
             "key": "daily_offering",
             "run": daily_job(daily_offering, target="Offer Gems"),
-            "must_finish": True,   # xong khi số lần đã offer trong DB >= số ở ô "Offer Gems" của tab
             "label": "Offering",
             "priority": 666,
-
-        },
-        { 
-            "key": "daily_resource_gathering",
-            "run": daily_job(daily_resource_gathering),
-            "must_finish": True,
-            "label": "Resource Gathering",
-            "priority": -665, "note": "Phải chạy ngay sau Offering (bàn tay nổi trong thành)",
         },
         { 
             "key": "daily_resource_tax",
@@ -236,39 +224,30 @@ DATA ={
             "must_finish": True,
             "label": "Resource Tax",
             "priority": 399,
-
         },
         { 
             "key": "daily_gold_levy",
             "run": daily_job(daily_gold_levy),
-            "must_finish": True,
             "label": "Gold Levy",
             "priority": 398,
-
         },
         { 
             "key": "daily_troop_training",
             "run": daily_job(daily_troop_training, after_go=troop_training_after_go),
-            "must_finish": True,
             "label": "Troop Training",
             "priority": 397,
-
         },
         { 
             "key": "daily_troop_heading",
             "run": daily_job(daily_troop_heading, after_go=troop_healing_after_go),
-            "must_finish": True,
             "label": "Troop Heading",
             "priority": 396,
-
         },
         { 
             "key": "daily_trap_buiding",
             "run": daily_job(daily_trap_buiding, after_go=trap_building_after_go),
-            "must_finish": True,
             "label": "Trap Buiding",
             "priority": 395,
-
         },
         { 
             "key": "daily_alliance_donation",
@@ -277,7 +256,6 @@ DATA ={
             "label": "Alliance Donation",
             "priority": 394, 
             "note": "Chạy cuối Daily theo giờ (ô chọn 0-4h); tới giờ thì worker đẩy lên đầu danh sách",
-
         },
         { 
             "key": "daily_alliance_help",
@@ -286,13 +264,10 @@ DATA ={
             "label": "Alliance Help",
             "priority": 393, 
             "note": "Như Alliance Donation (theo giờ, ô chọn 0-4h, mặc định 4h), chạy ngay sau Alliance Donation",
-
         },
-
-                { 
+        { 
             "key": "daily_alliance_research",
             "run": daily_job(daily_alliance_research, after_go=alliance_research_after_go),
-            "must_finish": True,
             "label": "Research",
             "priority": 392,
             "note": "Học viện: nghiên cứu 1 công nghệ xanh bất kỳ, tốn thời gian thì Speed Up bằng vật phẩm",
@@ -300,27 +275,21 @@ DATA ={
         { 
             "key": "daily_black_market",
             "run": daily_job(daily_black_market),
-            "must_finish": True,
             "label": "Black Market",
             "priority": 390,
-
         },
         { 
             "key": "daily_general_enhancing",
             "run": daily_job(daily_general_enhancing),
-            "must_finish": True,
             "label": "General Enhancing",
             "priority": 389, 
             "note": "Cần làm thêm",
-
         },
         { 
             "key": "daily_wheel_of_fortune",
             "run": daily_job(daily_wheel_of_fortune),
-            "must_finish": True,
             "label": "Wheel of Fortune",
             "priority": 388,
-
         },
         { 
             "key": "daily_patrol",
@@ -328,15 +297,12 @@ DATA ={
             "label": "Patrol",
             "priority": 387, 
             "must_finish": True,
-
         },
         { 
             "key": "daily_material_composing",
             "run": daily_job(daily_material_composing),
-            "must_finish": True,
             "label": "Material Composing",
             "priority": 386,
-
         },
         { 
             "key": "daily_greet_champion",
@@ -346,23 +312,6 @@ DATA ={
             "must_finish": True,
             "note": "Về thành: bấm trái tim trên Keep (hoặc Keep -> Champion), chào 2 lần",
         },
-        { 
-            "key": "daily_monster_killing",
-            "run": daily_job(daily_monster_killing),
-            "must_finish": True,
-            "label": "Monster Killing",
-            "priority": -384,
-
-        },
-        { 
-            "key": "daily_resource_collecting",
-            "run": daily_job(daily_resource_collecting),
-            "must_finish": True,
-            "label": "Resource Collecting",
-            "priority": 383,
-
-        },
-
         {
             "key": "daily_trade_carriage",
             "run": daily_job(daily_trade_carriage, after_go=trade_carriage_after_go),
@@ -374,10 +323,8 @@ DATA ={
         {
             "key": "daily_rewards",
             "run": daily_rewards,
-            "must_finish": True,
             "label": "Activity Rewards (nhận thưởng cuối)",
             "priority": 300,
-
         },
         {
             "key": "daily_gift_claims",

@@ -26,6 +26,8 @@ Làm khi cần quét thành trên máy civ N (N khác 1). Bố cục thành khá
 `civ<N>/city_tour.py` (thư mục mới, copy cấu trúc từ civ1): `FIXED` (toạ độ các công trình cố định so với Thành chính), `ROUTES` (đường vuốt giữa Keep và từng
 mốc), `ANCHOR_SHIFT` (độ lệch tâm "chính giữa"), `DATA` (13 ô quét). Số liệu civ1 là mẫu để đối chiếu (tên, thứ tự).
 
+(Cách đã làm với civ2 và công cụ tự động hoá: [MEASURE_CIV.md](MEASURE_CIV.md), script ở `tests/city/measure/`.)
+
 **1. Chuẩn bị**
 - Máy civ N đang ở màn thành (không phải thế giới; ở thế giới bấm nút toà thành góc dưới phải). `bot.civilization` hoặc ảnh mẫu
   phải nhận ra civ: kiểm tra ảnh `Images/Event/Building/civ<N>/<công trình>/` có đủ Keep, Walls, Research Factory, Tavern, Archer
