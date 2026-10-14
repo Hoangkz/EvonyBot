@@ -1,7 +1,7 @@
 """Claim the Claimable chest on the Empire Depot tab."""
-from .common import GiftTask
+from ..common import GiftTask
 from .named_flow import run_carousel_claim
-from .screens import GiftScreen
+from ..screens import GiftScreen
 
 KEY = "gift_empire_depot"
 

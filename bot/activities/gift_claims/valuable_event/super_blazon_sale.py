@@ -1,7 +1,7 @@
 """Claim the free chest in Super Blazon Sale."""
-from .common import GiftTask
+from ..common import GiftTask
 from .named_flow import run_carousel_claim
-from .screens import GiftScreen
+from ..screens import GiftScreen
 
 KEY = "gift_super_blazon_sale"
 

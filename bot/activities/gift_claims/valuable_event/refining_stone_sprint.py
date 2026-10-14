@@ -1,7 +1,7 @@
 """Open Sprint Package and claim its verified Free package."""
-from .common import GiftTask
+from ..common import GiftTask
 from .named_flow import run_carousel_claim
-from .screens import GiftScreen
+from ..screens import GiftScreen
 
 KEY = "gift_refining_stone_sprint"
 

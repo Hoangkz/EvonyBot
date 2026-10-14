@@ -1,7 +1,7 @@
 """Claim the free Daily Package on Valuable Event / Limited Offer."""
-from .common import GiftTask
+from ..common import GiftTask
 from .named_flow import run_carousel_claim
-from .screens import GiftScreen
+from ..screens import GiftScreen
 
 KEY = "gift_limited_offer"
 

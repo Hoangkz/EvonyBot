@@ -7,7 +7,12 @@ is discarded after the whole two-boundary scan completes.
 from dataclasses import dataclass, field
 
 from ...context.errors import YieldToBoss
-from . import back_to_territory, event_center, lobby, super_value_return, valuable_event
+from . import event_center, lobby, valuable_event
+# Compatibility aliases for callers that previously imported a specific
+# non-Event-Center claim flow from ``gift_claims``.  Implementations live in
+# ``valuable_event/``; only the public entry points remain here.
+from .valuable_event import (back_to_territory, empire_depot, limited_offer,
+                             login_gifts, super_value_return)
 from .common import (TEXT_CLAIM_CONTROLS, back_if_close_x,
                      claim_fixed_controls, claim_sparkles, return_home)
 from .screens import GiftScreen

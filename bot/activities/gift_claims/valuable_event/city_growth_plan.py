@@ -1,8 +1,8 @@
 """Claim unlocked free rewards in City Growth Plan Stage 1."""
-from .common import (GiftTask, claim_fixed_controls, close_congratulations,
+from ..common import (GiftTask, claim_fixed_controls, close_congratulations,
                      find, find_all, return_home, select_carousel_tab)
-from .lobby import open_named
-from .screens import GiftScreen
+from ..lobby import open_named
+from ..screens import GiftScreen
 
 KEY = "gift_city_growth_plan"
 

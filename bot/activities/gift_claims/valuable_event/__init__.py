@@ -12,7 +12,7 @@ from . import (
     super_blazon_sale,
     super_value_weekly_card,
 )
-from .common import (ClaimReport, TEXT_CLAIM_CONTROLS, back_if_close_x,
+from ..common import (ClaimReport, TEXT_CLAIM_CONTROLS, back_if_close_x,
                      claim_fixed_controls, claim_sparkles, find, find_all,
                      return_home, tap_claims)
 

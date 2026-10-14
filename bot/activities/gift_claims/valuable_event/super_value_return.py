@@ -2,7 +2,7 @@
 from dataclasses import dataclass
 
 from . import city_growth_plan, empire_depot, login_gifts, lucky_raffle
-from .common import (ClaimReport, TEXT_CLAIM_CONTROLS, back_if_close_x,
+from ..common import (ClaimReport, TEXT_CLAIM_CONTROLS, back_if_close_x,
                      claim_fixed_controls, claim_sparkles, find, find_all,
                      return_home)
 

@@ -1,7 +1,7 @@
 """Standalone helpers that enter flows by fixed inner-screen names."""
-from .common import (TEXT_CLAIM_CONTROLS, claim_fixed_controls, return_home,
+from ..common import (TEXT_CLAIM_CONTROLS, claim_fixed_controls, return_home,
                      select_carousel_tab, tap_claims)
-from .lobby import open_named
+from ..lobby import open_named
 
 
 def run_carousel_claim(bot, screen_name, page: str, tab: str,

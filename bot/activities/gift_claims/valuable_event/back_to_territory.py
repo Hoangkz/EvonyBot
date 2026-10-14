@@ -2,7 +2,7 @@
 import cv2
 import numpy as np
 
-from .common import (GiftTask, ClaimReport, TEXT_CLAIM_CONTROLS, back_if_close_x,
+from ..common import (GiftTask, ClaimReport, TEXT_CLAIM_CONTROLS, back_if_close_x,
                      claim_fixed_controls, claim_sparkles,
                      close_congratulations, find, find_all, return_home)
 

@@ -1,7 +1,7 @@
 """Claim glowing/unlocked rewards in the free Login Gifts column."""
-from .common import GiftTask, find, find_all, return_home, select_carousel_tab
-from .lobby import open_named
-from .screens import GiftScreen
+from ..common import GiftTask, find, find_all, return_home, select_carousel_tab
+from ..lobby import open_named
+from ..screens import GiftScreen
 
 KEY = "gift_login_gifts"
 PAGE = "LoginGifts/title"

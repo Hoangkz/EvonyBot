@@ -1,5 +1,5 @@
 """Claim the red-dot reward on the rotating Dragon Battle page."""
-from .common import (GiftTask, claim_fixed_controls, open_event_center_event,
+from ..common import (GiftTask, claim_fixed_controls, open_event_center_event,
                      return_home)
 
 KEY = "gift_dragon_battle"

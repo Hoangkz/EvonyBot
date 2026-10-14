@@ -1,8 +1,19 @@
 """Claim the highlighted cumulative reward on Grace of Star Trail."""
-from .common import (GiftTask, back_if_close_x, claim_fixed_controls,
+from ..common import (GiftTask, back_if_close_x, claim_fixed_controls,
                      open_event_center_event, return_home, tap_claims)
+from ..screens import GiftScreen
+from .policy import EventPolicy
 
 KEY = "gift_grace_of_star_trail"
+POLICY = EventPolicy(
+    "Grace of Star Trail",
+    screen=GiftScreen.GRACE_OF_STAR_TRAIL,
+    reward_navigation=(
+        "GraceOfStarTrail/button_star_trail_gift_current",
+        "GraceOfStarTrail/button_star_trail_gift_alt",
+        "GraceOfStarTrail/button_star_trail_gift",
+    ),
+)
 
 
 def run(bot):

@@ -2,11 +2,14 @@
 import cv2
 import numpy as np
 
-from .common import (ClaimReport, GiftTask, TEXT_CLAIM_CONTROLS, back_if_close_x,
+from . import (blessing_of_pallas, dwarfs_treasure, grace_of_star_trail,
+               hypnos_dream, poseidons_day, precious_blazon_exchange,
+               revelation_of_horus, sealed_imperial_treasury)
+from ..common import (ClaimReport, GiftTask, TEXT_CLAIM_CONTROLS, back_if_close_x,
                      claim_fixed_controls, claim_sparkles,
                      close_congratulations, find, find_all,
                      open_event_center, return_home)
-from .screens import GiftScreen, identify
+from ..screens import GiftScreen, identify
 
 KEY = "gift_event_center_limited"
 PAGE = "EventCenter/title"
@@ -24,20 +27,24 @@ CATEGORIES = (
 )
 CATEGORY_DONE_PREFIX = b"__category_done__\0"
 FORCED_EVENT_PREFIX = b"__forced_event__\0"
-SPECIAL_NAVIGATION = {
-    GiftScreen.PRECIOUS_BLAZON_EXCHANGE:
-        ("Rewards", "PreciousBlazonExchange/button_rewards"),
-    GiftScreen.HYPNOS_DREAM:
-        ("Rewards", "HypnosDream/button_rewards"),
-    GiftScreen.DWARFS_TREASURE:
-        ("Daily Free", "DwarfsTreasure/button_daily_free"),
-}
-FIXED_CLAIMS = TEXT_CLAIM_CONTROLS
-REWARD_NAVIGATION = (
-    "GraceOfStarTrail/button_star_trail_gift_current",
-    "GraceOfStarTrail/button_star_trail_gift_alt",
-    "GraceOfStarTrail/button_star_trail_gift",
+EVENT_POLICIES = (
+    blessing_of_pallas.POLICY,
+    precious_blazon_exchange.POLICY,
+    poseidons_day.POLICY,
+    hypnos_dream.POLICY,
+    grace_of_star_trail.POLICY,
+    sealed_imperial_treasury.POLICY,
+    dwarfs_treasure.POLICY,
+    revelation_of_horus.POLICY,
 )
+POLICY_BY_SCREEN = {policy.screen: policy for policy in EVENT_POLICIES
+                    if policy.screen is not None}
+SPECIAL_NAVIGATION = {policy.screen: policy.navigation for policy in EVENT_POLICIES
+                      if policy.screen is not None and policy.navigation is not None}
+SKIPPED_SCREENS = {policy.screen: policy for policy in EVENT_POLICIES
+                   if policy.screen is not None and policy.skip_reason is not None}
+FIXED_CLAIMS = TEXT_CLAIM_CONTROLS
+REWARD_NAVIGATION = grace_of_star_trail.POLICY.reward_navigation
 FORCED_LIMITED_ROWS = (
     ("GraceOfStarTrail/list_row", FORCED_EVENT_PREFIX + b"grace_of_star_trail"),
 )
@@ -235,9 +242,11 @@ def _process_current_event_content(bot):
 def _process_opened_event(bot):
     opened = bot.screenshot()
     name = identify(bot, opened)
-    if name in (GiftScreen.BACCHUS_TAVERN, GiftScreen.FOLLOW_US,
-                GiftScreen.REVELATION_OF_HORUS,
-                GiftScreen.SEALED_IMPERIAL_TREASURY):
+    skipped = SKIPPED_SCREENS.get(name)
+    if skipped is not None:
+        bot.record(f"Gift Claims: {skipped.label} - {skipped.skip_reason}")
+        return ClaimReport()
+    if name in (GiftScreen.BACCHUS_TAVERN, GiftScreen.FOLLOW_US):
         bot.record(f"Gift Claims: {name.value} - nhận diện và bỏ qua")
         return ClaimReport()
 

@@ -1,8 +1,8 @@
 """Redeem every affordable Stockpile chest through its confirmation popup."""
-from .common import (GiftTask, claim_fixed_controls, find, return_home,
+from ..common import (GiftTask, claim_fixed_controls, find, return_home,
                      select_carousel_tab, tap_claims)
-from .lobby import open_named
-from .screens import GiftScreen
+from ..lobby import open_named
+from ..screens import GiftScreen
 
 KEY = "gift_strategic_stockpile"
 SUBTAB = "StrategicStockpile/subtab_stockpile"

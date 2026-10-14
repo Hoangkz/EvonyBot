@@ -1,7 +1,7 @@
 """Claim the free Claimable chest on Lucky Raffle."""
-from .common import GiftTask
+from ..common import GiftTask
 from .named_flow import run_carousel_claim
-from .screens import GiftScreen
+from ..screens import GiftScreen
 
 KEY = "gift_lucky_raffle"
 
