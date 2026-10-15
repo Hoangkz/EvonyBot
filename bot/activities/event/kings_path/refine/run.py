@@ -19,6 +19,8 @@ Sau Go (về thành, Lò rèn ở giữa):
    Attribute" đang tích -> bỏ tích; bấm "Refine" giữa đáy -> hiện thuộc tính New + Cancel / Confirm
    -> Cancel (giữ thuộc tính cũ); lặp tới đủ (mục tiêu - số đã refine) lần. Không thấy nút
    BUTTON_MISSES giây liền thì thôi.
+   Đã khoá thuộc tính chất lượng cao thì Refine hiện hộp cảnh báo "You have unlocked high quality attribute(s)...":
+   tích ô trống "Don't show this again for today" rồi Confirm (hộp không hiện lại trong ngày).
 5. Back 2 lần (về thành), trả AGAIN: đi lại từ màn chính -> King's Path -> Day 4 -> Sharp Weapons -> OCR lại ->
    đủ thì xong, chưa thì Go lần nữa. Số đã refine không tăng sau một lượt bấm (VD hết nguyên
    liệu) -> xong hôm nay, mai làm tiếp.
@@ -83,6 +85,9 @@ from .constants import (
     TYPE_SAME,
     TYPE_SWITCHES,
     TYPE_WAIT,
+    WARN_BOX_FROM_LABEL,
+    WARN_CONFIRM,
+    WARN_LABEL,
 )
 
 NAME = "Refine"
@@ -262,6 +267,8 @@ def _refine_times(bot, need: int):
         if bot.find(EQUIPMENT_TITLE, screen=screen) is None:
             bot.record(f"{NAME}: left Refine Equipment screen after {tapped} time(s)")
             return
+        if _confirm_high_quality_warning(bot, screen):
+            continue
         cancel = bot.find(CANCEL, screen=screen)
         if cancel is not None:   # vừa Refine: bỏ thuộc tính mới
             bot.tap(*cancel, delay=REFINE_WAIT)
@@ -282,6 +289,23 @@ def _refine_times(bot, need: int):
         misses = 0
         bot.tap(*button, delay=REFINE_WAIT)
         tapped += 1
+
+
+def _confirm_high_quality_warning(bot, screen) -> bool:
+    """Hộp cảnh báo thuộc tính chất lượng cao đang hiện: tích ô "Don't show this again for today" rồi Confirm. True nếu đã
+    bấm (chụp lại rồi xét tiếp)."""
+    label = bot.find(WARN_LABEL, screen=screen)
+    if label is None:
+        return False
+    dx, dy = WARN_BOX_FROM_LABEL
+    bot.log(f"{NAME}: high quality warning, tick 'don't show again' and confirm")
+    bot.tap(label[0] + dx, label[1] + dy, delay=1)
+    confirm = bot.find(WARN_CONFIRM, screen=bot.screenshot())
+    if confirm is None:
+        confirm = bot.find(WARN_CONFIRM, screen=screen)
+    if confirm is not None:
+        bot.tap(*confirm, delay=REFINE_WAIT)
+    return True
 
 
 def _untick_boxes(bot, screen) -> bool:
