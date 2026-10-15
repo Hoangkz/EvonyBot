@@ -164,10 +164,14 @@ class _Boss:
                 continue
 
             if action == OUT_OF_STAMINA:
-                # Không đủ thể lực: use_stamina = No -> dừng hẳn Join Boss
+                # Không đủ thể lực: use_stamina = No -> Back 3 lần (popup, March, danh sách War) rồi
+                # đánh dấu rảnh để worker chuyển sang làm nhiệm vụ; không ghi JOINED, lượt sau thử lại.
                 if self.use_stamina not in STAMINA_CHOICES:
-                    bot.record("Join Monster War: hết thể lực, không dùng vật phẩm -> dừng Join Boss")
-                    return
+                    bot.record("Join Monster War: hết thể lực, không dùng vật phẩm -> rảnh, chuyển sang làm nhiệm vụ")
+                    for _ in range(3):
+                        bot.back(delay=1)
+                    self.idle_scrolls = IDLE_SCROLLS
+                    continue
                 bot.tap(*pos)
                 self._use_stamina()
                 continue   # _use_stamina đã March lại, hoặc (hết vật phẩm) đánh dấu rảnh
@@ -340,7 +344,7 @@ class _Boss:
             # Hết vật phẩm (màn Use Item không có nút Use, chỉ còn nút kim cương): Back 3 lần. Boss chưa
             # được tham gia nên tuyệt đối không ghi JOINED; lượt Join Boss sau có thể thử lại khi
             # thể lực đã hồi.
-            bot.record("Join Monster War: hết vật phẩm thể lực")
+            bot.record("Join Monster War: hết vật phẩm thể lực -> rảnh, chuyển sang làm nhiệm vụ")
             for _ in range(3):
                 bot.back(delay=1)
             self.idle_scrolls = IDLE_SCROLLS

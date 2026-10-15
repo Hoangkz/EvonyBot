@@ -127,6 +127,6 @@ NO_BOSS = "no_boss"   # màn hình chính không có listboss / PvPWar không c�
 LEAVE_ALLIANCE_POPUP = "leave_alliance_popup"
 
 # run() trả về IDLE khi thoát vì đang rảnh (chỉ khi bật exit_when_idle) —
-# worker sẽ quay lại kiểm tra boss sau. Mọi lần return khác (vd hết thể lực
-# mà use_stamina = No) = Join Boss dừng hẳn.
+# worker sẽ quay lại kiểm tra boss sau. Hết thể lực cũng là rảnh (không phải
+# dừng hẳn): worker chuyển sang làm nhiệm vụ rồi quay lại sau.
 IDLE = "idle"
