@@ -23,7 +23,7 @@ from .constants import (ALLIANCE_ICON, ASSISTANT_GENERAL, BACK, BOSS_MONSTER, CH
                         SELECT_GENERAL, STAMINA_ITEM_USE, STAMINA_REFILL_WAIT, STAMINA_SLIDER_END,
                         STAMINA_ADDED_WAIT, STAMINA_BASE, STAMINA_BAR_REGION, STAMINA_ITEM_MIN_SCORE, STAMINA_ITEM_REGION, STAMINA_ITEMS,
                         STAMINA_PLUS, STAMINA_PLUS_DELAY,
-                        STAMINA_USE, TAP, WAR_TAB, WAR_TICKED, WAR_UNTICK_TRIES)
+                        STAMINA_USE, TAP, TROOP_BACK_WAIT, TROOP_DETAIL, TROOP_DETAIL_SEEN, WAR_TAB, WAR_TICKED, WAR_UNTICK_TRIES)
 
 # --- CACHE CHECKS TỒN TẠI FILE (Chạy 1 lần duy nhất khi import, không đọc ổ cứng liên tục) ---
 def _check_exists(path: str) -> bool:
@@ -203,6 +203,12 @@ class _Boss:
 
             elif action == BACK:
                 bot.back()
+
+            elif action == TROOP_DETAIL_SEEN:
+                # Cú vuốt bị tính là tap vào thẻ -> Back một lần rồi chờ 1 s cho danh sách hiện lại
+                bot.record("Join Monster War: cuộn nhầm vào màn chi tiết đội -> Back")
+                bot.back(delay=TROOP_BACK_WAIT)
+                continue
 
             elif action == LEAVE_ALLIANCE_POPUP:
                 bot.tap(pos[0] + 40, pos[1] + 40)
@@ -866,9 +872,10 @@ WAR_ROW_Y, LIST_TOP_BELOW_WAR, POWER_PEEK_MARGIN = 116, 22, 20
 SCROLLS_EACH_WAY = 3                  # mỗi chu kỳ: 3 lần cuộn xuống rồi 3 lần cuộn lên
 IDLE_SCROLLS = 2 * SCROLLS_EACH_WAY   # cuộn hết 1 chu kỳ (6 lần) mà không thấy boss mới -> rảnh
 IDLE_WAIT = 2      # polling khi rảnh; không phải độ trễ của một thao tác UI
-# Vuốt ở mép trái (ngoài thẻ rally, thẻ rộng x 3-97 %): vuốt bắt đầu trên thẻ đôi khi bị game coi là
-# tap -> mở màn chi tiết đội (Total Troops) thay vì cuộn.
-SCROLL_X = 1.5
+# x (% màn hình) của mọi cú vuốt cuộn danh sách War. Vuốt ở mép trái (1,5 %, 4 %) không cuộn được
+# nên dùng giữa màn hình; đôi khi game coi cú vuốt trên thẻ là tap -> mở màn chi tiết đội (Total Troops),
+# lúc đó vòng chính tự Back về danh sách (go_home).
+SCROLL_X = 50
 SCROLL_SETTLE = 0.5   # giây chờ danh sách dừng trôi sau khi vuốt, trước khi chụp
 POLL_INTERVAL = 0.2     # kiểm tra sớm để đa số bước hoàn thành gần 1 giây
 STEP_TARGET = 1.0       # quá mức này ghi SLOW trong log performance
@@ -942,6 +949,7 @@ def _targets() -> list[tuple[str, str]]:
         (MARCH, MARCH_SCREEN),
         (JOIN, JOIN_LIST),
         (JOINED_BUTTON, JOINED),
+        (TROOP_DETAIL, TROOP_DETAIL_SEEN),     # lỡ bấm vào thẻ khi cuộn -> Back về danh sách
         (PVP_WAR, NO_BOSS),       # sau JOIN / JOINED: tới đây là list không có boss nào
         (WAR_TAB, SCROLL),
         ("Items/outLM.png", LEAVE_ALLIANCE_POPUP),

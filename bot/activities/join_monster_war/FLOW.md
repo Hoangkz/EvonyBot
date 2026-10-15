@@ -249,10 +249,10 @@ Tên cấu hình ALL/100 được chuyển thành các thao tác UI trên; hàm 
 
 | Giá trị `swipe` | Thao tác |
 | --- | --- |
-| 0, 1, 2 | Vuốt xuống: từ `(1,5%, 65%)` tới `(1,5%, 40%)`, thời lượng 0,8 giây. |
-| 3, 4, 5 | Vuốt lên: từ `(1,5%, 40%)` tới `(1,5%, 65%)`, thời lượng 0,8 giây. |
+| 0, 1, 2 | Vuốt xuống: từ `(50%, 65%)` tới `(50%, 40%)`, thời lượng 0,8 giây. |
+| 3, 4, 5 | Vuốt lên: từ `(50%, 40%)` tới `(50%, 65%)`, thời lượng 0,8 giây. |
 
-Điểm vuốt ở mép trái (`SCROLL_X = 1.5`), ngoài thẻ rally: vuốt bắt đầu trên thẻ đôi khi bị game coi là tap và mở màn chi tiết đội. Nếu vẫn lọt vào màn đó thì màn "không nhận ra" -> `go_home` Back về danh sách.
+Mọi cú vuốt dùng `SCROLL_X = 50`. Thử vuốt ở mép trái (1,5 %, 4 %) thì danh sách không cuộn. Đôi khi game coi cú vuốt trên thẻ là tap và mở màn chi tiết đội (Total Troops): bot nhận ra qua chữ "Total Troops:" (`totalTroops.png`, không kèm số), ghi log, **Back một lần rồi chờ 1 giây** (`TROOP_BACK_WAIT`) và chụp lại, không qua `go_home`.
 
 Sau mỗi lần vuốt, `swipe = (swipe + 1) % 6` (`SCROLLS_EACH_WAY = 3`: 3 lần xuống rồi 3 lần lên).
 

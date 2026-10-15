@@ -25,6 +25,9 @@ NOT_ENOUGH_STAMINA = f"{JB}/hettheluc.png"
 STAMINA_ITEM_USE = f"{JB}/staminaItemUse.png"
 # Nút "Use" lớn của popup chọn số lượng.
 STAMINA_USE = f"{JB}/staminaUse.png"
+# Chữ "Total Troops" của màn chi tiết đội (hiện khi cú vuốt cuộn bị game coi là tap vào thẻ rally):
+# không khớp màn nào khác -> Back một lần về danh sách War.
+TROOP_DETAIL = f"{JB}/totalTroops.png"
 JOINED_BUTTON = f"{JB}/Joined.png"
 PVP_WAR = f"{JB}/PvPWar.png"
 WAR_TAB = f"{JB}/checkChienTranh.png"
@@ -47,6 +50,7 @@ REGIONS = {
     JOIN: (70, 35, 100, 90),              # đo: x80-88, y47-49 (thẻ trên) / y80-82 (thẻ dưới)
     JOINED_BUTTON: (70, 35, 100, 90),     # đo: x77-91, y47-50 / y80-83
     MARCH: (60, 90, 100, 100),            # đo: x68-83 y94-97
+    TROOP_DETAIL: (3, 38, 45, 46),        # đo: x22-138, y288-308
     PVP_WAR: (5, 6, 45, 15),              # đo: x11-37 y9-12
     WAR_TAB: (5, 88, 50, 100),            # đo: x15-41 y94-97
     LISTBOSS: (80, 20, 100, 90),          # cột icon bên phải (đo: x86-97 y57-60, vị trí dọc có thể đổi)
@@ -94,6 +98,7 @@ STAMINA_BAR_REGION = (0, 48, 100, 58)    # % màn hình: dải chứa nút − v
 STAMINA_BASE = 100                       # thể lực popup mở sẵn
 STAMINA_PLUS_DELAY = 0                       # giây sau mỗi lần bấm +: mỗi tap ADB đã mất ~0,5 giây
 STAMINA_ADDED_WAIT = 1                   # giây chờ sau khi bấm + xong, trước khi bấm Use
+TROOP_BACK_WAIT = 1   # giây chờ sau khi Back khỏi màn chi tiết đội
 STAMINA_REFILL_WAIT = 2             # giây chờ sau khi bấm Use (game tự đóng popup) rồi mới Back
 PRESET_X0, PRESET_DX, PRESET_Y = 10.4, 11.3, 11
 
@@ -111,6 +116,7 @@ SAME_SPOT = 10                      # px: two positions closer than this are the
 
 # What to do when each image is seen.
 OUT_OF_STAMINA = "out_of_stamina"
+TROOP_DETAIL_SEEN = "troop_detail_seen"   # thấy màn chi tiết đội -> Back rồi chờ TROOP_BACK_WAIT
 MARCH_SCREEN = "march_screen"
 JOIN_LIST = "join_list"
 SCROLL = "scroll"

@@ -163,11 +163,18 @@ ALREADY_KNOWN_MINOTAUR = [
 ]
 # Còn thẻ bị che ở đáy màn hình -> vẫn phải cuộn xuống tìm rally khác.
 ALREADY_KNOWN_MORE_BELOW = [
-    Step(W("war_list_more_below.png"), swipe(1.5, 65, 1.5, 40)),
+    Step(W("war_list_more_below.png"), swipe(50, 65, 50, 40)),
+]
+
+# Cú vuốt bị game coi là tap vào thẻ -> màn chi tiết đội (Total Troops): Back đúng 1 lần về danh sách, cuộn tiếp.
+SWIPE_OPENED_TROOP_DETAIL = [
+    Step(W("war_list_more_below.png"), swipe(50, 65, 50, 40)),
+    Step("war_troop_detail.png", back()),
+    Step(W("war_list_more_below.png"), swipe(50, 65, 50, 40)),
 ]
 
 # Mỗi chu kỳ cuộn 3 lần xuống rồi 3 lần lên; hết 6 lần mà không thấy boss mới -> rảnh.
-DOWN, UP = swipe(1.5, 65, 1.5, 40), swipe(1.5, 40, 1.5, 65)
+DOWN, UP = swipe(50, 65, 50, 40), swipe(50, 40, 50, 65)
 SCROLL_LIMIT = [
     *[Step(W("war_list_more_below.png"), DOWN) for _ in range(3)],
     *[Step(W("war_list_more_below.png"), UP) for _ in range(3)],
@@ -247,7 +254,7 @@ JOINED_AND_JOIN = [
 # Cả hai thẻ đều "Joined", ô War bị thanh thông báo che (không thấy -> không bấm):
 # không có gì để Join, danh sách còn dài -> cuộn xuống.
 ALL_JOINED = [
-    Step("war_all_joined.png", swipe(1.5, 65, 1.5, 40)),
+    Step("war_all_joined.png", swipe(50, 65, 50, 40)),
 ]
 # Danh sách đã cuộn: thẻ trên cùng bị cắt (nút "Joined" ở y 370 khớp ảnh mẫu Join 0,80 ->
 # phải bị loại), Golem ở y 597 -> Join Golem.
@@ -430,7 +437,7 @@ ALL_JOINED_SHORT_LIST = [
 # các thẻ còn lại đang "Attacking" -> không thấy Join / Joined nào nhưng danh sách chưa hết ->
 # cuộn tiếp, không được rảnh.
 SCROLLED_ONLY_ATTACKING = [
-    Step("war_scrolled_only_attacking.png", swipe(1.5, 65, 1.5, 40)),
+    Step("war_scrolled_only_attacking.png", swipe(50, 65, 50, 40)),
 ]
 # 2 thẻ đều "Attacking" (không Join / Joined), có khoảng hở nhỏ ngay trên 2 nút xanh cuối
 # (Battle Logs / Auto-Join) = danh sách đã hiện hết -> rảnh ngay, không cuộn.
@@ -440,11 +447,11 @@ TWO_ATTACKING_LIST_END = [
 # Cuối một danh sách dài: thẻ cuối sát nút Battle Logs (không có khoảng trống), mọi boss
 # đã biết -> không được rảnh ngay, vẫn cuộn theo vòng 3 xuống / 3 lên.
 BOTTOM_OF_LONG_LIST = [
-    Step(W("war_list_bottom.png"), swipe(1.5, 65, 1.5, 40)),
+    Step(W("war_list_bottom.png"), swipe(50, 65, 50, 40)),
 ]
 # Nút Join của Golem bị cắt ở mép dưới (ngoài dải 262-615) -> chỉ còn Joined -> cuộn.
 JOIN_CUT_AT_BOTTOM = [
-    Step(W("war_scrolled_join_cut_bottom.png"), swipe(1.5, 65, 1.5, 40)),
+    Step(W("war_scrolled_join_cut_bottom.png"), swipe(50, 65, 50, 40)),
 ]
 
 
@@ -608,6 +615,9 @@ class JoinMonsterWarFlow(unittest.TestCase):
                 device = run_join(self, refill_plus(popup, times),
                                   {**ALL_TROOPS, "use_stamina": str(target)})
                 self.assertIn(f"Join Monster War: dùng vật phẩm thể lực ({target})", device.logs)
+
+    def test_swipe_opening_troop_detail_backs_once(self):
+        run_join(self, SWIPE_OPENED_TROOP_DETAIL, {**ALL_TROOPS})
 
     def test_out_of_stamina_items_does_not_mark_joined(self):
         device = run_join(self, OUT_OF_STAMINA_ITEMS, {**ALL_TROOPS, "use_stamina": "ALL"})
