@@ -48,6 +48,23 @@ class DailyTests(unittest.TestCase):
             region=(8, 37, 92, 47))
         first.assert_called_once()
 
+    def test_rewards_on_old_ui_claims_100_cards_and_stops_without_reopening_the_list(self):
+        """Giao diện cũ (lưới thẻ Activity): nhận thẻ 100% rồi dừng. Trước đây vòng lặp mở bảng lại (Back rồi mở) mãi."""
+        bot = mock.Mock()
+        bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
+        badges = iter([(17, 266), (140, 266), None])
+        bot.find.side_effect = lambda path, **_kw: (
+            (160, 13) if path == const.OLD_ACTIVITY_TITLE
+            else next(badges) if path == const.OLD_DONE_BADGE else None)
+        with mock.patch.object(common, "open_activity_list") as open_list:
+            common.collect_activity_rewards(bot)
+        open_list.assert_not_called()
+        bot.back.assert_not_called()
+        dx, dy = const.OLD_DONE_TAP
+        self.assertEqual(bot.tap.call_args_list,
+                         [mock.call(17 + dx, 266 + dy, delay=const.OLD_DONE_WAIT),
+                          mock.call(140 + dx, 266 + dy, delay=const.OLD_DONE_WAIT)])
+
     def test_every_task_has_priority_key(self):
         from bot.worker.priority import DATA
         keys = {t["key"] for t in DATA["Daily Activities"]}

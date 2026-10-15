@@ -99,6 +99,21 @@ def task_done_cards(task: Task) -> list[str]:
     return [path] if (TEMPLATE_DIR / path).exists() else []
 
 
+def _claim_old_cards(bot, max_taps: int = 10):
+    """Lưới thẻ Activity (giao diện cũ): bấm nhận từng thẻ "100%" (như _search_grid), đóng popup Congratulations bằng Back."""
+    for _ in range(max_taps):
+        bot.check()
+        screen = bot.screenshot()
+        if bot.find(OLD_CONGRATS, screen=screen) is not None:
+            bot.back(delay=1)
+            continue
+        badge = bot.find(OLD_DONE_BADGE, threshold=OLD_DONE_THRESHOLD, screen=screen)
+        if badge is None:
+            return
+        bot.log("Daily Activities: claim 100% task card")
+        bot.tap(badge[0] + OLD_DONE_TAP[0], badge[1] + OLD_DONE_TAP[1], delay=OLD_DONE_WAIT)
+
+
 def collect_activity_rewards(bot):
     """Bước cuối: nhận thưởng dòng nhiệm vụ (Claim All) rồi mở mọi rương điểm Activity."""
     folder = f"{ROOT}/CollectionActivities"
@@ -113,6 +128,12 @@ def collect_activity_rewards(bot):
         if reward_popup is not None:
             bot.back(delay=2)
             continue
+        # Giao diện cũ (lưới thẻ Activity): không có Claim All / ngôi sao Activity, nên nhận các thẻ 100% rồi dừng. Trước đây
+        # vòng lặp này mở lại bảng (Back rồi mở) mãi vì không bao giờ thấy ngôi sao.
+        if bot.find(OLD_ACTIVITY_TITLE, screen=screen) is not None:
+            _claim_old_cards(bot)
+            bot.record("Daily Activities: old Activity screen, claimed 100% cards (point chests not supported yet)")
+            return
         # Claim task rows first because their activity points can unlock an
         # additional chest in the same pass.
         claim_all = bot.find(f"{folder}/Claim_All.png", screen=screen)
