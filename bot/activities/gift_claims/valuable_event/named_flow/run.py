@@ -1,7 +1,49 @@
-"""Standalone helpers that enter flows by fixed inner-screen names."""
-from ...common import (TEXT_CLAIM_CONTROLS, claim_fixed_controls, return_home,
-                     select_carousel_tab, tap_claims)
+"""Shared Valuable Event processing for scanner and standalone DB flows."""
+from ...common import (ClaimReport, TEXT_CLAIM_CONTROLS, back_if_close_x,
+                       claim_fixed_controls, claim_sparkles, return_home,
+                       select_carousel_tab, tap_claims)
 from ...lobby import open_named
+
+LOWER_CONTENT = (0, 20, 100, 88)
+
+
+def process_lower(bot, navigation: tuple[str, ...],
+                  claims: tuple[str, ...]) -> tuple[ClaimReport, int]:
+    """Claim known controls first and re-check them after each glow probe."""
+    navigated = (tap_claims(bot, navigation, max_taps=len(navigation),
+                            initial_wait_attempts=2, region=LOWER_CONTENT)
+                 if navigation else 0)
+    controls = tuple(dict.fromkeys((*claims, *TEXT_CLAIM_CONTROLS)))
+    total = ClaimReport()
+    empty_rounds = 0
+    rounds = 0
+    while empty_rounds < 4 and rounds < 12:
+        rounds += 1
+        fixed = claim_fixed_controls(
+            bot, controls, max_taps=16,
+            initial_wait_attempts=2 if rounds == 1 else 0,
+            region=LOWER_CONTENT,
+        )
+        total = ClaimReport(total.attempted + fixed.attempted,
+                            total.verified + fixed.verified)
+
+        # A known launcher may reveal a detail layer. Close a supplied X and
+        # continue from the parent instead of ending before glow inspection.
+        back_if_close_x(bot)
+        sparkle = claim_sparkles(bot, region=LOWER_CONTENT, attempts=1)
+        total = ClaimReport(total.attempted + sparkle.attempted,
+                            total.verified + sparkle.verified)
+        if fixed.claimed or sparkle.claimed:
+            empty_rounds = 0
+        else:
+            empty_rounds += 1
+        bot.log("Gift Claims: Valuable Event vòng kiểm tra "
+                f"{rounds}, không phản hồi {empty_rounds}/4")
+
+    if empty_rounds >= 4:
+        bot.record("Gift Claims: Valuable Event không còn quà xác minh sau "
+                   "4 vòng; bỏ qua phần lấp lánh/trả phí và coi mục đã xét xong")
+    return total, navigated
 
 
 def run_carousel_claim(bot, screen_name, page: str, tab: str,
@@ -12,15 +54,7 @@ def run_carousel_claim(bot, screen_name, page: str, tab: str,
     if not select_carousel_tab(bot, page, tab):
         return_home(bot)
         return False
-    if navigation:
-        tap_claims(bot, navigation, max_taps=len(navigation),
-                   initial_wait_attempts=2)
-    # `claims` is kept as page metadata, but a generic tap is only driven by
-    # the tight common text crops. This makes the matched centre the real word
-    # inside the button instead of the centre of a chest/panel screenshot.
-    report = claim_fixed_controls(bot, TEXT_CLAIM_CONTROLS,
-                                  max_taps=16) if claims else None
-    if report is not None:
-        bot.log(f"Gift Claims: fixed claims {report.verified}/{report.attempted} verified")
+    report, _ = process_lower(bot, navigation, claims)
+    bot.log(f"Gift Claims: claims {report.verified}/{report.attempted} verified")
     return_home(bot)
     return True

@@ -4,10 +4,12 @@ Examples:
     venv\Scripts\python.exe -m tests.gift_claims.real_run --serial 127.0.0.1:21513
     # Event Center test chạy tới khi quét xong, không giới hạn 120 giây:
     venv\Scripts\python.exe -m tests.gift_claims.real_run --serial 127.0.0.1:21513 --task gift_event_center_limited
-    venv\Scripts\python.exe -m tests.gift_claims.real_run --task gift_limited_offer --shots
+    # Chỉ bật --shots khi cần phân tích nhận diện ảnh; ảnh được lưu trong thư mục tạm.
+    venv\Scripts\python.exe -m tests.gift_claims.real_run --serial 127.0.0.1:21513 --task gift_event_center_limited --shots
 """
 import argparse
 import sys
+import tempfile
 import threading
 import time
 from datetime import datetime
@@ -28,6 +30,8 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--serial", required=True)
     parser.add_argument("--task", action="append", help="gift_* key; repeat to run several")
+    parser.add_argument("--region", choices=("1", "2"),
+                        help="chạy riêng Vùng 1 (ngoài Event Center) hoặc Vùng 2")
     parser.add_argument("--slice-seconds", type=float,
                         help="chỉ dùng khi cần mô phỏng worker yield; bỏ tham số này "
                              "để test chạy tới khi hoàn tất")
@@ -35,7 +39,11 @@ def main():
                         help="start the combined flow at the right-rail boundary")
     parser.add_argument("--max-slices", type=int,
                         help="stop a live diagnostic after this many slices")
-    parser.add_argument("--shots", action="store_true")
+    parser.add_argument(
+        "--shots",
+        action="store_true",
+        help="lưu mọi ảnh bot chụp vào thư mục tạm để chẩn đoán nhận diện",
+    )
     args = parser.parse_args()
 
     start = time.monotonic()
@@ -47,7 +55,8 @@ def main():
     bot.mark_daily_done = lambda key: done.__setitem__(key, datetime.now().isoformat(timespec="seconds"))
 
     if args.shots:
-        output = Path("tests/gift_claims/adb_runs") / datetime.now().strftime("%Y%m%d-%H%M%S")
+        output = (Path(tempfile.gettempdir()) / "evonybot_gift_claims" /
+                  datetime.now().strftime("%Y%m%d-%H%M%S"))
         output.mkdir(parents=True, exist_ok=True)
         screenshot, count = bot.screenshot, [0]
 
@@ -59,6 +68,14 @@ def main():
 
         bot.screenshot = save_screenshot
         log(f"screenshots: {output.resolve()}")
+
+    if args.region:
+        region = (gift_claims.registry.REGION_1 if args.region == "1"
+                  else gift_claims.registry.REGION_2)
+        clean = gift_claims.run_region(bot, region)
+        log(f"Region {args.region} clean: {clean}")
+        log(f"daily_done: {sorted(done)}")
+        return
 
     if args.task:
         if args.task != [event_center.KEY]:

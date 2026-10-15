@@ -3,7 +3,7 @@ import cv2
 import numpy as np
 
 from ...context.errors import YieldToBoss
-from .common import REFERENCE_WIDTH, find_all, return_home
+from .common import REFERENCE_WIDTH, find, find_all, return_home
 from .screens import GiftScreen, identify
 
 BOTTOM = "bottom"
@@ -24,8 +24,47 @@ EVENT_CENTER_LAUNCHERS = ("EventCenter/launcher_side", "EventCenter/launcher")
 # event even after the game has removed its notification badge.
 FIXED_PARENT_TARGETS = {
     GiftScreen.VALUABLE_EVENT: (77, 83),
-    GiftScreen.SUPER_VALUE_RETURN: (77, 83),
+    GiftScreen.SUPER_VALUE_RETURN: (9, 83),
 }
+FIXED_PARENT_LAUNCHERS = {
+    GiftScreen.VALUABLE_EVENT: (
+        "ValuableEvent/launcher", (45, 70, 85, 95)),
+    GiftScreen.SUPER_VALUE_RETURN: (
+        "EmpireDepot/launcher", (0, 70, 25, 95)),
+}
+PARENT_ANCHOR_TABS = {
+    GiftScreen.VALUABLE_EVENT: (
+        "ResourceConsumptionSprint/tab", "LimitedOffer/tab"),
+    GiftScreen.SUPER_VALUE_RETURN: ("EmpireDepot/tab",),
+}
+
+
+def _switch_parent_carousel(bot, expected) -> bool:
+    """Switch between Valuable Event and Super Value Return by a named tab."""
+    current = identify(bot, bot.screenshot())
+    if current not in (GiftScreen.VALUABLE_EVENT, GiftScreen.SUPER_VALUE_RETURN):
+        return False
+    anchors = PARENT_ANCHOR_TABS.get(expected, ())
+    for direction in (-1, 1):
+        for step in range(9):
+            screen = bot.screenshot()
+            if identify(bot, screen) == expected:
+                return True
+            target = next((find(bot, name, screen, threshold=0.70,
+                                region=(0, 7, 100, 20))
+                           for name in anchors
+                           if find(bot, name, screen, threshold=0.70,
+                                   region=(0, 7, 100, 20)) is not None), None)
+            if target is not None:
+                bot.tap(*target, delay=2)
+                if identify(bot, bot.screenshot()) == expected:
+                    return True
+            if step < 8:
+                if direction < 0:
+                    bot.swipe_percent(85, 14, 20, 14, duration=0.5, delay=1)
+                else:
+                    bot.swipe_percent(20, 14, 85, 14, duration=0.5, delay=1)
+    return False
 
 
 def _red_mask(screen):
@@ -208,18 +247,29 @@ def open_named(bot, expected):
     screen = bot.screenshot()
     if identify(bot, screen) == expected:
         return True
+    launcher_spec = FIXED_PARENT_LAUNCHERS.get(expected)
+    launcher = (find(bot, launcher_spec[0], screen, threshold=0.68,
+                     region=launcher_spec[1])
+                if launcher_spec is not None else None)
     target = FIXED_PARENT_TARGETS.get(expected)
-    if target is None:
+    if launcher is None and target is None:
         bot.log(f"Gift Claims: {expected.value} chưa có launcher cố định")
         return False
     bot.record(f"Gift Claims: mở {expected.value} từ vị trí cố định")
-    bot.tap_percent(*target, delay=2)
+    if launcher is not None:
+        # Template contains only the caption; the icon body above is the safe
+        # clickable launcher and follows the bottom bar when slots move.
+        bot.tap(launcher[0], max(0, launcher[1] - 20), delay=2)
+    else:
+        bot.tap_percent(*target, delay=2)
     for attempt in range(OPEN_WAIT_ATTEMPTS):
         screen = bot.screenshot()
         if identify(bot, screen) == expected:
             return True
         if attempt + 1 < OPEN_WAIT_ATTEMPTS:
             bot.sleep(1)
+    if _switch_parent_carousel(bot, expected):
+        return True
     bot.log(f"Gift Claims: launcher cố định không mở {expected.value}")
     return_home(bot)
     return False

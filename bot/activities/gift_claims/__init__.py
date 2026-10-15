@@ -145,15 +145,88 @@ def _dispatch(bot, screen_name: GiftScreen, progress: GiftProgress):
     return_home(bot)
 
 
-def run(bot) -> bool:
-    """Inspect every DB-pending reward location, in its two fixed zones.
+def run_region(bot, region: str) -> bool:
+    """Run every DB-pending gift location in exactly one user-defined region."""
+    if region not in (registry.REGION_1, registry.REGION_2):
+        raise ValueError(f"unknown gift region: {region}")
+    label = "Vùng 1 (ngoài Event Center)" if region == registry.REGION_1 else \
+            "Vùng 2 (Event Center)"
+    bot.record(f"Gift Claims: bắt đầu {label}")
+    pending_now = registry.pending(bot, region)
+    known_region_1 = {task.key for task in registry.REGION_1_TASKS}
+    if (region == registry.REGION_1
+            and all(item.task.key in known_region_1 for item in pending_now)):
+        return _run_region_1(bot, label)
+    for location in pending_now:
+        bot.check()
+        bot.record(f"Gift Claims: {label} kiểm tra {location.task.label}")
+        inspected = location.task.run(bot)
+        if not inspected:
+            bot.record(f"Gift Claims: chưa tới/kiểm tra xong "
+                       f"{location.task.label}; giữ PENDING")
+    remaining = registry.pending(bot, region)
+    if remaining:
+        bot.record(f"Gift Claims: {label} còn PENDING: " +
+                   ", ".join(item.task.label for item in remaining))
+        return False
+    bot.record(f"Gift Claims: {label} DONE")
+    return True
 
-    This is deliberately DB-first.  A red marker can disappear before a free
-    chest becomes visible, so it is not an execution queue and never writes a
-    DONE timestamp.  Every individual flow must return true only after it has
-    reached and inspected its named screen; :class:`GiftTask` then writes its
-    own key.  ``bot.check()`` keeps the normal two-minute/Boss yielding
-    contract between locations.
+
+def _finish_clean_parent(bot, tasks, due_keys, parent_label: str) -> None:
+    """A fully scanned carousel with no red tab completes its remaining keys."""
+    for task in tasks:
+        if task.key in due_keys:
+            from .common import mark_task_done
+            mark_task_done(bot, task.key)
+    bot.record(f"Gift Claims: {parent_label} hết tab đỏ; coi toàn bộ nhóm DONE")
+
+
+def _run_region_1(bot, label: str) -> bool:
+    """Run region 1 parent-by-parent instead of reopening every child tab."""
+    valuable_due = {
+        item.task.key for item in registry.pending(bot, registry.REGION_1)
+        if item.task in registry.VALUABLE_EVENT_TASKS
+    }
+    if valuable_due:
+        if lobby.open_named(bot, GiftScreen.VALUABLE_EVENT):
+            _, clean = valuable_event.run_opened(bot, valuable_due, handled=set())
+            if clean:
+                _finish_clean_parent(
+                    bot, registry.VALUABLE_EVENT_TASKS, valuable_due,
+                    "Valuable Event")
+        else:
+            bot.record("Gift Claims: chưa mở được Valuable Event; giữ nhóm PENDING")
+
+    super_due = {
+        item.task.key for item in registry.pending(bot, registry.REGION_1)
+        if item.task in registry.SUPER_VALUE_RETURN_TASKS
+    }
+    if super_due:
+        if lobby.open_named(bot, GiftScreen.SUPER_VALUE_RETURN):
+            _, clean = super_value_return.run_opened(bot, super_due, handled=set())
+            if clean:
+                _finish_clean_parent(
+                    bot, registry.SUPER_VALUE_RETURN_TASKS, super_due,
+                    "Super Value Return")
+        else:
+            bot.record("Gift Claims: chưa mở được Super Value Return; giữ nhóm PENDING")
+
+    remaining = registry.pending(bot, registry.REGION_1)
+    if remaining:
+        bot.record(f"Gift Claims: {label} còn PENDING: " +
+                   ", ".join(item.task.label for item in remaining))
+        return False
+    bot.record(f"Gift Claims: {label} DONE")
+    return True
+
+
+def run(bot) -> bool:
+    """Run region 1 then region 2 with durable child checkpoints.
+
+    Region 1 is grouped by parent carousel. A complete two-direction scan with
+    no red tab completes that parent's remaining children instead of reopening
+    each DB-pending tab. Region 2 keeps its Event Center inspection rules.
     """
     # ``gift_claims`` is deliberately only an aggregate scheduler checkpoint.
     # Every named location is authoritative: an old aggregate record must not
@@ -168,14 +241,8 @@ def run(bot) -> bool:
         bot.record("Gift Claims: aggregate DONE cũ nhưng còn điểm nhận chưa "
                    "kiểm tra; bỏ qua aggregate và tiếp tục theo DB con")
 
-    for zone in (registry.VALUABLE_EVENT, registry.EVENT_CENTER):
-        for location in registry.pending(bot, zone):
-            bot.check()
-            bot.record(f"Gift Claims: kiểm tra DB-pending {location.task.label}")
-            inspected = location.task.run(bot)
-            if not inspected:
-                bot.record(f"Gift Claims: chưa tới/kiểm tra xong "
-                           f"{location.task.label}; giữ PENDING")
+    run_region(bot, registry.REGION_1)
+    run_region(bot, registry.REGION_2)
 
     # A clean red-badge scan is not evidence that every named gift location
     # was inspected.  Each child flow writes its own key after opening the
@@ -194,4 +261,4 @@ def run(bot) -> bool:
     return True
 
 
-__all__ = ["KEY", "LABEL", "GiftProgress", "run"]
+__all__ = ["KEY", "LABEL", "GiftProgress", "run_region", "run"]

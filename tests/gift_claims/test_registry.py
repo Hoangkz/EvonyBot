@@ -57,7 +57,7 @@ class GiftClaimRegistryTests(unittest.TestCase):
             "GeneralVault/tab.png", "GeneralVault/button_daily_free.png",
             "DragonBattle/title.png",
             "Lobby/notification_dot.png", "Lobby/notification_dot_bottom.png",
-            "ValuableEvent/title.png",
+            "ValuableEvent/title.png", "ValuableEvent/launcher.png",
             "ValuableEvent/notification_dot.png", "SuperValueReturn/title.png",
             "SuperValueReturn/notification_dot.png", "EventCenter/notification_dot.png",
             "BacchusTavern/title.png", "LoginGifts/title.png",
@@ -68,6 +68,10 @@ class GiftClaimRegistryTests(unittest.TestCase):
             "GraceOfStarTrail/button_star_trail_gift_current.png",
             "GraceOfStarTrail/button_claim.png", "LimitedOffer/tab.png",
             "LimitedOffer/button_free.png", "SpeedupSprint/tab.png",
+            "ResourceConsumptionSprint/tab.png",
+            "ResourceConsumptionSprint/button_free.png",
+            "AncientDynastyTreasury/tab.png",
+            "AncientDynastyTreasury/button_daily_free.png",
             "RefiningStoneSprint/tab.png",
             "RefiningStoneSprint/subtab_sprint_quest.png",
             "StrategicStockpile/tab.png",
@@ -84,7 +88,8 @@ class GiftClaimRegistryTests(unittest.TestCase):
             "SuccessivePurchaseBenefits/button_daily_free_text.png", "LoginGifts/tab.png",
             "LoginGifts/detail_popup.png", "LoginGifts/congratulations.png",
             "LoginGifts/reward_glowing_treasure_box.png",
-            "EmpireDepot/tab.png", "EmpireDepot/button_claimable.png",
+            "EmpireDepot/tab.png", "EmpireDepot/launcher.png",
+            "EmpireDepot/button_claimable.png",
             "LuckyRaffle/tab.png", "LuckyRaffle/button_claimable.png",
             "CityGrowthPlan/tab.png", "CityGrowthPlan/button_claim_all.png",
             "CityGrowthPlan/detail_popup.png", "CityGrowthPlan/claimed.png",
@@ -167,6 +172,8 @@ class GiftClaimRegistryTests(unittest.TestCase):
     def test_registry_is_the_full_inventory_not_a_red_badge(self):
         keys = {item.task.key for item in registry.locations()}
         self.assertIn("gift_limited_offer", keys)
+        self.assertIn("gift_resource_consumption_sprint", keys)
+        self.assertIn("gift_ancient_dynasty_treasury", keys)
         self.assertIn("gift_login_gifts", keys)
         self.assertIn("gift_precious_blazon_exchange", keys)
         self.assertIn("gift_dwarfs_treasure", keys)
@@ -179,18 +186,91 @@ class GiftClaimRegistryTests(unittest.TestCase):
         self.assertNotIn("gift_limited_offer", pending_keys)
         self.assertIn("gift_login_gifts", pending_keys)
 
+    def test_region_1_contains_super_value_return_and_no_event_center_tasks(self):
+        region_1 = {item.task.key for item in registry.locations(registry.REGION_1)}
+        region_2 = {item.task.key for item in registry.locations(registry.REGION_2)}
+
+        self.assertTrue({"gift_empire_depot", "gift_lucky_raffle",
+                         "gift_city_growth_plan", "gift_login_gifts"} <= region_1)
+        self.assertIn("gift_resource_consumption_sprint", region_1)
+        self.assertIn("gift_grace_of_star_trail", region_2)
+        self.assertTrue(region_1.isdisjoint(region_2))
+
+    def test_run_region_executes_only_requested_region(self):
+        done = set()
+        bot = mock.Mock()
+        bot.is_daily_done.side_effect = done.__contains__
+        bot.mark_daily_done.side_effect = done.add
+        region_1_task = common.GiftTask(
+            "gift_region_1_test", "Region 1 test", lambda _bot: True)
+        region_2_task = common.GiftTask(
+            "gift_region_2_test", "Region 2 test", lambda _bot: True)
+        locations = (
+            registry.ClaimLocation(registry.REGION_1, region_1_task),
+            registry.ClaimLocation(registry.REGION_2, region_2_task),
+        )
+
+        def pending(_bot, zone=None):
+            return tuple(item for item in locations
+                         if item.zone == zone and item.task.key not in done)
+
+        with mock.patch.object(registry, "pending", side_effect=pending):
+            self.assertTrue(gift_claims.run_region(bot, registry.REGION_2))
+
+        self.assertIn("gift_region_2_test", done)
+        self.assertNotIn("gift_region_1_test", done)
+
+    def test_region_1_clean_parents_mark_all_children_done_without_reopening(self):
+        done = set()
+        bot = mock.Mock()
+        bot.is_daily_done.side_effect = done.__contains__
+        bot.mark_daily_done.side_effect = done.add
+        with (mock.patch.object(lobby, "open_named", return_value=True),
+              mock.patch.object(valuable_event, "run_opened",
+                                return_value=({}, True)) as valuable_scan,
+              mock.patch.object(gift_claims.super_value_return, "run_opened",
+                                return_value=({}, True)) as super_scan):
+            self.assertTrue(gift_claims.run_region(bot, registry.REGION_1))
+
+        self.assertEqual({task.key for task in registry.REGION_1_TASKS}, done)
+        valuable_scan.assert_called_once()
+        super_scan.assert_called_once()
+
+    def test_clean_super_value_return_marks_its_remaining_children_done(self):
+        done = {task.key for task in registry.VALUABLE_EVENT_TASKS}
+        bot = mock.Mock()
+        bot.is_daily_done.side_effect = done.__contains__
+        bot.mark_daily_done.side_effect = done.add
+        with (mock.patch.object(lobby, "open_named", return_value=True) as opener,
+              mock.patch.object(gift_claims.super_value_return, "run_opened",
+                                return_value=({}, True)) as super_scan):
+            self.assertTrue(gift_claims.run_region(bot, registry.REGION_1))
+
+        self.assertTrue({task.key for task in registry.SUPER_VALUE_RETURN_TASKS}
+                        <= done)
+        opener.assert_called_once_with(bot, GiftScreen.SUPER_VALUE_RETURN)
+        super_scan.assert_called_once()
+
     def test_named_parent_uses_fixed_launcher_not_a_notification_badge(self):
         bot = mock.Mock()
         bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
         with (mock.patch.object(common, "return_home", return_value=True),
               mock.patch.object(lobby, "return_home", return_value=True),
+              mock.patch.object(lobby, "find", return_value=(259, 591)),
               mock.patch.object(lobby, "identify",
                                 side_effect=(None, GiftScreen.VALUABLE_EVENT)),
               mock.patch.object(lobby, "open_next") as open_next):
             self.assertTrue(lobby.open_named(bot, GiftScreen.VALUABLE_EVENT))
 
-        bot.tap_percent.assert_called_once_with(77, 83, delay=2)
+        bot.tap.assert_called_once_with(259, 571, delay=2)
+        bot.tap_percent.assert_not_called()
         open_next.assert_not_called()
+
+    def test_super_value_return_uses_empire_depot_city_launcher(self):
+        name, region = lobby.FIXED_PARENT_LAUNCHERS[
+            GiftScreen.SUPER_VALUE_RETURN]
+        self.assertEqual("EmpireDepot/launcher", name)
+        self.assertEqual((0, 70, 25, 95), region)
 
     def test_claim_template_is_never_tapped_twice_on_an_unchanged_page(self):
         bot = mock.Mock()
@@ -324,11 +404,17 @@ class GiftClaimRegistryTests(unittest.TestCase):
 
     def test_valuable_navigation_is_not_registered_as_claim_control(self):
         specs = {spec.task.key: spec for spec in valuable_event.SPECS}
+        resource = specs["gift_resource_consumption_sprint"]
+        ancient = specs["gift_ancient_dynasty_treasury"]
         refining = specs["gift_refining_stone_sprint"]
         weekly = specs["gift_super_value_weekly_card"]
         self.assertEqual(("SpeedupSprint/subtab_package",),
                          refining.navigation)
         self.assertEqual(("SpeedupSprint/button_free",), refining.claims)
+        self.assertEqual(("ResourceConsumptionSprint/button_free",),
+                         resource.claims)
+        self.assertEqual(("AncientDynastyTreasury/button_daily_free",),
+                         ancient.navigation)
         self.assertEqual(("SuperValueWeeklyCard/button_scores",),
                          weekly.navigation)
         self.assertEqual((), weekly.claims)

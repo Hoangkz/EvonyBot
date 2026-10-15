@@ -13,6 +13,8 @@ from bot.context.errors import YieldToBoss
 
 event_center = import_module("bot.activities.gift_claims.event_center.run")
 valuable_event = import_module("bot.activities.gift_claims.valuable_event.run")
+valuable_named_flow = import_module(
+    "bot.activities.gift_claims.valuable_event.named_flow.run")
 back_to_territory = import_module(
     "bot.activities.gift_claims.valuable_event.back_to_territory.run")
 empire_depot = import_module("bot.activities.gift_claims.valuable_event.empire_depot.run")
@@ -140,6 +142,8 @@ class FixedGiftFlowTests(unittest.TestCase):
 
     def test_valuable_event_has_one_standard_spec_per_child_module(self):
         expected = {
+            "gift_resource_consumption_sprint",
+            "gift_ancient_dynasty_treasury",
             "gift_general_vault",
             "gift_refining_stone_sprint", "gift_strategic_stockpile",
             "gift_limited_offer", "gift_speedup_sprint", "gift_super_blazon_sale",
@@ -155,6 +159,48 @@ class FixedGiftFlowTests(unittest.TestCase):
             (96, 70), [(left, (50, 70)), (right, (100, 70))])
         self.assertIs(right, owner[0])
 
+    def test_valuable_known_controls_are_checked_before_each_sparkle(self):
+        bot = mock.Mock()
+        order = []
+
+        def fixed(*_args, **_kwargs):
+            order.append("fixed")
+            return common.ClaimReport()
+
+        def sparkle(*_args, **_kwargs):
+            order.append("sparkle")
+            return common.ClaimReport()
+
+        with (mock.patch.object(valuable_named_flow, "claim_fixed_controls",
+                                side_effect=fixed) as fixed_claims,
+              mock.patch.object(valuable_named_flow, "claim_sparkles",
+                                side_effect=sparkle),
+              mock.patch.object(valuable_named_flow, "back_if_close_x",
+                                return_value=False)):
+            report, navigated = valuable_named_flow.process_lower(
+                bot, (), ("ResourceConsumptionSprint/button_free",))
+
+        self.assertEqual(common.ClaimReport(), report)
+        self.assertEqual(0, navigated)
+        self.assertEqual(["fixed", "sparkle"] * 4, order)
+        controls = fixed_claims.call_args_list[0].args[1]
+        self.assertEqual("ResourceConsumptionSprint/button_free", controls[0])
+        self.assertTrue(all(name in controls for name in common.TEXT_CLAIM_CONTROLS))
+
+    def test_valuable_verified_claim_resets_four_empty_rounds(self):
+        bot = mock.Mock()
+        reports = [common.ClaimReport(1, 1)] + [common.ClaimReport()] * 4
+        with (mock.patch.object(valuable_named_flow, "claim_fixed_controls",
+                                side_effect=reports) as fixed,
+              mock.patch.object(valuable_named_flow, "claim_sparkles",
+                                return_value=common.ClaimReport()),
+              mock.patch.object(valuable_named_flow, "back_if_close_x",
+                                return_value=False)):
+            report, _ = valuable_named_flow.process_lower(bot, (), ())
+
+        self.assertEqual(common.ClaimReport(1, 1), report)
+        self.assertEqual(5, fixed.call_count)
+
     def test_super_value_return_has_one_standard_spec_per_child_module(self):
         expected = {
             "gift_empire_depot", "gift_lucky_raffle", "gift_city_growth_plan",
@@ -165,6 +211,16 @@ class FixedGiftFlowTests(unittest.TestCase):
         specs = {spec.task.key: spec for spec in super_value_return.SPECS}
         self.assertFalse(specs[login_gifts.KEY].requires_dot)
         self.assertTrue(specs[empire_depot.KEY].requires_dot)
+
+    def test_super_value_unknown_tab_signature_is_not_reopened_on_reverse_scan(self):
+        original = bytes([0b10101010] * 16)
+        animated = bytearray(original)
+        animated[0] ^= 0b00000111
+        animated[5] ^= 0b00000001
+        self.assertTrue(super_value_return._signature_seen(
+            bytes(animated), {original}))
+        self.assertFalse(super_value_return._signature_seen(
+            bytes([0b01010101] * 16), {original}))
 
     def test_login_gifts_never_probes_rows_without_a_glowing_chest(self):
         bot = mock.Mock()

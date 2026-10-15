@@ -9,8 +9,9 @@ the configured server reset (14:00 by default).
 from dataclasses import dataclass
 
 from .valuable_event import (
-    city_growth_plan, empire_depot, general_vault, limited_offer, login_gifts,
-    lucky_raffle, refining_stone_sprint, speedup_sprint, strategic_stockpile,
+    ancient_dynasty_treasury, city_growth_plan, empire_depot, general_vault,
+    limited_offer, login_gifts, lucky_raffle, refining_stone_sprint,
+    resource_consumption_sprint, speedup_sprint, strategic_stockpile,
     successive_purchase_benefits, sulis_wishing, super_blazon_sale,
     super_value_weekly_card,
 )
@@ -30,8 +31,16 @@ class ClaimLocation:
     task: GiftTask
 
 
-VALUABLE_EVENT = "valuable_event"
-EVENT_CENTER = "event_center"
+# Quy ước nghiệp vụ:
+# - Vùng 1: mọi điểm nhận quà KHÔNG nằm trong Event Center.
+# - Vùng 2: Event Center và toàn bộ event con của nó.
+REGION_1 = "region_1"
+REGION_2 = "region_2"
+
+# Compatibility aliases for older callers/tests.  ``VALUABLE_EVENT`` includes
+# Super Value Return and the other non-Event-Center gift parents as well.
+VALUABLE_EVENT = REGION_1
+EVENT_CENTER = REGION_2
 
 
 def _policy_task(module) -> GiftTask:
@@ -44,29 +53,40 @@ def _policy_task(module) -> GiftTask:
     return GiftTask(policy.key, policy.label, module.run)
 
 
+VALUABLE_EVENT_TASKS = (
+    resource_consumption_sprint.TASK,
+    ancient_dynasty_treasury.TASK,
+    general_vault.TASK,
+    refining_stone_sprint.TASK,
+    strategic_stockpile.TASK,
+    limited_offer.TASK,
+    speedup_sprint.TASK,
+    super_blazon_sale.TASK,
+    sulis_wishing.TASK,
+    super_value_weekly_card.TASK,
+    successive_purchase_benefits.TASK,
+)
+
+SUPER_VALUE_RETURN_TASKS = (
+    empire_depot.TASK,
+    lucky_raffle.TASK,
+    city_growth_plan.TASK,
+    login_gifts.TASK,
+)
+
+REGION_1_TASKS = VALUABLE_EVENT_TASKS + SUPER_VALUE_RETURN_TASKS
+
 LOCATIONS = (
-    ClaimLocation(VALUABLE_EVENT, general_vault.TASK),
-    ClaimLocation(VALUABLE_EVENT, refining_stone_sprint.TASK),
-    ClaimLocation(VALUABLE_EVENT, strategic_stockpile.TASK),
-    ClaimLocation(VALUABLE_EVENT, limited_offer.TASK),
-    ClaimLocation(VALUABLE_EVENT, speedup_sprint.TASK),
-    ClaimLocation(VALUABLE_EVENT, super_blazon_sale.TASK),
-    ClaimLocation(VALUABLE_EVENT, sulis_wishing.TASK),
-    ClaimLocation(VALUABLE_EVENT, super_value_weekly_card.TASK),
-    ClaimLocation(VALUABLE_EVENT, successive_purchase_benefits.TASK),
-    ClaimLocation(VALUABLE_EVENT, empire_depot.TASK),
-    ClaimLocation(VALUABLE_EVENT, lucky_raffle.TASK),
-    ClaimLocation(VALUABLE_EVENT, city_growth_plan.TASK),
-    ClaimLocation(VALUABLE_EVENT, login_gifts.TASK),
-    ClaimLocation(EVENT_CENTER, _policy_task(blessing_of_pallas)),
-    ClaimLocation(EVENT_CENTER, dragon_battle.TASK),
-    ClaimLocation(EVENT_CENTER, _policy_task(precious_blazon_exchange)),
-    ClaimLocation(EVENT_CENTER, _policy_task(poseidons_day)),
-    ClaimLocation(EVENT_CENTER, _policy_task(hypnos_dream)),
-    ClaimLocation(EVENT_CENTER, grace_of_star_trail.TASK),
-    ClaimLocation(EVENT_CENTER, _policy_task(sealed_imperial_treasury)),
-    ClaimLocation(EVENT_CENTER, _policy_task(dwarfs_treasure)),
-    ClaimLocation(EVENT_CENTER, _policy_task(revelation_of_horus)),
+    *(ClaimLocation(REGION_1, task) for task in REGION_1_TASKS),
+    ClaimLocation(REGION_2, _policy_task(blessing_of_pallas)),
+    ClaimLocation(REGION_2, dragon_battle.TASK),
+    ClaimLocation(REGION_2, _policy_task(precious_blazon_exchange)),
+    ClaimLocation(REGION_2, _policy_task(poseidons_day)),
+    ClaimLocation(REGION_2, _policy_task(hypnos_dream)),
+    ClaimLocation(REGION_2, grace_of_star_trail.TASK),
+    ClaimLocation(REGION_2, _policy_task(sealed_imperial_treasury)),
+    ClaimLocation(REGION_2, _policy_task(dwarfs_treasure)),
+    ClaimLocation(REGION_2, _policy_task(revelation_of_horus)),
 )
 
 

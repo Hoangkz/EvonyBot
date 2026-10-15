@@ -42,8 +42,11 @@ khi có quy tắc điều phối.
 1. Đọc registry và bỏ qua duy nhất những key đã DONE trong ngày server hiện
    tại. Key chưa DONE luôn phải đi tới đúng màn và kiểm tra, kể cả khi không
    còn chấm đỏ.
-2. Về màn thành phố; kiểm tra khu 1 (Valuable Event) trước, sau đó khu 2
-   (Event Center).
+2. Về màn thành phố; kiểm tra Vùng 1 trước, sau đó Vùng 2:
+   - Vùng 1 là toàn bộ điểm nhận quà không nằm trong Event Center, gồm
+     Valuable Event và Super Value Return (Empire Depot, Lucky Raffle,
+     City Growth Plan, Login Gifts).
+   - Vùng 2 là Event Center và toàn bộ event con được mở từ đó.
 3. Mở Valuable Event bằng vị trí launcher cố định ở thanh dưới và Event Center
    bằng template launcher cố định ở thanh phải; không chạm vào chấm đỏ.
    Facebook/Follow Us luôn bị loại.
@@ -75,15 +78,23 @@ khi có quy tắc điều phối.
    badge trang trí hoặc badge không tự tắt không được làm luồng lặp vô hạn.
 10. Hết 120 giây thì dừng tại điểm kiểm tra gần nhất, nhường Boss và tiếp tục
     các mục chưa xét ở lát sau.
-11. Nếu DB nói chưa làm mà thực tế phần thưởng đã nhận, vẫn phải mở màn đó;
-    sau khi xác định không còn phần thưởng miễn phí, ghi key DONE. Không có
-    nhánh nào ghi key chỉ vì badge biến mất.
+11. Nếu DB nói chưa làm, Vùng 1 mở màn cha và quét carousel đủ hai chiều. Khi
+    màn cha không còn tab đỏ, toàn bộ key còn lại của riêng màn cha đó được ghi
+    DONE, không mở lại từng tab. Vùng 2 vẫn phải vào đúng event con theo quy
+    tắc Event Center.
 
 ## Quy tắc từng nhóm
 
 - Valuable Event: tách rõ tab phụ và nút nhận. Sprint Package, Stockpile và
   Scores là điều hướng; Daily Free, Free và Redeem mới là nút nhận. Redeem chỉ
   được tính sau khi bấm xác nhận và thấy Congratulations.
+- Resource Consumption Sprint có tab riêng và dùng crop toàn nút Free, không
+  dùng nhầm tên Refining Stone Sprint. Ancient Dynasty Treasury có tab riêng
+  và mở đúng nút Daily Free bên phải trước khi xét nội dung.
+- Trong mỗi tab Valuable Event, bot vét toàn bộ Claim/Daily Free/Free đã biết
+  trước, sau đó mới thử một điểm lấp lánh và quay lại vét nút chữ. Sau 4 vòng
+  liên tiếp không xác minh thêm được quà, phần lấp lánh còn lại được coi là
+  nội dung trả phí/trang trí và mục được coi là đã xét xong.
 - Super Value Return: luôn kiểm tra Login Gifts một lần; Empire Depot và Lucky
   Raffle dùng Claimable; City Growth Plan ưu tiên Claim All rồi chỉ nhận cột
   miễn phí bên trái.

@@ -2,9 +2,11 @@
 from dataclasses import dataclass
 
 from . import (
+    ancient_dynasty_treasury,
     general_vault,
     limited_offer,
     refining_stone_sprint,
+    resource_consumption_sprint,
     speedup_sprint,
     strategic_stockpile,
     successive_purchase_benefits,
@@ -12,9 +14,9 @@ from . import (
     super_blazon_sale,
     super_value_weekly_card,
 )
-from ..common import (ClaimReport, TEXT_CLAIM_CONTROLS, back_if_close_x,
-                     claim_fixed_controls, claim_sparkles, find, find_all,
-                     mark_task_done, return_home, tap_claims)
+from ..common import (ClaimReport, TEXT_CLAIM_CONTROLS, find, find_all,
+                     mark_task_done, return_home)
+from .named_flow import process_lower
 
 PAGE = "ValuableEvent/title"
 DOT = "ValuableEvent/notification_dot"
@@ -32,6 +34,13 @@ class ValuableSpec:
 
 
 SPECS = (
+    ValuableSpec(resource_consumption_sprint.TASK,
+                 "ResourceConsumptionSprint/tab",
+                 navigation=("SpeedupSprint/subtab_package",),
+                 claims=("ResourceConsumptionSprint/button_free",)),
+    ValuableSpec(ancient_dynasty_treasury.TASK,
+                 "AncientDynastyTreasury/tab",
+                 navigation=("AncientDynastyTreasury/button_daily_free",)),
     ValuableSpec(general_vault.TASK, "GeneralVault/tab", claims=("GeneralVault/button_daily_free",)),
     ValuableSpec(refining_stone_sprint.TASK, "RefiningStoneSprint/tab",
                  navigation=("SpeedupSprint/subtab_package",),
@@ -104,17 +113,7 @@ def _close_known_popup(bot):
 
 def _process_lower(bot, navigation: tuple[str, ...],
                    claims: tuple[str, ...]) -> tuple[ClaimReport, int]:
-    """Navigate, claim fixed controls, then sample glow four bounded times."""
-    navigated = (tap_claims(bot, navigation, max_taps=len(navigation),
-                            initial_wait_attempts=2, region=LOWER_CONTENT)
-                 if navigation else 0)
-    fixed = claim_fixed_controls(bot, COMMON_LOWER_CLAIMS,
-                                 max_taps=16, region=LOWER_CONTENT)
-    if back_if_close_x(bot):
-        return fixed, navigated
-    sparkle = claim_sparkles(bot, region=LOWER_CONTENT, attempts=4)
-    return ClaimReport(fixed.attempted + sparkle.attempted,
-                       fixed.verified + sparkle.verified), navigated
+    return process_lower(bot, navigation, claims)
 
 
 def run_opened(bot, due_keys: set[str], *, handled: set[str] | None = None
@@ -194,12 +193,11 @@ def run_opened(bot, due_keys: set[str], *, handled: set[str] | None = None
 
     clean = _verify_clean(bot, handled)
     if clean and due_keys - handled:
-        # A missing badge only says nothing is currently highlighted.  It is
-        # not proof that a DB-pending tab was opened and inspected.  Leave the
-        # key pending so its fixed flow is revisited instead of creating a
-        # false daily checkpoint.
+        # The region-1 coordinator owns the daily checkpoints.  A complete
+        # two-direction scan with no red tab lets it finish the remaining
+        # child keys without reopening clean tabs.
         bot.record("Gift Claims: Valuable Event hết badge nhưng vẫn còn task "
-                   "DB chưa được mở; không ghi DONE từ badge")
+                   "DB chưa được mở; bộ điều phối sẽ coi cả nhóm DONE")
     bot.record("Gift Claims: Valuable Event - "
                + ("DONE, phần trên đã hết dấu đỏ" if clean
                   else "chưa DONE, phần trên vẫn còn dấu đỏ"))

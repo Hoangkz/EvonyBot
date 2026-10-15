@@ -1,6 +1,9 @@
 """Process known red-dot tabs on the fixed Super Value Return screen."""
 from dataclasses import dataclass
 
+import cv2
+import numpy as np
+
 from .. import city_growth_plan, empire_depot, login_gifts, lucky_raffle
 from ...common import (ClaimReport, TEXT_CLAIM_CONTROLS, back_if_close_x,
                      claim_fixed_controls, claim_sparkles, find, find_all,
@@ -57,6 +60,27 @@ def _dots(bot, screen):
     return find_all(bot, DOT, screen, threshold=0.65, region=(0, 7, 100, 19))
 
 
+def _tab_signature(screen, dot) -> bytes:
+    """Position-independent fingerprint used to avoid reopening one red tab."""
+    x, _ = dot
+    left, right = max(0, x - 48), min(screen.shape[1], x + 24)
+    patch = cv2.cvtColor(screen[42:125, left:right], cv2.COLOR_BGR2GRAY)
+    tiny = cv2.resize(patch, (17, 8), interpolation=cv2.INTER_AREA)
+    return np.packbits(tiny[:, 1:] > tiny[:, :-1]).tobytes()
+
+
+def _signature_seen(signature: bytes, seen: set[bytes]) -> bool:
+    """Allow a little animation noise while recognizing the same carousel tab."""
+    for old in seen:
+        if len(old) != len(signature):
+            continue
+        distance = sum((left ^ right).bit_count()
+                       for left, right in zip(old, signature))
+        if distance <= 12:
+            return True
+    return False
+
+
 def _verify_clean(bot, ignored_keys=()) -> bool:
     """Verify that no red tab remains anywhere in the parent carousel."""
     for direction in (-1, 1):
@@ -88,6 +112,7 @@ def run_opened(bot, due_keys: set[str], *, handled: set[str] | None = None
 
     handled = handled if handled is not None else set()
     attempted_this_run = set(handled)
+    unknown_tabs: set[bytes] = set()
     if (login_gifts.KEY in due_keys
             and find(bot, login_gifts.PAGE, screen, threshold=0.70,
                      region=(0, 15, 45, 25)) is not None):
@@ -118,6 +143,10 @@ def run_opened(bot, due_keys: set[str], *, handled: set[str] | None = None
             for dot in dots:
                 match = _owner_for_dot(dot, tabs)
                 if match is None:
+                    signature = _tab_signature(screen, dot)
+                    if _signature_seen(signature, unknown_tabs):
+                        continue
+                    unknown_tabs.add(signature)
                     bot.tap(max(0, dot[0] - 25), min(screen.shape[0] - 1, dot[1] + 16),
                             delay=1)
                     report = claim_fixed_controls(
@@ -183,12 +212,12 @@ def run_opened(bot, due_keys: set[str], *, handled: set[str] | None = None
 
     clean = _verify_clean(bot, handled)
     if clean and due_keys - handled:
-        # Do not manufacture a child checkpoint from the absence of a badge.
-        # The DB-first runner will open the named tab and inspect it on the
-        # next pass; this matters for Login Gifts and events whose badge fades
-        # before their free reward becomes visible.
+        # The region-1 coordinator owns the daily checkpoints.  Once this
+        # complete two-direction scan sees no red tab, it marks every
+        # remaining child in this parent DONE instead of reopening tabs that
+        # no longer advertise a claimable reward.
         bot.record("Gift Claims: Super Value Return hết badge nhưng vẫn còn "
-                   "task DB chưa được mở; không ghi DONE từ badge")
+                   "task DB chưa được mở; bộ điều phối sẽ coi cả nhóm DONE")
     bot.record("Gift Claims: Super Value Return - "
                + ("DONE, phần trên đã hết dấu đỏ" if clean
                   else "chưa DONE, phần trên vẫn còn dấu đỏ"))
