@@ -4,9 +4,9 @@ Only tasks backed by an implementation in ``bot.activities.daily_activities``
 are selectable. The remaining legacy entries stay visible at the bottom, but
 cannot accidentally enable work that the bot cannot perform.
 """
-from PyQt5.QtCore import QSignalBlocker
+from PyQt5.QtCore import QSignalBlocker, pyqtSignal
 from PyQt5.QtWidgets import (QCheckBox, QComboBox, QGridLayout, QGroupBox, QHBoxLayout, QLabel,
-                             QWidget)
+                             QPushButton, QWidget)
 
 from bot.activities.daily_activities import alliance_donation, alliance_help
 from bot.activities.event_center.crazy_eggs import constants as eggs
@@ -24,7 +24,7 @@ from bot.activities.daily_activities.resource_tax.constants import (
     TAX_RESOURCES,
 )
 
-from .tab_placeholder import BaseTab
+from .tab_placeholder import BaseTab, confirm_reset
 
 
 # The key stays compatible with the database and automation Task label; display
@@ -66,8 +66,15 @@ OFFERING_KEY = "Offering"
 
 
 class DailyActivitiesTab(BaseTab):
+    reset_progress_clicked = pyqtSignal()   # nút Reset progress: xoá dấu "đã làm" để bot làm lại
+
     def __init__(self, parent=None):
         super().__init__(title="Daily Activities", show_apply_all=True, parent=parent)
+        reset = QPushButton("Reset progress")
+        reset.setToolTip("Đặt mọi nhiệm vụ Daily Activities về chưa làm: lần chạy sau bot làm lại từ đầu "
+                         "(dùng khi game lỗi mà bot đã ghi là xong).")
+        reset.clicked.connect(self._confirm_reset)
+        self.apply_all_row.insertWidget(1, reset)
 
         self.task_boxes: dict[str, QCheckBox] = {}
         self.hourly_combos: dict[str, QComboBox] = {}
@@ -165,6 +172,12 @@ class DailyActivitiesTab(BaseTab):
             count.activated.connect(self.settings_changed)
         for box in self.task_boxes.values():
             box.clicked.connect(self.settings_changed)
+
+    def _confirm_reset(self):
+        if confirm_reset(self, "Reset progress",
+                         "Đặt mọi nhiệm vụ Daily Activities về chưa làm?\n"
+                         "Lần chạy sau bot sẽ làm lại từ đầu."):
+            self.reset_progress_clicked.emit()
 
     def _on_tax_free(self, name: str, checked: bool):
         """Ô Free chỉ được tích ở một loại: tích loại này thì bỏ tích các loại khác."""

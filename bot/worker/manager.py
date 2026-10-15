@@ -66,6 +66,13 @@ class BotManager(QObject):
         self.running_changed.emit(serial, True)
         return True
 
+    def clear_daily_done(self, serial: str, predicate):
+        """Worker đang chạy: bỏ các dấu "đã làm" thoả predicate(key) để làm lại ngay."""
+        worker = self._workers.get(serial)
+        if worker is not None:
+            for key in [k for k in worker.daily_done if predicate(k)]:
+                worker.daily_done.pop(key, None)
+
     def stop(self, serial: str):
         worker = self._workers.get(serial)
         if worker is not None:

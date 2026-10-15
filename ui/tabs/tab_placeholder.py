@@ -15,6 +15,7 @@ from PyQt5.QtWidgets import (
     QCheckBox,
     QComboBox,
     QGridLayout,
+    QMessageBox,
     QGroupBox,
     QHBoxLayout,
     QLabel,
@@ -79,6 +80,12 @@ class DesignerTab(QWidget):
 
     def set_settings(self, data: dict):
         pass
+
+
+def confirm_reset(parent, title: str, text: str) -> bool:
+    """Hộp hỏi lại trước khi reset (tránh bấm nhầm); mặc định chọn No."""
+    return QMessageBox.question(parent, title, text, QMessageBox.Yes | QMessageBox.No,
+                                QMessageBox.No) == QMessageBox.Yes
 
 
 class LabeledCombo(QWidget):
@@ -209,6 +216,7 @@ class BaseTab(QWidget):
             row_layout = QHBoxLayout(row)
             row_layout.setContentsMargins(0, 0, 0, 0)
             row_layout.addStretch(1)
+            self.apply_all_row = row_layout
             self.apply_all_button = QPushButton("Apply ALL")
             self.apply_all_button.setObjectName("ApplyAllButton")
             self.apply_all_button.clicked.connect(self.on_apply_all)

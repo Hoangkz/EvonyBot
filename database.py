@@ -56,6 +56,15 @@ TAB_COLUMNS = {
     "Event": "event",
     "Battlefield Shop": "battlefield_shop",
 }
+# Khoá daily_done của tab Event (nhiệm vụ gather_troops / kings_path / three_day, mốc reset event, đăng nhập, Voyage);
+# mọi khoá khác thuộc Daily Activities.
+EVENT_KEY_PREFIXES = ("gather_troops", "kings_path", "three_day", "event_")
+
+
+def is_event_key(key: str) -> bool:
+    return key.startswith(EVENT_KEY_PREFIXES)
+
+
 _JSON_COLUMNS = [*TAB_COLUMNS.values(), "daily_done"]
 
 _SCHEMA = """
@@ -351,6 +360,20 @@ class Database:
         """Raw {task: done_at} (có cả ngày cũ); người dùng tự so với mốc reset."""
         row = self._row(serial)
         return json.loads(row["daily_done"]) if row is not None else {}
+
+    def clear_daily_done(self, serial: str, event: bool):
+        """Xoá dấu "đã làm" của tab Event (event=True) hoặc của các nhiệm vụ còn lại (Daily Activities); giữ mốc reset event."""
+        now = _now()
+
+        def job(conn):
+            row = conn.execute("SELECT daily_done FROM devices WHERE serial = ?", (serial,)).fetchone()
+            if row is None:
+                return
+            progress = {k: v for k, v in json.loads(row["daily_done"]).items() if "_cycle_reset_" in k or is_event_key(k) != event}
+            conn.execute("UPDATE devices SET daily_done = ?, updated_at = ? WHERE serial = ?",
+                         (json.dumps(progress, ensure_ascii=False), now, serial))
+
+        self._write(job)
 
     def pending_daily_tasks(self, serial: str) -> list[str]:
         """Enabled tasks that haven't been done yet."""

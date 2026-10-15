@@ -26,7 +26,7 @@ from bot.common import GAME_PACKAGE
 
 from bot.worker import BotManager
 
-from database import Database
+from database import Database, is_event_key
 from ui import DeviceView, HomeView, Sidebar
 from ui import theme
 from ui.tabs.logs_tab import SHOW_SECONDS
@@ -153,7 +153,9 @@ class MainWindow(QMainWindow):
         view.stop_all_requested.connect(self._on_stop_all_requested)
         view.apply_all_requested.connect(self._on_apply_all_requested)
         view.server_changed.connect(self._on_server_changed)
-        view.civilization_changed.connect(self.db.set_civilization)
+        view.civilization_changed.connect(self._on_civilization_changed)
+        view.reset_progress_requested.connect(self._on_reset_progress)
+        view.reset_info_requested.connect(self._on_reset_info)
         view.tab_settings_changed.connect(self.db.save_settings)
         view.tabs.currentChanged.connect(self._on_tab_changed)
 
@@ -289,6 +291,26 @@ class MainWindow(QMainWindow):
         view = self.device_views.get(device_id)
         if view is not None:
             view.initialization_tab.set_settings({"server": server})
+
+    def _on_reset_info(self, device_id: str):
+        """Nút Reset info: đưa bubble, server, nền văn minh, route của máy về trống (DB và giao diện)."""
+        self._on_server_changed(device_id, "")
+        self.db.set_bubble_until(device_id, "")
+        self.db.set_civilization(device_id, 0)
+        self.db.set_city_map(device_id, "")
+        view = self.device_views.get(device_id)
+        if view is not None:
+            view.initialization_tab.set_settings({"server": "", "bubble_until": "", "civilization": 0})
+
+    def _on_reset_progress(self, device_id: str, event: bool):
+        """Nút Reset progress: xoá dấu "đã làm" (DB và worker đang chạy) để bot làm lại các nhiệm vụ của tab."""
+        self.db.clear_daily_done(device_id, event)
+        self.bots.clear_daily_done(device_id, lambda key: "_cycle_reset_" not in key and is_event_key(key) == event)
+
+    def _on_civilization_changed(self, device_id: str, civilization: int):
+        """Người dùng đổi nền văn minh -> lưu DB và xoá route (bản đồ thành) cũ về null để bot quét lại."""
+        self.db.set_civilization(device_id, civilization)
+        self.db.set_city_map(device_id, "")
 
     def _on_civilization_found(self, device_id: str, civilization: int):
         """Bot vừa tự xếp nền văn minh -> lưu DB và hiện lên tab Initialization."""

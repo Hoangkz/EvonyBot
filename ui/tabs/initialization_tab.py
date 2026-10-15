@@ -6,27 +6,27 @@ import time
 from datetime import datetime
 
 from PyQt5.QtCore import QTimer, pyqtSignal
+from PyQt5.QtWidgets import QPushButton
 
 from ..theme import COLORS
-from .tab_placeholder import DesignerTab
+from .tab_placeholder import DesignerTab, confirm_reset
 
 DESIGNER_DATA = {
     "ButtonJoinMonsterWar": {"loc": [85, 53], "size": [230, 40], "text": "Join Monster War", "type": "Button"},
     "ButtonOpenGiftBox": {"loc": [85, 117], "size": [230, 40], "text": "Open Gift Box", "type": "Button"},
-    "button10": {"loc": [85, 180], "size": [230, 40], "text": "Event", "type": "Button"},
-    "button7": {"loc": [740, 117], "size": [230, 40], "text": "Battlefield Shop", "type": "Button"},
+    "button10": {"loc": [740, 53], "size": [230, 40], "text": "Event", "type": "Button"},
     # button9 (Start All) nằm cạnh buttonStopAll (Stop All) dưới GroupBox; 2 nút
     # 125x40 (nhỏ lại so với 140x50 gốc) căn phải theo mép phải GroupBox (x=1075).
     "button9": {"loc": [815, 377], "size": [125, 40], "text": "Start All", "type": "Button"},
     "buttonStopAll": {"loc": [950, 377], "size": [125, 40], "text": "Stop All", "type": "Button"},
-    "buttonAllianceCapacity": {"loc": [409, 53], "size": [230, 40], "text": "Alliance Capacity", "type": "Button"},
-    "buttonBlackMarket": {"loc": [409, 117], "size": [230, 40], "text": "Black Market", "type": "Button"},
-    "buttonDailyActivities": {"loc": [740, 53], "size": [230, 40], "text": "Daily Activities", "type": "Button"},
+    "buttonAllianceCapacity": {"loc": [409, 117], "size": [230, 40], "text": "Alliance Capacity", "type": "Button"},
+    "buttonBlackMarket": {"loc": [740, 117], "size": [230, 40], "text": "Black Market", "type": "Button"},
+    "buttonDailyActivities": {"loc": [409, 53], "size": [230, 40], "text": "Daily Activities", "type": "Button"},
     "buttonInitializationApplyAll": {"loc": [935, 16], "size": [132, 43], "text": "Apply ALL", "type": "Button"},
     "buttonStart": {"loc": [449, 447], "size": [217, 51], "text": "Start", "type": "Button"},
     "groupBox2": {
-        "children": ["button10", "button7", "buttonBlackMarket", "ButtonOpenGiftBox",
-                      "ButtonJoinMonsterWar", "buttonDailyActivities", "buttonAllianceCapacity"],
+        "children": ["ButtonJoinMonsterWar", "buttonDailyActivities", "button10", "ButtonOpenGiftBox",
+                      "buttonAllianceCapacity", "buttonBlackMarket"],
         "loc": [13, 106], "size": [1062, 253], "text": "Select Activity", "type": "GroupBox",
     },
     "checkBoxBubble": {"loc": [13, 62], "size": [75, 28], "text": "Bubble", "type": "CheckBox"},
@@ -64,7 +64,6 @@ ACTIVITY_BUTTON_TARGETS = {
     "buttonDailyActivities": "Daily Activities",
     "ButtonOpenGiftBox": "Open Gift Box",
     "buttonBlackMarket": "Black Market",
-    "button7": "Battlefield Shop",
     "button10": "Event",
 }
 
@@ -109,10 +108,20 @@ class InitializationTab(DesignerTab):
     server_changed = pyqtSignal(str)   # server mới sau khi nhập xong
     settings_changed = pyqtSignal()    # bật/tắt bubble hoặc đổi loại bubble
     civilization_changed = pyqtSignal(int)   # người dùng chọn nền văn minh (1..7, 0 = tự nhận)
+    reset_info_clicked = pyqtSignal()        # nút Reset info: xoá bubble, server, nền văn minh, route của máy
 
     def __init__(self, device_id="", parent=None):
         super().__init__("tabPage1", DESIGNER_DATA, COMBO_ITEMS, PAGE_SIZE, parent=parent)
         c = self.controls
+
+        apply_all = c["buttonInitializationApplyAll"]
+        reset = QPushButton("Reset info", self.page)
+        reset.setToolTip("Xoá bubble, server, nền văn minh và route (bản đồ thành) đã lưu của máy này: "
+                         "lần chạy sau bot đọc / quét lại từ đầu.")
+        hint = reset.sizeHint()
+        reset.setGeometry(apply_all.x() - hint.width() - 6, apply_all.y() + (apply_all.height() - hint.height()) // 2,
+                          hint.width(), hint.height())
+        reset.clicked.connect(self._confirm_reset_info)
 
         c["labelID"].setStyleSheet("font-size: 16.2pt;")
         if device_id:
@@ -161,6 +170,12 @@ class InitializationTab(DesignerTab):
             c[name].setCheckable(True)
             c[name].setStyleSheet(ACTIVITY_BUTTON_STYLE)
             c[name].toggled.connect(self.settings_changed.emit)
+
+    def _confirm_reset_info(self):
+        if confirm_reset(self, "Reset info",
+                         "Xoá bubble, server, nền văn minh và route (bản đồ thành) đã lưu của máy này?\n"
+                         "Lần chạy sau bot sẽ đọc / quét lại từ đầu."):
+            self.reset_info_clicked.emit()
 
     def set_running(self, running: bool):
         """While the bot runs, Start becomes Stop (same button, same signal)."""

@@ -30,6 +30,8 @@ class DeviceView(QWidget):
     # onto every other device.
     apply_all_requested = pyqtSignal(str, dict)
     server_changed = pyqtSignal(str, str)   # (device_id, server)
+    reset_progress_requested = pyqtSignal(str, bool)   # (device_id, True = tab Event, False = Daily Activities)
+    reset_info_requested = pyqtSignal(str)   # device_id: xoá bubble, server, nền văn minh, route
     civilization_changed = pyqtSignal(str, int)   # (device_id, nền văn minh 1..7, 0 = tự nhận)
     # (device_id, {tab title: settings}) — một tab có `settings_changed` vừa được người dùng sửa.
     tab_settings_changed = pyqtSignal(str, dict)
@@ -73,6 +75,12 @@ class DeviceView(QWidget):
             lambda server: self.server_changed.emit(self.device_id, server)
         )
 
+        self.daily_activities_tab.reset_progress_clicked.connect(
+            lambda: self.reset_progress_requested.emit(self.device_id, False))
+        self.event_tab.reset_progress_clicked.connect(
+            lambda: self.reset_progress_requested.emit(self.device_id, True))
+        self.initialization_tab.reset_info_clicked.connect(
+            lambda: self.reset_info_requested.emit(self.device_id))
         self.initialization_tab.civilization_changed.connect(
             lambda civilization: self.civilization_changed.emit(self.device_id, civilization)
         )

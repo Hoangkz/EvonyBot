@@ -25,7 +25,7 @@ from PyQt5.QtWidgets import QAbstractItemView, QListWidget, QListWidgetItem, QPu
 from bot.activities.event.cycle import describe
 
 from .event import DATA
-from .tab_placeholder import DesignerTab
+from .tab_placeholder import DesignerTab, confirm_reset
 
 GROUPS = DATA["groups"]
 
@@ -92,10 +92,19 @@ DESIGNER_DATA, _CHECKBOXES, _COMBOS, _REDEEMS, PAGE_SIZE = _build(GROUPS)
 class EventTab(DesignerTab):
     # Người dùng đổi một ô (không phát khi set_settings nạp cấu hình) -> lưu DB.
     settings_changed = pyqtSignal()
+    reset_progress_clicked = pyqtSignal()   # nút Reset progress: xoá dấu "đã làm" để bot làm lại
 
     def __init__(self, parent=None):
         super().__init__("Event", DESIGNER_DATA, {}, PAGE_SIZE, parent=parent)
         c = self.controls
+        apply_all = c["buttonEventApplyALL"]
+        reset = QPushButton("Reset progress", self.page)
+        reset.setToolTip("Đặt mọi nhiệm vụ Event về chưa làm: lần chạy sau bot làm lại từ đầu "
+                         "(dùng khi game lỗi mà bot đã ghi là xong).")
+        hint = reset.sizeHint()
+        reset.setGeometry(apply_all.x() - hint.width() - 6, apply_all.y() + (apply_all.height() - hint.height()) // 2,
+                          hint.width(), hint.height())
+        reset.clicked.connect(self._confirm_reset)
         for name, spec in _CHECKBOXES.values():
             self._set_day_tip(spec, c[name])
             c[name].clicked.connect(self.settings_changed)
@@ -116,6 +125,12 @@ class EventTab(DesignerTab):
         self._lists = {}
         for panel, (y, spec) in _REDEEMS.items():
             self._lists[spec["key"]] = self._build_redeem(c[panel], y, spec)
+
+    def _confirm_reset(self):
+        if confirm_reset(self, "Reset progress",
+                         "Đặt mọi nhiệm vụ Event về chưa làm?\n"
+                         "Lần chạy sau bot sẽ làm lại từ đầu."):
+            self.reset_progress_clicked.emit()
 
     def showEvent(self, event):
         """Mở tab: danh sách quà luôn cuộn về đầu để thấy món ưu tiên nhất (thứ tự nạp / chỉ mục chọn có thể làm nó trôi xuống)."""
