@@ -224,8 +224,11 @@ class BotWorker(QThread):
                 self.guards.restart_for_reset(now_reset)
             # Mỗi vòng đọc lại trạng thái từ DB và bỏ qua nhiệm vụ đã xong hôm nay (đổi mục tiêu ở tab, sang ngày mới... thì
             # nhiệm vụ tự quay lại, không cần dựng lại danh sách).
+            # Nhiệm vụ cần route (needs_city_map) chờ tới khi máy có bản đồ thành (quét lúc rảnh, bên dưới); đã thử quét mà
+            # không được thì thôi chờ, nhiệm vụ tự xoay xở.
+            waiting = lambda t: t.needs_city_map and not self.ctx.city_map and not scan_tried
             skip = lambda t: ((t.once and t.key in ran_once) or attempts.get(t.key, 0) >= MAX_ATTEMPTS
-                              or self._is_done(t, ran))
+                              or waiting(t) or self._is_done(t, ran))
             # Việc theo giờ: chỉ cần so giờ đã lưu trong DB; tới giờ thì làm ngay, trước các việc trong danh sách.
             task = next((t for t in timed if not skip(t) and self._is_due(t)), None)
             pending = [t for t in order if not skip(t)]
@@ -234,12 +237,13 @@ class BotWorker(QThread):
                     # Không còn nhiệm vụ nào (kể cả việc theo giờ chưa tới giờ) và Join Boss vừa báo rảnh: chưa có bản đồ thành
                     # thì tìm route các công trình (city_map.scan_city: tìm Thành chính trước rồi quét từng ô, lưu DB); cứ 3 cú
                     # vuốt kiểm tra số boss, tăng thì vào Join Boss tới khi rảnh rồi vuốt tiếp. Mỗi lượt Start thử một lần.
-                    if boss and not self.ctx.city_map and not scan_tried:
+                    need_map = any(waiting(t) for t in order)
+                    if (boss or need_map) and not self.ctx.city_map and not scan_tried:
                         scan_tried = True
                         self.record("Rảnh (hết nhiệm vụ, Join Boss rảnh): tìm route các công trình")
                         self.activity_changed.emit(self.serial, JOIN_BOSS)
                         self._boss_count = None
-                        self.guards.call(None, scan_city, self.ctx, "City scan", self._watch_boss_count)
+                        self.guards.call(None, scan_city, self.ctx, "City scan", self._watch_boss_count if boss else None)
                         continue
                     self.guards.call(None, self.ctx.sleep, IDLE_WAIT)
                     continue

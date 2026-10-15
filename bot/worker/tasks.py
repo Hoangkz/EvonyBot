@@ -29,6 +29,7 @@ class Task:
     must_finish: bool = False   # bắt đầu rồi thì chạy tới xong, không bị ngắt (trừ Stop)
     tail: bool = False          # nhiệm vụ nhận thưởng cuối chuỗi: nhiệm vụ cùng nhóm bị chuyển xuống cuối thì dừng trước nó
     once: bool = False          # xong rồi thì không đưa lại vào danh sách khi sang ngày mới (chỉ chạy lại khi Start lại)
+    needs_city_map: bool = False  # cần route công trình: chưa có bản đồ thành trong DB thì worker quét trước khi chạy
     run: Callable | None = None  # run(ctx, cấu hình tab của group): làm nhiệm vụ rồi lưu kết quả vào DB
     enabled: Callable[[dict], bool] = always       # enabled(cấu hình tab của group) -> nhiệm vụ này đã được tích?
     done: Callable | None = None                   # done(ctx, cấu hình tab của group) -> hôm nay đã xong chưa? (đọc DB)
@@ -59,7 +60,7 @@ def build_task(row: dict, group: str) -> Task:
             return hours > 0 and (since is None or since >= hours)
 
     return Task(key, row.get("group", group), int(row.get("priority", DEFAULT_PRIORITY)),
-                must_finish=bool(row.get("must_finish")), once=bool(row.get("once")), tail=bool(row.get("tail")),
+                must_finish=bool(row.get("must_finish")), once=bool(row.get("once")), tail=bool(row.get("tail")), needs_city_map=bool(row.get("needs_city_map")),
                 run=job["run"], enabled=job.get("enabled", always), due=due,
                 done=job.get("done") or ((lambda ctx, settings: ctx.is_daily_done(key)) if row.get("saves") else None))
 

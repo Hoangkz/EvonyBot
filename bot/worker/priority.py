@@ -361,7 +361,8 @@ DATA ={
             "run": black_market_market,
             "label": "Black Market: mua ở Market",
             "priority": 0,
-            "once": True 
+            "once": True,
+            "needs_city_map": True,   # nhiệm vụ cần route: chỉ vào danh sách khi máy đã có bản đồ thành (worker quét lúc Join Boss rảnh)
         }
     ],
     "Battlefield Shop": [
