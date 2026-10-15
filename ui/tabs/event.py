@@ -98,7 +98,7 @@ DATA ={
         },
         {
             "key": "three_day",
-            "title": "3-Day Event (Event Center > Limited)",
+            "title": "3-Day Event",
             "checkboxes": [ ],
             "combos": [
                 { "key": "three_day_alliance", "label": "Alliance:", "values": [ 0, 10, 30, 60 ], "default": 60 },

@@ -7,7 +7,7 @@ Battlefield / Art Hall / Trap Factory đứng yên). Toạ độ bản đồ = t
 (CENTER): công trình b ở toạ độ V_b nghĩa là từ Thành chính ở giữa, vuốt tổng cộng V_b (ngón tay, px) thì b vào giữa.
 Vuốt chậm (SWIPE_TIME) thì nội dung dịch gần đúng bằng cú vuốt.
 
-- scan(bot, name): đang ở Thành chính (VD sau Go nhiệm vụ Gold Levy) -> đi vòng các ô theo city_tour.py, mỗi ô kéo
+- scan(bot, name): đang ở Thành chính (VD sau Go nhiệm vụ Gold Levy) -> đi vòng các ô theo city_tour.py của civ (civ<N>/), mỗi ô kéo
   bù công trình giữa màn vào giữa; ghi mọi công trình nhận ra được (ảnh mẫu civ / ảnh tự học của event/city_building) với toạ
   độ bản đồ; công trình đã ghi thấy lại thì dùng để chỉnh vị trí camera (không dồn sai số). Trả {công trình: [x, y]}.
 - goto(bot, name, building, city_map): tìm trên màn một công trình đã có trong bản đồ -> biết camera đang ở đâu ->
@@ -54,7 +54,7 @@ from ..activities.event.city_building import (
     _candidates,
 )
 
-from .city_tour import ANCHOR_SHIFT, DATA as TOUR, FIXED, ROUTES, SUPPORTED_CIVS
+from .tours import FIXED_NAMES, TOURS
 # Công trình nhận ra khi quét / đi (có ảnh mẫu trong Images/Event/Building/civ<N>/ hoặc ảnh tự học).
 BUILDINGS = (KEEP, MARKET, HOSPITAL, FORGE, BARRACKS, STABLES, ARCHER_CAMP, WORKSHOP, TRAP_FACTORY, ACADEMY, SHRINE,
              ART_HALL, BATTLEFIELD, PASTURE, WALLS, EMBASSY, PRISON, TAVERN, RESEARCH_FACTORY, HOLY_PALACE, ICE_LAND,
@@ -182,11 +182,11 @@ def _offset(pos):
     return pos[0] - CENTER[0], pos[1] - CENTER[1]
 
 
-def centre(bot, building: str, pos):
-    """Kéo bù `building` (đang ở `pos`) vào giữa màn (công trình trong ANCHOR_SHIFT: tới tâm riêng của nó). Trả (vị trí mới,
-    cú vuốt tổng đã dùng)."""
+def centre(bot, building: str, pos, anchor_shift=None):
+    """Kéo bù `building` (đang ở `pos`) vào giữa màn (công trình trong `anchor_shift` = ANCHOR_SHIFT của civ: tới tâm riêng của
+    nó). Trả (vị trí mới, cú vuốt tổng đã dùng)."""
     used = [0, 0]
-    shift = ANCHOR_SHIFT.get(building, (0, 0))
+    shift = (anchor_shift or {}).get(building, (0, 0))
     for _ in range(CENTER_TRIES):
         dx, dy = _offset(pos)
         dx, dy = dx - shift[0], dy - shift[1]
@@ -203,8 +203,8 @@ def centre(bot, building: str, pos):
     return pos, tuple(used)
 
 
-def scan(bot, name: str) -> dict:
-    """Đang ở Thành chính (giữa màn): đi vòng các ô (city_tour.py), ghi toạ độ bản đồ mọi công trình nhận ra được.
+def scan(bot, name: str, tour) -> dict:
+    """Đang ở Thành chính (giữa màn): đi vòng các ô của `tour` (city_tour.py của civ), ghi toạ độ bản đồ mọi công trình nhận ra được.
     Trả {công trình: [x, y]} ({} nếu không thấy Thành chính lúc bắt đầu)."""
     screen = city_screen(bot)
     score, keep = locate(bot, screen, KEEP)
@@ -213,7 +213,7 @@ def scan(bot, name: str) -> dict:
         return {}
     city_map = {KEEP: [0, 0]}
     cam = list(_offset(keep))      # toạ độ bản đồ của giữa màn hiện tại
-    for plot in TOUR:
+    for plot in tour.DATA:
         for start, end in plot["swipes"]:
             swipe_from_to(bot, start, end)
             cam[0] += end[0] - start[0]
@@ -230,10 +230,10 @@ def scan(bot, name: str) -> dict:
                 if abs(_offset(p)[0]) <= PLOT_RADIUS[0] and abs(_offset(p)[1]) <= PLOT_RADIUS[1]}
         middle = min(near.items(), key=lambda kv: abs(_offset(kv[1])[0]) + abs(_offset(kv[1])[1]), default=None)
         if middle is not None:      # công trình của ô (gần giữa màn) -> kéo bù, không kéo về công trình ô khác
-            _, (ux, uy) = centre(bot, middle[0], middle[1])
+            _, (ux, uy) = centre(bot, middle[0], middle[1], tour.ANCHOR_SHIFT)
             cam[0] += ux
             cam[1] += uy
-    for building, view in FIXED.items():      # công trình cố định: không quét, thêm sẵn toạ độ đã đo
+    for building, view in tour.FIXED.items():      # công trình cố định: không quét, thêm sẵn toạ độ đã đo
         city_map.setdefault(building, list(view))
     bot.record(f"{name}: city scanned, {len(city_map)} buildings: {', '.join(sorted(city_map))}")
     return city_map
@@ -255,11 +255,14 @@ def goto(bot, name: str, building: str, city_map: dict):
     if building not in city_map:
         return None
     target = city_map[building]
+    shifts = None
     for _ in range(GOTO_TRIES):
         screen = city_screen(bot)
+        if shifts is None:
+            shifts = getattr(tour_of(bot, screen), "ANCHOR_SHIFT", {})
         score, pos = locate(bot, screen, building)
         if pos is not None and score >= BUILDING_THRESHOLD:
-            return centre(bot, building, pos)[0]
+            return centre(bot, building, pos, shifts)[0]
         found = visible(bot, screen, [b for b in city_map if b != building])
         if not found:
             bot.log(f"{name}: no known building on screen")
@@ -297,46 +300,56 @@ def civ_of(bot, screen) -> int | None:
     if civ:
         return civ
     best_score, best_civ = BUILDING_THRESHOLD, None
-    for owner, image in _candidates(bot, (KEEP, *FIXED)):
+    for owner, image in _candidates(bot, (KEEP, *FIXED_NAMES)):
         score, pos = bot.best_match(image, screen=screen)
         if owner and pos is not None and score >= best_score:
             best_score, best_civ = score, owner
     return best_civ
 
 
-def find_keep(bot, name: str) -> bool:
+def tour_of(bot, screen):
+    """Dữ liệu route (module civ<N>/city_tour.py) của thành đang hiện: theo civ_of; chưa biết civ thì dùng civ1; civ chưa đo đủ -> None."""
+    civ = civ_of(bot, screen)
+    return TOURS.get(civ if civ is not None else 1)
+
+
+def find_keep(bot, name: str):
     """Đưa Thành chính vào giữa màn (bước đầu của quét route: các ô sau đều đi từ Thành chính). Mọi nhiệm vụ đã xong nên không
     còn nút Go để nhờ game kéo Thành chính vào giữa, phải tự tìm:
     1. Thấy Thành chính -> kéo bù vào giữa.
     2. Thấy một công trình cố định (FIXED: Tường thành / Research Factory / Tavern) -> kéo nó vào giữa màn rồi vuốt đúng
        đường cố định về Thành chính (ROUTES, đo sẵn) -> kéo bù Thành chính vào giữa.
     3. Không thấy mốc nào -> dò vòng xoáy (spiral_swipes, mỗi cú xong kiểm tra lại), thấy một mốc là dừng và về Thành chính ngay.
-    Trả False nếu dò hết mà không thấy, hoặc đi xong mà không thấy Thành chính."""
+    Trả dữ liệu route của civ (module civ<N>/city_tour.py) khi Thành chính đã ở giữa màn; None nếu dò hết mà không thấy, civ chưa có
+    route, hoặc đi xong mà không thấy Thành chính."""
     for move in [None, *spiral_swipes()]:
         if move is not None:
             swipe(bot, move)
         screen = city_screen(bot)
-        found = visible(bot, screen, [KEEP, *FIXED])
+        found = visible(bot, screen, [KEEP, *FIXED_NAMES])
         if not found:
             continue
         civ = civ_of(bot, screen)
-        if civ is not None and civ not in SUPPORTED_CIVS:
-            bot.record(f"{name}: civ {civ} has no route data yet (only civ {', '.join(map(str, SUPPORTED_CIVS))}), skip city scan")
-            return False
+        tour = TOURS.get(civ if civ is not None else 1)
+        if tour is None:
+            bot.record(f"{name}: civ {civ} has no route data yet (only civ {', '.join(map(str, TOURS))}), skip city scan")
+            return None
         if KEEP in found:
-            return centre(bot, KEEP, found[KEEP])[0] is not None
-        anchor = next(b for b in FIXED if b in found)
-        pos, _ = centre(bot, anchor, found[anchor])
-        bot.log(f"{name}: {anchor} found, fixed route to the Keep: {len(ROUTES[(anchor, KEEP)])} swipe(s)")
-        for finger in ROUTES[(anchor, KEEP)]:
+            return tour if centre(bot, KEEP, found[KEEP], tour.ANCHOR_SHIFT)[0] is not None else None
+        anchor = next((b for b in tour.FIXED if b in found), None)
+        if anchor is None:
+            continue      # mốc thấy được không thuộc civ này (nhận nhầm): dò tiếp
+        pos, _ = centre(bot, anchor, found[anchor], tour.ANCHOR_SHIFT)
+        bot.log(f"{name}: {anchor} found, fixed route to the Keep: {len(tour.ROUTES[(anchor, KEEP)])} swipe(s)")
+        for finger in tour.ROUTES[(anchor, KEEP)]:
             swipe(bot, finger)
         score, keep = locate(bot, city_screen(bot), KEEP)
         if keep is None or score < BUILDING_THRESHOLD:
             bot.log(f"{name}: Keep not recognised after the fixed route, keep searching")
             continue
-        centre(bot, KEEP, keep)
-        return True
-    return False
+        centre(bot, KEEP, keep, tour.ANCHOR_SHIFT)
+        return tour
+    return None
 
 
 def ensure_city(bot, name: str):
@@ -356,7 +369,7 @@ def scan_city(bot, name: str, watch=None) -> bool:
     0. ensure_city: đang ở bản đồ thế giới thì bấm nút về thành.
     1. find_keep: tìm Thành chính (thấy Thành chính / một công trình cố định thì đi thẳng tới Thành chính; không thấy gì thì dò
        vòng xoáy quanh chỗ đứng).
-    2. scan: đi từng ô route (city_tour.py), ghi toạ độ công trình nhận ra.
+    2. scan: đi từng ô route (city_tour.py của civ), ghi toạ độ công trình nhận ra.
     3. lưu bản đồ vào DB.
     `watch(bot)`: gọi lúc bắt đầu và cứ BOSS_CHECK_EVERY cú vuốt (kiểm tra boss mới, worker làm: số boss tăng thì vào Join Boss
     tới khi rảnh rồi mới vuốt tiếp). Trả True khi đã quét và lưu; False khi chưa quét được (không tìm được Thành chính...)."""
@@ -373,10 +386,11 @@ def scan_city(bot, name: str, watch=None) -> bool:
             return False
         if watch is not None:
             watch(bot)      # ghi số boss ban đầu
-        if not find_keep(bot, name):
-            bot.record(f"{name}: scan city: cannot find the Keep (no Keep / fixed building found), skip")
+        tour = find_keep(bot, name)
+        if tour is None:
+            bot.record(f"{name}: scan city: cannot find the Keep (no Keep / fixed building found, or civ has no route data), skip")
             return False
-        found = scan(bot, name)
+        found = scan(bot, name, tour)
         if not found:
             return False
         bot.set_city_map(found)

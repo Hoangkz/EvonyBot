@@ -1,7 +1,7 @@
 """
 Unit test bot/city/city_map.py bằng thành giả: các công trình ở toạ độ bản đồ cố định, camera dịch đúng bằng cú vuốt;
 locate trả vị trí công trình trên màn theo camera. Kiểm: chia cú thẳng hàng (split), quét thành ghi đúng toạ độ (scan),
-đi tới công trình từ một công trình đã biết (goto), toạ độ ô trong bot/city/city_tour.py.
+đi tới công trình từ một công trình đã biết (goto), toạ độ ô trong bot/city/civ1/city_tour.py.
 """
 import unittest
 from unittest import mock
@@ -11,9 +11,11 @@ import numpy as np
 import sys
 
 import bot.city.city_map  # noqa: F401
+from bot.city import tours
 
 city_map = sys.modules["bot.city.city_map"]   # package city có module city_map; lấy qua sys.modules cho đồng bộ với các test khác
 
+civ1 = tours.civ1      # bảng route civ1 (bot/city/civ1/city_tour.py)
 W, H = 396, 704
 
 
@@ -84,18 +86,18 @@ class CityMapTest(unittest.TestCase):
         self.assertEqual(city.swipes, [])
 
     def test_scan_records_every_plot(self):
-        """Thành giả có công trình đúng ở toạ độ các ô của bot/city/city_tour.py: quét từ Thành chính ghi đủ, đúng toạ độ."""
+        """Thành giả có công trình đúng ở toạ độ các ô của bot/city/civ1/city_tour.py: quét từ Thành chính ghi đủ, đúng toạ độ."""
         names = ["academy", "trap_factory", "barracks", "archer_camp", "workshop", "stables", "hospital", "market",
                  "war_hall", "embassy", "tavern", "prison", "forge"]
         world = {"keep": (0, 0)}
-        for name, plot in zip(names, city_map.TOUR):
+        for name, plot in zip(names, civ1.DATA):
             world[name] = tuple(plot["view"])
         city = FakeCity(world)
         bot = self._patch(city)
         with mock.patch.object(city_map, "BUILDINGS", tuple(world)):
-            found = city_map.scan(bot, "BM")
-        self.assertEqual(set(found), set(world) | set(city_map.FIXED))
-        for name, view in city_map.FIXED.items():
+            found = city_map.scan(bot, "BM", civ1)
+        self.assertEqual(set(found), set(world) | set(civ1.FIXED))
+        for name, view in civ1.FIXED.items():
             if name not in names:    # công trình cố định không có ô riêng: toạ độ có sẵn; tavern thì là một ô, lấy toạ độ quét
                 self.assertEqual(found[name], view)
         for name, view in world.items():
@@ -105,10 +107,10 @@ class CityMapTest(unittest.TestCase):
         """Rảnh, chưa có bản đồ: camera đứng ở Tường thành (không thấy Thành chính) -> về Thành chính, quét 13 ô, lưu bản đồ."""
         names = ["academy", "trap_factory", "barracks", "archer_camp", "workshop", "stables", "hospital", "market",
                  "war_hall", "embassy", "tavern", "prison", "forge"]
-        world = {"keep": (0, 0), **{b: tuple(v) for b, v in city_map.FIXED.items()}}
-        for name, plot in zip(names, city_map.TOUR):
+        world = {"keep": (0, 0), **{b: tuple(v) for b, v in civ1.FIXED.items()}}
+        for name, plot in zip(names, civ1.DATA):
             world[name] = tuple(plot["view"])
-        city = FakeCity(world, cam=tuple(city_map.FIXED["walls"]))
+        city = FakeCity(world, cam=tuple(civ1.FIXED["walls"]))
         bot = self._patch(city)
         bot.find.return_value = (1, 1)           # đang ở màn thành (nút •••)
         bot.city_map = {}
@@ -121,31 +123,31 @@ class CityMapTest(unittest.TestCase):
 
     def test_find_keep_sweeps_when_no_anchor_on_screen(self):
         """Không thấy Thành chính / Tường thành / Research Factory trên màn: dò (vuốt xoắn ốc) tới khi thấy rồi kéo Thành chính vào giữa."""
-        world = {"keep": (0, 0), **{b: tuple(v) for b, v in city_map.FIXED.items()}}
+        world = {"keep": (0, 0), **{b: tuple(v) for b, v in civ1.FIXED.items()}}
         city = FakeCity(world, cam=(-520, 0))     # Thành chính lệch ra ngoài mép trái màn
         bot = self._patch(city)
-        self.assertTrue(city_map.find_keep(bot, "BM"))
+        self.assertIs(city_map.find_keep(bot, "BM"), civ1)
         self.assertLessEqual(abs(city.cam[0]), city_map.TOLERANCE)
         self.assertLessEqual(abs(city.cam[1]), city_map.TOLERANCE)
 
     def test_find_keep_from_a_fixed_building_uses_the_fixed_route(self):
         """Thấy Tavern / Research Factory / Walls trên màn: vuốt đúng đường cố định (ROUTES) về Thành chính, không dò."""
-        for anchor in city_map.FIXED:
-            world = {"keep": (0, 0), **{b: tuple(v) for b, v in city_map.FIXED.items()}}
-            city = FakeCity(world, cam=tuple(city_map.FIXED[anchor]))
+        for anchor in civ1.FIXED:
+            world = {"keep": (0, 0), **{b: tuple(v) for b, v in civ1.FIXED.items()}}
+            city = FakeCity(world, cam=tuple(civ1.FIXED[anchor]))
             bot = self._patch(city)
             self.assertTrue(city_map.find_keep(bot, "BM"), anchor)
             self.assertLessEqual(abs(city.cam[0]), city_map.TOLERANCE, anchor)
             self.assertLessEqual(abs(city.cam[1]), city_map.TOLERANCE, anchor)
-            self.assertEqual(sum(1 for s in city.swipes if s in city_map.ROUTES[(anchor, "keep")]),
-                             len(city_map.ROUTES[(anchor, "keep")]), anchor)
+            self.assertEqual(sum(1 for s in city.swipes if s in civ1.ROUTES[(anchor, "keep")]),
+                             len(civ1.ROUTES[(anchor, "keep")]), anchor)
 
     def test_routes_match_fixed_positions(self):
         """Tổng cú vuốt của mỗi đường cố định khớp hiệu toạ độ hai công trình (lệch tối đa 20 px mỗi trục)."""
-        pos = {"keep": (0, 0), **{b: tuple(v) for b, v in city_map.FIXED.items()}}
-        for (src, dst), moves in city_map.ROUTES.items():
+        pos = {"keep": (0, 0), **{b: tuple(v) for b, v in civ1.FIXED.items()}}
+        for (src, dst), moves in civ1.ROUTES.items():
             total = (sum(m[0] for m in moves), sum(m[1] for m in moves))
-            shift = lambda b: city_map.ANCHOR_SHIFT.get(b, (0, 0))
+            shift = lambda b: civ1.ANCHOR_SHIFT.get(b, (0, 0))
             want = (pos[dst][0] - pos[src][0] + shift(dst)[0] - shift(src)[0],
                     pos[dst][1] - pos[src][1] + shift(dst)[1] - shift(src)[1])
             self.assertLessEqual(abs(total[0] - want[0]), 20, (src, dst))
@@ -153,7 +155,7 @@ class CityMapTest(unittest.TestCase):
 
     def test_find_keep_from_anywhere_in_the_city(self):
         """Mọi chỗ đứng trong thành (lưới 200 px): vòng xoáy thấy một mốc và đưa Thành chính vào giữa màn."""
-        world = {"keep": (0, 0), **{b: tuple(v) for b, v in city_map.FIXED.items()}}
+        world = {"keep": (0, 0), **{b: tuple(v) for b, v in civ1.FIXED.items()}}
         for x in range(-450, 1251, 200):
             for y in range(-900, 251, 200):
                 city = FakeCity(world, cam=(x, y))
@@ -167,17 +169,17 @@ class CityMapTest(unittest.TestCase):
         world = {"keep": (0, 0)}
         city = FakeCity(world, cam=(-5000, 5000))
         bot = self._patch(city)
-        self.assertFalse(city_map.find_keep(bot, "BM"))
+        self.assertIsNone(city_map.find_keep(bot, "BM"))
         self.assertEqual(len(city.swipes), len(city_map.spiral_swipes()))
 
     def test_scan_city_checks_bosses_every_three_swipes(self):
         """scan_city gọi watch lúc bắt đầu rồi cứ BOSS_CHECK_EVERY cú vuốt một lần (cả lúc tìm Thành chính lẫn lúc quét ô)."""
         names = ["academy", "trap_factory", "barracks", "archer_camp", "workshop", "stables", "hospital", "market",
                  "war_hall", "embassy", "tavern", "prison", "forge"]
-        world = {"keep": (0, 0), **{b: tuple(v) for b, v in city_map.FIXED.items()}}
-        for name, plot in zip(names, city_map.TOUR):
+        world = {"keep": (0, 0), **{b: tuple(v) for b, v in civ1.FIXED.items()}}
+        for name, plot in zip(names, civ1.DATA):
             world[name] = tuple(plot["view"])
-        city = FakeCity(world, cam=tuple(city_map.FIXED["walls"]))
+        city = FakeCity(world, cam=tuple(civ1.FIXED["walls"]))
         bot = self._patch(city)
         bot.find.return_value = (1, 1)
         bot.city_map = {}
@@ -215,21 +217,25 @@ class CityMapTest(unittest.TestCase):
         self.assertEqual(len(set(starts)), 3)
 
     def test_find_keep_skips_a_civilization_without_route_data(self):
-        """Thấy công trình của civ 7 (chưa có bảng route) -> không vuốt theo bảng civ1, trả False."""
-        world = {"keep": (0, 0), **{b: tuple(v) for b, v in city_map.FIXED.items()}}
-        city = FakeCity(world, cam=tuple(city_map.FIXED["walls"]))
+        """Thấy công trình của civ 6 (chưa đo đủ route) -> không vuốt theo bảng civ1, trả None."""
+        world = {"keep": (0, 0), **{b: tuple(v) for b, v in civ1.FIXED.items()}}
+        city = FakeCity(world, cam=tuple(civ1.FIXED["walls"]))
         bot = self._patch(city)
-        bot.civilization = 7
-        self.assertFalse(city_map.find_keep(bot, "BM"))
+        bot.civilization = 6
+        self.assertIsNone(city_map.find_keep(bot, "BM"))
         self.assertEqual(city.swipes, [])
         bot.record.assert_called()
 
     def test_tour_swipes_safe(self):
-        """Mỗi cú trong bot/city/city_tour.py có điểm đầu / cuối trong màn 396x704."""
-        for plot in city_map.TOUR:
-            for start, end in plot["swipes"]:
-                for x, y in (start, end):
-                    self.assertTrue(0 <= x < W and 0 <= y < H, plot["plot"])
+        """Mỗi cú trong city_tour.py của mọi civ có điểm đầu / cuối trong màn 396x704."""
+        for civ, tour in tours.ALL.items():
+            for plot in tour.DATA:
+                for start, end in plot["swipes"]:
+                    for x, y in (start, end):
+                        self.assertTrue(0 <= x < W and 0 <= y < H, (civ, plot["plot"]))
+
+    def test_only_complete_civs_are_enabled(self):
+        self.assertEqual(set(tours.TOURS), {1, 2, 3, 4, 5, 7})      # civ6 chưa có route (COMPLETE = False)
 
 
 if __name__ == "__main__":

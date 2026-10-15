@@ -29,11 +29,11 @@ research_factory KHÔNG quét, không có ô trong DATA: toạ độ bản đồ
   Tavern - Keep = -(91 - 188, 469 - 238). (Không dùng view ô 11 [143, -166]: đó là tâm camera của ô, lệch ~80 px.) Tavern vẫn
   là một ô của DATA (scan đi qua và ghi toạ độ quét được); FIXED chỉ để find_keep dùng làm mốc tìm Thành chính.
 
-CIVILIZATION: bố cục thành khác nhau theo nền văn minh nên FIXED / ANCHOR_SHIFT / ROUTES / DATA dưới đây chỉ đúng nền văn minh trong
-SUPPORTED_CIVS (đo trên civ1: máy 21913 / 21923 / 21943). Máy civ khác không quét route (scan_city ghi log rồi bỏ) cho tới khi có số
-đo riêng; thêm civ mới vào SUPPORTED_CIVS chỉ khi đã có đủ bảng của civ đó.
+CIVILIZATION: bố cục thành khác nhau theo nền văn minh nên mỗi civ có thư mục riêng (bot/city/civ<N>/city_tour.py) với FIXED /
+ANCHOR_SHIFT / ROUTES / DATA riêng; file này là civ1 (đo trên máy 21913 / 21923 / 21943). bot/city/tours.py gom các civ đã đo đủ
+(COMPLETE = True); civ chưa đo đủ thì scan_city ghi log rồi bỏ.
 """
-SUPPORTED_CIVS = (1,)
+COMPLETE = True
 FIXED = {'walls': [969, -612], 'research_factory': [955, 49], 'tavern': [97, -231], 'archer_tower': [1777, -1044], 'watchtower': [1840, -158], 'art_hall': [1190, -64], 'pasture': [1367, -108], 'rally_spot': [-415, -550]}
 # Công trình có tâm ảnh mẫu lệch khỏi tâm nhìn thấy: kéo "vào giữa" nghĩa là ảnh mẫu ở giữa màn + độ lệch này (Tường thành: cổng ở
 # giữa màn khi ảnh mẫu nằm lệch phải 49 px). Các đường trong ROUTES bắt đầu / kết thúc ở tâm này.

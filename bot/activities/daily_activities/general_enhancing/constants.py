@@ -28,7 +28,12 @@ AFTER_OPEN_TAP = (30, 50)   # sau Go: bấm chỗ này (% màn hình)
 # - nút "Cancel" (108, 669) sau khi cultivate: 1,00; Cancel của popup khác cũng 0,96 .. 1,00 -> chỉ tìm ở góc dưới
 #   trái (CANCEL_REGION) và chỉ sau khi vừa bấm Gold Cultivate.
 # - tim lọc chưa tích của giao diện cũ chỉ khớp ảnh Event 0,86 -> ngưỡng FAVORITE_OFF_THRESHOLD.
-GOLD_CULTIVATE = f"{FOLDER_PATH}/GoldCultivate.png"
+# Giao diện mới (máy 21913, 396x704): màn Cultivate ở tab "Cultivate Once" có hai nút đáy "Gems Cultivate" / "Gold Cultivate"
+# (6000 vàng); bấm Gold Cultivate -> hiện kết quả với nút Cancel / Confirm. Chữ "Gold Cultivate" (tâm (297, 641)):
+# 1,00 trên màn Cultivate Once; tab Quick Cultivate 0,66. (GoldCultivate.png là ảnh giao diện cũ, không dùng nữa.)
+GOLD_CULTIVATE = f"{FOLDER_PATH}/GoldCultivateNew.png"
+GOLD_REGION = (45, 85, 100, 100)        # % màn hình: nút Gold Cultivate nằm góc dưới phải
+GOLD_GOAL = 5                           # số lần Gold Cultivate (nhiệm vụ "Cultivate Generals for 5 time(s)")
 CULTIVATE_CANCEL = f"{FOLDER_PATH}/CultivateCancel.png"
 CANCEL_REGION = (0, 88, 50, 100)        # % màn hình
 FAVORITE_OFF_THRESHOLD = 0.8

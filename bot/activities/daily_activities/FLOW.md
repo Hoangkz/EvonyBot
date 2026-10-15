@@ -171,7 +171,7 @@ Mỗi nhiệm vụ có file `FLOW.md` riêng trong thư mục của nó (thứ t
 
 1. Mở Features → Items → Special.
 2. Tìm offer búa (`bua.png`).
-3. Bấm bên trái nút Plus để chọn số lượng tối đa.
+3. Bấm nút Plus `HAMMER_MAX_TAPS` = 10 lần để lên số lượng tối đa (bấm vùng bên trái Plus không đáng tin, chỉ mua được 1 búa).
 4. Xác nhận mua.
 5. Nếu kiểm tra Special quá năm lần mà không thấy búa, trả `False`.
 

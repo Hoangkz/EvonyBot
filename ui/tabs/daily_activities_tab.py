@@ -4,9 +4,9 @@ Only tasks backed by an implementation in ``bot.activities.daily_activities``
 are selectable. The remaining legacy entries stay visible at the bottom, but
 cannot accidentally enable work that the bot cannot perform.
 """
-from PyQt5.QtCore import QSignalBlocker
+from PyQt5.QtCore import QSignalBlocker, pyqtSignal
 from PyQt5.QtWidgets import (QCheckBox, QComboBox, QGridLayout, QGroupBox, QHBoxLayout, QLabel,
-                             QWidget)
+                             QPushButton, QWidget)
 
 from bot.activities.daily_activities import alliance_donation, alliance_help
 from bot.activities.event_center.crazy_eggs import constants as eggs
@@ -24,7 +24,7 @@ from bot.activities.daily_activities.resource_tax.constants import (
     TAX_RESOURCES,
 )
 
-from .tab_placeholder import BaseTab
+from .tab_placeholder import BaseTab, confirm_reset
 
 
 # The key stays compatible with the database and automation Task label; display
@@ -32,8 +32,6 @@ from .tab_placeholder import BaseTab
 SUPPORTED_TASKS = (
     ("Offering", "Offering"),   # ô chọn số lần (không phải checkbox) -> đặt đầu; thứ tự chạy ở run.py TASKS
     ("Monster Killing", "Monster Killing"),
-    ("Resource Collecting", "Resource Collecting"),
-    ("Resource Gathering", "Resource Gathering"),
     ("Resource Tax", "Resource Tax"),
     ("Gold Levy", "Gold Levy"),
     ("Troop Training", "Troop Training"),
@@ -49,17 +47,7 @@ SUPPORTED_TASKS = (
     ("Research", "Research"),
     ("Trade Carriage", "Trade Carriage"),
     ("Greet Champion", "Greet Champion"),
-)
-
-UNSUPPORTED_TASKS = (
-    ("Construction", "Construction"),
-    ("PvP Battle", "PvP Battle"),
-    ("Troop Killing", "Troop Killing"),
-    ("Boss Monster Kill", "Boss Monster Kill"),
-    ("Relic Exploration", "Relic Exploration"),
-    ("Labor", "Labor"),
-    ("Valueble Event", "Valuable Event"),
-    ("Buy x10 Stamina", "Buy x10 Stamina (legacy)"),
+    ("Alliance VIP", "Alliance VIP"),   # mặc định tích
 )
 
 GENERAL_KEY = "General"
@@ -78,11 +66,17 @@ OFFERING_KEY = "Offering"
 
 
 class DailyActivitiesTab(BaseTab):
+    reset_progress_clicked = pyqtSignal()   # nút Reset progress: xoá dấu "đã làm" để bot làm lại
+
     def __init__(self, parent=None):
         super().__init__(title="Daily Activities", show_apply_all=True, parent=parent)
+        reset = QPushButton("Reset progress")
+        reset.setToolTip("Đặt mọi nhiệm vụ Daily Activities về chưa làm: lần chạy sau bot làm lại từ đầu "
+                         "(dùng khi game lỗi mà bot đã ghi là xong).")
+        reset.clicked.connect(self._confirm_reset)
+        self.apply_all_row.insertWidget(1, reset)
 
         self.task_boxes: dict[str, QCheckBox] = {}
-        self.unsupported_boxes: dict[str, QCheckBox] = {}
         self.hourly_combos: dict[str, QComboBox] = {}
 
         general = QGroupBox("General")
@@ -141,7 +135,7 @@ class DailyActivitiesTab(BaseTab):
                 continue
             box = QCheckBox(label)
             # Preserve the old form's default while keeping the stored key compatible.
-            box.setChecked(key == "Troop Heading")
+            box.setChecked(key in ("Troop Heading", "Alliance VIP"))
             self.task_boxes[key] = box
             selection_grid.addWidget(box, index // 4, index % 4)
         # City Tax: số lần thu mỗi loại + ô Free (chỉ một loại được tích).
@@ -168,18 +162,6 @@ class DailyActivitiesTab(BaseTab):
             selection_grid.setColumnStretch(column, 1)
         self.add_row(selection)
 
-        unavailable = QGroupBox("Unavailable Daily — not implemented yet")
-        unavailable_grid = QGridLayout(unavailable)
-        for index, (key, label) in enumerate(UNSUPPORTED_TASKS):
-            box = QCheckBox(label)
-            box.setEnabled(False)
-            box.setToolTip("This daily activity does not have automation logic yet.")
-            self.unsupported_boxes[key] = box
-            unavailable_grid.addWidget(box, index // 4, index % 4)
-        for column in range(4):
-            unavailable_grid.setColumnStretch(column, 1)
-        self.add_row(unavailable)
-
         self.buy_hammers.clicked.connect(self.settings_changed)
         self.stamina_quantity.activated.connect(self.settings_changed)
         self.crazy_eggs.activated.connect(self.settings_changed)
@@ -191,6 +173,12 @@ class DailyActivitiesTab(BaseTab):
         for box in self.task_boxes.values():
             box.clicked.connect(self.settings_changed)
 
+    def _confirm_reset(self):
+        if confirm_reset(self, "Reset progress",
+                         "Đặt mọi nhiệm vụ Daily Activities về chưa làm?\n"
+                         "Lần chạy sau bot sẽ làm lại từ đầu."):
+            self.reset_progress_clicked.emit()
+
     def _on_tax_free(self, name: str, checked: bool):
         """Ô Free chỉ được tích ở một loại: tích loại này thì bỏ tích các loại khác."""
         if checked:
@@ -201,8 +189,6 @@ class DailyActivitiesTab(BaseTab):
 
     def get_settings(self) -> dict:
         settings = {key: box.isChecked() for key, box in self.task_boxes.items()}
-        # Clear legacy unsupported selections instead of sending them to the runner.
-        settings.update({key: False for key in self.unsupported_boxes})
         offer = int(self.offer_gems.currentText())
         settings[OFFERING_KEY] = offer > 0
         settings[OFFER_GEMS_KEY] = offer
@@ -228,8 +214,6 @@ class DailyActivitiesTab(BaseTab):
         try:
             for key, box in self.task_boxes.items():
                 value = data.get(key)
-                if key == "Resource Gathering" and key not in data:
-                    value = data.get("Resource Garthering")
                 if value is not None:
                     box.setChecked(bool(value))
 

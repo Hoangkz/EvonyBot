@@ -106,6 +106,12 @@ QGroupBox::title {{
     color: {COLORS['text_primary']};
 }}
 
+/* ---- Nền trang của mọi tab: một chỗ chung. Gắn property tabPage=true lên widget trang; bộ chọn property chỉ
+   trúng chính widget đó, không lan xuống nút / ô con (khác "background: white" đặt thẳng lên trang). ---- */
+QWidget[tabPage="true"] {{
+    background: white;
+}}
+
 /* ---- Buttons ---- */
 QPushButton {{
     background: {COLORS['bg_panel']};

@@ -13,7 +13,7 @@ Thứ tự ưu tiên: Bubble > Auto Times Out > Join Boss > nhiệm vụ.
 - Auto Times Out (số phút chọn ở màn Home, chung mọi thiết bị): lo ngay sau bubble; chạy đủ số phút kể từ
   lần đóng game trước thì ngắt mọi thứ đang chạy (RestartDue) và đóng game; nhiệm vụ đang dở làm lại.
 - Có chọn Join Boss: mỗi vòng chạy Join Boss (rảnh thì nhường), rồi 1 nhiệm vụ tối đa OTHERS_WINDOW
-  giây; xong nhiệm vụ là quay lại Join Boss ngay. Hết giờ / có boss mới -> nhiệm vụ đang dở chưa xong nên xuống cuối danh sách.
+  giây; xong nhiệm vụ là quay lại Join Boss ngay. Hết giờ / có boss mới -> nhiệm vụ đang dở giữ nguyên vị trí, sau Join Boss làm tiếp.
   Join Boss dừng hẳn (không phải rảnh) -> vẫn chạy tiếp các nhiệm vụ.
 - Nhiệm vụ must_finish (priority.py): đã bắt đầu thì chạy tới xong; Bubble / Auto Times Out / boss mới /
   120 giây không ngắt (chỉ Stop). Xong rồi mới tới Bubble, Auto Times Out và Join Boss.
@@ -48,7 +48,7 @@ from ..context import BotContext, BotInterrupted, TimedOut
 from ..context.errors import BossAvailable, StopRequested, YieldToBoss
 from .guards import Guards
 from .server_clock import ServerClock
-from .tasks import build_tasks
+from .tasks import build_tasks, sink
 from .status import STATUS_ERROR, STATUS_RUNNING, STATUS_STOPPED
 
 JOIN_BOSS = "Join Monster War"
@@ -154,6 +154,7 @@ class BotWorker(QThread):
             self.ctx.mark_daily_done = self._mark_daily_done
             self.ctx.done_at = self.daily_done.get
             self.ctx.daily_keys = lambda: list(self.daily_done)
+            self.ctx.server_time = lambda: self.server_time
             self.ctx.record = self.record
             # Nền văn minh đã lưu DB (None = chưa biết); bot tự xếp thì lưu lại qua signal.
             self.ctx.civilization = self.settings.get("Initialization", {}).get("civilization") or None
@@ -223,8 +224,11 @@ class BotWorker(QThread):
                 self.guards.restart_for_reset(now_reset)
             # Mỗi vòng đọc lại trạng thái từ DB và bỏ qua nhiệm vụ đã xong hôm nay (đổi mục tiêu ở tab, sang ngày mới... thì
             # nhiệm vụ tự quay lại, không cần dựng lại danh sách).
+            # Nhiệm vụ cần route (needs_city_map) chờ tới khi máy có bản đồ thành (quét lúc rảnh, bên dưới); đã thử quét mà
+            # không được thì thôi chờ, nhiệm vụ tự xoay xở.
+            waiting = lambda t: t.needs_city_map and not self.ctx.city_map and not scan_tried
             skip = lambda t: ((t.once and t.key in ran_once) or attempts.get(t.key, 0) >= MAX_ATTEMPTS
-                              or self._is_done(t, ran))
+                              or waiting(t) or self._is_done(t, ran))
             # Việc theo giờ: chỉ cần so giờ đã lưu trong DB; tới giờ thì làm ngay, trước các việc trong danh sách.
             task = next((t for t in timed if not skip(t) and self._is_due(t)), None)
             pending = [t for t in order if not skip(t)]
@@ -233,12 +237,13 @@ class BotWorker(QThread):
                     # Không còn nhiệm vụ nào (kể cả việc theo giờ chưa tới giờ) và Join Boss vừa báo rảnh: chưa có bản đồ thành
                     # thì tìm route các công trình (city_map.scan_city: tìm Thành chính trước rồi quét từng ô, lưu DB); cứ 3 cú
                     # vuốt kiểm tra số boss, tăng thì vào Join Boss tới khi rảnh rồi vuốt tiếp. Mỗi lượt Start thử một lần.
-                    if boss and not self.ctx.city_map and not scan_tried:
+                    need_map = any(waiting(t) for t in order)
+                    if (boss or need_map) and not self.ctx.city_map and not scan_tried:
                         scan_tried = True
                         self.record("Rảnh (hết nhiệm vụ, Join Boss rảnh): tìm route các công trình")
                         self.activity_changed.emit(self.serial, JOIN_BOSS)
                         self._boss_count = None
-                        self.guards.call(None, scan_city, self.ctx, "City scan", self._watch_boss_count)
+                        self.guards.call(None, scan_city, self.ctx, "City scan", self._watch_boss_count if boss else None)
                         continue
                     self.guards.call(None, self.ctx.sleep, IDLE_WAIT)
                     continue
@@ -256,9 +261,10 @@ class BotWorker(QThread):
                 if attempts[task.key] >= MAX_ATTEMPTS:
                     self.record(f"{task.key}: chưa xong sau {MAX_ATTEMPTS} lần thử, bỏ qua tới ngày mới")
                     continue
+            if not completed:
+                continue   # bị ngắt (boss / hết 120 giây): sau Join Boss làm tiếp chính nhiệm vụ này, không đổi sang việc khác
             if task.due is None:
-                order.remove(task)
-                order.append(task)   # chưa xong: chuyển xuống cuối (việc theo giờ thì chờ tới giờ kế tiếp)
+                sink(order, task)   # chưa xong: xuống cuối chuỗi cùng nhóm, trên nhiệm vụ nhận thưởng (việc theo giờ thì chờ tới giờ kế tiếp)
                 stalled += 1
                 if stalled >= len(pending):   # cả danh sách đều chưa xong: nghỉ chút rồi mới vòng lại
                     stalled = 0
@@ -331,7 +337,7 @@ class BotWorker(QThread):
             self._run_one(task)
             self.record(f"Xong: {task.key}")
             return True
-        # Bị ngắt: chưa xong, nhiệm vụ xuống cuối danh sách rồi gọi lại từ đầu hàm run(); worker không lưu điểm thực thi.
+        # Bị ngắt: chưa xong, nhiệm vụ giữ vị trí và được gọi lại từ đầu hàm run() sau Join Boss; worker không lưu điểm thực thi.
         except TimedOut:
             self.record(f"Tạm dừng: {task.key} (hết {OTHERS_WINDOW} giây, quay lại Join Monster War)")
             return False    # hết OTHERS_WINDOW giây

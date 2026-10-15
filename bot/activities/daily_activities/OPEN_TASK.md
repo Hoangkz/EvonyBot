@@ -18,7 +18,9 @@ flowchart TD
     L --> R{Kết quả}
     G --> R
     R -->|bấm được Go| OK[TASK_OPENED → after_go của nhiệm vụ]
-    R -->|thấy Claim / tích V| D[TASK_DONE → xong hôm nay, mục tiêu 0]
+    R -->|thấy Claim| D[TASK_DONE → xong hôm nay, mục tiêu 0]
+    R -->|thấy tích V| K[Back, mở lại danh sách, tìm lại; đủ TICK_TRIES = 3 lần liên tiếp vẫn tích → TASK_DONE]
+    R -->|chưa thấy dòng nhưng thấy tích V ở đâu đó trên màn| K
     R -->|thấy dòng mà không nhận ra nút| U[TASK_UNKNOWN → bỏ qua, không đánh dấu]
     R -->|lướt hết không thấy| N{Đã thử lại đủ 2 lần?}
     N -->|chưa| BK[Back → mở lại bảng Activity, tìm lại] --> B
@@ -46,9 +48,8 @@ Mỗi vòng chụp màn hình rồi làm **một** việc (tối đa `OPEN_ACTIV
 
 Lặp, mỗi vòng một ảnh chụp (tối đa `LIST_MAX_SCROLLS` = 25 lần cuộn):
 
-1. **Claim All** (`CLAIM_ALL`) còn sáng (`_active_claim_all`: nút xám cũng khớp ảnh mẫu 0,86 nên xét thêm độ bão hoà
-   màu ≥ `CLAIM_ALL_MIN_SATURATION`) → bấm (không hiện popup). Bấm mà Claim All vẫn còn (lỗi game) → bỏ qua Claim
-   All tới hết lượt mở nhiệm vụ này.
+0. Vừa mở danh sách (bản mới) `_claim_all_first`: chờ 1 giây cho danh sách đứng yên, Claim All xanh thì bấm (tối đa `CLAIM_ALL_TAPS` = 3 lần) rồi mới tìm nhiệm vụ. Mỗi lần kiểm tra đều log độ bão hoà màu và "green"/"gray".
+1. Claim All chỉ kiểm tra **một lần** lúc vừa mở danh sách (bước 0), không kiểm tra lại khi cuộn; `_active_claim_all`: nút xám cũng khớp ảnh mẫu 0,86 nên xét thêm độ bão hoà màu ≥ `CLAIM_ALL_MIN_SATURATION`. Mỗi lần mở lại danh sách (sang màn khác rồi quay lại, Back và mở lại) thì kiểm tra một lần nữa.
 2. Tìm **tiêu đề dòng** của nhiệm vụ (`task_titles`: ảnh trong `ACTIONS` có action OPEN…, VD
    `ActivitiesOffer/Offer.png` = "Use the Offer feature in Shrine" — chỉ phần chữ, không lấy "for N time(s)"
    nên dòng lần 1 / lần 2 đều khớp).

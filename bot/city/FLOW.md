@@ -1,7 +1,7 @@
 # Flow: Bản đồ thành và route công trình (bot/city)
 
-Dùng chung, không thuộc activity nào. Code: [city_map.py](city_map.py), dữ liệu: [city_tour.py](city_tour.py) (chỉ đúng civ1,
-`SUPPORTED_CIVS`). Việc còn lại: [TODO.md](TODO.md). Black Market chỉ **dùng** bản đồ trong DB để tới Chợ
+Dùng chung, không thuộc activity nào. Code: [city_map.py](city_map.py), dữ liệu: mỗi civ một thư mục ([civ1/city_tour.py](civ1/city_tour.py), [civ7/city_tour.py](civ7/city_tour.py)), [tours.py](tours.py) gom
+lại (civ nào `COMPLETE = True` mới được quét). Việc còn lại: [TODO.md](TODO.md). Black Market chỉ **dùng** bản đồ trong DB để tới Chợ
 (`goto`), **không quét** — quét do worker làm khi rảnh.
 
 ## Tìm route công trình (city_map.scan_city) — chạy khi rảnh
@@ -10,7 +10,7 @@ Khi **không còn nhiệm vụ nào và Join Boss rảnh** mà máy chưa có b�
 ([bot_worker.py](../worker/bot_worker.py), mỗi lượt Start thử một lần). Ở vị trí bất kỳ:
 
 1. **Tìm Thành chính trước** (`find_keep`): thấy Thành chính thì kéo bù vào giữa; thấy một công trình cố định (`FIXED` trong
-   [city_tour.py](city_tour.py): Walls, Research Factory, Tavern, Archer Tower, Watchtower, Art Hall, Pasture, Rally Spot) thì đi
+   `civ<N>/city_tour.py`: Walls, Research Factory, Tavern, Archer Tower, Watchtower, Art Hall, Pasture, Rally Spot) thì đi
    đúng đường cố định `ROUTES` về Thành chính; không thấy gì thì dò vòng xoáy quanh chỗ đứng (`spiral_swipes`, tối đa 40 cú).
 2. **Quét từng ô** (`scan`, 13 ô trong `DATA`): ghi toạ độ công trình nhận ra được.
 3. **Lưu vào DB** (`bot.set_city_map`); không lưu file.
@@ -23,8 +23,10 @@ Test: `tests/city/test_city_map.py`, `tests/worker/test_boss_watch.py`, `tests/j
 ## Hướng dẫn đo route cho một nền văn minh
 
 Làm khi cần quét thành trên máy civ N (N khác 1). Bố cục thành khác nhau theo civ nên **không dùng số civ1**. Dữ liệu cần đo, trong
-[city_tour.py](city_tour.py): `FIXED` (toạ độ các công trình cố định so với Thành chính), `ROUTES` (đường vuốt giữa Keep và từng
+`civ<N>/city_tour.py` (thư mục mới, copy cấu trúc từ civ1): `FIXED` (toạ độ các công trình cố định so với Thành chính), `ROUTES` (đường vuốt giữa Keep và từng
 mốc), `ANCHOR_SHIFT` (độ lệch tâm "chính giữa"), `DATA` (13 ô quét). Số liệu civ1 là mẫu để đối chiếu (tên, thứ tự).
+
+(Cách đã làm với civ2 và công cụ tự động hoá: [MEASURE_CIV.md](MEASURE_CIV.md), script ở `tests/city/measure/`.)
 
 **1. Chuẩn bị**
 - Máy civ N đang ở màn thành (không phải thế giới; ở thế giới bấm nút toà thành góc dưới phải). `bot.civilization` hoặc ảnh mẫu
@@ -55,7 +57,7 @@ mốc), `ANCHOR_SHIFT` (độ lệch tâm "chính giữa"), `DATA` (13 ô quét)
 có bước kéo bù).
 
 **5. Ghi dữ liệu và bật civ**
-- Tách bảng theo civ trong `city_tour.py` (xem TODO mục 5), thêm civ N vào `SUPPORTED_CIVS` **chỉ khi đã có đủ** bảng của civ đó.
+- Ghi vào `bot/city/civ<N>/city_tour.py`, thêm civ N vào `ALL` trong [tours.py](tours.py); đổi `COMPLETE = True` **chỉ khi đã có đủ** bảng của civ đó.
 - Cập nhật test `tests/city/test_city_map.py` (danh sách tên ô, `FIXED`, `ROUTES` khớp hiệu toạ độ trong 20 px) rồi chạy:
   `.\venv\Scripts\python.exe -m unittest tests.city.test_city_map`.
 

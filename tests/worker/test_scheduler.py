@@ -229,7 +229,7 @@ class WorkerLoopTests(unittest.TestCase):
         self.assertEqual(calls, [("a", None, False), ("b", None, False)])
 
     def test_task_limited_to_120s_with_boss(self):
-        """Có Join Boss: mỗi nhiệm vụ tối đa 120 giây; hết giờ thì chưa xong nên xuống cuối danh sách."""
+        """Có Join Boss: mỗi nhiệm vụ tối đa 120 giây; hết giờ thì sau Join Boss làm tiếp chính nhiệm vụ đó."""
         calls = []
 
         def run_a(ctx, settings):
@@ -251,7 +251,7 @@ class WorkerLoopTests(unittest.TestCase):
             return BOSS_IDLE
 
         self.run_until_stop(worker, run_activity)
-        self.assertEqual(calls, [JOIN_BOSS, "a", JOIN_BOSS, "b"])
+        self.assertEqual(calls, [JOIN_BOSS, "a", JOIN_BOSS, "a", JOIN_BOSS, "b"])
 
     def test_bubble_off_no_bubble_rule(self):
         """Không tích Bubble: không lo bubble trước nhiệm vụ, không hẹn ngắt vì bubble."""

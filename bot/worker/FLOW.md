@@ -77,7 +77,8 @@ flowchart TD
 ```
 
 - **Mỗi vòng có Join Boss: 1 lượt Join Boss rồi đúng 1 nhiệm vụ**, tối đa `OTHERS_WINDOW` = 120 giây cho **từng** nhiệm vụ. Bị
-  ngắt (hết 120 giây, có boss mới) thì chưa xong nên xuống cuối danh sách.
+  ngắt (hết 120 giây, có boss mới) thì giữ nguyên vị trí: sau Join Boss làm tiếp chính nhiệm vụ đó (chỉ nhiệm vụ chạy hết một
+  lượt mà chưa xong mới xuống cuối danh sách).
 - **Xong hay chưa** do `Task.done` quyết định (đọc daily_done). Nhiệm vụ không có dấu trong DB (`done` = None: Alliance Capacity,
   Black Market, Battlefield Shop) coi là xong hôm nay khi đã chạy hết một lượt.
 - **Sang ngày mới** (qua mốc reset server, chọn ở màn Home, mặc định 14:00) thì đưa lại mọi nhiệm vụ vào danh sách; nhiệm vụ

@@ -15,6 +15,7 @@ from PyQt5.QtWidgets import (
     QCheckBox,
     QComboBox,
     QGridLayout,
+    QMessageBox,
     QGroupBox,
     QHBoxLayout,
     QLabel,
@@ -65,6 +66,13 @@ class DesignerTab(QWidget):
 
         for name, widget in self.controls.items():
             if "applyall" in name.lower():
+                # Cùng màu / cỡ với nút Apply ALL của BaseTab (Daily Activities): theme ApplyAllButton, cỡ tự nhiên, giữ mép phải.
+                widget.setObjectName("ApplyAllButton")
+                widget.style().unpolish(widget)       # nút đã polish lúc show() chưa có tên: áp lại theme để đo đúng cỡ chữ đậm
+                widget.style().polish(widget)
+                right, top = widget.x() + widget.width(), widget.y()
+                hint = widget.sizeHint()
+                widget.setGeometry(right - hint.width(), top, hint.width(), hint.height())
                 widget.clicked.connect(self.apply_all_clicked.emit)
 
     def get_settings(self) -> dict:
@@ -72,6 +80,12 @@ class DesignerTab(QWidget):
 
     def set_settings(self, data: dict):
         pass
+
+
+def confirm_reset(parent, title: str, text: str) -> bool:
+    """Hộp hỏi lại trước khi reset (tránh bấm nhầm); mặc định chọn No."""
+    return QMessageBox.question(parent, title, text, QMessageBox.Yes | QMessageBox.No,
+                                QMessageBox.No) == QMessageBox.Yes
 
 
 class LabeledCombo(QWidget):
@@ -181,25 +195,33 @@ class BaseTab(QWidget):
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
 
-        if show_apply_all:
-            header = QHBoxLayout()
-            header.addStretch(1)
-            self.apply_all_button = QPushButton("Apply ALL")
-            self.apply_all_button.setObjectName("ApplyAllButton")
-            self.apply_all_button.clicked.connect(self.on_apply_all)
-            header.addWidget(self.apply_all_button)
-            outer.addLayout(header)
-
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QScrollArea.Shape.NoFrame)
 
         content = QWidget()
+        for page in (self, content):
+            page.setProperty("tabPage", True)       # nền trắng chung của mọi tab (theme.py)
+        self.setAttribute(Qt.WA_StyledBackground, True)
+        content.setAttribute(Qt.WA_StyledBackground, True)
         self.body_layout = QVBoxLayout(content)
-        self.body_layout.setContentsMargins(16, 12, 16, 16)
+        self.body_layout.setContentsMargins(20, 16, 21, 16)     # như Join Monster War
         self.body_layout.addStretch(1)
         scroll.setWidget(content)
         outer.addWidget(scroll)
+
+        if show_apply_all:
+            # Nút Apply ALL nằm trong vùng cuộn, hàng đầu, sát phải: cuộn thì trôi theo nội dung (giống Join Monster War).
+            row = QWidget()
+            row_layout = QHBoxLayout(row)
+            row_layout.setContentsMargins(0, 0, 0, 0)
+            row_layout.addStretch(1)
+            self.apply_all_row = row_layout
+            self.apply_all_button = QPushButton("Apply ALL")
+            self.apply_all_button.setObjectName("ApplyAllButton")
+            self.apply_all_button.clicked.connect(self.on_apply_all)
+            row_layout.addWidget(self.apply_all_button)
+            self.add_row(row)
 
     def add_row(self, widget):
         """Insert a widget above the trailing stretch."""

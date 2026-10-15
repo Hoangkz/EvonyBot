@@ -22,8 +22,10 @@ Settings (lưu ở cột `event` của DB) giữ đủ thông tin mỗi nhiệm 
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtWidgets import QAbstractItemView, QListWidget, QListWidgetItem, QPushButton
 
+from bot.activities.event.cycle import describe
+
 from .event import DATA
-from .tab_placeholder import DesignerTab
+from .tab_placeholder import DesignerTab, confirm_reset
 
 GROUPS = DATA["groups"]
 
@@ -90,10 +92,19 @@ DESIGNER_DATA, _CHECKBOXES, _COMBOS, _REDEEMS, PAGE_SIZE = _build(GROUPS)
 class EventTab(DesignerTab):
     # Người dùng đổi một ô (không phát khi set_settings nạp cấu hình) -> lưu DB.
     settings_changed = pyqtSignal()
+    reset_progress_clicked = pyqtSignal()   # nút Reset progress: xoá dấu "đã làm" để bot làm lại
 
     def __init__(self, parent=None):
         super().__init__("Event", DESIGNER_DATA, {}, PAGE_SIZE, parent=parent)
         c = self.controls
+        apply_all = c["buttonEventApplyALL"]
+        reset = QPushButton("Reset progress", self.page)
+        reset.setToolTip("Đặt mọi nhiệm vụ Event về chưa làm: lần chạy sau bot làm lại từ đầu "
+                         "(dùng khi game lỗi mà bot đã ghi là xong).")
+        hint = reset.sizeHint()
+        reset.setGeometry(apply_all.x() - hint.width() - 6, apply_all.y() + (apply_all.height() - hint.height()) // 2,
+                          hint.width(), hint.height())
+        reset.clicked.connect(self._confirm_reset)
         for name, spec in _CHECKBOXES.values():
             self._set_day_tip(spec, c[name])
             c[name].clicked.connect(self.settings_changed)
@@ -115,6 +126,18 @@ class EventTab(DesignerTab):
         for panel, (y, spec) in _REDEEMS.items():
             self._lists[spec["key"]] = self._build_redeem(c[panel], y, spec)
 
+    def _confirm_reset(self):
+        if confirm_reset(self, "Reset progress",
+                         "Đặt mọi nhiệm vụ Event về chưa làm?\n"
+                         "Lần chạy sau bot sẽ làm lại từ đầu."):
+            self.reset_progress_clicked.emit()
+
+    def showEvent(self, event):
+        """Mở tab: danh sách quà luôn cuộn về đầu để thấy món ưu tiên nhất (thứ tự nạp / chỉ mục chọn có thể làm nó trôi xuống)."""
+        super().showEvent(event)
+        for lst in self._lists.values():
+            lst.scrollToTop()
+
     def _build_redeem(self, panel, y, spec) -> QListWidget:
         """Danh sách quà xếp thứ tự ưu tiên (kéo thả hoặc nút Up / Down) dưới các ô chọn."""
         from PyQt5.QtWidgets import QLabel
@@ -133,6 +156,7 @@ class EventTab(DesignerTab):
             button.setToolTip("Up" if step < 0 else "Down")
             button.clicked.connect(lambda _=False, l=lst, d=step: self._move(l, d))
         lst.setCurrentRow(0)
+        lst.scrollToTop()
         lst.show()
         return lst
 
@@ -203,6 +227,15 @@ class EventTab(DesignerTab):
             saved = (data.get(key) or {}).get("order") if isinstance(data.get(key), dict) else None
             for position, item_id in enumerate(i for i in (saved or []) if self._row_of(lst, i) >= 0):
                 lst.insertItem(position, lst.takeItem(self._row_of(lst, item_id)))
+            lst.scrollToTop()   # món ưu tiên nhất (hàng đầu) phải thấy ngay, không phải cuộn lên
+
+    def set_event_times(self, daily_keys):
+        """Tiêu đề mỗi group hiện thời gian còn lại của event ("Gather Troops — còn 3d 14:22") theo mốc reset bot đã lưu
+        (khoá daily_done `<event>_cycle_reset_...`, xem bot/activities/event/cycle.py); chưa có mốc thì chỉ hiện tên group."""
+        keys = list(daily_keys)
+        for g, group in enumerate(GROUPS):
+            text = describe(keys, group["key"])
+            self.controls[f"groupBoxEvent{g}"].setTitle(group["title"] if text is None else f"{group['title']} — {text}")
 
     @staticmethod
     def _row_of(lst: QListWidget, item_id) -> int:

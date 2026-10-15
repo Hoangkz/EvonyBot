@@ -13,10 +13,14 @@ from ..activities.daily_activities.troop_training.run import after_go as troop_t
 from ..activities.daily_activities.trap_building import TASK as daily_trap_buiding
 from ..activities.daily_activities.trap_building.run import after_go as trap_building_after_go
 from ..activities.daily_activities.black_market import TASK as daily_black_market
+from ..activities.daily_activities.black_market.run import after_go as black_market_after_go
 from ..activities.daily_activities.general_enhancing import TASK as daily_general_enhancing
+from ..activities.daily_activities.general_enhancing.run import after_go as general_enhancing_after_go
 from ..activities.daily_activities.wheel_of_fortune import TASK as daily_wheel_of_fortune
 from ..activities.daily_activities.patrol import TASK as daily_patrol
+from ..activities.daily_activities.patrol.run import after_go as patrol_after_go
 from ..activities.daily_activities.material_composing import TASK as daily_material_composing
+from ..activities.daily_activities.material_composing import after_go as material_composing_after_go
 from ..activities.daily_activities.alliance_research import TASK as daily_alliance_research
 from ..activities.daily_activities.alliance_research.run import after_go as alliance_research_after_go
 from ..activities.daily_activities.greet_champion import TASK as daily_greet_champion
@@ -45,6 +49,8 @@ from ..activities.daily_activities.alliance_donation.run import donate_free
 from ..activities.daily_activities.alliance_help import TASK as alliance_help_task
 from ..activities.daily_activities.alliance_help.run import help_all
 from ..activities.daily_activities.buy_daily.run import JOB as daily_buy_general
+from ..activities.daily_activities.alliance_vip import JOB as daily_alliance_vip
+from ..activities.daily_activities.city_vip import JOB as daily_city_vip
 from ..activities.daily_activities.alliance_donation import constants as alliance_donation_constants
 from ..activities.daily_activities.alliance_help import constants as alliance_help_constants
 from ..activities.daily_activities.common import GIFTS_JOB as daily_gift_claims
@@ -80,7 +86,6 @@ DATA ={
             "run": crazy_eggs,
             "label": "Crazy Eggs",
             "priority": 999,
-
             "group": "Daily Activities"
 }
     ],
@@ -91,7 +96,6 @@ DATA ={
             "saves": True,
             "label": "Open Gift Box",
             "priority": 888,
-
         }
     ],
     "Alliance Capacity": [
@@ -211,24 +215,14 @@ DATA ={
         { 
             "key": "daily_buy_general",
             "run": daily_buy_general,
-            "must_finish": True,
             "label": "General: Buy Stamina + Hammers",
             "priority": 668,
-    },
+        },
         { 
             "key": "daily_offering",
             "run": daily_job(daily_offering, target="Offer Gems"),
-            "must_finish": True,   # xong khi số lần đã offer trong DB >= số ở ô "Offer Gems" của tab
             "label": "Offering",
             "priority": 666,
-
-        },
-        { 
-            "key": "daily_resource_gathering",
-            "run": daily_job(daily_resource_gathering),
-            "must_finish": True,
-            "label": "Resource Gathering",
-            "priority": -665, "note": "Phải chạy ngay sau Offering (bàn tay nổi trong thành)",
         },
         { 
             "key": "daily_resource_tax",
@@ -236,39 +230,30 @@ DATA ={
             "must_finish": True,
             "label": "Resource Tax",
             "priority": 399,
-
         },
         { 
             "key": "daily_gold_levy",
             "run": daily_job(daily_gold_levy),
-            "must_finish": True,
             "label": "Gold Levy",
             "priority": 398,
-
         },
         { 
             "key": "daily_troop_training",
             "run": daily_job(daily_troop_training, after_go=troop_training_after_go),
-            "must_finish": True,
             "label": "Troop Training",
             "priority": 397,
-
         },
         { 
             "key": "daily_troop_heading",
             "run": daily_job(daily_troop_heading, after_go=troop_healing_after_go),
-            "must_finish": True,
             "label": "Troop Heading",
             "priority": 396,
-
         },
         { 
             "key": "daily_trap_buiding",
             "run": daily_job(daily_trap_buiding, after_go=trap_building_after_go),
-            "must_finish": True,
             "label": "Trap Buiding",
             "priority": 395,
-
         },
         { 
             "key": "daily_alliance_donation",
@@ -277,7 +262,6 @@ DATA ={
             "label": "Alliance Donation",
             "priority": 394, 
             "note": "Chạy cuối Daily theo giờ (ô chọn 0-4h); tới giờ thì worker đẩy lên đầu danh sách",
-
         },
         { 
             "key": "daily_alliance_help",
@@ -286,57 +270,59 @@ DATA ={
             "label": "Alliance Help",
             "priority": 393, 
             "note": "Như Alliance Donation (theo giờ, ô chọn 0-4h, mặc định 4h), chạy ngay sau Alliance Donation",
-
         },
-
-                { 
+        { 
             "key": "daily_alliance_research",
             "run": daily_job(daily_alliance_research, after_go=alliance_research_after_go),
-            "must_finish": True,
             "label": "Research",
             "priority": 392,
             "note": "Học viện: nghiên cứu 1 công nghệ xanh bất kỳ, tốn thời gian thì Speed Up bằng vật phẩm",
         },
         { 
+            "key": "daily_city_vip",
+            "run": daily_city_vip,
+            "label": "City VIP",
+            "priority": 650,   # cao nhất trong Event (cao nhất 600) và Daily Activities
+            "note": "Nhận VIP ở thành: không có ô tích, chỉ 0h-1h giờ máy tính và khi đã có route công trình trong DB (flow nhận chưa viết)",
+        },
+        { 
+            "key": "daily_alliance_vip",
+            "run": daily_alliance_vip,
+            "label": "Alliance VIP",
+            "priority": 391,
+            "note": "Alliance Shop: mua VIP Monthly rồi Daily (nút xám = coi như đã mua)",
+        },
+        { 
             "key": "daily_black_market",
-            "run": daily_job(daily_black_market),
-            "must_finish": True,
+            "run": daily_job(daily_black_market, after_go=black_market_after_go),
             "label": "Black Market",
             "priority": 390,
-
         },
         { 
             "key": "daily_general_enhancing",
-            "run": daily_job(daily_general_enhancing),
-            "must_finish": True,
+            "run": daily_job(daily_general_enhancing, after_go=general_enhancing_after_go),
             "label": "General Enhancing",
             "priority": 389, 
             "note": "Cần làm thêm",
-
         },
         { 
             "key": "daily_wheel_of_fortune",
             "run": daily_job(daily_wheel_of_fortune),
-            "must_finish": True,
             "label": "Wheel of Fortune",
             "priority": 388,
-
         },
         { 
             "key": "daily_patrol",
-            "run": daily_job(daily_patrol),
+            "run": daily_job(daily_patrol, after_go=patrol_after_go),
             "label": "Patrol",
             "priority": 387, 
             "must_finish": True,
-
         },
         { 
             "key": "daily_material_composing",
-            "run": daily_job(daily_material_composing),
-            "must_finish": True,
+            "run": daily_job(daily_material_composing, after_go=material_composing_after_go),
             "label": "Material Composing",
             "priority": 386,
-
         },
         { 
             "key": "daily_greet_champion",
@@ -346,23 +332,6 @@ DATA ={
             "must_finish": True,
             "note": "Về thành: bấm trái tim trên Keep (hoặc Keep -> Champion), chào 2 lần",
         },
-        { 
-            "key": "daily_monster_killing",
-            "run": daily_job(daily_monster_killing),
-            "must_finish": True,
-            "label": "Monster Killing",
-            "priority": -384,
-
-        },
-        { 
-            "key": "daily_resource_collecting",
-            "run": daily_job(daily_resource_collecting),
-            "must_finish": True,
-            "label": "Resource Collecting",
-            "priority": 383,
-
-        },
-
         {
             "key": "daily_trade_carriage",
             "run": daily_job(daily_trade_carriage, after_go=trade_carriage_after_go),
@@ -374,16 +343,16 @@ DATA ={
         {
             "key": "daily_rewards",
             "run": daily_rewards,
-            "must_finish": True,
             "label": "Activity Rewards (nhận thưởng cuối)",
             "priority": 300,
-
+            "tail": True,
         },
         {
             "key": "daily_gift_claims",
             "run": daily_gift_claims,
             "label": "Nhận quà cuối ngày (sau khi Daily và thưởng Activity xong)",
-            "priority": 200,
+            "priority": -200,
+            "tail": True,
         }
     ],
     "Black Market": [
@@ -392,7 +361,8 @@ DATA ={
             "run": black_market_market,
             "label": "Black Market: mua ở Market",
             "priority": 0,
-            "once": True 
+            "once": True,
+            "needs_city_map": True,   # nhiệm vụ cần route: chỉ vào danh sách khi máy đã có bản đồ thành (worker quét lúc Join Boss rảnh)
         }
     ],
     "Battlefield Shop": [

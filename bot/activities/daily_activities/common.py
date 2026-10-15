@@ -22,10 +22,14 @@ from .constants import (
     REWARDS,
     ACTIVITY_LIST,
     ACTIVITY_TAB,
+    ACTIVITY_TAB_REGION,
+    ACTIVITY_TAB_THRESHOLD,
     BACK,
     CLAIM_ALL,
     CLAIM_ALL_MIN_SATURATION,
     CLAIM_ALL_SIZE,
+    CLAIM_ALL_TAPS,
+    CLAIM_ALL_THRESHOLD,
     CLAIM_BUTTON,
     DONE,
     GO_BUTTON,
@@ -70,6 +74,8 @@ from .constants import (
     TAP,
     TASK_DONE,
     TASK_HAS_GO,
+    TASK_TICK,
+    TICK_TRIES,
     TASK_NO_LIST,
     TASK_NOT_FOUND,
     TASK_OPENED,
@@ -170,6 +176,12 @@ def run_task(bot, task: Task) -> TaskResult:
             row_state = open_task_row(bot, screen, pos, task.after_open_tap, task.folder)
             if row_state == ROW_COMPLETE:
                 scroll_up(bot, 2)
+        elif action is None and (tab := bot.find(ACTIVITY_TAB, threshold=ACTIVITY_TAB_THRESHOLD, screen=screen,
+                                                 region=ACTIVITY_TAB_REGION)) is not None:
+            # Popup Quests 2 tab (không Chapter Quests) đang ở tab Main Quest: chữ "Activity" khớp ~0,90 (sát ngưỡng mặc
+            # định 0,9 nên các ảnh tab ở trên bỏ sót) -> bấm tab bằng ngưỡng riêng của hàng tab.
+            bot.log("Daily Activities: Activity tab (2-tab Quests), tapping it")
+            bot.tap(*tab, delay=2)
         elif action is None:
             # A task's Go button often spends a few seconds transitioning to
             # the world/search screen. Pressing Android Back during that gap
@@ -419,6 +431,14 @@ def collect_activity_rewards(bot):
             # so stale coordinates for the remaining chests are not reusable.
             bot.tap(*sorted(chests)[0], delay=2)
             continue
+        # Popup Quests 2 tab (không Chapter Quests) đang ở tab Main Quest: chữ "Activity" khớp ~0,90, sát ngưỡng mặc định 0,9
+        # nên các ảnh tab bên dưới bỏ sót, rơi vào BACK (đóng Quests) rồi mở lại -> lặp mãi. Bấm tab bằng ngưỡng riêng.
+        if bot.find(f"{folder}/Click_ActivitiesLight.png", screen=screen) is None:
+            tab = bot.find(ACTIVITY_TAB, threshold=ACTIVITY_TAB_THRESHOLD, screen=screen, region=ACTIVITY_TAB_REGION)
+            if tab is not None:
+                bot.log("Daily Activities: Activity tab, tapping it")
+                bot.tap(*tab, delay=2)
+                continue
         action, pos = find_first(bot, screen, targets,
                                  position_cache=image_positions(bot), fallback_full=True)
         if action == DONE:
@@ -453,7 +473,7 @@ def open_activity_list(bot) -> str | None:
                 bot.back(delay=1)
                 continue
             return ui
-        tab = bot.find(ACTIVITY_TAB, screen=screen)
+        tab = bot.find(ACTIVITY_TAB, threshold=ACTIVITY_TAB_THRESHOLD, screen=screen, region=ACTIVITY_TAB_REGION)
         if tab is not None:
             bot.tap(*tab, delay=2)
             continue
@@ -477,7 +497,7 @@ def open_task(bot, titles, cards=(), max_scrolls: int = LIST_MAX_SCROLLS, done_c
     """Mở nhiệm vụ tới lúc bấm Go (sau Go hai phiên bản giống nhau, phần riêng của nhiệm vụ làm tiếp).
     `titles`: ảnh tiêu đề dòng (bản mới, task_titles); `cards`: ảnh thẻ (bản cũ, task_cards);
     `done_cards`: ảnh thẻ đã nhận thưởng (bản cũ, task_done_cards) -> TASK_DONE.
-    Bản MỚI (_search_list): Claim All bấm trước; cuộn tìm tiêu đề; nút ngay dưới tiêu đề là Go ->
+    Bản MỚI: Claim All kiểm tra một lần lúc vừa mở danh sách (_claim_all_first), rồi _search_list: cuộn tìm tiêu đề; nút ngay dưới tiêu đề là Go ->
     bấm. Bản CŨ (_search_grid): lướt lưới tìm thẻ -> bấm thẻ -> popup -> Go.
     Lướt hết không thấy: Back rồi mở lại bảng Activity, tìm thêm LIST_RETRIES lần.
     Trả TASK_OPENED (đã bấm Go), TASK_DONE (dòng / popup không còn Go), TASK_NOT_FOUND (lướt hết
@@ -488,11 +508,13 @@ def open_task(bot, titles, cards=(), max_scrolls: int = LIST_MAX_SCROLLS, done_c
     titles = (titles,) if isinstance(titles, str) else tuple(titles)
     cards = (cards,) if isinstance(cards, str) else tuple(cards)
     done_cards = (done_cards,) if isinstance(done_cards, str) else tuple(done_cards)
-    bot._daily_claim_all_stuck = False   # Claim All kẹt chỉ bỏ qua trong lượt mở nhiệm vụ này
-    for attempt in range(LIST_RETRIES + 1):
+    attempt = ticks = 0
+    while attempt <= LIST_RETRIES:
         ui = open_activity_list(bot)
         if ui is None:
             return TASK_NO_LIST
+        if ui == NEW_UI:
+            _claim_all_first(bot)
         if ui == OLD_UI:
             if not cards:
                 bot.record("Daily Activities: task has no card image for the old Activity screen")
@@ -505,6 +527,16 @@ def open_task(bot, titles, cards=(), max_scrolls: int = LIST_MAX_SCROLLS, done_c
                 return TASK_UNKNOWN
             wanted = titles
             result = _search_list(bot, titles, max_scrolls, tap_go)
+        if result == TASK_TICK:
+            # Dòng hiện dấu tích: có thể nhận nhầm / danh sách chưa cập nhật -> Back, mở lại, tìm Go tiếp; đủ TICK_TRIES lần
+            # liên tiếp vẫn tích thì coi nhiệm vụ đã xong. Chỉ kiểm tra (tap_go=False) thì không cần thử lại.
+            ticks += 1
+            if ticks >= TICK_TRIES or not tap_go:
+                bot.log(f"Daily Activities: task row shows tick {ticks} time(s); done")
+                return TASK_DONE
+            bot.log(f"Daily Activities: task row shows tick ({ticks}/{TICK_TRIES}), back and retry")
+            bot.back(delay=1)
+            continue
         if result != TASK_NOT_FOUND:
             return result
         if attempt < LIST_RETRIES:
@@ -512,30 +544,21 @@ def open_task(bot, titles, cards=(), max_scrolls: int = LIST_MAX_SCROLLS, done_c
             bot.log(f"Daily Activities: {wanted[0]} not found, back and retry "
                     f"{attempt + 1}/{LIST_RETRIES}")
             bot.back(delay=1)
+        attempt += 1
     return TASK_NOT_FOUND
 
 
 def _search_list(bot, titles, max_scrolls: int, tap_go: bool = True) -> str:
-    """Danh sách Activity (bản mới): mỗi màn thấy Claim All thì bấm trước (bấm mà vẫn còn = lỗi game,
-    bỏ qua tới hết lượt này); tìm tiêu đề dòng; thấy (và trên ROW_TITLE_MAX_Y): nút ngay dưới
+    """Danh sách Activity (bản mới; Claim All đã xử lý một lần lúc vừa mở danh sách, _claim_all_first, không
+    kiểm tra lại khi cuộn); tìm tiêu đề dòng; thấy (và trên ROW_TITLE_MAX_Y): nút ngay dưới
     (ROW_BUTTON_DY) là Go -> bấm, TASK_OPENED; Claim / tích V -> TASK_DONE; không nhận ra nút ->
     TASK_UNKNOWN. Tiêu đề sát đáy (y > ROW_TITLE_MAX_Y) thì cuộn tiếp, trừ khi đã hết danh sách. Không
     thấy thì cuộn xuống; hết danh sách -> TASK_NOT_FOUND."""
-    claim_all_stuck = getattr(bot, "_daily_claim_all_stuck", False)
     previous = None
     scrolls = 0
     settled = False   # đã chờ danh sách đứng yên rồi xét lại dòng (khi không nhận ra nút)
     while True:
         screen = bot.screenshot()
-        if not claim_all_stuck:
-            claim_all = _active_claim_all(bot, screen)
-            if claim_all is not None:
-                bot.log("Daily Activities: Claim All")
-                bot.tap(*claim_all, delay=2)
-                screen = bot.screenshot()   # bấm Claim All không hiện popup
-                if _active_claim_all(bot, screen) is not None:
-                    bot.log("Daily Activities: Claim All still there, ignoring it")
-                    claim_all_stuck = bot._daily_claim_all_stuck = True
         title = next((pos for path in titles
                       if (pos := bot.find(path, screen=screen)) is not None), None)
         at_end = previous is not None and _same_list(previous, screen)
@@ -544,8 +567,11 @@ def _search_list(bot, titles, max_scrolls: int, tap_go: bool = True) -> str:
             button = _row_button(bot, screen, title, tap_go)
             if button == "go":
                 return TASK_OPENED if tap_go else TASK_HAS_GO
-            if button in ("claim", "tick"):
-                bot.log(f"Daily Activities: task row shows {button}; done")
+            if button == "tick":
+                bot.log("Daily Activities: task row shows tick")
+                return TASK_TICK
+            if button == "claim":
+                bot.log("Daily Activities: task row shows claim; done")
                 return TASK_DONE
             if not settled:
                 # Danh sách có thể còn trôi sau khi cuộn (ảnh nhoè, nút không khớp): chờ rồi xét lại một lần.
@@ -554,6 +580,11 @@ def _search_list(bot, titles, max_scrolls: int, tap_go: bool = True) -> str:
                 continue
             bot.record(f"Daily Activities: task row {title} has no Go / Claim / tick, not marking done")
             return TASK_UNKNOWN
+        # Tiêu đề luôn xét trước (tiêu đề và tích có thể cùng một màn); chỉ khi KHÔNG thấy tiêu đề mà đã thấy một dấu tích V: danh sách xếp nhiệm vụ đã xong ở / dưới dấu tích,
+        # nên nhiệm vụ này (chưa thấy Go ở trên) đã xong. Có thể cuộn trượt qua dòng Go nên open_task kiểm tra lại (TICK_TRIES).
+        if title is None and (TEMPLATE_DIR / TICK_BUTTON).exists() and bot.find(TICK_BUTTON, screen=screen) is not None:
+            bot.log("Daily Activities: tick seen before the task row")
+            return TASK_TICK
         if scrolls >= max_scrolls or at_end:
             break
         previous = screen
@@ -621,16 +652,29 @@ def _search_grid(bot, cards, max_scrolls: int, done_cards=(), tap_go: bool = Tru
 
 
 def _active_claim_all(bot, screen):
-    """Tâm nút Claim All còn sáng (có thưởng để nhận), hoặc None. Nút xám cũng khớp ảnh mẫu (0,86) nên xét thêm độ
-    bão hoà màu trong khung nút: xám -> None."""
-    pos = bot.find(CLAIM_ALL, screen=screen)
+    """Tâm nút Claim All còn sáng (màu xanh, có thưởng để nhận), hoặc None. Nút xám cũng khớp ảnh mẫu (0,86) nên xét thêm
+    độ bão hoà màu trong khung nút: xám -> None. Log độ khớp + độ bão hoà để biết vì sao bấm / không bấm."""
+    pos = bot.find(CLAIM_ALL, threshold=CLAIM_ALL_THRESHOLD, screen=screen)
     if pos is None:
         return None
     w, h = CLAIM_ALL_SIZE
     box = bot.crop(screen, pos[0] - w // 2, pos[1] - h // 2, w, h)
-    if float(cv2.cvtColor(box, cv2.COLOR_BGR2HSV)[..., 1].mean()) < CLAIM_ALL_MIN_SATURATION:
-        return None
-    return pos
+    saturation = float(cv2.cvtColor(box, cv2.COLOR_BGR2HSV)[..., 1].mean())
+    active = saturation >= CLAIM_ALL_MIN_SATURATION
+    bot.log(f"Daily Activities: Claim All at {pos}, saturation {saturation:.0f} -> {'green' if active else 'gray'}")
+    return pos if active else None
+
+
+def _claim_all_first(bot):
+    """Vừa mở danh sách Activity (bản mới): chờ danh sách đứng yên rồi kiểm tra Claim All; xanh thì bấm (lặp tới
+    CLAIM_ALL_TAPS lần, tới khi hết xanh), xám / không thấy thì thôi. Làm trước khi tìm nhiệm vụ."""
+    bot.sleep(1)
+    for _ in range(CLAIM_ALL_TAPS):
+        claim_all = _active_claim_all(bot, bot.screenshot())
+        if claim_all is None:
+            return
+        bot.log("Daily Activities: Claim All")
+        bot.tap(*claim_all, delay=2)
 
 
 def _row_button(bot, screen, title, tap_go: bool = True) -> str | None:
@@ -819,10 +863,9 @@ def daily_selected_done(ctx, settings: dict) -> bool:
 
 @save_errors("daily_rewards")
 def _run_rewards(ctx, settings):
-    """Nhận thưởng Activity (dòng nhiệm vụ + rương điểm); chỉ lưu "đã nhận" khi mọi việc Daily đã tích đều xong."""
+    """Nhận thưởng Activity (dòng nhiệm vụ + rương điểm): mỗi ngày một lần, nhận xong là lưu "đã nhận" (dù còn việc Daily dở)."""
     collect_activity_rewards(ctx)
-    if daily_selected_done(ctx, settings):
-        ctx.mark_daily_done(REWARDS)
+    ctx.mark_daily_done(REWARDS)
 
 
 @save_errors("daily_gift_claims")
@@ -836,6 +879,20 @@ def _any_selected(settings: dict) -> bool:
     return bool(selected_labels(settings))
 
 
-REWARDS_JOB = {"run": _run_rewards, "enabled": _any_selected, "done": lambda ctx, settings: ctx.is_daily_done(REWARDS)}
-GIFTS_JOB = {"run": _run_gifts, "enabled": _any_selected,
-             "done": lambda ctx, settings: ctx.is_daily_done(gift_claims.KEY)}
+def _rewards_done_or_not_ready(ctx, settings) -> bool:
+    """Xong hôm nay, hoặc chưa có việc Daily đã tích nào xong: worker bỏ qua, không mở bảng Activity nhận thưởng khi chưa có gì để
+    nhận. Mỗi vòng worker đọc lại, có một việc xong là tự quay lại."""
+    if ctx.is_daily_done(REWARDS):
+        return True
+    return not any(ctx.is_daily_done(_KEY_BY_LABEL.get(label, label)) for label in selected_labels(settings))
+
+
+def _gifts_done_or_not_ready(ctx, settings) -> bool:
+    """Xong hôm nay, hoặc chưa tới lúc nhận (Daily đã tích chưa xong hết / thưởng Activity chưa nhận): worker bỏ qua, không
+    gọi run chạy không để đếm lần thử. Mỗi vòng worker đọc lại, hết điều kiện chặn là tự quay lại."""
+    return (ctx.is_daily_done(gift_claims.KEY)
+            or not (daily_selected_done(ctx, settings) and ctx.is_daily_done(REWARDS)))
+
+
+REWARDS_JOB = {"run": _run_rewards, "enabled": _any_selected, "done": _rewards_done_or_not_ready}
+GIFTS_JOB = {"run": _run_gifts, "enabled": _any_selected, "done": _gifts_done_or_not_ready}
