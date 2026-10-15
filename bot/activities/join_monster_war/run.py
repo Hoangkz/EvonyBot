@@ -9,7 +9,7 @@ from ...ocr import read_boss_name, read_coords
 from ...ocr._digits import read_chars, split as split_chars
 from ...ocr.read_coords import FONT as COORDS_FONT, MAX_RATIO as COORDS_MAX_RATIO
 from ...ocr.read_power import text as read_power_text
-from . import boss_names
+from . import boss_names, stamina_wait
 from .boss_memory import JOINED as MEMORY_JOINED
 from .boss_memory import BossMemory
 from .constants import (ALLIANCE_ICON, ASSISTANT_GENERAL, BACK, BOSS_MONSTER, CHOOSE_DEVELOPMENT,
@@ -170,7 +170,7 @@ class _Boss:
                     bot.record("Join Monster War: hết thể lực, không dùng vật phẩm -> rảnh, chuyển sang làm nhiệm vụ")
                     for _ in range(3):
                         bot.back(delay=1)
-                    self.idle_scrolls = IDLE_SCROLLS
+                    self._stamina_empty()
                     continue
                 bot.tap(*pos)
                 self._use_stamina()
@@ -330,6 +330,13 @@ class _Boss:
         strip = screen[int(h * y0 / 100):int(h * y1 / 100), int(w * x0 / 100):int(w * x1 / 100)]
         return strip.size > 0 and int(strip.max()) < LIST_END_MAX_LIGHT
 
+    def _stamina_empty(self):
+        """Hết thể lực: đánh dấu rảnh và lưu mốc "bây giờ + 20 phút" vào DB; worker làm nhiệm vụ tới mốc đó rồi mới gọi
+        Join Boss lại (stamina_wait.py)."""
+        self.idle_scrolls = IDLE_SCROLLS
+        until = stamina_wait.save(self.bot)
+        self.bot.record(f"Join Monster War: hết thể lực, làm nhiệm vụ tới {until:%H:%M:%S} rồi Join Boss lại")
+
     def _use_stamina(self):
         """Sau khi bấm Confirm ở popup không đủ thể lực: màn "Use Item" -> bấm nút Use đầu
         tiên (vật phẩm trên cùng) -> popup số lượng -> Use -> chờ, Back về màn March, March lại."""
@@ -347,7 +354,7 @@ class _Boss:
             bot.record("Join Monster War: hết vật phẩm thể lực -> rảnh, chuyển sang làm nhiệm vụ")
             for _ in range(3):
                 bot.back(delay=1)
-            self.idle_scrolls = IDLE_SCROLLS
+            self._stamina_empty()
             return
         bot.tap(*buttons[0])
 
