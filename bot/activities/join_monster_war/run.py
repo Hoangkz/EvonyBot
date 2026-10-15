@@ -34,7 +34,7 @@ CAN_READ_COORDS = _check_exists(LOCATION)
 
 def run(bot, settings: dict):
     """`bot` là BotContext của thiết bị; `settings` là cấu hình của tab "Join Monster War".
-    Trả về IDLE nếu thoát vì rảnh, None nếu dừng hẳn."""
+    Trả về IDLE nếu thoát vì rảnh (kể cả hết thể lực), None nếu dừng hẳn."""
     # BossMemory sống cùng BotContext (một lượt Start -> Stop của giả lập), nên
     # còn nguyên qua các lần worker gọi lại Join Boss sau khi làm activity khác.
     if getattr(bot, "boss_memory", None) is None:
