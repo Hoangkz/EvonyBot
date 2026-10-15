@@ -41,8 +41,8 @@ SETTINGS = {
     ],
 }
 
-DOWN = swipe(50, 65, 50, 40)
-UP = swipe(50, 40, 50, 65)
+DOWN = swipe(1.5, 65, 1.5, 40)
+UP = swipe(1.5, 40, 1.5, 65)
 
 
 class CurrentCodeJoinBossFlow(unittest.TestCase):

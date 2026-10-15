@@ -227,7 +227,7 @@ Hàm không trả cờ thành công/thất bại. Khi nó trả về, `_march()`
 
 Được gọi khi vòng lặp chính gặp popup không đủ thể lực (`OUT_OF_STAMINA`) mà `use_stamina` là `ALL` / `100`: bấm Confirm rồi:
 
-1. Màn **Use Item**: tìm các nút "Use ( N )" (`staminaItemUse.png`, chỉ trong cột nút bên phải), bấm nút **trên cùng** (vật phẩm đầu tiên). Không có nút nào: log "hết vật phẩm thể lực", **Back 2 lần**, không ghi `JOINED`, rồi đánh dấu rảnh. Lượt Join Boss sau có thể thử lại khi thể lực đã hồi.
+1. Màn **Use Item**: tìm các nút "Use ( N )" (`staminaItemUse.png`, chỉ trong cột nút bên phải), bấm nút **trên cùng** (vật phẩm đầu tiên). Không có nút Use nào (chỉ còn vật phẩm nút kim cương) = hết vật phẩm: log "hết vật phẩm thể lực", **Back 3 lần**, không ghi `JOINED`, rồi đánh dấu rảnh. Lượt Join Boss sau có thể thử lại khi thể lực đã hồi.
 2. **Popup số lượng** (nút Use lớn `staminaUse.png`):
    - `100`: bấm Use luôn (số lượng mặc định);
    - `ALL`: bấm gần cuối thanh trượt (`STAMINA_SLIDER_END`, dùng hết), rồi bấm Use.
@@ -249,8 +249,10 @@ Tên cấu hình ALL/100 được chuyển thành các thao tác UI trên; hàm 
 
 | Giá trị `swipe` | Thao tác |
 | --- | --- |
-| 0, 1, 2 | Vuốt xuống: từ `(50%, 65%)` tới `(50%, 40%)`, thời lượng 0,8 giây. |
-| 3, 4, 5 | Vuốt lên: từ `(50%, 40%)` tới `(50%, 65%)`, thời lượng 0,8 giây. |
+| 0, 1, 2 | Vuốt xuống: từ `(1,5%, 65%)` tới `(1,5%, 40%)`, thời lượng 0,8 giây. |
+| 3, 4, 5 | Vuốt lên: từ `(1,5%, 40%)` tới `(1,5%, 65%)`, thời lượng 0,8 giây. |
+
+Điểm vuốt ở mép trái (`SCROLL_X = 1.5`), ngoài thẻ rally: vuốt bắt đầu trên thẻ đôi khi bị game coi là tap và mở màn chi tiết đội. Nếu vẫn lọt vào màn đó thì màn "không nhận ra" -> `go_home` Back về danh sách.
 
 Sau mỗi lần vuốt, `swipe = (swipe + 1) % 6` (`SCROLLS_EACH_WAY = 3`: 3 lần xuống rồi 3 lần lên).
 

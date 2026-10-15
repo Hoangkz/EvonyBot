@@ -304,9 +304,9 @@ class _Boss:
         self.idle_scrolls += 1
         bot.log(f"Cuộn {'xuống' if self.swipe < SCROLLS_EACH_WAY else 'lên'} ({self.idle_scrolls}/{IDLE_SCROLLS})")
         if self.swipe < SCROLLS_EACH_WAY:
-            bot.swipe_percent(50, 65, 50, 40, duration=0.8)
+            bot.swipe_percent(SCROLL_X, 65, SCROLL_X, 40, duration=0.8)
         else:
-            bot.swipe_percent(50, 40, 50, 65, duration=0.8)
+            bot.swipe_percent(SCROLL_X, 40, SCROLL_X, 65, duration=0.8)
         self.swipe = (self.swipe + 1) % (2 * SCROLLS_EACH_WAY)
         delay(bot, SCROLL_SETTLE)
         self.next_screen = bot.screenshot()
@@ -324,7 +324,6 @@ class _Boss:
         """Sau khi bấm Confirm ở popup không đủ thể lực: màn "Use Item" -> bấm nút Use đầu
         tiên (vật phẩm trên cùng) -> popup số lượng -> Use -> chờ, Back về màn March, March lại."""
         bot = self.bot
-        buttons = []
         _, buttons = self._poll_screen(
             "open_stamina_items",
             lambda image: sorted(bot.find_all(STAMINA_ITEM_USE, screen=image,
@@ -332,11 +331,12 @@ class _Boss:
                                  key=lambda p: p[1]),
         )
         if not buttons:
-            # Hết vật phẩm: Back 2 lần. Boss chưa được tham gia nên tuyệt đối không ghi JOINED;
-            # lượt Join Boss sau có thể thử lại khi thể lực đã hồi.
+            # Hết vật phẩm (màn Use Item không có nút Use, chỉ còn nút kim cương): Back 3 lần. Boss chưa
+            # được tham gia nên tuyệt đối không ghi JOINED; lượt Join Boss sau có thể thử lại khi
+            # thể lực đã hồi.
             bot.record("Join Monster War: hết vật phẩm thể lực")
-            bot.back(delay=1)
-            bot.back(delay=1)
+            for _ in range(3):
+                bot.back(delay=1)
             self.idle_scrolls = IDLE_SCROLLS
             return
         bot.tap(*buttons[0])
@@ -807,7 +807,7 @@ class _Boss:
             shift = top - py + POWER_PEEK_MARGIN
             bot.log(f"Boss {coords}: thanh lực bị che, cuộn nhẹ {shift}px để đọc lực")
             height = screen.shape[0]
-            bot.swipe_percent(50, 40, 50, 40 + 100 * shift / height, duration=0.8)
+            bot.swipe_percent(SCROLL_X, 40, SCROLL_X, 40 + 100 * shift / height, duration=0.8)
             delay(bot, SCROLL_SETTLE)
             screen = bot.screenshot()
             self.next_screen = screen
@@ -866,6 +866,9 @@ WAR_ROW_Y, LIST_TOP_BELOW_WAR, POWER_PEEK_MARGIN = 116, 22, 20
 SCROLLS_EACH_WAY = 3                  # mỗi chu kỳ: 3 lần cuộn xuống rồi 3 lần cuộn lên
 IDLE_SCROLLS = 2 * SCROLLS_EACH_WAY   # cuộn hết 1 chu kỳ (6 lần) mà không thấy boss mới -> rảnh
 IDLE_WAIT = 2      # polling khi rảnh; không phải độ trễ của một thao tác UI
+# Vuốt ở mép trái (ngoài thẻ rally, thẻ rộng x 3-97 %): vuốt bắt đầu trên thẻ đôi khi bị game coi là
+# tap -> mở màn chi tiết đội (Total Troops) thay vì cuộn.
+SCROLL_X = 1.5
 SCROLL_SETTLE = 0.5   # giây chờ danh sách dừng trôi sau khi vuốt, trước khi chụp
 POLL_INTERVAL = 0.2     # kiểm tra sớm để đa số bước hoàn thành gần 1 giây
 STEP_TARGET = 1.0       # quá mức này ghi SLOW trong log performance

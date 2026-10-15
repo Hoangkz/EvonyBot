@@ -62,13 +62,6 @@ def W(screen):
     return f"{screen}?war_off"
 
 
-def no_items(screen):
-    """ẢNH TỔNG HỢP: xoá cột nút "Use ( N )" của màn Use Item (không còn vật phẩm thể lực).
-    Thay bằng ảnh chụp thật khi có."""
-    screen[300:, 255:370] = (20, 20, 20)
-    return screen
-
-
 def unknown(screen):
     """ẢNH TỔNG HỢP: màn hình không ảnh mẫu nào khớp (nhiễu), như hiệu ứng tạm sau khi bấm
     Join. (Làm tối ảnh thật không đủ: so khớp ảnh mẫu không phụ thuộc độ sáng.)"""
@@ -87,7 +80,7 @@ def run_join(testcase, flow, settings, **kwargs):
     with mock.patch.object(_Boss, "_read_march_target_coords", reported_target), \
             mock.patch.object(_Boss, "_joined_target_visible", return_value=True):
         return run_flow(testcase, join_monster_war.run, SCREENS, flow, settings,
-                        variants={"war_off": war_off, "no_items": no_items, "unknown": unknown}, **kwargs)
+                        variants={"war_off": war_off, "unknown": unknown}, **kwargs)
 
 
 def remember(coords, status):
@@ -170,11 +163,11 @@ ALREADY_KNOWN_MINOTAUR = [
 ]
 # Còn thẻ bị che ở đáy màn hình -> vẫn phải cuộn xuống tìm rally khác.
 ALREADY_KNOWN_MORE_BELOW = [
-    Step(W("war_list_more_below.png"), swipe(50, 65, 50, 40)),
+    Step(W("war_list_more_below.png"), swipe(1.5, 65, 1.5, 40)),
 ]
 
 # Mỗi chu kỳ cuộn 3 lần xuống rồi 3 lần lên; hết 6 lần mà không thấy boss mới -> rảnh.
-DOWN, UP = swipe(50, 65, 50, 40), swipe(50, 40, 50, 65)
+DOWN, UP = swipe(1.5, 65, 1.5, 40), swipe(1.5, 40, 1.5, 65)
 SCROLL_LIMIT = [
     *[Step(W("war_list_more_below.png"), DOWN) for _ in range(3)],
     *[Step(W("war_list_more_below.png"), UP) for _ in range(3)],
@@ -254,7 +247,7 @@ JOINED_AND_JOIN = [
 # Cả hai thẻ đều "Joined", ô War bị thanh thông báo che (không thấy -> không bấm):
 # không có gì để Join, danh sách còn dài -> cuộn xuống.
 ALL_JOINED = [
-    Step("war_all_joined.png", swipe(50, 65, 50, 40)),
+    Step("war_all_joined.png", swipe(1.5, 65, 1.5, 40)),
 ]
 # Danh sách đã cuộn: thẻ trên cùng bị cắt (nút "Joined" ở y 370 khớp ảnh mẫu Join 0,80 ->
 # phải bị loại), Golem ở y 597 -> Join Golem.
@@ -400,14 +393,14 @@ def refill(slider_step):
     ]
 
 
-# Hết vật phẩm thể lực: màn Use Item không còn nút Use -> Back 2 lần -> không dừng (thể lực
+# Hết vật phẩm thể lực: màn Use Item không còn nút Use -> Back 3 lần -> không dừng (thể lực
 # tự hồi): nhớ boss là đã tham gia và coi như rảnh (trả IDLE khi còn activity khác).
 OUT_OF_STAMINA_ITEMS = [
     Step(W("02_war_list_join.png"), tap(JOIN)),
     Step(MARCH_SCREEN, preset(1)),
     Step(MARCH_SCREEN, tap(MARCH)),
     Step(STAMINA_POPUP, tap(NOT_ENOUGH_STAMINA)),
-    Step("stamina_after_use.png?no_items", back(2)),
+    Step("stamina_no_items.png", back(3)),
     Step(W("war_after_march_joined.png"), end(IDLE)),
 ]
 REFILL_100 = refill([Step("stamina_use_popup_100.png", tap(STAMINA_USE))])   # mặc định 10/87 (= 100)
@@ -437,7 +430,7 @@ ALL_JOINED_SHORT_LIST = [
 # các thẻ còn lại đang "Attacking" -> không thấy Join / Joined nào nhưng danh sách chưa hết ->
 # cuộn tiếp, không được rảnh.
 SCROLLED_ONLY_ATTACKING = [
-    Step("war_scrolled_only_attacking.png", swipe(50, 65, 50, 40)),
+    Step("war_scrolled_only_attacking.png", swipe(1.5, 65, 1.5, 40)),
 ]
 # 2 thẻ đều "Attacking" (không Join / Joined), có khoảng hở nhỏ ngay trên 2 nút xanh cuối
 # (Battle Logs / Auto-Join) = danh sách đã hiện hết -> rảnh ngay, không cuộn.
@@ -447,11 +440,11 @@ TWO_ATTACKING_LIST_END = [
 # Cuối một danh sách dài: thẻ cuối sát nút Battle Logs (không có khoảng trống), mọi boss
 # đã biết -> không được rảnh ngay, vẫn cuộn theo vòng 3 xuống / 3 lên.
 BOTTOM_OF_LONG_LIST = [
-    Step(W("war_list_bottom.png"), swipe(50, 65, 50, 40)),
+    Step(W("war_list_bottom.png"), swipe(1.5, 65, 1.5, 40)),
 ]
 # Nút Join của Golem bị cắt ở mép dưới (ngoài dải 262-615) -> chỉ còn Joined -> cuộn.
 JOIN_CUT_AT_BOTTOM = [
-    Step(W("war_scrolled_join_cut_bottom.png"), swipe(50, 65, 50, 40)),
+    Step(W("war_scrolled_join_cut_bottom.png"), swipe(1.5, 65, 1.5, 40)),
 ]
 
 
