@@ -8,13 +8,28 @@ import cv2
 import numpy as np
 
 from bot.activities import gift_claims
-from bot.activities.gift_claims import common, valuable_event
+from bot.activities.gift_claims import common, lobby, valuable_event
+from bot.activities.gift_claims import registry
 from bot.activities.gift_claims.screens import GiftScreen
 from bot.context.errors import YieldToBoss
+from bot.daily_reset import done_today
 from database import Database
 
 
 class GiftClaimRegistryTests(unittest.TestCase):
+    def test_child_task_persists_its_own_key_only_after_success(self):
+        bot = mock.Mock()
+        bot.is_daily_done.return_value = False
+        successful = common.GiftTask("gift_test_child", "Test child",
+                                     lambda _bot: True)
+        failed = common.GiftTask("gift_test_failed", "Test failed",
+                                 lambda _bot: False)
+
+        self.assertTrue(successful.run(bot))
+        self.assertFalse(failed.run(bot))
+
+        bot.mark_daily_done.assert_called_once_with("gift_test_child")
+
     def test_each_event_center_package_exposes_a_run_entry_point(self):
         names = (
             "blessing_of_pallas", "dragon_battle", "dwarfs_treasure",
@@ -77,10 +92,13 @@ class GiftClaimRegistryTests(unittest.TestCase):
             "EventCenter/facebook_activity.png",
             "PreciousBlazonExchange/title.png",
             "PreciousBlazonExchange/button_rewards.png",
-            "DwarfsTreasure/title.png",
+            "DwarfsTreasure/title.png", "DwarfsTreasure/list_row.png",
             "DwarfsTreasure/button_daily_free.png",
             "HypnosDream/title.png",
             "HypnosDream/button_rewards.png",
+            "PoseidonsDay/title.png",
+            "PoseidonsDay/tab_ocean_offering.png",
+            "PoseidonsDay/button_daily_free.png",
             "RevelationOfHorus/title.png",
             "SealedImperialTreasury/title.png",
         }
@@ -89,41 +107,35 @@ class GiftClaimRegistryTests(unittest.TestCase):
         self.assertTrue(all(cv2.imread(str(folder / name)) is not None
                             for name in expected))
 
-    def test_combined_gift_task_is_saved_only_after_both_boundaries_finish(self):
+    def test_combined_gift_task_is_saved_only_after_registry_locations_finish(self):
         done = set()
         bot = mock.Mock()
         bot.is_daily_done.side_effect = done.__contains__
         bot.mark_daily_done.side_effect = done.add
-        with mock.patch.object(gift_claims.lobby, "open_next",
-                               side_effect=(None, None)):
-            gift_claims.run(bot)
-        self.assertEqual(done, {gift_claims.KEY})
-        bot.mark_daily_done.assert_called_once_with(gift_claims.KEY)
+        task = common.GiftTask("gift_example", "Example", lambda _bot: True)
+        location = registry.ClaimLocation(registry.VALUABLE_EVENT, task)
 
-    def test_interrupted_dot_is_not_saved_and_is_retried(self):
-        from bot.context import TimedOut
+        def pending(_bot, zone=None):
+            if "gift_example" in done:
+                return ()
+            return (location,) if zone in (None, registry.VALUABLE_EVENT) else ()
 
+        with mock.patch.object(registry, "pending", side_effect=pending):
+            self.assertTrue(gift_claims.run(bot))
+
+        self.assertEqual(done, {"gift_example", gift_claims.KEY})
+
+    def test_pending_location_does_not_write_aggregate_checkpoint(self):
         bot = mock.Mock()
         bot.is_daily_done.return_value = False
-        calls = [GiftScreen.VALUABLE_EVENT, GiftScreen.VALUABLE_EVENT, None, None]
+        task = common.GiftTask("gift_example", "Example", lambda _bot: False)
+        location = registry.ClaimLocation(registry.VALUABLE_EVENT, task)
+        with mock.patch.object(registry, "pending", return_value=(location,)):
+            self.assertFalse(gift_claims.run(bot))
 
-        def open_next(_bot, _boundary, attempted):
-            value = calls.pop(0)
-            if value is not None:
-                attempted.append((50, 500))
-            return value
+        bot.mark_daily_done.assert_not_called()
 
-        with (mock.patch.object(gift_claims.lobby, "open_next", side_effect=open_next),
-              mock.patch.object(gift_claims.valuable_event._run, "run_opened",
-                                side_effect=(TimedOut(), ({}, True)))):
-            with self.assertRaises(TimedOut):
-                gift_claims.run(bot)
-            self.assertEqual([], bot._gift_claims_progress.attempted["bottom"])
-            gift_claims.run(bot)
-
-        bot.mark_daily_done.assert_called_once_with(gift_claims.KEY)
-
-    def test_database_migrates_old_child_keys_to_one_combined_task(self):
+    def test_database_keeps_individual_gift_checkpoint_after_reopen(self):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / "gift-test.db"
             db = Database(path)
@@ -139,7 +151,46 @@ class GiftClaimRegistryTests(unittest.TestCase):
                 reopened.close()
 
         self.assertIn(gift_claims.KEY, done)
-        self.assertNotIn("gift_limited_offer", done)
+        self.assertIn("gift_limited_offer", done)
+
+    def test_gift_checkpoint_expires_at_the_server_reset_not_midnight(self):
+        # The exact case from the flow contract: the 14/10 completion is no
+        # longer current at 15:00 on 15/10 because the 14:00 server reset has
+        # already happened.
+        from datetime import datetime
+
+        self.assertFalse(done_today("2026-10-14T21:05:00", "14:00",
+                                    datetime(2026, 10, 15, 15, 0)))
+        self.assertTrue(done_today("2026-10-14T21:05:00", "14:00",
+                                   datetime(2026, 10, 15, 13, 59)))
+
+    def test_registry_is_the_full_inventory_not_a_red_badge(self):
+        keys = {item.task.key for item in registry.locations()}
+        self.assertIn("gift_limited_offer", keys)
+        self.assertIn("gift_login_gifts", keys)
+        self.assertIn("gift_precious_blazon_exchange", keys)
+        self.assertIn("gift_dwarfs_treasure", keys)
+        self.assertIn("gift_blessing_of_pallas", keys)
+        self.assertIn("gift_poseidons_day", keys)
+
+        bot = mock.Mock()
+        bot.is_daily_done.side_effect = {"gift_limited_offer"}.__contains__
+        pending_keys = {item.task.key for item in registry.pending(bot)}
+        self.assertNotIn("gift_limited_offer", pending_keys)
+        self.assertIn("gift_login_gifts", pending_keys)
+
+    def test_named_parent_uses_fixed_launcher_not_a_notification_badge(self):
+        bot = mock.Mock()
+        bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
+        with (mock.patch.object(common, "return_home", return_value=True),
+              mock.patch.object(lobby, "return_home", return_value=True),
+              mock.patch.object(lobby, "identify",
+                                side_effect=(None, GiftScreen.VALUABLE_EVENT)),
+              mock.patch.object(lobby, "open_next") as open_next):
+            self.assertTrue(lobby.open_named(bot, GiftScreen.VALUABLE_EVENT))
+
+        bot.tap_percent.assert_called_once_with(77, 83, delay=2)
+        open_next.assert_not_called()
 
     def test_claim_template_is_never_tapped_twice_on_an_unchanged_page(self):
         bot = mock.Mock()

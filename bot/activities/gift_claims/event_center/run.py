@@ -2,13 +2,13 @@
 import cv2
 import numpy as np
 
-from . import (blessing_of_pallas, dwarfs_treasure, grace_of_star_trail,
+from . import (blessing_of_pallas, dragon_battle, dwarfs_treasure, grace_of_star_trail,
                hypnos_dream, poseidons_day, precious_blazon_exchange,
                revelation_of_horus, sealed_imperial_treasury)
 from ..common import (ClaimReport, GiftTask, TEXT_CLAIM_CONTROLS, back_if_close_x,
                      claim_fixed_controls, claim_sparkles,
                      close_congratulations, find, find_all,
-                     open_event_center, return_home)
+                     mark_task_done, open_event_center, return_home)
 from ..screens import GiftScreen, identify
 
 KEY = "gift_event_center_limited"
@@ -16,19 +16,26 @@ PAGE = "EventCenter/title"
 DOT = "EventCenter/notification_dot"
 CONGRATULATIONS = "LoginGifts/congratulations"
 MAX_SCROLLS = 8
-LOWER = (0, 18, 100, 88)
+# Text controls such as Blessing of Pallas' green Claim sit as low as 91% of
+# the 396x704 frame.  Fixed text templates are safe to search down to the
+# bottom because they only match Claim/Free/Daily Free words.  Sparkle remains
+# restricted separately so decorative/purchase animation near the footer can
+# never become a blind tap.
+LOWER = (0, 18, 100, 98)
+# Grace of Star Trail keeps its Gift launcher in the top-right carousel, well
+# above the ordinary body controls covered by LOWER.
+REWARD_NAV_REGION = (0, 7, 100, 30)
 SPARKLE_SAFE = (5, 18, 90, 78)
 INNER_TOP = (0, 7, 100, 15)
 MAX_INNER_SWIPES = 4
 CATEGORIES = (
     ("limited", 18),
-    ("activities", 50),
-    ("competition", 82),
 )
 CATEGORY_DONE_PREFIX = b"__category_done__\0"
 FORCED_EVENT_PREFIX = b"__forced_event__\0"
 EVENT_POLICIES = (
     blessing_of_pallas.POLICY,
+    dragon_battle.POLICY,
     precious_blazon_exchange.POLICY,
     poseidons_day.POLICY,
     hypnos_dream.POLICY,
@@ -46,7 +53,13 @@ SKIPPED_SCREENS = {policy.screen: policy for policy in EVENT_POLICIES
 FIXED_CLAIMS = TEXT_CLAIM_CONTROLS
 REWARD_NAVIGATION = grace_of_star_trail.POLICY.reward_navigation
 FORCED_LIMITED_ROWS = (
-    ("GraceOfStarTrail/list_row", FORCED_EVENT_PREFIX + b"grace_of_star_trail"),
+    ("GraceOfStarTrail/list_row", FORCED_EVENT_PREFIX + b"grace_of_star_trail",
+     GiftScreen.GRACE_OF_STAR_TRAIL, "Grace of Star Trail"),
+    # Dwarf's Treasure may lose its outer Event Center badge while the
+    # Daily Free chest inside is still claimable.  Check the named row once
+    # per daily run instead of using the outer badge as its source of truth.
+    ("DwarfsTreasure/list_row", FORCED_EVENT_PREFIX + b"dwarfs_treasure",
+     GiftScreen.DWARFS_TREASURE, "Dwarf's Treasure"),
 )
 
 
@@ -147,11 +160,16 @@ def _tap_special_navigation(bot, *, attempts=4) -> ClaimReport:
     clickable icon rather than on the label below it.
     """
     attempted_count = 0
+    opened_entries = set()
     for attempt in range(attempts):
         bot.check()
         screen = bot.screenshot()
         screen_name = identify(bot, screen)
         control = SPECIAL_NAVIGATION.get(screen_name)
+        if screen_name is not None and control is None:
+            # A fixed page such as Grace has no Rewards/Daily Free launcher;
+            # do not spend four screenshots proving that before its own flow.
+            return ClaimReport()
         if control is not None:
             label, template = control
             pos = find(bot, template, screen, threshold=0.68, region=LOWER)
@@ -160,6 +178,7 @@ def _tap_special_navigation(bot, *, attempts=4) -> ClaimReport:
                 bot.tap(*pos, delay=1)
                 attempted_count += 1
                 if close_congratulations(bot):
+                    bot.record(f"Gift Claims: verified {label} Congratulations")
                     return ClaimReport(attempted_count, 1)
                 after = bot.screenshot()
                 after_name = identify(bot, after)
@@ -173,6 +192,21 @@ def _tap_special_navigation(bot, *, attempts=4) -> ClaimReport:
                 # sparkle stages process that child instead of clicking again.
                 if after_name != screen_name:
                     return ClaimReport(attempted_count, 0)
+            else:
+                policy = POLICY_BY_SCREEN.get(screen_name)
+                if policy is not None:
+                    for entry in policy.navigation_entry:
+                        if entry in opened_entries:
+                            continue
+                        entry_pos = find(bot, entry, screen, threshold=0.72,
+                                         region=(0, 7, 100, 22))
+                        if entry_pos is None:
+                            continue
+                        opened_entries.add(entry)
+                        attempted_count += 1
+                        bot.record(f"Gift Claims: Event Center mở tab {entry}")
+                        bot.tap(*entry_pos, delay=1)
+                        break
         if attempt + 1 < attempts:
             bot.sleep(0.6)
     if attempted_count:
@@ -187,7 +221,8 @@ def _tap_reward_navigation(bot) -> ClaimReport:
     """Open Star Trail Gift, then tap the separate coin Claim control."""
     screen = bot.screenshot()
     for template in REWARD_NAVIGATION:
-        pos = find(bot, template, screen, threshold=0.68, region=LOWER)
+        pos = find(bot, template, screen, threshold=0.68,
+                   region=REWARD_NAV_REGION)
         if pos is None:
             continue
         bot.record(f"Gift Claims: Event Center tap Star Trail Gift ({template})")
@@ -199,7 +234,7 @@ def _tap_reward_navigation(bot) -> ClaimReport:
         for attempt in range(4):
             claim_screen = bot.screenshot()
             claim = find(bot, "GraceOfStarTrail/button_claim", claim_screen,
-                         threshold=0.70, region=LOWER)
+                         threshold=0.70, region=REWARD_NAV_REGION)
             if claim is not None:
                 attempted += 1
                 bot.record("Gift Claims: tap Grace of Star Trail coin Claim")
@@ -209,7 +244,7 @@ def _tap_reward_navigation(bot) -> ClaimReport:
                     return ClaimReport(attempted, 1)
                 after = bot.screenshot()
                 if find(bot, "GraceOfStarTrail/button_claim", after,
-                        threshold=0.70, region=LOWER) is None:
+                        threshold=0.70, region=REWARD_NAV_REGION) is None:
                     bot.record("Gift Claims: verified Star Trail coin Claim disappeared")
                     return ClaimReport(attempted, 1)
             if attempt < 3:
@@ -221,8 +256,22 @@ def _tap_reward_navigation(bot) -> ClaimReport:
 
 def _process_current_event_content(bot):
     """Process one selected inner tab; return (claims, panel_was_closed)."""
-    special = _tap_special_navigation(bot, attempts=4)
+    opened_name = identify(bot)
+    special = (_tap_special_navigation(bot, attempts=4)
+               if opened_name in SPECIAL_NAVIGATION else ClaimReport())
+    if opened_name in SPECIAL_NAVIGATION:
+        # Dwarf/Precious/Hypnos each has one exact free-reward launcher.  Once
+        # it has been checked, the event is exhausted.  Continuing into the
+        # generic sparkle fallback is unsafe: on the real Dwarf page the
+        # animated castle bubbles led out to the paid Decorate screen even
+        # after Daily Free had already produced Congratulations.
+        return special, False
     reward_navigation = _tap_reward_navigation(bot)
+    if opened_name == GiftScreen.GRACE_OF_STAR_TRAIL:
+        # Grace has one exact contract: Star Trail Gift -> coin Claim.  If the
+        # child opened but Claim was not verified, keep it pending; unrelated
+        # sparkle checks must not hide that actionable recognition failure.
+        return reward_navigation, False
     fixed = claim_fixed_controls(bot, FIXED_CLAIMS, max_taps=16,
                                  initial_wait_attempts=2, region=LOWER)
     if back_if_close_x(bot):
@@ -239,23 +288,63 @@ def _process_current_event_content(bot):
                         fixed.verified + sparkle.verified), False)
 
 
+def _finish_event(bot, policy, report: ClaimReport) -> ClaimReport:
+    """Persist the named child only after its opened content was exhausted."""
+    if policy is not None and policy.key is not None:
+        mark_task_done(bot, policy.key)
+    return report
+
+
 def _process_opened_event(bot):
     opened = bot.screenshot()
     name = identify(bot, opened)
+    policy = POLICY_BY_SCREEN.get(name)
     skipped = SKIPPED_SCREENS.get(name)
     if skipped is not None:
         bot.record(f"Gift Claims: {skipped.label} - {skipped.skip_reason}")
-        return ClaimReport()
+        return _finish_event(bot, skipped, ClaimReport())
     if name in (GiftScreen.BACCHUS_TAVERN, GiftScreen.FOLLOW_US):
         bot.record(f"Gift Claims: {name.value} - nhận diện và bỏ qua")
         return ClaimReport()
+
+    # A page without a captured title (currently including Blessing of
+    # Pallas) must not feed its artwork into the red-dot
+    # carousel detector.  On the real Pallas frame the countdown/book art at
+    # y≈64 was mistaken for three inner tabs, costing almost the whole 120 s
+    # slice.  Inspect the page body exactly once; its fixed Claim/Free controls
+    # are still handled, but decorative red pixels can no longer drive taps.
+    if name is None:
+        bot.record("Gift Claims: Event Center page chưa có title template; "
+                   "kiểm tra nội dung một lần, không quét dot trong artwork")
+        report, _ = _process_current_event_content(bot)
+        return report
 
     # Grace may keep its claim badge only on the nested Star Trail Gift icon,
     # without a reliable red dot on the Event Center list row. Open it once
     # per task and use the exact current icon crop before any generic red scan.
     if name == GiftScreen.GRACE_OF_STAR_TRAIL:
         report, _ = _process_current_event_content(bot)
-        return report
+        if report.acted and not report.claimed:
+            bot.record("Gift Claims: Grace of Star Trail đã mở Star Trail Gift "
+                       "nhưng chưa xác minh được Claim; giữ PENDING để sửa/retry")
+            return report
+        return _finish_event(bot, policy, report)
+
+    # Every captured Event Center page owns a dedicated policy.  Its exact
+    # Rewards/Daily Free/Claim controls are safer and faster than interpreting
+    # arbitrary red artwork in the title strip.  On real Hypnos frames the
+    # gold info icon, and later the red X plus quest decorations, all satisfied
+    # the old generic dot geometry and opened the Quests modal after Rewards
+    # had already been collected.  Keep generic inner-tab scanning only for a
+    # genuinely UNKNOWN page until that event receives its own title/policy.
+    if policy is not None:
+        report, _ = _process_current_event_content(bot)
+        if report.acted and not report.claimed:
+            bot.record(f"Gift Claims: {policy.label} đã bấm nút/tab nhận "
+                       "nhưng sau 4 lần chưa có xác minh; giữ PENDING, "
+                       "cần chỉnh nhận dạng/trạng thái")
+            return report
+        return _finish_event(bot, policy, report)
 
     # Most Event Center rows have no nested carousel badge. Scanning the full
     # horizontal strip for every such row can consume the whole 120-second
@@ -263,7 +352,7 @@ def _process_opened_event(bot):
     # sweep; otherwise process only its current reward content.
     if not _inner_red_dots(opened):
         report, _ = _process_current_event_content(bot)
-        return report
+        return _finish_event(bot, policy, report)
 
     attempted = set()
     handled_positions = []
@@ -298,7 +387,7 @@ def _process_opened_event(bot):
                 attempted.add(signature)
                 handled_positions.append(dot)
                 if closed:
-                    return total
+                    return _finish_event(bot, policy, total)
                 # Selecting a tab changes its artwork (and animated events can
                 # change it again), so its original dHash alone is not a stable
                 # "already handled" key.  Also remember the selected state at
@@ -333,7 +422,7 @@ def _process_opened_event(bot):
         report, _ = _process_current_event_content(bot)
         total = ClaimReport(total.attempted + report.attempted,
                             total.verified + report.verified)
-    return total
+    return _finish_event(bot, policy, total)
 
 
 def _category_signature(category: str, signature: bytes) -> bytes:
@@ -437,6 +526,8 @@ def _verify_clean(bot, category: str, ignored=()) -> bool:
 def _scan_category(bot, category: str, visited: set[bytes]) -> bool:
     """Process all claimable red rows in one Event Center category."""
     opened_count = 0
+    failed_forced = set()
+    recentered_forced = set()
     for scroll in range(MAX_SCROLLS + 1):
         bot.check()
         while True:
@@ -448,28 +539,57 @@ def _scan_category(bot, category: str, visited: set[bytes]) -> bool:
                 return True
             candidate = None
             if category == "limited":
-                for template, key in FORCED_LIMITED_ROWS:
-                    if key in visited:
+                for template, key, expected_screen, event_label in FORCED_LIMITED_ROWS:
+                    if key in visited or key in failed_forced:
                         continue
                     row = find(bot, template, screen, threshold=0.76,
                                region=(10, 15, 75, 98))
                     if isinstance(row, tuple) and len(row) == 2:
-                        candidate = row[1], key
-                        bot.record("Gift Claims: Event Center mở Grace of Star Trail "
-                                   "để kiểm tra Star Trail Gift dù dòng ngoài không đỏ")
+                        if (row[1] > int(screen.shape[0] * 0.80)
+                                and key not in recentered_forced):
+                            # A row title can be visible above the bottom bar
+                            # while its clickable body is still off-screen.
+                            # Bring it into the list body before selecting it.
+                            recentered_forced.add(key)
+                            bot.record(f"Gift Claims: kéo {event_label} từ sát đáy "
+                                       "lên giữa màn hình trước khi bấm")
+                            bot.swipe_percent(50, 82, 50, 52,
+                                              duration=0.4, delay=0.8)
+                            candidate = "recenter"
+                            break
+                        # The title sits near the top edge of a list row. Tap
+                        # below it so a small residual scroll cannot select
+                        # the preceding event (observed with Dwarf -> Sealed).
+                        tap_y = min(screen.shape[0] - 1, row[1] + 18)
+                        candidate = tap_y, key, expected_screen, event_label
+                        bot.record(f"Gift Claims: Event Center mở {event_label} "
+                                   "để kiểm tra quà bên trong dù dòng ngoài không đỏ "
+                                   f"(y={tap_y})")
                         break
+                if candidate == "recenter":
+                    continue
             for _, y in _row_dots(bot, screen):
                 if candidate is not None:
                     break
                 signature = _row_signature(screen, y)
                 key = _category_signature(category, signature)
                 if not _category_seen(category, signature, visited):
-                    candidate = y, key
+                    candidate = y, key, None, None
                     break
             if candidate is None:
                 break
-            y, key = candidate
+            y, key, expected_screen, event_label = candidate
             bot.tap_percent(52, y * 100 / screen.shape[0], delay=2)
+            if expected_screen is not None:
+                actual_screen = identify(bot)
+                if actual_screen != expected_screen:
+                    bot.log(f"Gift Claims: bấm hàng {event_label} nhưng mở "
+                            f"{getattr(actual_screen, 'value', actual_screen)}; "
+                            "không đánh dấu DONE, giữ PENDING")
+                    failed_forced.add(key)
+                    if not _back_to_list(bot):
+                        return False
+                    continue
             _process_opened_event(bot)
             opened_count += 1
             # The child row is complete at this point.  Checkpoint it before
@@ -486,10 +606,10 @@ def _scan_category(bot, category: str, visited: set[bytes]) -> bool:
                 bot.log(f"Gift Claims: Event Center/{category} đã tới cuối danh sách")
                 break
 
-    clean = _verify_clean(bot, category, visited)
+    clean = _verify_clean(bot, category, visited) and not failed_forced
     has_checkpoint = any(item.startswith(category.encode("ascii") + b"\0")
                          for item in visited)
-    if not clean and has_checkpoint:
+    if not clean and has_checkpoint and not failed_forced:
         # The authoritative sweep already opened every visible red row.  Some
         # event badges remain red for purchases, locked rewards, or rotating
         # notices even after four failed claim/sparkle checks.  They are now
@@ -517,10 +637,6 @@ def run_opened(bot, handled=None):
         bot.check()
         if _category_done_key(category) in visited:
             bot.record(f"Gift Claims: Event Center/{category} đã DONE ở lát trước; bỏ qua")
-            continue
-        if category == "activities":
-            visited.add(_category_done_key(category))
-            bot.record("Gift Claims: Event Center/activities tạm thời bỏ qua; đánh dấu DONE")
             continue
         if not _select_category(bot, category, x_percent):
             bot.log(f"Gift Claims: không mở được nhóm Event Center/{category}")

@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from .. import city_growth_plan, empire_depot, login_gifts, lucky_raffle
 from ...common import (ClaimReport, TEXT_CLAIM_CONTROLS, back_if_close_x,
                      claim_fixed_controls, claim_sparkles, find, find_all,
-                     return_home)
+                     mark_task_done, return_home)
 
 PAGE = "SuperValueReturn/title"
 DOT = "SuperValueReturn/notification_dot"
@@ -93,6 +93,7 @@ def run_opened(bot, due_keys: set[str], *, handled: set[str] | None = None
                      region=(0, 15, 45, 25)) is not None):
         login_gifts.claim_opened(bot)
         handled.add(login_gifts.KEY)
+        mark_task_done(bot, login_gifts.KEY)
         results[login_gifts.KEY] = "processed"
 
     for direction in (-1, 1):
@@ -109,6 +110,7 @@ def run_opened(bot, due_keys: set[str], *, handled: set[str] | None = None
                     claimed = bool(login_gifts.claim_opened(bot))
                     results[login_gifts.KEY] = "processed" if claimed else "checked"
                     handled.add(login_gifts.KEY)
+                    mark_task_done(bot, login_gifts.KEY)
                     screen = bot.screenshot()
             dots = _dots(bot, screen)
             tabs = [(spec, find(bot, spec.tab, screen, threshold=0.70,
@@ -168,6 +170,7 @@ def run_opened(bot, due_keys: set[str], *, handled: set[str] | None = None
                 if (cleared or not spec.requires_dot
                         or key not in (login_gifts.KEY, city_growth_plan.KEY)):
                     handled.add(key)
+                    mark_task_done(bot, key)
                 bot.log(f"Gift Claims: {spec.task.label} - dấu đỏ "
                         f"{'đã mất' if cleared else 'vẫn còn'} sau xử lý")
 
@@ -179,6 +182,13 @@ def run_opened(bot, due_keys: set[str], *, handled: set[str] | None = None
                 bot.swipe_percent(20, 14, 85, 14, duration=0.5, delay=1)
 
     clean = _verify_clean(bot, handled)
+    if clean and due_keys - handled:
+        # Do not manufacture a child checkpoint from the absence of a badge.
+        # The DB-first runner will open the named tab and inspect it on the
+        # next pass; this matters for Login Gifts and events whose badge fades
+        # before their free reward becomes visible.
+        bot.record("Gift Claims: Super Value Return hết badge nhưng vẫn còn "
+                   "task DB chưa được mở; không ghi DONE từ badge")
     bot.record("Gift Claims: Super Value Return - "
                + ("DONE, phần trên đã hết dấu đỏ" if clean
                   else "chưa DONE, phần trên vẫn còn dấu đỏ"))

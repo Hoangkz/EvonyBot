@@ -7,6 +7,7 @@ from ..policy import EventPolicy
 KEY = "gift_grace_of_star_trail"
 POLICY = EventPolicy(
     "Grace of Star Trail",
+    key=KEY,
     screen=GiftScreen.GRACE_OF_STAR_TRAIL,
     reward_navigation=(
         "GraceOfStarTrail/button_star_trail_gift_current",

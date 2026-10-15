@@ -2,9 +2,17 @@
 
 ## Phạm vi
 
-Task `gift_claims` chỉ chạy sau Daily Activities và có ưu tiên thấp nhất. Toàn bộ
-quà dùng một task chung. DB chỉ lưu `gift_claims` sau khi cả khu 1 và khu 2 đã
-được kiểm tra xong; tiến độ giữa các lát 120 giây chỉ lưu trong RAM.
+Task `gift_claims` chỉ chạy sau Daily Activities và có ưu tiên thấp nhất. Mỗi
+điểm nhận có một key DB riêng (ví dụ `gift_limited_offer`), còn `gift_claims`
+chỉ là key tổng để scheduler biết cả hai khu đã xong. Registry tại
+`gift_claims/registry.py` là danh sách bắt buộc phải kiểm tra; chấm đỏ không
+được dùng để kết luận một task đã xong.
+
+Mỗi key được DB lưu timestamp ISO, ví dụ `gift_limited_offer:
+2026-10-14T21:05:00`. `BotWorker.is_daily_done()` so timestamp với lần reset
+server gần nhất (mặc định 14:00, lấy từ DB settings). Vì vậy lúc 15:00 ngày
+15/10, bản ghi 21:05 ngày 14/10 là **chưa làm**; lúc 13:59 thì vẫn **đã làm**.
+DB không xoá key khi sang ngày mới.
 
 ## Cấu trúc và điểm chạy hiện tại
 
@@ -31,9 +39,14 @@ khi có quy tắc điều phối.
 
 ## Trình tự chung
 
-1. Về màn thành phố.
-2. Quét khu 1 ở thanh dưới, sau đó quét khu 2 ở thanh bên phải.
-3. Loại mọi thành phần đỏ nằm trên biểu tượng Facebook hoặc Follow Us.
+1. Đọc registry và bỏ qua duy nhất những key đã DONE trong ngày server hiện
+   tại. Key chưa DONE luôn phải đi tới đúng màn và kiểm tra, kể cả khi không
+   còn chấm đỏ.
+2. Về màn thành phố; kiểm tra khu 1 (Valuable Event) trước, sau đó khu 2
+   (Event Center).
+3. Mở Valuable Event bằng vị trí launcher cố định ở thanh dưới và Event Center
+   bằng template launcher cố định ở thanh phải; không chạm vào chấm đỏ.
+   Facebook/Follow Us luôn bị loại.
    Các mảng đỏ sát nhau trên cùng một icon phải được gộp thành một badge thật;
    không được mở lại artwork của cùng icon như một mục Unknown.
 4. Bấm một dấu đỏ chưa xét và nhận diện màn vừa mở bằng tiêu đề cố định.
@@ -53,16 +66,18 @@ khi có quy tắc điều phối.
    - nút nhận vừa bấm biến mất;
    - trạng thái Claimed xuất hiện tại đúng phần thưởng.
 8. Việc chỉ bấm nút điều hướng không được tính là đã nhận quà.
-9. Quay lại header hoặc danh sách và quét lại. Màn cha chỉ DONE khi không còn
-   dấu đỏ, ngoại trừ Facebook hoặc màn được quy định bỏ qua.
+9. Quay lại header hoặc danh sách và xác minh flow của đúng event đã hoàn tất.
+   Chỉ lúc đó key riêng của event mới được ghi timestamp. Màn cha/aggregate
+   chỉ DONE khi tất cả key trong registry của cả hai khu đều current.
    Trên carousel, mỗi dấu đỏ chỉ thuộc tab có tâm gần nó nhất; dấu của tab bên
    cạnh không được dùng để kết luận tab vừa xử lý vẫn còn đỏ.
    Mục đã được mở, kiểm tra nút cố định và sparkle đủ 4 lần được coi là đã xét;
    badge trang trí hoặc badge không tự tắt không được làm luồng lặp vô hạn.
 10. Hết 120 giây thì dừng tại điểm kiểm tra gần nhất, nhường Boss và tiếp tục
     các mục chưa xét ở lát sau.
-11. Nếu một màn từng còn đỏ nhưng không xuất hiện trong lần quét lại đầy đủ cả
-    hai vùng, coi dấu đỏ đó đã được xóa; không để trạng thái cũ chặn task DB.
+11. Nếu DB nói chưa làm mà thực tế phần thưởng đã nhận, vẫn phải mở màn đó;
+    sau khi xác định không còn phần thưởng miễn phí, ghi key DONE. Không có
+    nhánh nào ghi key chỉ vì badge biến mất.
 
 ## Quy tắc từng nhóm
 
@@ -82,6 +97,9 @@ khi có quy tắc điều phối.
 - Event Center: ưu tiên quét đủ ba nhóm theo thứ tự Limited, Activities rồi
   Competition. Precious Blazon Exchange và Hypnos' Dream chỉ mở Rewards khi
   thấy đúng phần chữ Rewards; Dwarf's Treasure tương tự với chữ Daily Free.
+  Poseidon's Day phải nhận diện đúng tiêu đề, bấm tab Ocean Offering có dấu đỏ,
+  rồi bấm đúng rương Daily Free. Các event có nút riêng này kết thúc ngay sau
+  khi kiểm tra nút, không chạy fallback sparkle để tránh mở nhầm màn trả phí.
   Mỗi nút đặc biệt được tìm tối đa bốn lần rồi bỏ qua. Trong Activities, nếu
   thấy hàng Facebook kèm dấu đỏ thì không mở Facebook và coi nhóm đã DONE.
   Competition kiểm tra các nút nhận cố định trước, sau đó thử tối đa bốn điểm

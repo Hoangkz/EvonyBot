@@ -1,8 +1,11 @@
 """Claim the red-dot reward on the rotating Dragon Battle page."""
 from ...common import (GiftTask, claim_fixed_controls, open_event_center_event,
                      return_home)
+from ...screens import GiftScreen
+from ..policy import EventPolicy
 
 KEY = "gift_dragon_battle"
+POLICY = EventPolicy("Dragon Battle", key=KEY, screen=GiftScreen.DRAGON_BATTLE)
 
 
 def run(bot):

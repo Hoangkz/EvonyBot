@@ -18,6 +18,14 @@ MAX_OPENS_PER_BOUNDARY = 16
 OPEN_WAIT_ATTEMPTS = 6
 IGNORED_RIGHT_LAUNCHERS = ("FollowUs/facebook_icon",)
 EVENT_CENTER_LAUNCHERS = ("EventCenter/launcher_side", "EventCenter/launcher")
+# The city-side gift carousel is the fixed Valuable Event launcher on the
+# bottom rail.  Its artwork changes with the promotion, but the launcher slot
+# does not.  Entering by this slot lets the DB-first runner inspect a pending
+# event even after the game has removed its notification badge.
+FIXED_PARENT_TARGETS = {
+    GiftScreen.VALUABLE_EVENT: (77, 83),
+    GiftScreen.SUPER_VALUE_RETURN: (77, 83),
+}
 
 
 def _red_mask(screen):
@@ -194,14 +202,24 @@ def open_next(bot, boundary: str, attempted: list[tuple[int, int]]):
 
 
 def open_named(bot, expected):
-    """Search both boundaries until a red-dot icon opens the expected title."""
-    for boundary in BOUNDARIES:
-        attempted = []
-        for _ in range(MAX_OPENS_PER_BOUNDARY):
-            name = open_next(bot, boundary, attempted)
-            if name is None:
-                break
-            if name == expected:
-                return True
-            return_home(bot)
+    """Open a named parent through its fixed launcher, never a red badge."""
+    if not return_home(bot):
+        return False
+    screen = bot.screenshot()
+    if identify(bot, screen) == expected:
+        return True
+    target = FIXED_PARENT_TARGETS.get(expected)
+    if target is None:
+        bot.log(f"Gift Claims: {expected.value} chưa có launcher cố định")
+        return False
+    bot.record(f"Gift Claims: mở {expected.value} từ vị trí cố định")
+    bot.tap_percent(*target, delay=2)
+    for attempt in range(OPEN_WAIT_ATTEMPTS):
+        screen = bot.screenshot()
+        if identify(bot, screen) == expected:
+            return True
+        if attempt + 1 < OPEN_WAIT_ATTEMPTS:
+            bot.sleep(1)
+    bot.log(f"Gift Claims: launcher cố định không mở {expected.value}")
+    return_home(bot)
     return False

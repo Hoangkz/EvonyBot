@@ -14,7 +14,7 @@ from . import (
 )
 from ..common import (ClaimReport, TEXT_CLAIM_CONTROLS, back_if_close_x,
                      claim_fixed_controls, claim_sparkles, find, find_all,
-                     return_home, tap_claims)
+                     mark_task_done, return_home, tap_claims)
 
 PAGE = "ValuableEvent/title"
 DOT = "ValuableEvent/notification_dot"
@@ -182,6 +182,7 @@ def run_opened(bot, due_keys: set[str], *, handled: set[str] | None = None
                 attempted_this_run.add(key)
                 if dot_gone or key != strategic_stockpile.KEY:
                     handled.add(key)
+                    mark_task_done(bot, key)
                 screen = after
 
             if step == MAX_SWIPES:
@@ -192,6 +193,13 @@ def run_opened(bot, due_keys: set[str], *, handled: set[str] | None = None
                 bot.swipe_percent(20, 14, 85, 14, duration=0.5, delay=1)
 
     clean = _verify_clean(bot, handled)
+    if clean and due_keys - handled:
+        # A missing badge only says nothing is currently highlighted.  It is
+        # not proof that a DB-pending tab was opened and inspected.  Leave the
+        # key pending so its fixed flow is revisited instead of creating a
+        # false daily checkpoint.
+        bot.record("Gift Claims: Valuable Event hết badge nhưng vẫn còn task "
+                   "DB chưa được mở; không ghi DONE từ badge")
     bot.record("Gift Claims: Valuable Event - "
                + ("DONE, phần trên đã hết dấu đỏ" if clean
                   else "chưa DONE, phần trên vẫn còn dấu đỏ"))

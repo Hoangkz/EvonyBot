@@ -1,14 +1,13 @@
-"""One resumable, low-priority task for every post-daily gift flow.
+"""One resumable, low-priority DB-first task for every post-daily gift flow.
 
-Only ``KEY`` is persisted. The per-screen modules are implementation details:
-their progress lives on ``BotContext`` while the worker yields to Join Boss and
-is discarded after the whole two-boundary scan completes.
+Every named reward location has a durable child key.  ``KEY`` is written only
+after all locations in both outer zones have a current server-day checkpoint.
 """
 from dataclasses import dataclass, field
 from importlib import import_module
 
 from ...context.errors import YieldToBoss
-from . import event_center, lobby, valuable_event
+from . import event_center, lobby, registry, valuable_event
 # Compatibility aliases for callers that previously imported a specific
 # non-Event-Center claim flow from ``gift_claims``.  Implementations live in
 # ``valuable_event/``; only the public entry points remain here.
@@ -45,6 +44,13 @@ def _progress(bot) -> GiftProgress:
     progress = getattr(bot, "_gift_claims_progress", None)
     if not isinstance(progress, GiftProgress):
         progress = GiftProgress()
+        # Child keys are durable checkpoints.  They survive a Boss yield or
+        # worker restart, while the combined ``gift_claims`` key is still
+        # withheld until both outer zones are completely clean.
+        progress.valuable_done.update(
+            key for key in valuable_event.KEYS if bot.is_daily_done(key))
+        progress.super_value_done.update(
+            key for key in super_value_return.KEYS if bot.is_daily_done(key))
         bot._gift_claims_progress = progress
     return progress
 
@@ -140,68 +146,51 @@ def _dispatch(bot, screen_name: GiftScreen, progress: GiftProgress):
 
 
 def run(bot) -> bool:
-    """Resume both boundaries and persist only after the whole scan finishes.
+    """Inspect every DB-pending reward location, in its two fixed zones.
 
-    A timeout/boss exception may interrupt any device action. The last outer
-    dot is rolled back, while completed inner tabs stay in memory, so the next
-    two-minute slice resumes safely rather than repeating the entire scan.
+    This is deliberately DB-first.  A red marker can disappear before a free
+    chest becomes visible, so it is not an execution queue and never writes a
+    DONE timestamp.  Every individual flow must return true only after it has
+    reached and inspected its named screen; :class:`GiftTask` then writes its
+    own key.  ``bot.check()`` keeps the normal two-minute/Boss yielding
+    contract between locations.
     """
-    if bot.is_daily_done(KEY):
+    # ``gift_claims`` is deliberately only an aggregate scheduler checkpoint.
+    # Every named location is authoritative: an old aggregate record must not
+    # suppress a newly introduced/missing child location on the same server
+    # day.  This is also what makes the next run after reset inspect each
+    # location again even if the city currently displays no red badge.
+    if registry.complete(bot):
+        if not bot.is_daily_done(KEY):
+            bot.mark_daily_done(KEY)
         return True
+    if bot.is_daily_done(KEY):
+        bot.record("Gift Claims: aggregate DONE cũ nhưng còn điểm nhận chưa "
+                   "kiểm tra; bỏ qua aggregate và tiếp tục theo DB con")
 
-    progress = _progress(bot)
-    # Unknown means the clicked lobby marker opened no captured title. Many of
-    # those badges clear merely by being opened. Retry it on the next full
-    # pass, but do not carry a stale Unknown blocker forever after the marker
-    # has disappeared from the lobby.
-    if (progress.boundary_index == 0
-            and all(not points for points in progress.attempted.values())):
-        progress.unresolved_parents.discard(GiftScreen.UNKNOWN)
-    while progress.boundary_index < len(lobby.BOUNDARIES):
-        boundary = lobby.BOUNDARIES[progress.boundary_index]
-        attempted = progress.attempted[boundary]
-        bot.check()
-        before = len(attempted)
-        try:
-            screen_name = lobby.open_next(bot, boundary, attempted)
-            if screen_name is None:
-                progress.boundary_index += 1
-                continue
-            progress.seen_parents.add(screen_name)
-            _dispatch(bot, screen_name, progress)
-        except Exception:
-            # open_next can itself time out after appending/tapping a dot, so
-            # rollback covers both navigation and the opened child flow.
-            if len(attempted) > before:
-                attempted.pop()
-            raise
+    for zone in (registry.VALUABLE_EVENT, registry.EVENT_CENTER):
+        for location in registry.pending(bot, zone):
+            bot.check()
+            bot.record(f"Gift Claims: kiểm tra DB-pending {location.task.label}")
+            inspected = location.task.run(bot)
+            if not inspected:
+                bot.record(f"Gift Claims: chưa tới/kiểm tra xong "
+                           f"{location.task.label}; giữ PENDING")
 
-    # A parent may remove its lobby badge on the final successful tap just as
-    # the two-minute slice expires. A complete two-boundary rescan is the
-    # authoritative verification: if that parent was not seen again, its old
-    # unresolved marker is stale and must not block the combined DB task.
-    vanished = progress.unresolved_parents - progress.seen_parents
-    for screen_name in vanished:
-        progress.unresolved_parents.discard(screen_name)
-        progress.outcomes.append(f"cleared_on_lobby_recheck:{screen_name.value}")
-        bot.record(f"Gift Claims: {screen_name.value} đã hết dấu đỏ khi quét lại hai vùng")
-
-    if progress.unresolved_parents:
-        names = ", ".join(sorted(item.value for item in progress.unresolved_parents))
-        bot.record(f"Gift Claims: chưa DONE ({names} còn đỏ); nhường Boss rồi quét lại")
-        progress.boundary_index = 0
-        progress.attempted = {name: [] for name in lobby.BOUNDARIES}
-        progress.seen_parents.clear()
-        raise YieldToBoss
+    # A clean red-badge scan is not evidence that every named gift location
+    # was inspected.  Each child flow writes its own key after opening the
+    # page; only those keys may complete the aggregate task.
+    if not registry.complete(bot):
+        pending = ", ".join(item.task.label for item in registry.pending(bot))
+        bot.record("Gift Claims: còn PENDING theo DB (không suy từ chấm đỏ): "
+                   + pending)
+        return False
 
     bot.mark_daily_done(KEY)
-    verified = sum(1 for item in progress.outcomes
-                   if not item.startswith("unidentified:"))
-    unknown = sum(1 for item in progress.outcomes
-                  if item.startswith("unidentified_checked:"))
-    bot.record(f"Gift Claims: HOÀN THÀNH một task chung; "
-               f"{verified} luồng đã kiểm tra, {unknown} dấu đỏ không có màn cố định")
-    delattr(bot, "_gift_claims_progress")
+    bot.record("Gift Claims: HOÀN THÀNH; mọi key khu Valuable Event và "
+               "Event Center đều current sau reset server")
+    if hasattr(bot, "_gift_claims_progress"):
+        delattr(bot, "_gift_claims_progress")
     return True
 
 

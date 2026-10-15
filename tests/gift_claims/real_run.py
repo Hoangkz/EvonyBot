@@ -2,6 +2,8 @@ r"""Run one or all gift-claim modules on a real ADB device.
 
 Examples:
     venv\Scripts\python.exe -m tests.gift_claims.real_run --serial 127.0.0.1:21513
+    # Event Center test chạy tới khi quét xong, không giới hạn 120 giây:
+    venv\Scripts\python.exe -m tests.gift_claims.real_run --serial 127.0.0.1:21513 --task gift_event_center_limited
     venv\Scripts\python.exe -m tests.gift_claims.real_run --task gift_limited_offer --shots
 """
 import argparse
@@ -27,7 +29,8 @@ def main():
     parser.add_argument("--serial", required=True)
     parser.add_argument("--task", action="append", help="gift_* key; repeat to run several")
     parser.add_argument("--slice-seconds", type=float,
-                        help="simulate the worker time slice and resume after timeout")
+                        help="chỉ dùng khi cần mô phỏng worker yield; bỏ tham số này "
+                             "để test chạy tới khi hoàn tất")
     parser.add_argument("--zone2", action="store_true",
                         help="start the combined flow at the right-rail boundary")
     parser.add_argument("--max-slices", type=int,
@@ -63,7 +66,10 @@ def main():
         bot._deadline = (time.monotonic() + args.slice_seconds
                          if args.slice_seconds else None)
         try:
-            clean = event_center.run_opened(bot)
+            # Standalone diagnostics start from whichever screen the emulator
+            # currently shows. Open Event Center through its fixed launcher
+            # before scanning the event list.
+            clean = event_center.run(bot)
             log(f"Event Center clean: {clean}")
         except BotInterrupted as exc:
             log(f"Event Center yield: {type(exc).__name__}")

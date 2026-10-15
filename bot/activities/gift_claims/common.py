@@ -24,6 +24,10 @@ FIXED_CONTROL_THRESHOLDS = {
     # frame the user-provided crop scores about 0.65, while the surrounding
     # icon/background changes between events.
     "Common/button_daily_free_text": 0.62,
+    # Blessing of Pallas renders the same word with a narrower green glow.
+    # Real 396x704 ADB frames score ~0.663 at the exact Claim button while
+    # the Event Center list stays below 0.47, so 0.65 keeps useful margin.
+    "Common/button_claim_text": 0.65,
     "Common/button_free_text": 0.70,
     "Common/button_claim_all_text": 0.70,
 }
@@ -46,6 +50,20 @@ class GiftTask:
     label: str
     run: Callable
 
+    def __post_init__(self):
+        """Make a standalone event task persist its own successful result."""
+        action = self.run
+
+        def persisted(bot, *args, **kwargs):
+            if bot.is_daily_done(self.key):
+                return True
+            completed = action(bot, *args, **kwargs)
+            if completed:
+                mark_task_done(bot, self.key)
+            return completed
+
+        object.__setattr__(self, "run", persisted)
+
 
 @dataclass(frozen=True)
 class ClaimReport:
@@ -60,6 +78,13 @@ class ClaimReport:
     @property
     def claimed(self) -> bool:
         return self.verified > 0
+
+
+def mark_task_done(bot, key: str) -> None:
+    """Persist one completed gift event without completing the combined task."""
+    if not bot.is_daily_done(key):
+        bot.mark_daily_done(key)
+        bot.record(f"Gift Claims: DB DONE {key}")
 
 
 def path(name: str) -> str:
@@ -155,27 +180,34 @@ def open_launcher(bot, launcher: str | tuple[str, ...]):
 
 def open_event_center(bot):
     """Open the explicitly named Event Center icon wherever the lobby moved it."""
-    if not return_home(bot):
-        return None
-    lobby = bot.screenshot()
-    launcher = None
-    for name in EVENT_CENTER_LAUNCHERS:
-        launcher = find(bot, name, lobby, threshold=0.70,
-                        region=(60, 5, 100, 72))
-        if launcher is not None:
-            break
-    if launcher is None:
-        bot.log("Gift Claims: named Event Center launcher not found")
-        return None
-    # The template is the fixed caption; tap the icon body immediately above.
-    bot.tap(launcher[0], max(0, launcher[1] - 20), delay=1)
-    for attempt in range(EVENT_CENTER_WAIT_ATTEMPTS):
-        screen = bot.screenshot()
-        if find(bot, "EventCenter/title", screen, threshold=0.72,
-                region=(0, 0, 100, 13)) is not None:
-            return screen
-        if attempt + 1 < EVENT_CENTER_WAIT_ATTEMPTS:
-            bot.sleep(1)
+    # A rotating sale popup can race the launcher tap and cover Event Center.
+    # Close an explicit X with Android Back, then reacquire the named launcher
+    # instead of spending the whole attempt looking for the hidden title.
+    for launch_attempt in range(3):
+        if not return_home(bot):
+            return None
+        lobby = bot.screenshot()
+        launcher = None
+        for name in EVENT_CENTER_LAUNCHERS:
+            launcher = find(bot, name, lobby, threshold=0.70,
+                            region=(60, 5, 100, 72))
+            if launcher is not None:
+                break
+        if launcher is None:
+            bot.log("Gift Claims: named Event Center launcher not found")
+            return None
+        # The template is the fixed caption; tap the icon body immediately above.
+        bot.tap(launcher[0], max(0, launcher[1] - 20), delay=1)
+        for attempt in range(EVENT_CENTER_WAIT_ATTEMPTS):
+            screen = bot.screenshot()
+            if find(bot, "EventCenter/title", screen, threshold=0.72,
+                    region=(0, 0, 100, 13)) is not None:
+                return screen
+            if back_if_close_x(bot, screen):
+                bot.record("Gift Claims: popup che Event Center; đóng và thử launcher lại")
+                break
+            if attempt + 1 < EVENT_CENTER_WAIT_ATTEMPTS:
+                bot.sleep(1)
     bot.log("Gift Claims: Event Center did not open")
     return_home(bot)
     return None
@@ -205,15 +237,13 @@ def select_carousel_tab(bot, page_title: str, tab: str, screen=None) -> bool:
 
 
 def open_event_center_event(bot, row: str, page_title: str) -> bool:
-    """Open one visible Limited event only when its row has an exact red dot."""
+    """Open one visible named Event Center row, independent of red badges."""
     screen = open_event_center(bot)
     if screen is None:
         return False
     row_pos = find(bot, row, screen, threshold=0.80, region=(15, 15, 70, 98))
-    dots = find_all(bot, "EventCenter/notification_dot", screen, threshold=0.65,
-                    region=(10, 15, 25, 98))
-    if row_pos is None or not any(abs(y - row_pos[1]) <= 35 for _, y in dots):
-        bot.log(f"Gift Claims: {row} has no claim indicator")
+    if row_pos is None:
+        bot.log(f"Gift Claims: không thấy hàng cố định {row}")
         return_home(bot)
         return False
     bot.tap_percent(52, row_pos[1] * 100 / screen.shape[0], delay=2)
@@ -435,8 +465,22 @@ def claim_sparkles(bot, *, region=(0, 20, 100, 88), attempts=4) -> ClaimReport:
 def back_if_close_x(bot, screen=None) -> bool:
     """Use Android Back when an opened reward panel exposes the supplied X."""
     screen = bot.screenshot() if screen is None else screen
-    if find(bot, "Common/button_close_x", screen, threshold=0.78,
-            region=(0, 0, 100, 35)) is None:
+    close = find(bot, "Common/button_close_x", screen, threshold=0.78,
+                 region=(0, 0, 100, 35)) is not None
+    if not close:
+        # Some rotating sales use a bright red diagonal X instead of the
+        # round gold X supplied by the user.  Restrict this fallback to the
+        # extreme top-right corner so red event artwork is never actionable.
+        height, width = screen.shape[:2]
+        corner = screen[:max(1, round(height * 0.06)),
+                        max(0, round(width * 0.90)):]
+        hsv = cv2.cvtColor(corner, cv2.COLOR_BGR2HSV)
+        bright_red = ((cv2.inRange(hsv, np.array((0, 170, 145)),
+                                   np.array((12, 255, 255))) |
+                       cv2.inRange(hsv, np.array((170, 170, 145)),
+                                   np.array((179, 255, 255)))))
+        close = cv2.countNonZero(bright_red) >= max(20, round(width * height * 0.00025))
+    if not close:
         return False
     bot.record("Gift Claims: thấy nút X; dùng Back để thoát mục")
     bot.back(delay=0.8)
