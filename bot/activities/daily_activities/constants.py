@@ -5,17 +5,8 @@ constants.py — Daily Activities: thư mục ảnh, tên action và key daily_d
 ROOT = "DailyActivites"
 USE_ALL = f"{ROOT}/UseAllActivities"
 
-# Action chung của vòng lặp run_task (common.py). Action riêng của nhiệm vụ là chuỗi khác (VD "tax"),
-# được chuyển cho handler của nhiệm vụ.
-DONE, BACK, TAP, SCROLL, OPEN = "done", "back", "tap", "scroll", "open"
-OPEN_MONSTER_FIRST, OPEN_MONSTER_SECOND = "open_monster_first", "open_monster_second"
-VERIFY_COLLECTING, OPEN_COLLECTING_HELPER = "verify_collecting", "open_collecting_helper"
-# Kết quả open_task_row.
-ROW_OPENED, ROW_COMPLETE, ROW_MOVED = "opened", "complete", "moved"
-# Ảnh tiêu đề dòng nhiệm vụ: find_first trả góc trên trái (dòng Go tính từ đó, như bản C#).
-ROW_ANCHORS = frozenset({OPEN, OPEN_MONSTER_FIRST, OPEN_MONSTER_SECOND,
-                         VERIFY_COLLECTING, OPEN_COLLECTING_HELPER,
-                         "claim", "donate", "crystal", "compose"})
+# Action của collect_activity_rewards (common.py): màn đã ở bảng Activity / Back / bấm.
+DONE, BACK, TAP = "done", "back", "tap"
 
 # ---- Mở nhiệm vụ, phiên bản giao diện MỚI (common.open_task) ---------------------------------
 # Màn chính (nút "•••", 0,96) -> nút Quests góc dưới trái (0,97) -> popup Quests -> tab Activity
@@ -110,7 +101,6 @@ TICK_BUTTON = f"{USE_ALL}/Tick.png"
 TICK_DY = 33
 
 REWARDS = "Activity Rewards"   # key trong daily_done cho bước nhận thưởng cuối
-REWARDS_KEY = "daily_rewards"   # key của bước nhận thưởng cuối trong bot/worker/priority.py
 GENERAL = "General"
 # Mua Stamina + Hammer (nhiệm vụ General): mỗi món có dấu "xong hôm nay" riêng.
 STAMINA_REACHED = "General: Stamina reached"   # f"{STAMINA_REACHED} {N}" = hôm nay đã mua tới cái thứ N (nâng mốc thì mua phần còn lại)

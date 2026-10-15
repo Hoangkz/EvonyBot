@@ -7,9 +7,6 @@ KEY = "daily_alliance_help"   # key nhiệm vụ trong bot/worker/priority.py
 LABEL = "Alliance Help"       # tên ở tab Daily Activities, key daily_done
 FOLDER = "ActivitiesAllianceHelp"
 FOLDER_PATH = f"{ROOT}/{FOLDER}"
-# Không có luồng C# cũ: không có ảnh "đã xong" / action cho common.run_task.
-DONE_IMAGES = ()
-ACTIONS = ()
 
 # ---- Theo giờ (../common.py try_task, worker gọi), như Alliance Donation ------------------------
 # Nhiệm vụ "Complete Alliance Help for 5 time(s)". Màn chính -> Liên minh -> dòng "Alliance Help" -> màn Alliance

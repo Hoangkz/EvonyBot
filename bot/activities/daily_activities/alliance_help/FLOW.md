@@ -14,5 +14,3 @@ Tab UI: ô chọn giờ thay cho ô tích — **0 / 1h / 2h / 3h / 4h** (mặc �
    là "No records" trước khi bấm) → Back → lưu giờ thử (`TRIED_KEY`) → kiểm tra dòng / thẻ Activity như Alliance Donation
    (`../common.py` `check_done`, không bấm Go): xong → đánh dấu xong hôm nay (lưu DB), trong ngày không kiểm tra lại.
 5. Chưa xong → `bot.again_after`: worker hẹn chạy lại Daily Activities sau số giờ đã chọn, độ ưu tiên thấp nhất.
-
-Không có luồng C# cũ (`ACTIONS` rỗng, không chạy qua `common.run_task`).

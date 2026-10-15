@@ -1,25 +1,12 @@
 """
 constants.py — ảnh của nhiệm vụ Daily Activities "Troop Training" (thư mục ảnh ActivitiesTroopTrain/).
 """
-from ..constants import ROOT, OPEN, TAP
+from ..constants import ROOT
 
 KEY = "daily_troop_training"   # key nhiệm vụ trong bot/worker/priority.py
 LABEL = "Troop Training"   # ô tích ở tab Daily Activities, key daily_done
 FOLDER = "ActivitiesTroopTrain"
 FOLDER_PATH = f"{ROOT}/{FOLDER}"
-# Ảnh "đã xong" (thấy là nhiệm vụ hôm nay xong).
-DONE_IMAGES = ("TroopFinish.png", "TroopFinish1.png", )
-# (ảnh, action) theo thứ tự ưu tiên. Action chung (OPEN / TAP / ...) do common.run_task xử lý,
-# action riêng (chuỗi) chuyển cho run.handle.
-ACTIONS = (
-    ("TroopSpeed.png", "speed"),
-    ("TrainSoldierSelectedCurrent.png", "soldier"),
-    ("TrainSoldierCurrent.png", "soldier"),
-    ("TrainSoldier1.png", "soldier"),
-    ("TrainInterface.png", "interface"),
-    ("Train.png", TAP),
-    ("TrainTroop.png", OPEN),
-)
 
 # ---- Luồng mới sau Go (run.after_go), giống King's Path Train Troop -------------------------------
 # Go -> về thành, game kéo tới công trình train ngẫu nhiên 1 trong 4 loại lính (bộ / kỵ / cung / xe) ->

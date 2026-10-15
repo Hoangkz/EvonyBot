@@ -1,7 +1,7 @@
 # Flow: Black Market
 
-Nhiệm vụ Daily Activities. Ảnh / action: [constants.py](constants.py), handler: [run.py](run.py).
-Phần dùng chung (mở Quests → Activity, tìm dòng, bấm Go, state machine `run_task`): [../FLOW.md](../FLOW.md).
+Nhiệm vụ Daily Activities. Ảnh: [constants.py](constants.py), phần làm sau Go (`after_go`): [run.py](run.py).
+Phần dùng chung (mở bảng Activity, tìm dòng / thẻ, bấm Go): [../OPEN_TASK.md](../OPEN_TASK.md), [../FLOW.md](../FLOW.md).
 
 ## Luồng mới (`run.after_go`, sau khi `common.open_task` bấm Go)
 
@@ -20,13 +20,3 @@ Giống hệt King's Path Black Market sau Go: dùng chung `event/kings_path/bla
    cương < **50** (`GEMS_MIN`, giá một lần refresh trả phí) → Back, dừng. Đọc lỗi → bỏ qua kiểm tra.
 5. Dừng giữa chừng (hết hàng / không thấy Instant Refresh / kẹt / thiếu vàng, kim cương) → không đánh dấu, lần sau
    thử lại từ 0.
-
-## Luồng cũ C# (`common.run_task` + `run.handle`, `run.py` chung vẫn đang dùng)
-
-1. Mở từ `ActivitiesBlackMarket.png` rồi `BuyMarket.png`.
-2. Khi thấy `Market.png` hoặc `Market1.png`, tìm lần lượt các mặt hàng tài
-   nguyên: food, lumber, ore, stone.
-3. Mỗi lần mua bấm xác nhận tại `(190, 415)`.
-4. Tối đa ba lần mua trong lượt rồi Back.
-5. Không dùng tọa độ Instant Refresh cũ vì client hiện tại tính phí gem.
-6. `BlackMarketFinishCurrent.png` hoặc `BlackMarketFinish.png` báo hoàn thành.

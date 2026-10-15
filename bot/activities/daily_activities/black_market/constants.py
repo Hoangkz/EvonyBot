@@ -1,23 +1,12 @@
 """
 constants.py — ảnh của nhiệm vụ Daily Activities "Black Market" (thư mục ảnh ActivitiesBuyMarket/).
 """
-from ..constants import ROOT, OPEN, TAP
+from ..constants import ROOT
 
 KEY = "daily_black_market"   # key nhiệm vụ trong bot/worker/priority.py
 LABEL = "Black Market"   # ô tích ở tab Daily Activities, key daily_done
 FOLDER = "ActivitiesBuyMarket"
 FOLDER_PATH = f"{ROOT}/{FOLDER}"
-# Ảnh "đã xong" (thấy là nhiệm vụ hôm nay xong).
-DONE_IMAGES = ("BlackMarketFinishCurrent.png", "BlackMarketFinish.png", )
-# (ảnh, action) theo thứ tự ưu tiên. Action chung (OPEN / TAP / ...) do common.run_task xử lý,
-# action riêng (chuỗi) chuyển cho run.handle.
-ACTIONS = (
-    ("Confirm.png", TAP),
-    ("Market.png", "buy"),
-    ("Market1.png", "buy"),
-    ("BuyMarket.png", "market"),
-    ("ActivitiesBlackMarket.png", OPEN),
-)
 
 # ---- Luồng mới sau Go (run.after_go), giống hệt King's Path Black Market sau Go --------------------
 # Go -> về thành, Chợ ở giữa -> menu "Black Market" -> event/kings_path/black_market buy_items: mua các món không

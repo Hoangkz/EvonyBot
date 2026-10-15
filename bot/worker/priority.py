@@ -1,11 +1,11 @@
 """priority.py — bảng nhiệm vụ của worker: mỗi dòng có độ ưu tiên và `run` là việc thực hiện nhiệm vụ đó, import thẳng từ
 bot/activities: một hàm trơn `run(ctx, cấu hình tab)`, hoặc một dict {run, enabled, done, every} do code của nhiệm vụ dựng sẵn. Dòng không có `run` (Bubble, Join Monster War, việc chưa làm) không vào danh sách nhiệm vụ."""
-from ..activities.daily_activities.monster_killing import TASK as daily_monster_killing
-from ..activities.daily_activities.resource_collecting import TASK as daily_resource_collecting
 from ..activities.daily_activities.offering import TASK as daily_offering
-from ..activities.daily_activities.resource_gathering import TASK as daily_resource_gathering
+from ..activities.daily_activities.offering.run import after_go as offering_after_go
 from ..activities.daily_activities.resource_tax import TASK as daily_resource_tax
+from ..activities.daily_activities.resource_tax.run import after_go as resource_tax_after_go
 from ..activities.daily_activities.gold_levy import TASK as daily_gold_levy
+from ..activities.daily_activities.gold_levy.run import after_go as gold_levy_after_go
 from ..activities.daily_activities.troop_training import TASK as daily_troop_training
 from ..activities.daily_activities.troop_healing import TASK as daily_troop_heading
 from ..activities.daily_activities.troop_healing.run import after_go as troop_healing_after_go
@@ -17,6 +17,7 @@ from ..activities.daily_activities.black_market.run import after_go as black_mar
 from ..activities.daily_activities.general_enhancing import TASK as daily_general_enhancing
 from ..activities.daily_activities.general_enhancing.run import after_go as general_enhancing_after_go
 from ..activities.daily_activities.wheel_of_fortune import TASK as daily_wheel_of_fortune
+from ..activities.daily_activities.wheel_of_fortune.run import after_go as wheel_of_fortune_after_go
 from ..activities.daily_activities.patrol import TASK as daily_patrol
 from ..activities.daily_activities.patrol.run import after_go as patrol_after_go
 from ..activities.daily_activities.material_composing import TASK as daily_material_composing
@@ -220,20 +221,20 @@ DATA ={
         },
         { 
             "key": "daily_offering",
-            "run": daily_job(daily_offering, target="Offer Gems"),
+            "run": daily_job(daily_offering, target="Offer Gems", after_go=offering_after_go),
             "label": "Offering",
             "priority": 666,
         },
         { 
             "key": "daily_resource_tax",
-            "run": daily_job(daily_resource_tax),
+            "run": daily_job(daily_resource_tax, after_go=resource_tax_after_go),
             "must_finish": True,
             "label": "Resource Tax",
             "priority": 399,
         },
         { 
             "key": "daily_gold_levy",
-            "run": daily_job(daily_gold_levy),
+            "run": daily_job(daily_gold_levy, after_go=gold_levy_after_go),
             "label": "Gold Levy",
             "priority": 398,
         },
@@ -307,7 +308,7 @@ DATA ={
         },
         { 
             "key": "daily_wheel_of_fortune",
-            "run": daily_job(daily_wheel_of_fortune),
+            "run": daily_job(daily_wheel_of_fortune, after_go=wheel_of_fortune_after_go),
             "label": "Wheel of Fortune",
             "priority": 388,
         },

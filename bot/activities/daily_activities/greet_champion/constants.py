@@ -1,17 +1,12 @@
 """
 constants.py — ảnh của nhiệm vụ Daily Activities "Greet Champion" (thư mục ảnh ActivitiesGreetChampion/).
 """
-from ..constants import ROOT, OPEN
+from ..constants import ROOT
 
 KEY = "daily_greet_champion"   # key nhiệm vụ trong bot/worker/priority.py
 LABEL = "Greet Champion"   # ô tích ở tab Daily Activities, key daily_done
 FOLDER = "ActivitiesGreetChampion"
 FOLDER_PATH = f"{ROOT}/{FOLDER}"
-# Ảnh "đã xong": không có, xong khi đã chào tới 10/10 (hay dòng nhiệm vụ hết Go).
-DONE_IMAGES = ()
-# Tiêu đề dòng "Greet the Champion 2 time(s)." lấy từ Title.png (chỉ chữ "Greet the Champion", bỏ số lần);
-# ACTIONS chỉ để đủ Task.
-ACTIONS = (("Title.png", OPEN),)
 
 # ---- Sau Go (run.after_go) --------------------------------------------------------------------
 # Go -> về thành chính. Thành chính (Keep) ở giữa:

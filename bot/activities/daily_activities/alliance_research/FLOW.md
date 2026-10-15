@@ -2,8 +2,7 @@
 
 Nhiệm vụ Daily Activities (ô tích **Research** ở tab Daily Activities). Ảnh / hằng số: [constants.py](constants.py),
 code: [run.py](run.py). Phần chung (mở Quests → Activity, tìm dòng "Research technologies", bấm Go):
-[../OPEN_TASK.md](../OPEN_TASK.md). Dòng này cũng là đường tắt của Resource Collecting
-([../resource_collecting/FLOW.md](../resource_collecting/FLOW.md)); hai nhiệm vụ độc lập nhau.
+[../OPEN_TASK.md](../OPEN_TASK.md).
 
 ```mermaid
 flowchart TD

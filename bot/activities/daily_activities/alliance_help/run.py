@@ -12,8 +12,6 @@ from ...event.kings_path.donate.constants import ALLIANCE_BUTTON, OUT_ALLIANCE
 from ...result import NOT_DONE, TaskResult
 from ..common import Task, check_done
 from .constants import (
-    ACTIONS,
-    DONE_IMAGES,
     FOLDER,
     HELP_ALL,
     HELP_ROW,
@@ -27,11 +25,6 @@ from .constants import (
 )
 
 _ON_HELP, _TAP, _BACK, _OUT = "on_help", "tap", "back", "out_alliance"
-
-
-def handle(bot, action, pos, screen):
-    """Không có luồng C# cũ (ACTIONS rỗng)."""
-    return False
 
 
 def help_all(bot) -> TaskResult:
@@ -104,4 +97,4 @@ def _open_help(bot) -> bool:
     return False
 
 
-TASK = Task(LABEL, FOLDER, DONE_IMAGES, ACTIONS, handle, key=KEY)
+TASK = Task(LABEL, FOLDER, key=KEY)

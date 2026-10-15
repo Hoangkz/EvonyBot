@@ -1,7 +1,7 @@
 # Flow: Trap Building
 
-Nhiệm vụ Daily Activities. Ảnh / action: [constants.py](constants.py), handler: [run.py](run.py).
-Phần dùng chung (mở Quests → Activity, tìm dòng, bấm Go, state machine `run_task`): [../FLOW.md](../FLOW.md).
+Nhiệm vụ Daily Activities. Ảnh: [constants.py](constants.py), phần làm sau Go (`after_go`): [run.py](run.py).
+Phần dùng chung (mở bảng Activity, tìm dòng / thẻ, bấm Go): [../OPEN_TASK.md](../OPEN_TASK.md), [../FLOW.md](../FLOW.md).
 
 ## Luồng mới (`run.after_go`, sau khi `common.open_task` bấm Go)
 
@@ -18,11 +18,3 @@ Trap Factory (`event/gather_troops/trap_factory`, xây bẫy).
 4. Nút Build hiện lại → đánh dấu xong hôm nay, Back đóng màn Train.
 
 Worker chạy luồng này: `priority.py` truyền `after_go` vào `daily_job` (open_task_or_finish → after_go).
-
-## Luồng cũ C# (`common.run_task` + `run.handle`, không còn được worker gọi cho nhiệm vụ này)
-
-1. Mở từ `ActivitiesBuildTrap1.png` rồi `Build.png`.
-2. `BuildInterface.png`: chọn trap tier I hiện tại, nhập 150 và xây.
-3. `Trap-i.png`: trường hợp đã ở màn chọn trap, nhập 150 và xây trực tiếp.
-4. `TrapSpeed.png`: dùng speedup, sau đó Back.
-5. `TrapFinish.png` hoặc `TrapFinish1.png` báo hoàn thành.

@@ -1,7 +1,7 @@
 # Flow: Troop Training
 
-Nhiệm vụ Daily Activities. Ảnh / action: [constants.py](constants.py), handler: [run.py](run.py).
-Phần dùng chung (mở Quests → Activity, tìm dòng, bấm Go, state machine `run_task`): [../FLOW.md](../FLOW.md).
+Nhiệm vụ Daily Activities. Ảnh: [constants.py](constants.py), phần làm sau Go (`after_go`): [run.py](run.py).
+Phần dùng chung (mở bảng Activity, tìm dòng / thẻ, bấm Go): [../OPEN_TASK.md](../OPEN_TASK.md), [../FLOW.md](../FLOW.md).
 
 ## Luồng mới (`run.after_go`, sau khi `common.open_task` bấm Go)
 
@@ -23,13 +23,3 @@ Giống King's Path Train Troop (`event/kings_path/train_troop`), dùng lại c�
 7. Quá `MAX_STEPS` vòng / không chọn được cấp I / không đọc được số mỗi mẻ → ghi lịch sử, không đánh dấu.
 
 Worker chạy luồng này: `priority.py` truyền `after_go` vào `daily_job` (open_task_or_finish → after_go).
-
-## Luồng cũ C# (`common.run_task` + `run.handle`, không còn được worker gọi cho nhiệm vụ này)
-
-1. Mở từ hàng `TrainTroop.png`.
-2. `Train.png`: bấm vào mục Train chung.
-3. `TrainInterface.png`: vuốt ngang carousel quân.
-4. `TrainSoldierCurrent.png`, `TrainSoldierSelectedCurrent.png` hoặc
-   `TrainSoldier1.png`: nhập số lượng 500 và xác nhận.
-5. `TroopSpeed.png`: dùng nút speedup hiện tại.
-6. `TroopFinish.png` hoặc `TroopFinish1.png` báo hoàn thành.

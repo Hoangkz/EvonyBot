@@ -1,23 +1,12 @@
 """
 constants.py — ảnh của nhiệm vụ Daily Activities "Offering" (thư mục ảnh ActivitiesOffer/).
 """
-from ..constants import ROOT, OPEN, TAP
+from ..constants import ROOT
 
 KEY = "daily_offering"   # key nhiệm vụ trong bot/worker/priority.py
 LABEL = "Offering"   # ô tích ở tab Daily Activities, key daily_done
 FOLDER = "ActivitiesOffer"
 FOLDER_PATH = f"{ROOT}/{FOLDER}"
-# Ảnh "đã xong" (thấy là nhiệm vụ hôm nay xong).
-DONE_IMAGES = ("Offerdone.png", "Offerdone1.png", )
-# (ảnh, action) theo thứ tự ưu tiên. Action chung (OPEN / TAP / ...) do common.run_task xử lý,
-# action riêng (chuỗi) chuyển cho run.handle.
-ACTIONS = (
-    ("Offerfins.png", "finish_offer"),
-    ("OfferGems.png", "offer_gems"),
-    ("Offer1.png", "offer"),
-    ("Offer.png", OPEN),
-    ("Offer2.png", TAP),
-)
 
 # ---- Sau Go (giống Event, ../../event/kings_path/building.py open_building) --------------------
 # Go -> về thành, Đền thờ (Shrine) ở giữa -> nhận ra theo ảnh mẫu civ (Event/Building/civ<N>/shrine,
