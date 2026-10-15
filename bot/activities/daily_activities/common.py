@@ -863,10 +863,9 @@ def daily_selected_done(ctx, settings: dict) -> bool:
 
 @save_errors("daily_rewards")
 def _run_rewards(ctx, settings):
-    """Nhận thưởng Activity (dòng nhiệm vụ + rương điểm); chỉ lưu "đã nhận" khi mọi việc Daily đã tích đều xong."""
+    """Nhận thưởng Activity (dòng nhiệm vụ + rương điểm): mỗi ngày một lần, nhận xong là lưu "đã nhận" (dù còn việc Daily dở)."""
     collect_activity_rewards(ctx)
-    if daily_selected_done(ctx, settings):
-        ctx.mark_daily_done(REWARDS)
+    ctx.mark_daily_done(REWARDS)
 
 
 @save_errors("daily_gift_claims")
@@ -880,6 +879,20 @@ def _any_selected(settings: dict) -> bool:
     return bool(selected_labels(settings))
 
 
-REWARDS_JOB = {"run": _run_rewards, "enabled": _any_selected, "done": lambda ctx, settings: ctx.is_daily_done(REWARDS)}
-GIFTS_JOB = {"run": _run_gifts, "enabled": _any_selected,
-             "done": lambda ctx, settings: ctx.is_daily_done(gift_claims.KEY)}
+def _rewards_done_or_not_ready(ctx, settings) -> bool:
+    """Xong hôm nay, hoặc chưa có việc Daily đã tích nào xong: worker bỏ qua, không mở bảng Activity nhận thưởng khi chưa có gì để
+    nhận. Mỗi vòng worker đọc lại, có một việc xong là tự quay lại."""
+    if ctx.is_daily_done(REWARDS):
+        return True
+    return not any(ctx.is_daily_done(_KEY_BY_LABEL.get(label, label)) for label in selected_labels(settings))
+
+
+def _gifts_done_or_not_ready(ctx, settings) -> bool:
+    """Xong hôm nay, hoặc chưa tới lúc nhận (Daily đã tích chưa xong hết / thưởng Activity chưa nhận): worker bỏ qua, không
+    gọi run chạy không để đếm lần thử. Mỗi vòng worker đọc lại, hết điều kiện chặn là tự quay lại."""
+    return (ctx.is_daily_done(gift_claims.KEY)
+            or not (daily_selected_done(ctx, settings) and ctx.is_daily_done(REWARDS)))
+
+
+REWARDS_JOB = {"run": _run_rewards, "enabled": _any_selected, "done": _rewards_done_or_not_ready}
+GIFTS_JOB = {"run": _run_gifts, "enabled": _any_selected, "done": _gifts_done_or_not_ready}

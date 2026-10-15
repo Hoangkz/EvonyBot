@@ -27,6 +27,7 @@ class Task:
     group: str      # activity chứa nhiệm vụ = tên chạy qua ACTIVITIES / tab settings
     priority: int
     must_finish: bool = False   # bắt đầu rồi thì chạy tới xong, không bị ngắt (trừ Stop)
+    tail: bool = False          # nhiệm vụ nhận thưởng cuối chuỗi: nhiệm vụ cùng nhóm bị chuyển xuống cuối thì dừng trước nó
     once: bool = False          # xong rồi thì không đưa lại vào danh sách khi sang ngày mới (chỉ chạy lại khi Start lại)
     run: Callable | None = None  # run(ctx, cấu hình tab của group): làm nhiệm vụ rồi lưu kết quả vào DB
     enabled: Callable[[dict], bool] = always       # enabled(cấu hình tab của group) -> nhiệm vụ này đã được tích?
@@ -58,9 +59,20 @@ def build_task(row: dict, group: str) -> Task:
             return hours > 0 and (since is None or since >= hours)
 
     return Task(key, row.get("group", group), int(row.get("priority", DEFAULT_PRIORITY)),
-                must_finish=bool(row.get("must_finish")), once=bool(row.get("once")),
+                must_finish=bool(row.get("must_finish")), once=bool(row.get("once")), tail=bool(row.get("tail")),
                 run=job["run"], enabled=job.get("enabled", always), due=due,
                 done=job.get("done") or ((lambda ctx, settings: ctx.is_daily_done(key)) if row.get("saves") else None))
+
+
+def sink(order: list[Task], task: Task):
+    """Nhiệm vụ chưa xong: chuyển xuống cuối chuỗi cùng nhóm, nhưng trên các nhiệm vụ `tail` (nhận thưởng) của nhóm đó. Nhiệm
+    vụ `tail` thì xuống cuối danh sách. Nhóm không có nhiệm vụ `tail` thì cuối nhóm."""
+    order.remove(task)
+    if task.tail:
+        order.append(task)
+        return
+    last = max((i for i, t in enumerate(order) if t.group == task.group and not t.tail), default=None)
+    order.insert(len(order) if last is None else last + 1, task)
 
 
 def build_registry(data: dict) -> list[Task]:

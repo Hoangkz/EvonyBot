@@ -48,7 +48,7 @@ from ..context import BotContext, BotInterrupted, TimedOut
 from ..context.errors import BossAvailable, StopRequested, YieldToBoss
 from .guards import Guards
 from .server_clock import ServerClock
-from .tasks import build_tasks
+from .tasks import build_tasks, sink
 from .status import STATUS_ERROR, STATUS_RUNNING, STATUS_STOPPED
 
 JOIN_BOSS = "Join Monster War"
@@ -260,8 +260,7 @@ class BotWorker(QThread):
             if not completed:
                 continue   # bị ngắt (boss / hết 120 giây): sau Join Boss làm tiếp chính nhiệm vụ này, không đổi sang việc khác
             if task.due is None:
-                order.remove(task)
-                order.append(task)   # chưa xong: chuyển xuống cuối (việc theo giờ thì chờ tới giờ kế tiếp)
+                sink(order, task)   # chưa xong: xuống cuối chuỗi cùng nhóm, trên nhiệm vụ nhận thưởng (việc theo giờ thì chờ tới giờ kế tiếp)
                 stalled += 1
                 if stalled >= len(pending):   # cả danh sách đều chưa xong: nghỉ chút rồi mới vòng lại
                     stalled = 0

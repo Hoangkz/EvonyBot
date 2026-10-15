@@ -345,12 +345,14 @@ DATA ={
             "run": daily_rewards,
             "label": "Activity Rewards (nhận thưởng cuối)",
             "priority": 300,
+            "tail": True,
         },
         {
             "key": "daily_gift_claims",
             "run": daily_gift_claims,
             "label": "Nhận quà cuối ngày (sau khi Daily và thưởng Activity xong)",
-            "priority": 200,
+            "priority": -200,
+            "tail": True,
         }
     ],
     "Black Market": [
