@@ -53,6 +53,12 @@ def target(bot):
         return test_open_task(bot)
     if os.environ.get("EVONY_TEST") == "greet":
         return test_greet_champion(bot)
+    if os.environ.get("EVONY_TEST") == "recruit":
+        return test_recruit_general(bot)
+    if os.environ.get("EVONY_TEST") == "recruit_tap":
+        return test_recruit_tap(bot)
+    if os.environ.get("EVONY_TEST") == "recruit_buy":
+        return test_recruit_buy(bot)
     return test_trade_carriage(bot)
 
 
@@ -77,6 +83,83 @@ def test_open_task(bot):
                               done_cards=common.task_done_cards(task), tap_go=False)
     bot.log(f"open_task({name}, tap_go=False) -> {result}")
     return result
+
+
+def _db_city_map() -> dict:
+    """Route công trình của máy SERIAL đã lưu trong DB của app (chỉ đọc), {} nếu chưa có."""
+    import json
+    import sqlite3
+    import database
+    conn = sqlite3.connect(database.DB_PATH)
+    try:
+        row = conn.execute("SELECT city_map FROM devices WHERE serial = ?", (SERIAL,)).fetchone()
+    finally:
+        conn.close()
+    return json.loads(row[0]) if row and row[0] else {}
+
+
+def test_recruit_general(bot):
+    """Activity Recruit General (chạy một mình): chưa có route thì quét (route chỉ giữ trong bộ nhớ của lần chạy, không lưu DB) ->
+    Tavern -> Recruit General -> tích Historic / bỏ Epic -> Refresh liên tục... EVONY_BUY=Buy General Token đổi nút mua (mặc định
+    Recruit General)."""
+    from bot.activities import recruit_general
+    bot.civilization = None
+    bot.set_civilization = lambda civ: setattr(bot, "civilization", civ)
+    bot.city_map = _db_city_map()   # route đã lưu trong DB (chưa có thì activity quét)
+    bot.set_city_map = lambda city_map: setattr(bot, "city_map", city_map)
+    return recruit_general.run(bot, {"buy_with": os.environ.get("EVONY_BUY", "Recruit General")})
+
+
+def test_recruit_buy(bot):
+    """Recruit General MUA THẬT, chạy liên tục tới khi mua đủ BUY_LIMIT (3) tướng: tướng nào có vương miện cũng coi là cần mua (không xét
+    tên), mua bằng nút theo EVONY_BUY (mặc định Recruit General). EVONY_SHOT=<file.png>: lưu ảnh màn hình khi kết thúc. TỐN VÀNG."""
+    import importlib
+    module = importlib.import_module("bot.activities.recruit_general.run")
+    module._wanted_general = lambda b: "ANY-CROWNED-GENERAL"
+    bot.civilization = None
+    bot.set_civilization = lambda civ: setattr(bot, "civilization", civ)
+    bot.city_map = _db_city_map()
+    bot.set_city_map = lambda city_map: setattr(bot, "city_map", city_map)
+    try:
+        return module.run(bot, {"buy_with": os.environ.get("EVONY_BUY", "Recruit General")})
+    finally:
+        shot = os.environ.get("EVONY_SHOT")
+        if shot:
+            cv2.imwrite(shot, bot.screenshot())
+
+
+def test_recruit_tap(bot):
+    """Recruit General tới bước BẤM VÀO TƯỚNG, KHÔNG mua: tướng xịn nào có vương miện cũng coi là "cần mua" (giả), bấm vào tướng, chờ màn
+    chi tiết, ghi có thấy nút Recruit General / Buy General Token không, Back về danh sách rồi dừng. Không bấm nút mua."""
+    import importlib
+    from bot.activities.recruit_general.constants import (DETAIL_BUY_TOKEN, DETAIL_RECRUIT, DETAIL_THRESHOLD, DETAIL_WAIT,
+                                                          GENERAL_ART, REFRESH, THRESHOLD)
+    module = importlib.import_module("bot.activities.recruit_general.run")
+
+    def fake_buy(b, name, buy_with="Recruit General"):
+        b.record(f"TEST: tap the General ({name}), no buy")
+        b.tap_percent(*GENERAL_ART)
+        for waited in range(1, DETAIL_WAIT + 1):
+            b.sleep(1)
+            screen = b.screenshot()
+            if b.find(REFRESH, screen=screen, threshold=THRESHOLD) is None:
+                recruit = b.find(DETAIL_RECRUIT, screen=screen, threshold=DETAIL_THRESHOLD)
+                token = b.find(DETAIL_BUY_TOKEN, screen=screen, threshold=DETAIL_THRESHOLD)
+                b.record(f"TEST: detail screen after {waited}s: Recruit button {recruit}, Buy Token button {token}")
+                break
+        else:
+            b.record(f"TEST: detail screen NOT shown after {DETAIL_WAIT}s")
+        b.back(delay=1)
+        raise StopRequested()
+
+    module._wanted_general = lambda b: "TEST-GENERAL"
+    module._buy = fake_buy
+    bot.civilization = None
+    bot.set_civilization = lambda civ: setattr(bot, "civilization", civ)
+    bot.city_map = _db_city_map()   # route đã lưu trong DB (chưa có thì activity quét)
+    bot.set_city_map = lambda city_map: setattr(bot, "city_map", city_map)
+    bot.log(f"route từ DB: {len(bot.city_map)} công trình")
+    return module.run(bot, {})
 
 
 def test_greet_champion(bot):

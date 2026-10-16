@@ -18,7 +18,7 @@ class TrainTroopFlow(unittest.TestCase):
         flow = [
             Step("day3_healing_heart.png", tap(f"{KP}/Tab/strongTroops.png")),
             Step("day3_strong_troops_go.png", tap_at(335, 344)),
-            # Doanh trại đã có ảnh học sẵn (Images/Event/Building): bấm đúng chỗ nhận ra, không bấm giữa màn.
+            # Doanh trại đã có ảnh học sẵn (Images/Building): bấm đúng chỗ nhận ra, không bấm giữa màn.
             Step("train_after_go.png", tap_at(181, 333, tol=5)),
             Step("train_menu.png", tap("Event/GatherTroops/Train/train.png")),
             # Vòng đang chọn đã là cấp I và train được: không bấm vòng nào, bấm Train luôn.

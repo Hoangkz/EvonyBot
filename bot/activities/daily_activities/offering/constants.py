@@ -9,7 +9,7 @@ FOLDER = "ActivitiesOffer"
 FOLDER_PATH = f"{ROOT}/{FOLDER}"
 
 # ---- Sau Go (giống Event, ../../event/kings_path/building.py open_building) --------------------
-# Go -> về thành, Đền thờ (Shrine) ở giữa -> nhận ra theo ảnh mẫu civ (Event/Building/civ<N>/shrine,
+# Go -> về thành, Đền thờ (Shrine) ở giữa -> nhận ra theo ảnh mẫu civ (Building/civ<N>/shrine,
 # 0,97) -> bấm -> menu: icon "Offer" (Offer1.png, 0,98 tại (150, 216)) -> màn Offer (nút "Offer Gems"
 # OfferGems.png 1,00 tại (108, 665); cạnh nó "Offer Tribute" dùng vật phẩm Tribute).
 MENU_OFFER = f"{FOLDER_PATH}/Offer1.png"

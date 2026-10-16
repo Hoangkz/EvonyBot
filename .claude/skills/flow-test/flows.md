@@ -285,3 +285,16 @@ Cập nhật event 3 ngày (đã đổi logic): vào event là ở đầu danh s
 Heal (King's Path / Daily Activities): nút Heal phải sáng (cam, `heal_screen.png`) mới `tap(HEAL_BUTTON)`; xám (`heal_screen_reset.png`) thì làm lại từ màn Hospital (`test_heal_button_not_lit_redo_from_hospital`); thấy hộp "Healing ... Speed Up" ngay sau khi nhập số thì đi tiếp tới Speed Up (`test_heal_already_started_goes_to_speed_up`).
 
 Donate (Alliance Science): bấm Donate tới khi ra nút kim cương (`donate_gems.png`) kể cả khi đã đủ số cần, rồi mới xong.
+
+## Recruit General — `tests/recruit_general/`
+
+Settings: `{}`; ctx có `city_map` (đã có route trong DB).
+
+| #   | Màn hình                                         | Action                                            |
+| --- | ------------------------------------------------ | ------------------------------------------------- |
+| 01  | Menu tròn Tavern (nút "•••" còn hiện)             | `tap_at` Tavern, rồi `tap("RecruitGeneral/MenuRecruit.png")` |
+| 02  | Màn Recruit General, hai ô chưa tích              | `tap_pct(56.6, 83)` (tích Historic)               |
+| 02b | Historic tích, Epic chưa tích (tổng hợp)          | `tap("RecruitGeneral/Refresh.png")` liên tục      |
+| 03  | Hai ô đã tích                                    | `tap_pct(10.6, 83)` (bỏ tích Epic)                |
+| 04  | Popup "Your Tavern has a high quality General"    | `tap("RecruitGeneral/Cancel.png")`, dừng          |
+

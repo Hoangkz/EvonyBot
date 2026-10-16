@@ -18,6 +18,8 @@ Thứ tự ưu tiên: Bubble > Auto Times Out > Join Boss > nhiệm vụ.
 - Nhiệm vụ must_finish (priority.py): đã bắt đầu thì chạy tới xong; Bubble / Auto Times Out / boss mới /
   120 giây không ngắt (chỉ Stop). Xong rồi mới tới Bubble, Auto Times Out và Join Boss.
 - Không chọn Join Boss: không có giới hạn 120 giây, các nhiệm vụ chạy lần lượt tới khi xong.
+- Activity chạy một mình (activities.EXCLUSIVE_ACTIVITIES, VD Recruit General): chỉ chạy hàm của nó, KHÔNG liên quan Bubble
+  (kể cả đã tích), Auto Times Out, reset server, Join Boss hay nhiệm vụ nào khác (_run_exclusive).
 - Không tích Bubble: không có luật Bubble (không lo bubble, không bị ngắt vì bubble).
 - Một nhiệm vụ chạy hết một lượt mà vẫn chưa xong tối đa MAX_ATTEMPTS (6) lần mỗi ngày; quá thì bỏ qua tới ngày mới
   (bị ngắt giữa chừng không tính là một lần thử).
@@ -37,7 +39,7 @@ from types import SimpleNamespace
 
 from PyQt5.QtCore import QThread, pyqtSignal
 
-from ..activities import ACTIVITIES
+from ..activities import ACTIVITIES, EXCLUSIVE_ACTIVITIES
 from ..city.city_map import scan_city
 from ..activities.join_monster_war import IDLE as BOSS_IDLE
 from ..activities.join_monster_war import stamina_wait
@@ -166,7 +168,10 @@ class BotWorker(QThread):
             self.ctx.city_map = dict(self.settings.get("Initialization", {}).get("city_map") or {})
             self.ctx.set_city_map = self._set_city_map
             self._register_boss_listener()
-            self._run_tasks()
+            if EXCLUSIVE_ACTIVITIES.intersection(self.activities):
+                self._run_exclusive()
+            else:
+                self._run_tasks()
         # Ngắt có chủ đích (Stop/timeout truyền tới đây) không xem là lỗi.
         except BotInterrupted:
             pass
@@ -195,6 +200,22 @@ class BotWorker(QThread):
                 self._ensure_server()
             self.activity_changed.emit(self.serial, activity)
             self._run_activity(activity, self.settings.get(activity, {}))
+
+    def _run_exclusive(self):
+        """Activity chạy một mình: gọi thẳng hàm run, không qua guards (Bubble, Auto Times Out, reset server) và không
+        có Join Boss / nhiệm vụ khác. Chạy một lượt rồi dừng; hàm run tự lặp nếu cần."""
+        for activity in self.activities:
+            if self._stop.is_set():
+                break
+            if activity not in EXCLUSIVE_ACTIVITIES:
+                continue
+            run = ACTIVITIES.get(activity)
+            if run is None:
+                self.log(f"Unknown activity: {activity}")
+                continue
+            self._current = activity
+            self.activity_changed.emit(self.serial, activity)
+            run(self.ctx, self.settings.get(activity, {}))
 
     def _run_tasks(self):
         """Vòng lặp chính (xem docstring đầu file) cho tới khi Stop."""

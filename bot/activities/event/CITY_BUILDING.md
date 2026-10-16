@@ -56,7 +56,7 @@ flowchart TD
 
 | | Ảnh có sẵn | Ảnh tự học |
 | --- | --- | --- |
-| Thư mục | `Images/Event/Building/civ<N>/<building>/*.png` | `%LOCALAPPDATA%\EvonyBot\buildings\civ<N>\<building>\*.png` |
+| Thư mục | `Images/Building/civ<N>/<building>/*.png` | `%LOCALAPPDATA%\EvonyBot\buildings\civ<N>\<building>\*.png` |
 | Ai tạo | Người làm bot (chụp tay, xem mục 6) | Bot, lúc chạy |
 | Có trong git / bản build | Có (build chép cả `Images/`) | Không, riêng từng máy |
 | Khi cập nhật app | Bị thay bằng bản mới | Giữ nguyên |
@@ -112,7 +112,7 @@ cứu, mẫu chụp lúc rảnh), khớp nhầm công trình / civ khác ≤ 0,6
 
 1. Đưa công trình ra giữa màn trên giả lập (đúng nền văn minh), đóng menu / popup.
 2. Chụp 30 khung trong 30 s (công trình ít thay đổi: 10 khung / 10 s đủ).
-3. Cắt bằng `stable_window` + trung vị → `Images/Event/Building/civ<N>/<building>/1.png`.
+3. Cắt bằng `stable_window` + trung vị → `Images/Building/civ<N>/<building>/1.png`.
    - Hiệu ứng nhiều (Bệnh viện, Chợ): dùng khung to trên thân công trình + **nhiều ảnh**: bắt đầu từ trung vị,
      thêm khung khớp kém nhất tới khi mọi khung khớp ≥ 0,97 (tối đa 10 ảnh).
    - Có chữ tên công trình / bong bóng "?" / huy hiệu cấp lấn vào: thu hẹp vùng cắt cho từng máy.
@@ -136,7 +136,7 @@ cứu, mẫu chụp lúc rảnh), khớp nhầm công trình / civ khác ≤ 0,6
 | `MAX_SAMPLES` | 3 | Số ảnh tự học tối đa mỗi công trình |
 | `MAX_CIVS` | 7 | Số nền văn minh |
 | `LEARNED_DIR` | `%LOCALAPPDATA%\EvonyBot\buildings` | Thư mục ảnh tự học |
-| `BUNDLED_DIR` | `Images/Event/Building` | Thư mục ảnh có sẵn |
+| `BUNDLED_DIR` | `Images/Building` | Thư mục ảnh có sẵn |
 
 ## 8. Test
 

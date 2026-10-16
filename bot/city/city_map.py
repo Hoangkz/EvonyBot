@@ -56,7 +56,7 @@ from ..activities.event.city_building import (
 )
 
 from .tours import FIXED_NAMES, TOURS
-# Công trình nhận ra khi quét / đi (có ảnh mẫu trong Images/Event/Building/civ<N>/ hoặc ảnh tự học).
+# Công trình nhận ra khi quét / đi (có ảnh mẫu trong Images/Building/civ<N>/ hoặc ảnh tự học).
 BUILDINGS = (KEEP, MARKET, HOSPITAL, FORGE, BARRACKS, STABLES, ARCHER_CAMP, WORKSHOP, TRAP_FACTORY, ACADEMY, SHRINE,
              ART_HALL, BATTLEFIELD, PASTURE, WALLS, EMBASSY, PRISON, TAVERN, RESEARCH_FACTORY, HOLY_PALACE, ICE_LAND,
              RALLY_SPOT, VICTORY_COLUMN, TRIUMPHAL_ARCH, WATCHTOWER, ARCHER_TOWER, DRAGON_CLIFF, SUBORDINATE_CITY,

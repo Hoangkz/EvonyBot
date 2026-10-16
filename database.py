@@ -54,6 +54,7 @@ TAB_COLUMNS = {
     "Open Gift Box": "open_gift_box",
     "Black Market": "black_market",
     "Event": "event",
+    "Recruit General": "recruit_general",
 }
 # Khoá daily_done của tab Event (nhiệm vụ gather_troops / kings_path / three_day, mốc reset event, đăng nhập, Voyage);
 # mọi khoá khác thuộc Daily Activities.
@@ -103,6 +104,17 @@ def _connect(path: Path) -> sqlite3.Connection:
     conn.execute("PRAGMA journal_mode = WAL")
     conn.execute("PRAGMA synchronous = NORMAL")
     return conn
+
+
+def _add_json_columns(conn: sqlite3.Connection):
+    """Bảng devices đã có mà thiếu cột JSON của tab mới (TAB_COLUMNS): THÊM cột, không xoá dữ liệu. Chạy trước _reset_old_layout (nó
+    xoá cả bảng devices khi thiếu cột)."""
+    columns = {row["name"] for row in conn.execute("PRAGMA table_info(devices)")}
+    if not columns:
+        return
+    for column in _JSON_COLUMNS:
+        if column not in columns:
+            conn.execute(f"ALTER TABLE devices ADD COLUMN {column} TEXT NOT NULL DEFAULT '{{}}'")
 
 
 def _reset_old_layout(conn: sqlite3.Connection):
@@ -175,6 +187,7 @@ class Database:
     def __init__(self, path: Path = DB_PATH):
         path.parent.mkdir(parents=True, exist_ok=True)
         self.conn = _connect(path)
+        _add_json_columns(self.conn)
         _reset_old_layout(self.conn)
         self.conn.executescript(_SCHEMA)
         _add_missing_columns(self.conn)

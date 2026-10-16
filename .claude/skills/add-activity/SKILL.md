@@ -87,7 +87,7 @@ Quy tắc bắt buộc:
    - Cài `get_settings() -> dict` và `set_settings(data)`; key của dict chính là key activity đọc qua `settings.get(...)`. Dict phải JSON-serializable.
 4. [ui/tabs/__init__.py](../../../ui/tabs/__init__.py): import + `__all__`.
 5. [ui/device_view.py](../../../ui/device_view.py): tạo instance và `self._add_tab(tab, "<Display Name>")` — title này là khóa settings.
-6. [ui/tabs/initialization_tab.py](../../../ui/tabs/initialization_tab.py): thêm nút vào `DESIGNER_DATA` và `ACTIVITY_BUTTON_TARGETS` để chọn được activity.
+6. [ui/tabs/initialization_tab.py](../../../ui/tabs/initialization_tab.py): thêm nút vào `DESIGNER_DATA` và `ACTIVITY_BUTTONS` trong [ui/tabs/constants.py](../../../ui/tabs/constants.py) (`target` + `exclusive`: True nếu activity chạy một mình, bỏ tích các nút khác) để chọn được activity.
 7. File dữ liệu ngoài `Images/` (VD ảnh) cần ship → thêm `Copy-Item` trong [installer/build.ps1](../../../installer/build.ps1); dữ liệu dạng `.py` (VD [bot/worker/priority.py](../../../bot/worker/priority.py)) được compile cùng code, không cần ship riêng.
 
 ## 3. Ảnh template

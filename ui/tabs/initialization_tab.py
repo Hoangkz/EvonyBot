@@ -8,64 +8,20 @@ from datetime import datetime
 from PyQt5.QtCore import QTimer, pyqtSignal
 from PyQt5.QtWidgets import QPushButton
 
-from ..theme import COLORS
+from .constants import (
+    ACTIVITY_BUTTONS,
+    ACTIVITY_BUTTON_STYLE,
+    ACTIVITY_BUTTON_TARGETS,
+    BUBBLE_TYPES,
+    CIVILIZATIONS,
+    CIVILIZATION_UNKNOWN,
+    COMBO_ITEMS,
+    DEFAULT_BUBBLE_TYPE,
+    DESIGNER_DATA,
+    PAGE_SIZE,
+)
 from .tab_placeholder import DesignerTab, confirm_reset
 
-DESIGNER_DATA = {
-    "ButtonJoinMonsterWar": {"loc": [85, 53], "size": [230, 40], "text": "Join Monster War", "type": "Button"},
-    "ButtonOpenGiftBox": {"loc": [85, 117], "size": [230, 40], "text": "Open Gift Box", "type": "Button"},
-    "button10": {"loc": [740, 53], "size": [230, 40], "text": "Event", "type": "Button"},
-    # button9 (Start All) nằm cạnh buttonStopAll (Stop All) dưới GroupBox; 2 nút
-    # 125x40 (nhỏ lại so với 140x50 gốc) căn phải theo mép phải GroupBox (x=1075).
-    "button9": {"loc": [815, 377], "size": [125, 40], "text": "Start All", "type": "Button"},
-    "buttonStopAll": {"loc": [950, 377], "size": [125, 40], "text": "Stop All", "type": "Button"},
-    "buttonAllianceCapacity": {"loc": [409, 117], "size": [230, 40], "text": "Alliance Capacity", "type": "Button"},
-    "buttonBlackMarket": {"loc": [740, 117], "size": [230, 40], "text": "Black Market", "type": "Button"},
-    "buttonDailyActivities": {"loc": [409, 53], "size": [230, 40], "text": "Daily Activities", "type": "Button"},
-    "buttonInitializationApplyAll": {"loc": [935, 16], "size": [132, 43], "text": "Apply ALL", "type": "Button"},
-    "buttonStart": {"loc": [449, 447], "size": [217, 51], "text": "Start", "type": "Button"},
-    "groupBox2": {
-        "children": ["ButtonJoinMonsterWar", "buttonDailyActivities", "button10", "ButtonOpenGiftBox",
-                      "buttonAllianceCapacity", "buttonBlackMarket"],
-        "loc": [13, 106], "size": [1062, 253], "text": "Select Activity", "type": "GroupBox",
-    },
-    "checkBoxBubble": {"loc": [13, 62], "size": [75, 28], "text": "Bubble", "type": "CheckBox"},
-    "comboBoxBubbleType": {"loc": [90, 62], "size": [60, 28], "type": "ComboBox"},
-    "labelBubbleTime": {"loc": [158, 62], "size": [100, 28], "type": "Label"},
-    "labelCivilization": {"loc": [180, 22], "size": [72, 28], "text": "Civilization:", "type": "Label"},
-    "comboBoxCivilization": {"loc": [254, 22], "size": [100, 28], "type": "ComboBox"},
-    "labelID": {"loc": [506, 18], "size": [200, 32], "text": "labelID", "type": "Label"},
-    "labelServer": {"loc": [13, 22], "size": [48, 28], "text": "Server:", "type": "Label"},
-    "textBoxServer": {"loc": [63, 22], "size": [100, 28], "type": "TextBox"},
-    "tabPage1": {
-        "children": ["button9", "buttonStopAll", "buttonInitializationApplyAll", "buttonStart",
-                     "labelID",
-                     "labelServer", "textBoxServer", "checkBoxBubble", "labelBubbleTime",
-                     "comboBoxBubbleType", "labelCivilization", "comboBoxCivilization",
-                     "groupBox2"],
-        "loc": [4, 31], "size": [1088, 609], "text": "Initialization", "type": "TabPage",
-    },
-}
-# Loại bubble (khiên) có thể dùng.
-BUBBLE_TYPES = ["8h", "24h", "3d", "7d"]
-DEFAULT_BUBBLE_TYPE = "24h"
-# Nền văn minh: số 1..7 (devices.civilization) = vị trí trong danh sách; mục đầu = chưa biết (bot tự nhận).
-CIVILIZATIONS = ["Europe", "China", "Japan", "Korea", "America", "Russia", "Arabia"]
-CIVILIZATION_UNKNOWN = "(auto)"
-COMBO_ITEMS = {"comboBoxBubbleType": BUBBLE_TYPES,
-               "comboBoxCivilization": [CIVILIZATION_UNKNOWN, *CIVILIZATIONS]}
-PAGE_SIZE = (1088, 609)
-
-# Original button.Tag values in the C# form matched the activity's
-# display text, which in turn matches this app's tab titles.
-ACTIVITY_BUTTON_TARGETS = {
-    "ButtonJoinMonsterWar": "Join Monster War",
-    "buttonAllianceCapacity": "Alliance Capacity",
-    "buttonDailyActivities": "Daily Activities",
-    "ButtonOpenGiftBox": "Open Gift Box",
-    "buttonBlackMarket": "Black Market",
-    "button10": "Event",
-}
 
 def seconds_until(iso: str) -> float | None:
     """Số giây từ bây giờ tới thời điểm ISO (giờ máy); None nếu rỗng / sai định dạng."""
@@ -83,22 +39,6 @@ def format_remaining(seconds: float) -> str:
     minutes, secs = divmod(rest, 60)
     clock = f"{hours:02d}:{minutes:02d}:{secs:02d}"
     return f"{days}d {clock}" if days else clock
-
-
-# Set on each button directly: the designer page's own "background: white"
-# stylesheet would otherwise win over the app-level theme.
-ACTIVITY_BUTTON_STYLE = f"""
-QPushButton:checked {{
-    background: {COLORS['success']};
-    border-color: {COLORS['success']};
-    color: white;
-    font-weight: 600;
-}}
-QPushButton:checked:hover {{
-    background: #28985f;
-    color: white;
-}}
-"""
 
 
 class InitializationTab(DesignerTab):
@@ -169,7 +109,20 @@ class InitializationTab(DesignerTab):
         for name in ACTIVITY_BUTTON_TARGETS:
             c[name].setCheckable(True)
             c[name].setStyleSheet(ACTIVITY_BUTTON_STYLE)
-            c[name].toggled.connect(self.settings_changed.emit)
+            c[name].toggled.connect(lambda checked, name=name: self._on_activity_toggled(name, checked))
+
+    def _on_activity_toggled(self, name: str, checked: bool):
+        """Nút exclusive chạy một mình: nó được tích -> bỏ tích mọi nút khác; nút thường được tích -> bỏ tích các nút
+        exclusive. Bỏ tích bằng code không phát lại tín hiệu."""
+        if checked:
+            exclusive = ACTIVITY_BUTTONS[name]["exclusive"]
+            for other, info in ACTIVITY_BUTTONS.items():
+                if other != name and (exclusive or info["exclusive"]):
+                    button = self.controls[other]
+                    button.blockSignals(True)
+                    button.setChecked(False)
+                    button.blockSignals(False)
+        self.settings_changed.emit()
 
     def _confirm_reset_info(self):
         if confirm_reset(self, "Reset info",

@@ -19,6 +19,7 @@ from .tabs import (
     JoinMonsterWarTab,
     LogsTab,
     OpenGiftBoxTab,
+    RecruitGeneralTab,
 )
 
 
@@ -62,6 +63,9 @@ class DeviceView(QWidget):
         self._add_tab(self.open_gift_box_tab, "Open Gift Box")
         self._add_tab(self.alliance_capacity_tab, "Alliance Capacity")
         self._add_tab(self.black_market_tab, "Black Market")
+        # Recruit General: đứng ngay trên tab Logs.
+        self.recruit_general_tab = RecruitGeneralTab()
+        self._add_tab(self.recruit_general_tab, "Recruit General")
         # Logs không có cấu hình: thêm thẳng, không nối Apply ALL / settings.
         self.logs_tab = LogsTab()
         self.tabs.addTab(self.logs_tab, "Logs")
