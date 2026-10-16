@@ -9,11 +9,16 @@ run.py — activity "Recruit General": `run(bot, settings)` (chưa có cấu hì
 5. Đã mở ít hơn MIN_GENERALS (5) tướng (3/6, 4/6): level Tavern quá thấp để roll tướng xịn -> ghi log rồi dừng.
    Ô cảnh báo: "Historic General" chưa tích thì tích; "Epic (Orange) General" đang tích thì bỏ tích.
 6. Bấm Refresh liên tục (mỗi lần chờ 0,3 giây). Hiện popup "Your Tavern has a high quality General..." -> bấm Cancel -> tướng đang hiện phải có
-   vương miện (không xét màu chấm), không thì Refresh tiếp -> kiểm tra tên tướng (GENERALS_DIR), rồi kéo ảnh tướng sang trái / phải tới
+   vương miện (không xét màu chấm), không thì Refresh tiếp -> kiểm tra tên tướng (OCR, so với tướng đã tích ở UI), rồi kéo ảnh tướng sang trái / phải tới
    các tướng tím / vàng khác kiểm tra tên (_handle_generals); cần mua thì mua rồi kéo tiếp, xong Refresh tiếp; mua đủ BUY_LIMIT (3) tướng thì dừng: có trong danh sách cần mua -> luồng mua (CHƯA làm, chỉ ghi log); không -> Refresh tiếp. Cũng dừng khi
    rời màn Recruit General, mất nút Refresh hoặc đủ REFRESH_MAX lần.
 Trả True khi tới màn Recruit General và hai ô đúng trạng thái, False khi không tới được / không đổi được ô.
 """
+import os
+import re
+import time
+from pathlib import Path
+
 import cv2
 import numpy as np
 
@@ -21,10 +26,14 @@ from ...context.templates import TEMPLATE_DIR
 from ...city.city_map import BUILDING_THRESHOLD, centre, city_screen, find_keep, goto, locate, scan_city, swipe
 from ..daily_activities.constants import MAIN_MORE
 from ..event.city_building import TAVERN
+from ...ocr import read_general_name
+from ...ocr.read_general_name import similarity
 from .constants import (
     BOX_CHECKED,
     CANCEL,
     CANCEL_WAIT,
+    CONFIRM,
+    CONFIRM_WAIT,
     CROWNS,
     CROWN_COLOR_DX,
     CROWN_COLOR_Y,
@@ -36,12 +45,29 @@ from .constants import (
     CROWN_THRESHOLD,
     CROWN_Y,
     BUY_KEY,
+    GOLD_MAX_USES,
+    GOLD_LIST_MIN_DIFF,
+    HOW_TO_GET_TITLE,
+    HOW_TO_GET_WAIT,
+    LIST_USE,
+    LIST_USE_REGION,
+    LIST_USE_THRESHOLD,
+    OPEN_GOLD_KEY,
+    MAX_TAPS,
+    POPUP_MAX,
+    GOLD_STEP_DELAY,
+    POPUP_MINIMUM,
+    POPUP_OPEN_WAIT,
+    POPUP_USE,
+    POPUP_WAIT,
+    USE_LOAD_WAIT,
     BUY_LIMIT,
     BUY_RECRUIT,
     BUY_TOKEN,
     DETAIL_BUY_TOKEN,
     DETAIL_RECRUIT,
     DETAIL_THRESHOLD,
+    DETAIL_BACK_WAIT,
     DETAIL_WAIT,
     DOT_HUES,
     EMBLEM,
@@ -65,7 +91,7 @@ from .constants import (
     HIGH_QUALITY_POPUP,
     MIN_GENERALS,
     GENERAL_ART,
-    GENERALS_DIR,
+    GENERALS_KEY,
     HISTORIC_BOX,
     LIST_RELOAD_WAIT,
     LIST_WAIT,
@@ -75,8 +101,8 @@ from .constants import (
     MENU_TRIES,
     MENU_WAIT,
     NAME,
-    NAME_REGION,
-    NAME_THRESHOLD,
+    NAME_MATCH,
+    NAME_STRIP,
     REFRESH,
     REFRESH_MAX,
     REFRESH_WAIT,
@@ -124,7 +150,7 @@ def _to_city(bot) -> bool:
     for _ in range(HOME_BACKS):
         if bot.find(MAIN_MORE) is not None:
             return True
-        bot.back(delay=1)
+        bot.back(delay=1)  # delay cố định, không cần sửa
     return bot.find(MAIN_MORE) is not None
 
 
@@ -190,9 +216,9 @@ def _set_box(bot, label: str, region, centre, want: bool) -> bool:
         if _is_checked(bot, region) == want:
             bot.log(f"{NAME}: {label} is {'checked' if want else 'unchecked'}")
             return True
-        bot.tap_percent(*centre, delay=0)
+        bot.tap_percent(*centre, delay=0)  # delay cố định, không cần sửa
         for _ in range(BOX_WAIT):
-            bot.sleep(1)
+            bot.sleep(1)  # delay cố định, không cần sửa
             if _is_checked(bot, region) == want:
                 break
     ok = _is_checked(bot, region) == want
@@ -218,9 +244,13 @@ def _refresh(bot, settings: dict) -> bool:
         if bot.find(HIGH_QUALITY_POPUP, screen=screen, threshold=THRESHOLD) is not None:   # xét trước: tiêu đề / Refresh vẫn khớp dưới popup
             cancel = bot.find(CANCEL, screen=screen, threshold=THRESHOLD)
             if cancel is not None:
-                bot.tap(*cancel, delay=CANCEL_WAIT)
+                bot.tap(*cancel, delay=CANCEL_WAIT)  # delay cố định, không cần sửa
             bot.record(f"{NAME}: high quality General after {count} refresh(es), cancelled")
-            bought_now = _handle_generals(bot, settings)
+            try:
+                bought_now = _handle_generals(bot, settings)
+            except NotEnoughGold as error:
+                bot.record(f"{NAME}: not enough gold to recruit {error}, stop")
+                return False
             if bought_now:
                 bought += bought_now
                 bot.record(f"{NAME}: bought {bought}/{BUY_LIMIT} General(s) so far")
@@ -229,7 +259,9 @@ def _refresh(bot, settings: dict) -> bool:
                     return True
                 if not _set_warnings(bot):   # mua xong game có thể bỏ tích hai ô: tích lại Historic
                     return False
-            continue   # xong lượt kiểm tra: Refresh tiếp
+            if not _refresh_confirm(bot):   # đã kiểm tra hết tướng xịn: Refresh tiếp, popup hiện lại thì bấm Confirm
+                return False
+            continue
         if bot.find(TITLE, screen=screen, threshold=THRESHOLD) is None:
             bot.record(f"{NAME}: left the Recruit General screen after {count} refresh(es), stop")
             return True
@@ -238,28 +270,76 @@ def _refresh(bot, settings: dict) -> bool:
             bot.record(f"{NAME}: Refresh button not found after {count} refresh(es), stop")
             return False
         # Thực hiện bấm Refresh cho đến khi ra tướng lịch sử (popup high quality General -> Cancel, dừng ở trên).
-        bot.tap(*button, delay=REFRESH_WAIT)
+        bot.tap(*button, delay=REFRESH_WAIT)  # delay cố định, không cần sửa
     bot.record(f"{NAME}: {REFRESH_MAX} refreshes done")
     return True
 
 
-def _wanted_general(bot) -> str | None:
-    """Tên tướng đang hiện nếu nằm trong danh sách cần mua (ảnh tên trong GENERALS_DIR, tên file = tên tướng), không thì None."""
-    screen = bot.screenshot()
-    for path in sorted((TEMPLATE_DIR / GENERALS_DIR).glob("*.png")):
-        if bot.find(f"{GENERALS_DIR}/{path.name}", screen=screen, threshold=NAME_THRESHOLD, region=NAME_REGION) is not None:
-            return path.stem
+def _refresh_confirm(bot) -> bool:
+    """Các tướng xịn đã kiểm tra xong (không mua / đã mua): bấm Refresh, popup "high quality General" hiện lại thì bấm Confirm (chờ tối đa
+    CONFIRM_WAIT giây, 1 giây / lần). False nếu không thấy nút Refresh."""
+    button = bot.find(REFRESH, threshold=THRESHOLD)
+    if button is None:
+        bot.record(f"{NAME}: Refresh button not found to refresh after checking the Generals, stop")
+        return False
+    bot.tap(*button, delay=1)  # delay cố định, không cần sửa
+    for _ in range(CONFIRM_WAIT):
+        screen = bot.screenshot()
+        if bot.find(HIGH_QUALITY_POPUP, screen=screen, threshold=THRESHOLD) is not None:
+            confirm = bot.find(CONFIRM, screen=screen, threshold=THRESHOLD)
+            if confirm is not None:
+                bot.tap(*confirm, delay=REFRESH_WAIT)  # delay cố định, không cần sửa
+                bot.log(f"{NAME}: Generals checked, Confirm the refresh")
+                return True
+        bot.sleep(1)  # delay cố định, không cần sửa
+    return True   # không có popup (VD refresh miễn phí): đã refresh
+
+
+LOGS_DIR = Path(os.environ.get("LOCALAPPDATA", Path.home())) / "EvonyBot" / "logs" / "generals"
+_logged: set = set()    # tên OCR đã lưu trong phiên này
+
+
+def _log_unknown(text: str | None, strip) -> None:
+    """Tên OCR có "?" (glyph chưa có mẫu): lưu dải tên (đúng ảnh cho `python -m bot.ocr.add_sample GeneralName`) vào logs/generals/<tên OCR>.png
+    ("?" đổi thành "x" trong tên file; cùng tên đọc lại thì ghi đè) và ghi logs/generals/unknown.logs. Mỗi tên chỉ lưu một lần mỗi lần chạy."""
+    if not text or "?" not in text or text in _logged:
+        return
+    _logged.add(text)
+    image = re.sub(r'[\\/:*"<>|\s]+', "_", text.replace("?", "x")) + ".png"
+    try:
+        LOGS_DIR.mkdir(parents=True, exist_ok=True)
+        cv2.imwrite(str(LOGS_DIR / image), strip)
+        with open(LOGS_DIR / "unknown.logs", "a", encoding="utf-8") as f:
+            f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} name={text!r} image={image}\n")
+    except OSError:
+        pass
+
+
+def _wanted_general(bot, wanted: list) -> str | None:
+    """Tên tướng đang hiện nếu nằm trong danh sách tướng đã tích ở UI (`wanted` = settings["generals"]), không thì None. Đọc tên bằng OCR
+    (read_general_name) rồi lấy tướng giống nhất, từ NAME_MATCH (50%) trở lên là khớp: chữ OCR chỉ cần nằm trong tên (một phần tên là đủ, VD "?athanael" khớp "Nathanael Greene"), chỉ xét chữ cái, bỏ phần trong ngoặc của tên."""
+    strip = bot.crop(bot.screenshot(), *NAME_STRIP)
+    text = read_general_name(strip)
+    _log_unknown(text, strip)
+    score, name = max(((similarity(text, general), general) for general in wanted), default=(0.0, None))
+    bot.log(f"{NAME}: General name read {text!r}, best match {name!r} {score:.0%}")
+    if name is not None and score >= NAME_MATCH:
+        return name
     bot.log(f"{NAME}: General not in the wanted list, keep refreshing")
     return None
 
 
-def _buy(bot, name: str, buy_with: str = BUY_RECRUIT) -> bool:
+class NotEnoughGold(Exception):
+    """Không đủ vàng mua tướng (Open Gold tắt, hoặc đã mở hết rương vẫn thiếu): dừng activity (`_refresh` bắt, trả False)."""
+
+
+def _buy(bot, name: str, buy_with: str = BUY_RECRUIT, open_gold: bool = False) -> bool:
     """Mua tướng `name` đang hiện: bấm vào ảnh tướng -> chờ màn chi tiết (1 giây / lần tối đa DETAIL_WAIT giây, mất nút Refresh = đã ra) -> bấm nút mua: màn chỉ có MỘT nút (Recruit General ở
     giữa) thì bấm thẳng nút đó; có hai nút thì bấm theo setting `buy_with` (Recruit General / Buy General Token). Bấm nút xong chờ về màn danh sách tướng (`_wait_list`, tối đa LIST_WAIT giây, quá hạn thì Back). Popup / màn kết quả giữa chừng CHƯA có ảnh. True nếu đã bấm nút."""
     bot.record(f"{NAME}: wanted General {name} is in the Tavern, open its detail")
     bot.tap_percent(*GENERAL_ART)
     for _ in range(DETAIL_WAIT):   # chờ 1 giây rồi xét; mất nút Refresh của Tavern = đã ra màn chi tiết, còn thì chờ thêm 1 giây
-        bot.sleep(1)
+        bot.sleep(1)  # delay cố định, không cần sửa
         screen = bot.screenshot()
         if bot.find(REFRESH, screen=screen, threshold=THRESHOLD) is None:
             break
@@ -280,8 +360,107 @@ def _buy(bot, name: str, buy_with: str = BUY_RECRUIT) -> bool:
         return False
     bot.tap(*button)
     bot.record(f"{NAME}: tapped {label} for {name}")
+    if _how_to_get_shown(bot):   # thiếu vàng: game mở màn "How to get" thay vì mua
+        if not open_gold:
+            bot.record(f"{NAME}: not enough gold for {name} and Open Gold is off, back to the General list and stop")
+            bot.back(delay=1)    # How to get -> màn chi tiết; delay cố định, không cần sửa
+            bot.back(delay=1)    # màn chi tiết -> màn danh sách; delay cố định, không cần sửa
+            _wait_list(bot)
+            raise NotEnoughGold(name)
+        bot.record(f"{NAME}: not enough gold for {name}, open all the gold items")
+        _open_all_gold(bot)
+        bot.back()                             # hết rương Use: How to get -> màn chi tiết
+        template = DETAIL_RECRUIT if label == BUY_RECRUIT else DETAIL_BUY_TOKEN
+        if bot.wait_for(template, timeout=DETAIL_BACK_WAIT, threshold=DETAIL_THRESHOLD, interval=1) is None:
+            bot.record(f"{NAME}: General detail screen not shown after {DETAIL_BACK_WAIT}s after opening gold, stop")
+            return False
+        bot.tap(*button, delay=GOLD_STEP_DELAY)   # bấm lại nút mua với số vàng mới; delay cố định, không cần sửa
+        bot.record(f"{NAME}: tapped {label} for {name} again after opening gold")
+        if _how_to_get_shown(bot):
+            bot.record(f"{NAME}: still not enough gold for {name}, back to the General list and stop")
+            bot.back(delay=1)  # delay cố định, không cần sửa
+            bot.back(delay=1)  # delay cố định, không cần sửa
+            _wait_list(bot)
+            raise NotEnoughGold(name)
     _wait_list(bot)
     return True
+
+
+def _how_to_get_shown(bot) -> bool:
+    """Sau khi bấm nút mua: wait_for màn "How to get" (thiếu vàng), 1 giây / lần tối đa HOW_TO_GET_WAIT giây, True khi thấy; thấy nút Refresh của
+    Tavern (đã mua xong, về danh sách) thì dừng chờ, False."""
+    for _ in range(HOW_TO_GET_WAIT):
+        if bot.wait_for(HOW_TO_GET_TITLE, timeout=1, threshold=THRESHOLD, interval=1) is not None:
+            return True
+        if bot.find(REFRESH, threshold=THRESHOLD) is not None:
+            return False
+    return False
+
+
+def _open_all_gold(bot) -> int:
+    """Màn "How to get": bấm "Use" của từng rương vàng từ trên xuống, mỗi rương hiện popup số lượng: thanh trượt đã ở mức tối đa thì nút trái là "Minimum"
+    (bấm Use luôn); là "Max" (chưa ở tối đa) thì bấm Max trước rồi bấm Use. Không thấy nút Use nào trên màn = hết vàng, dừng
+    (người gọi Back về màn mua). Chỉ có một rương thì Use dùng luôn, không popup (danh sách đổi = đã dùng); bấm Use mà màn không đổi thì bỏ qua. Tối đa GOLD_MAX_USES lần. Trả số rương đã dùng."""
+    used, tried = 0, []
+    while used < GOLD_MAX_USES:
+        screen = bot.screenshot()
+        buttons = sorted(bot.find_all(LIST_USE, screen=screen, threshold=LIST_USE_THRESHOLD, region=LIST_USE_REGION), key=lambda p: p[1])
+        button = next((b for b in buttons if all(abs(b[1] - y) > 8 for y in tried)), None)
+        if button is None:      # không còn nút Use nào trên màn: hết vàng (rương còn lại là nút kim cương)
+            break
+        tried.append(button[1])
+        bot.tap(*button, delay=GOLD_STEP_DELAY)  # delay cố định, không cần sửa
+        if _use_in_popup(bot):                      # nhiều hơn một: popup số lượng, bấm Use xong về danh sách
+            used += 1
+            tried = []
+        elif _list_changed(bot, screen):            # chỉ có một: không popup, dùng luôn, danh sách đổi
+            bot.log(f"{NAME}: used one gold item without a quantity popup")
+            used += 1
+            tried = []
+        else:
+            bot.log(f"{NAME}: nothing happened after the Use button, skip it")
+    bot.record(f"{NAME}: opened {used} gold item(s)")
+    return used
+
+
+def _use_in_popup(bot) -> bool:
+    """Popup số lượng của rương: chờ tối đa POPUP_WAIT giây; bấm Max (tìm ảnh nút) nếu chưa ở tối đa, bấm Use, chờ popup đóng. True nếu đã bấm Use."""
+    for _ in range(POPUP_OPEN_WAIT):
+        screen = bot.screenshot()
+        if bot.find(POPUP_USE, screen=screen, threshold=THRESHOLD) is not None:
+            break
+        bot.sleep(GOLD_STEP_DELAY)  # delay cố định, không cần sửa
+    else:
+        return False
+    for _ in range(MAX_TAPS):   # nút trái chỉ ghi "Max" hoặc "Minimum": "Max" = chưa ở tối đa, bấm xong đổi thành "Minimum" (thanh trượt ở tối đa)
+        maximum = bot.find(POPUP_MAX, threshold=THRESHOLD)
+        if maximum is None:
+            break
+        bot.tap(*maximum, delay=GOLD_STEP_DELAY)  # delay cố định, không cần sửa
+    if bot.find(POPUP_MINIMUM, threshold=THRESHOLD) is None:
+        bot.log(f"{NAME}: popup left button is not Minimum after Max, press Use anyway")
+    use = bot.find(POPUP_USE, threshold=THRESHOLD)
+    if use is None:
+        return False
+    bot.tap(*use, delay=USE_LOAD_WAIT)   # giữa màn hiện vòng tròn xoay (đang tải): chờ xong rồi mới xét; delay cố định, không cần sửa
+    for _ in range(POPUP_WAIT):   # chờ popup đóng
+        if bot.find(POPUP_USE, threshold=THRESHOLD) is None:
+            return True
+        bot.sleep(GOLD_STEP_DELAY)  # delay cố định, không cần sửa
+    bot.back(delay=GOLD_STEP_DELAY)   # popup còn nguyên (VD hiện thêm popup kết quả): đóng; delay cố định, không cần sửa
+    return True
+
+
+def _list_changed(bot, before) -> bool:
+    """Danh sách rương khác ảnh `before` (chụp trước khi bấm Use): chỉ có một rương thì Use dùng luôn, không popup, danh sách đổi."""
+    bot.sleep(USE_LOAD_WAIT)   # vòng tròn xoay giữa màn (đang tải) xong rồi mới so ảnh; delay cố định, không cần sửa
+    return _screen_diff(before, bot.screenshot()) > GOLD_LIST_MIN_DIFF
+
+
+def _screen_diff(before, after) -> float:
+    """Độ khác nhau trung bình (0..255) của hai ảnh màn hình, bỏ thanh tiêu đề và đáy."""
+    y0, y1 = int(before.shape[0] * 0.15), int(before.shape[0] * 0.95)
+    return float(np.abs(before[y0:y1].astype(np.int16) - after[y0:y1].astype(np.int16)).mean())
 
 
 def _wait_list(bot) -> bool:
@@ -290,14 +469,14 @@ def _wait_list(bot) -> bool:
     True nếu tự về."""
     back = False
     for _ in range(LIST_WAIT):
-        bot.sleep(1)
+        bot.sleep(1)  # delay cố định, không cần sửa
         if bot.find(REFRESH, screen=bot.screenshot(), threshold=THRESHOLD) is not None:
             back = True
             break
     if not back:
         bot.record(f"{NAME}: not back at the General list after {LIST_WAIT}s, Back")
-        bot.back(delay=1)
-    bot.sleep(LIST_RELOAD_WAIT)   # chờ 2s để đợi game load lại dữ liệu
+        bot.back(delay=1)  # delay cố định, không cần sửa
+    bot.sleep(LIST_RELOAD_WAIT)   # chờ 2s để đợi game load lại dữ liệu; delay cố định, không cần sửa
     return back
 
 
@@ -385,7 +564,7 @@ def shown_slot(screen) -> int | None:
 def _handle_generals(bot, settings: dict) -> int:
     """Sau Cancel: các tướng xịn = chấm có vương miện (có thể 2 tướng, hiếm). Không có tướng nào có vương miện thì thôi (0). Kiểm tra
     tên tướng đang hiện (nếu có vương miện) rồi kéo sang từng tướng có vương miện còn lại (gần trước); tướng nào tên nằm trong danh sách
-    cần mua thì mua (`_buy`, xong game về màn danh sách, chữ "Recruited"), rồi kéo tiếp sang tướng kế. Trả số tướng đã mua."""
+    cần mua thì mua (`_buy`, xong game về màn danh sách, chữ "Recruited"), rồi kéo tiếp sang tướng kế. Trả số tướng đã mua; raise NotEnoughGold khi thiếu vàng (dừng activity)."""
     screen = bot.screenshot()
     crowned = crowned_slots(bot, screen)
     if not crowned:
@@ -402,8 +581,8 @@ def _handle_generals(bot, settings: dict) -> int:
         if slot != shown_slot(bot.screenshot()) and not _goto_slot(bot, slot):
             bot.log(f"{NAME}: cannot reach General slot {slot + 1}")
             continue
-        name = _wanted_general(bot)
-        if name is not None and _buy(bot, name, settings.get(BUY_KEY) or BUY_RECRUIT):
+        name = _wanted_general(bot, list(settings.get(GENERALS_KEY) or []))
+        if name is not None and _buy(bot, name, settings.get(BUY_KEY) or BUY_RECRUIT, bool(settings.get(OPEN_GOLD_KEY))):
             bought += 1   # mua xong: tướng vẫn đang hiện (chữ "Recruited"), kéo tiếp sang tướng kế
     return bought
 
@@ -436,10 +615,10 @@ def _swipe_until_changed(bot, swipe) -> bool:
     before = shown_slot(bot.screenshot())
     bot.swipe_percent(*swipe)
     if before is None:
-        bot.sleep(1)
+        bot.sleep(1)  # delay cố định, không cần sửa
         return True
     for _ in range(SWIPE_CHANGE_WAIT):
-        bot.sleep(1)
+        bot.sleep(1)  # delay cố định, không cần sửa
         after = shown_slot(bot.screenshot())
         if after is not None and after != before:
             return True
@@ -453,6 +632,6 @@ def _wait_emblem(bot) -> bool:
     for _ in range(EMBLEM_WAIT):
         if bot.find(EMBLEM, threshold=EMBLEM_THRESHOLD, region=EMBLEM_REGION) is not None:
             return True
-        bot.sleep(1)
+        bot.sleep(1)  # delay cố định, không cần sửa
     bot.log(f"{NAME}: emblem not shown next to the General name")
     return False

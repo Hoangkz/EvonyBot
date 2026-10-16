@@ -45,10 +45,9 @@ flowchart TD
     K -->|rời màn / mất nút Refresh / đủ 1000 lần| Z
 ```
 
-Đã ở màn Recruit General thì bỏ qua các bước tới đó, chỉ chỉnh hai ô rồi Refresh. Confirm của popup không bao giờ được bấm.
+Đã ở màn Recruit General thì bỏ qua các bước tới đó, chỉ chỉnh hai ô rồi Refresh. Confirm của popup chỉ bấm sau khi đã kiểm tra hết tướng xịn (không mua, hoặc mua xong): Refresh lại rồi bấm Confirm (`_refresh_confirm`).
 
-**Tướng cần mua:** mỗi tướng một ảnh tên trong `Images/RecruitGeneral/Generals/` (tên file = tên tướng, xem README ở đó), tìm trong dải
-`NAME_REGION` với ngưỡng 0,9. Thư mục rỗng = không mua tướng nào, Refresh tiếp. Mua: bấm giữa ảnh tướng (`GENERAL_ART`) -> màn chi tiết tướng (nút `DetailRecruit.png` "Recruit General" + giá, `DetailBuyToken.png`; 1,00, màn Tavern <= 0,37). Màn chi tiết có hai kiểu: hai nút (Recruit General + Buy General Token) hoặc MỘT nút Recruit General ở giữa (một số tướng). Ảnh là phần chữ của nút (không kèm giá): `DetailRecruit.png` 1,00 ở cả hai kiểu; `DetailBuyToken.png` 1,00 ở kiểu hai nút, kiểu một nút 0,46 (ngưỡng 0,9). Một nút -> bấm thẳng; hai nút -> bấm theo `buy_with`. Bấm nút xong game tự về màn danh sách tướng: `_wait_list` chờ 1 giây / lần (thấy nút Refresh của Tavern = đã về), tối đa `LIST_WAIT` = 10 giây, quá hạn thì Back (dự phòng). Popup xác nhận / màn kết quả giữa chừng (nếu có) chờ ảnh.
+**Tướng cần mua:** các tên đã tích ở UI (`settings["generals"]`). Bot đọc tên tướng đang hiện bằng OCR (`bot/ocr/read_general_name.py`, mẫu chữ ở `Images/OCR/GeneralName/`), so mờ với từng tên đã tích: chỉ chữ cái (bỏ phần trong ngoặc, `i` = `l`); chữ OCR chỉ cần nằm TRONG tên là được (VD `?athanael` khớp "Nathanael Greene"): số chữ khớp / số chữ OCR đọc được từ 50% (`NAME_MATCH`) và khớp ít nhất 3 chữ thì mua. Chưa tích tướng nào = không mua, Refresh tiếp. Tên OCR có `?` thì lưu ảnh dải tên vào `%LOCALAPPDATA%\EvonyBot\logs\generals\` để thêm mẫu. Mua: bấm giữa ảnh tướng (`GENERAL_ART`) -> màn chi tiết tướng (nút `DetailRecruit.png` "Recruit General" + giá, `DetailBuyToken.png`; 1,00, màn Tavern <= 0,37). Màn chi tiết có hai kiểu: hai nút (Recruit General + Buy General Token) hoặc MỘT nút Recruit General ở giữa (một số tướng). Ảnh là phần chữ của nút (không kèm giá): `DetailRecruit.png` 1,00 ở cả hai kiểu; `DetailBuyToken.png` 1,00 ở kiểu hai nút, kiểu một nút 0,46 (ngưỡng 0,9). Một nút -> bấm thẳng; hai nút -> bấm theo `buy_with`. Bấm nút xong game tự về màn danh sách tướng: `_wait_list` chờ 1 giây / lần (thấy nút Refresh của Tavern = đã về), tối đa `LIST_WAIT` = 10 giây, quá hạn thì Back (dự phòng). Popup xác nhận / màn kết quả giữa chừng (nếu có) chờ ảnh.
 
 ## Nhận diện
 
@@ -116,3 +115,12 @@ Chỉ mở 3/6 hoặc 4/6 tướng (ít hơn `MIN_GENERALS` = 5 chấm) thì Tav
 Mua xong bot vẫn Refresh tiếp để săn tướng xịn kế tiếp; mua đủ `BUY_LIMIT` = 3 tướng trong một lượt chạy thì ghi log "bought 3 General(s), stop" rồi dừng
 (`_refresh` đếm số tướng `_handle_generals` đã mua). Test thật trên 21913 (2026-10-16): mua 1 tướng (Yi Song-gye) bằng nút Recruit General ở màn một nút,
 game hiện "You have recruited ..." rồi tự về màn danh sách.
+
+## Thiếu vàng (Open Gold)
+
+Bấm nút mua mà không đủ vàng thì game mở màn "How to get" (danh sách rương vàng) thay vì mua (`HowToGetTitle.png`).
+- Tab KHÔNG tích "Open Gold": Back hai lần về danh sách tướng rồi DỪNG activity (bot dừng).
+- Tab tích "Open Gold": bấm "Use" (`ListUse.png`, cột nút bên phải) của từng rương từ trên xuống, tới khi không còn nút Use nào trên màn (rương còn lại là nút kim cương = hết vàng) rồi Back về màn mua.
+  Mỗi rương hiện popup số lượng: nút trái là "Minimum" (`PopupMinimum.png`) nghĩa là thanh trượt đã ở tối đa -> bấm "Use" (`PopupUse.png`); nút trái ghi "Max" (`PopupMax.png`, thanh trượt chưa ở tối đa) -> bấm Max rồi mới bấm Use. Xong Back về màn chi tiết, bấm lại nút mua; vẫn thiếu vàng thì Back về danh sách rồi dừng activity.
+Rương chỉ có một: bấm Use dùng luôn, không popup (danh sách đổi = đã dùng). Use xong về danh sách, mở tiếp tới khi hết chữ Use; Back về màn chi tiết chờ bằng wait_for 1 giây / lần tối đa 10 giây. Chưa có ảnh: popup kết quả sau Use (nếu có).
+Sau khi bấm Use (trong popup hoặc nút Use đứng một mình) giữa màn hiện vòng tròn xoay đang tải: chờ `USE_LOAD_WAIT` = 3 giây rồi mới xét tiếp.

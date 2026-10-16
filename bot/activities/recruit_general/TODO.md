@@ -9,7 +9,7 @@
 ## Chưa làm
 - [ ] Popup khác khi Refresh (hết kim cương, hết Refresh...) chưa có ảnh: hiện chỉ dừng khi rời màn / mất nút Refresh.
 - [ ] Luồng MUA tướng: `_buy` mới mở màn chi tiết tướng; cần ảnh popup / màn sau khi bấm Recruit General (60.000.000 vàng) để làm tiếp.
-- [ ] Danh sách tướng cần mua đang rỗng: cần ảnh tên từng tướng (cắt dải tên, bỏ vào `Images/RecruitGeneral/Generals/`).
+- [x] Danh sách tướng cần mua lấy từ UI (settings["generals"]), bot đọc tên bằng OCR rồi so mờ >= 50%.
 - [ ] Chưa có ảnh màn Recruit General SAU khi Cancel (tên tướng xịn hiện rõ, không bị mờ): test dùng ảnh tên tổng hợp.
 - [ ] Nhánh quét route (chưa có route trong DB) chưa có flow test.
 - [ ] Sau khi bấm Recruit General / Buy General Token: có popup xác nhận / màn kết quả giữa chừng không (chưa có ảnh); `_wait_list` chỉ chờ nút Refresh hiện lại.

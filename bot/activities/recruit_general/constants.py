@@ -29,18 +29,20 @@ BOX_WAIT = 3                # giây tối đa chờ ô đổi trạng thái sau 
 # bấm Cancel rồi dừng (không Confirm). Tiêu đề / nút Refresh vẫn khớp 0,99 dưới popup nên phải xét popup TRƯỚC.
 # Dừng khi: có popup tướng xịn (đã Cancel), rời màn Recruit General (không thấy tiêu đề: popup / cảnh báo hiện lên), không thấy nút Refresh, hoặc đủ REFRESH_MAX lần.
 REFRESH = f"{FOLDER}/Refresh.png"
-REFRESH_WAIT = 1   # giây chờ sau mỗi lần bấm Refresh: bấm Refresh cho đến khi ra tướng lịch sử
+REFRESH_WAIT = 1   # giây chờ sau mỗi lần bấm Refresh: bấm Refresh cho đến khi ra tướng lịch sử (delay cố định, không cần sửa)
 REFRESH_MAX = 1000   # số lần bấm tối đa mỗi lượt chạy
 HIGH_QUALITY_POPUP = f"{FOLDER}/HighQualityPopup.png"   # dòng chữ của popup (1,00; màn Recruit General thường 0,30)
 CANCEL = f"{FOLDER}/Cancel.png"                         # nút Cancel đỏ của popup (1,00; màn thường 0,45)
-CANCEL_WAIT = 1   # giây chờ sau khi bấm Cancel
+CANCEL_WAIT = 1   # giây chờ sau khi bấm Cancel (delay cố định, không cần sửa)
+CONFIRM = f"{FOLDER}/Confirm.png"                       # nút Confirm xanh của popup (1,00; màn Recruit General 0,48)
+CONFIRM_WAIT = 3  # giây tối đa chờ popup hiện lại sau khi Refresh (tướng xịn đã kiểm tra) để bấm Confirm
 
 # ---- Kiểm tra tướng để mua (sau khi Cancel popup tướng xịn) ----
-# Tên tướng hiện trong dải ngay dưới tướng. Tướng CẦN MUA: mỗi tướng một ảnh tên trong GENERALS_DIR (tên file = tên tướng).
+# Tên tướng hiện trong dải ngay dưới tướng, đọc bằng OCR (bot/ocr/read_general_name.py). Tướng CẦN MUA: các tên đã tích ở UI (settings["generals"]).
 # Thấy tên nằm trong danh sách -> luồng mua; không thì Refresh tiếp. Thư mục rỗng = không mua tướng nào.
-GENERALS_DIR = f"{FOLDER}/Generals"
-NAME_REGION = (25, 68, 75, 74)   # % màn hình (x0, y0, x1, y1): dải tên tướng
-NAME_THRESHOLD = 0.9
+GENERALS_KEY = "generals"   # key trong settings của tab: {"generals": [tên tướng đã tích, ...]} (ui/tabs/constants.py RECRUIT_GENERALS_KEY)
+NAME_MATCH = 0.5               # tên OCR giống tên tướng cần mua từ mức này (0..1) là khớp
+NAME_STRIP = (99, 478, 198, 34)   # px (x, y, rộng, cao) trên màn 396x704: cả thanh tên tướng, để OCR tách nền thanh
 
 # ---- Thanh chấm màu 6 tướng trong Tavern (dưới ảnh tướng, trên dải tên) ----
 # Mỗi tướng một chấm, màu theo phẩm chất: trắng (xám) / xanh lá / xanh dương / TÍM / VÀNG. Bot KHÔNG lọc theo màu, chỉ quan tâm tướng
@@ -95,8 +97,8 @@ SHOWN_MIN_POINTS = 2
 # Tướng đang hiện là tướng xịn nhất; còn tướng xịn khác (có vương miện) thì kéo ảnh tướng sang trái hoặc phải tới đó: viền vàng của tướng
 # đang hiện chuyển theo sang chấm của tướng mới. Tướng đích nằm bên phải thì kéo sang trái, bên trái thì kéo sang phải (giả định: kéo sang
 # trái = tướng bên phải); kéo xong thấy tướng đang hiện xa chấm đích hơn thì đổi hướng. Điểm kéo nằm giữa ảnh tướng (không chạm hàng chấm / dải tên): % màn hình (x1, y1, x2, y2).
-SWIPE_LEFT = (80, 40, 20, 40)
-SWIPE_RIGHT = (20, 40, 80, 40)
+SWIPE_LEFT = (95, 40, 5, 40)
+SWIPE_RIGHT = (5, 40, 95, 40)
 SWITCH_MAX = 8     # số lần kéo tối đa để tới một tướng
 # Kéo xong có chuyển tướng chưa: chỉ cần chấm của tướng đang hiện (viền vàng, SHOWN_*) sang chấm khác là đủ, KHÔNG kiểm tra ảnh tướng (hai tướng
 # giống nhau thì ảnh không đổi). Chờ 1 giây / lần tối đa SWIPE_CHANGE_WAIT giây; hết giờ chấm vẫn đứng yên thì kéo lại (tính vào SWITCH_MAX).
@@ -128,8 +130,29 @@ DETAIL_WAIT = 8          # giây tối đa chờ màn chi tiết tướng sau kh
 # ---- Sau khi bấm nút mua: về lại màn danh sách tướng (Tavern) ----
 # Chờ 1 giây, thấy nút Refresh của Tavern = đã về; chưa thì chờ thêm 1 giây / lần tối đa LIST_WAIT giây; vẫn chưa về thì bấm Back.
 LIST_WAIT = 10   # giây tối đa chờ về màn danh sách tướng sau khi bấm nút mua
-LIST_RELOAD_WAIT = 2   # giây chờ thêm sau khi về màn danh sách tướng: chờ 2s để đợi game load lại dữ liệu, rồi mới làm tiếp
+LIST_RELOAD_WAIT = 2   # giây chờ thêm sau khi về màn danh sách tướng: chờ 2s để đợi game load lại dữ liệu, rồi mới làm tiếp (delay cố định, không cần sửa)
 
 # ---- Giới hạn số tướng mua mỗi lượt chạy ----
 # Mua xong vẫn Refresh tiếp (săn tướng xịn kế tiếp); mua đủ BUY_LIMIT tướng trong lượt chạy này thì ghi log rồi dừng activity.
 BUY_LIMIT = 3
+
+# ---- Thiếu vàng: bấm nút mua ra màn "How to get" (danh sách rương vàng) -> mở hết rương nếu tab tích "Open Gold" ----
+# Ảnh cắt từ ảnh chụp 396x704: tiêu đề "How to get" (1,00; màn chi tiết tướng 0,30), chữ "Use" của nút Use trong danh sách (1,00 .. 0,93; chữ "Use it to
+# gain" cùng cỡ nên chỉ tìm ở LIST_USE_REGION = cột nút), popup số lượng: chữ "Minimum" của nút trái (chỉ hiện khi thanh trượt đã ở tối đa) và chữ "Use".
+OPEN_GOLD_KEY = "open_gold"   # key trong settings của tab (ui/tabs/constants.py RECRUIT_OPEN_GOLD_KEY)
+HOW_TO_GET_TITLE = f"{FOLDER}/HowToGetTitle.png"
+HOW_TO_GET_WAIT = 10          # giây tối đa chờ màn How to get sau khi bấm nút mua (wait_for 1 giây / lần)
+LIST_USE = f"{FOLDER}/ListUse.png"
+LIST_USE_REGION = (68, 15, 100, 100)   # % màn hình: cột nút Use
+LIST_USE_THRESHOLD = 0.75
+POPUP_MINIMUM = f"{FOLDER}/PopupMinimum.png"
+POPUP_USE = f"{FOLDER}/PopupUse.png"
+POPUP_MAX = f"{FOLDER}/PopupMax.png"   # chữ "Max" của nút trái khi thanh trượt chưa ở tối đa (1,00; chữ "Minimum" 0,46)
+MAX_TAPS = 2                  # số lần bấm Max tối đa (bấm xong nút đổi thành "Minimum"; chưa đổi thì bấm lại)
+POPUP_OPEN_WAIT = 2           # giây tối đa chờ popup số lượng mở sau khi bấm Use trong danh sách (chỉ có một rương: không popup)
+POPUP_WAIT = 3                # giây tối đa chờ popup mở / đóng (xét 1 giây / lần)
+GOLD_STEP_DELAY = 2           # giây chờ sau mỗi bước mở vàng (bấm Use, Max, Use trong popup, cuộn, Back, bấm mua lại) (delay cố định, không cần sửa)
+USE_LOAD_WAIT = 3             # giây chờ sau khi bấm Use (giữa màn hiện vòng tròn xoay đang tải) (delay cố định, không cần sửa)
+GOLD_MAX_USES = 40            # số rương tối đa dùng mỗi lần
+GOLD_LIST_MIN_DIFF = 1.0     # độ khác nhau trung bình (0..255) giữa hai ảnh danh sách rương trước / sau khi bấm Use; cao hơn = danh sách đã đổi = đã dùng
+DETAIL_BACK_WAIT = 10        # giây tối đa chờ về màn chi tiết tướng sau khi Back khỏi How to get (wait_for 1 giây / lần)

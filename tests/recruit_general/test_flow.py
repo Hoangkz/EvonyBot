@@ -11,7 +11,7 @@ import unittest
 from pathlib import Path
 
 from bot.activities import recruit_general
-from bot.activities.recruit_general.constants import CANCEL, DETAIL_BUY_TOKEN, DETAIL_RECRUIT, MENU_RECRUIT, REFRESH, REFRESH_MAX, REFRESH_WAIT
+from bot.activities.recruit_general.constants import CANCEL, CONFIRM, DETAIL_BUY_TOKEN, DETAIL_RECRUIT, MENU_RECRUIT, REFRESH, REFRESH_MAX, REFRESH_WAIT
 from tests.flow import Step, end, run_flow, swipe, tap, tap_at, tap_pct
 
 SCREENS = Path(__file__).parent / "screens"
@@ -524,7 +524,7 @@ class RecruitGeneralFlow(unittest.TestCase):
         self._wanted_dir(True, "03_recruit_both_checked.png", "Frederick the Great", (486, 504, 138, 258))
         flow = [
             Step("04_high_quality_popup.png", tap(CANCEL)),
-            Step("08_two_generals.png", swipe(20, 40, 80, 40)),                  # đích bên trái: kéo sang phải
+            Step("08_two_generals.png", swipe(5, 40, 95, 40)),                  # đích bên trái: kéo sang phải
             Step("03_recruit_both_checked.png", tap_pct(50, 40)),                # tới tướng chấm 1 (huy hiệu hiện), cần mua: bấm vào tướng
             Step("05_general_detail.png", tap(DETAIL_RECRUIT)),
             Step("07_after_recruit.png", tap_pct(*HISTORIC_PCT)),                # game về danh sách, bỏ tích hai ô: tích lại Historic
@@ -561,9 +561,28 @@ class RecruitGeneralFlow(unittest.TestCase):
             Step("04_high_quality_popup.png", tap(CANCEL)),
             Step("01_tavern_menu.png", end(result=True)),      # dừng ở đây, không thêm thao tác nào
         ]
-        with mock.patch.object(module, "_handle_generals", return_value=1),                 mock.patch.object(module, "_set_warnings", return_value=True):
+        with mock.patch.object(module, "_handle_generals", return_value=1),                 mock.patch.object(module, "_set_warnings", return_value=True),                 mock.patch.object(module, "_refresh_confirm", return_value=True):   # bước Refresh + Confirm sau mỗi lượt test riêng
             device = run_flow(self, recruit_general.run, SCREENS, flow, {}, setup=_setup, variants=VARIANTS)
         self.assertTrue(any("bought 3 General(s), stop" in line for line in device.logs))
+
+    def test_refresh_after_checking_confirms_the_popup(self):
+        """Kiểm tra xong các tướng xịn: bấm Refresh; popup "high quality General" hiện lại thì bấm Confirm."""
+        module = importlib.import_module("bot.activities.recruit_general.run")
+        flow = [
+            Step("02_recruit_unchecked.png?right", tap(REFRESH)),
+            Step("04_high_quality_popup.png", tap(CONFIRM)),
+            Step("02_recruit_unchecked.png?right", end(result=True)),
+        ]
+        run_flow(self, lambda ctx, _s: module._refresh_confirm(ctx), SCREENS, flow, {}, setup=_setup, variants=VARIANTS)
+
+    def test_refresh_after_checking_without_popup(self):
+        """Refresh miễn phí / không hiện popup: không bấm Confirm, coi là đã refresh."""
+        module = importlib.import_module("bot.activities.recruit_general.run")
+        flow = [
+            Step("02_recruit_unchecked.png?right", tap(REFRESH)),
+            Step("02_recruit_unchecked.png?right", end(result=True)),
+        ]
+        run_flow(self, lambda ctx, _s: module._refresh_confirm(ctx), SCREENS, flow, {}, setup=_setup, variants=VARIANTS)
 
     def test_cancel_then_crowned_but_unwanted_keeps_refreshing(self):
         """Có vương miện nhưng tên không có trong danh sách: Refresh tiếp."""
