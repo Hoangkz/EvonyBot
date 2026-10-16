@@ -26,7 +26,7 @@ Flow:
 """
 import numpy as np
 
-from .....common import delay, wait_gone
+from .....common import delay, find_first, wait_gone
 from .....ocr import read_progress
 from ...common import (HANDLED, STOP, EventState, mark_complete,
                        mark_target_reached, run_task)
@@ -64,6 +64,7 @@ from .constants import (
     RECRUIT_SETTLE_DIFF,
     RECRUIT_SETTLE_TRIES,
     RECRUIT_SETTLE_WAIT,
+    GO_LEAVE_TRIES,
     RECRUIT_STUCK_VISITS,
     X100_WAIT,
 )
@@ -124,7 +125,15 @@ def run(bot, task: dict, state: EventState):
                 mark_complete(bot, KEY)
                 return STOP
             done = _read_done(bot, screen, go)
-            bot.tap(*go, delay=3)
+            bot.tap(*go, delay=2)
+            # Bấm Go thì rời tab Recruit More: chưa rời thì chờ thêm 1s, tối đa GO_LEAVE_TRIES lần chờ thêm (hết lượt thì
+            # vòng ngoài nhận diện lại; còn kẹt ở đây thì RECRUIT_STUCK_VISITS lo).
+            for attempt in range(GO_LEAVE_TRIES + 1):
+                if attempt:
+                    bot.sleep(1)
+                left, _ = find_first(bot, bot.screenshot(), _TARGETS, regions=REGIONS, thresholds=THRESHOLDS)
+                if left != ON_RECRUIT_MORE:
+                    break
             went = True
         else:
             return None   # EVENT_OPENED hoặc action dùng chung: run_task lo

@@ -42,7 +42,7 @@ Logic đã xong; còn thiếu **ảnh** (thêm ảnh là dùng được, không 
    `tests/daily_activities/screens/16..19_old_grid_*.png`; thẻ khớp 1,00, thẻ khác <= 0,51). Kiểm tra trên tài khoản
    khác (13_old_activity_grid): Gathering 0,97, Troop Healing 0,97, General Enhancing 0,97, Material Composing 0,96,
    Trap Building 0,88 (việc còn lại: [trap_building/TODO.md](trap_building/TODO.md)). Đã bấm thẻ xác nhận: găng tay = Resource
-   Collecting ("Collect resources from inside the City"), bình hoá chất = Research (không phải nhiệm vụ của bot).
+   Collecting ("Collect resources from inside the City"), bình hoá chất = Research (Card.png của alliance_research).
 4. **Thẻ đã 100% (bản cũ)**: icon thành hộp quà, bot nhận ra bằng chữ "100%" (`OLD_DONE_BADGE`) → bấm nhận, **chỉ
    khi chưa cuộn** (thẻ chưa nhận nằm đầu lưới; đã cuộn mà thấy "100%" là đã nhận). ~~Ảnh lưới sau khi nhận~~: đã
    có — thẻ xuống cuối lưới, icon cũ + tích xanh "Completed"; mỗi nhiệm vụ `<thư mục ảnh>/Done.png` → `TASK_DONE`.
@@ -84,3 +84,14 @@ Việc riêng của nhiệm vụ nào ghi trong `<thư mục nhiệm vụ>/TODO.
 | Wheel of Fortune | [wheel_of_fortune/TODO.md](wheel_of_fortune/TODO.md) | 3 |
 | Patrol | [patrol/TODO.md](patrol/TODO.md) | 3 |
 | Material Composing | [material_composing/TODO.md](material_composing/TODO.md) | 3 |
+
+## Chờ cố định cần xem (có nên đổi sang wait_for không?)
+
+Chỗ chờ số giây viết cứng, không có vòng kiểm tra rồi thử lại. Xác nhận từng chỗ: cần `wait_for` thì sửa, không thì gạch.
+
+### [common.py](common.py)
+
+- [ ] [common.py:262](common.py#L262) (1s): `bot.back(delay=1)`
+- [ ] [common.py:270](common.py#L270) (1s): `bot.back(delay=1)`
+- [ ] [common.py:402](common.py#L402) (1s): `bot.sleep(1)`
+- [ ] [common.py:480](common.py#L480) (1s): `bot.back(delay=1)   # đóng bảng Activity`

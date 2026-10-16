@@ -1,6 +1,7 @@
 """Gift claims that are opened from the city's Event Center."""
 from . import run as _run
-from .run import KEY, TASK, run, run_opened
+from .run import TASK, run_opened
+from .zone import KEY, run
 
 
 def __getattr__(name):

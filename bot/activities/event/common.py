@@ -207,6 +207,24 @@ def run_task(bot, state: EventState, name: str, event_icon: str, handle=None, *,
             return
 
 
+TAB_CHANGE_TRIES = 10   # tap_tab: số lần chờ thêm 1s (sau lần kiểm tra đầu) khi tab chưa đổi
+
+
+def tap_tab(bot, x, y, action, targets, regions=None, thresholds=None) -> bool:
+    """Bấm tab Day / tab phụ của event (`action` là action vừa nhận ra ở chỗ bấm), chờ 1s rồi kiểm tra đã đổi chưa (nhận
+    diện lại bằng `targets` thấy action khác), chưa thì chờ thêm 1s rồi kiểm tra lại, tối đa TAB_CHANGE_TRIES lần chờ thêm.
+    Hết lượt mà chưa đổi thì thôi (False), vòng run_task nhận diện lại màn rồi bấm lại."""
+    bot.tap(x, y, delay=1)
+    for attempt in range(TAB_CHANGE_TRIES + 1):
+        if attempt:
+            bot.sleep(1)
+        now, _ = find_first(bot, bot.screenshot(), list(targets), regions=regions, thresholds=thresholds)
+        if now != action:
+            return True
+    bot.log(f"Event: tab still {action} after {TAB_CHANGE_TRIES} extra waits, tap again")
+    return False
+
+
 def claim_all(bot, state: EventState, pos):
     """Bấm Claim All. Lỗi game (nút không mất): bấm liên tiếp quá CLAIM_ALL_MAX_TAPS lần thì
     Back và đếm lại từ 0."""

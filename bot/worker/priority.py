@@ -44,7 +44,6 @@ from ..activities.event.kings_path.refine.run import run as kings_path_refine
 from ..activities.event.kings_path.black_market.run import run as kings_path_black_market
 from ..activities.alliance_capacity.run import run as alliance_capacity
 from ..activities.black_market.run import run as black_market_market
-from ..activities.battlefield_shop.run import run as battlefield_shop
 from ..activities.daily_activities.alliance_donation import TASK as alliance_donation_task
 from ..activities.daily_activities.alliance_donation.run import donate_free
 from ..activities.daily_activities.alliance_help import TASK as alliance_help_task
@@ -60,10 +59,10 @@ from ..activities.event.run import claim_job, event_job
 from ..activities.event_center.crazy_eggs.run import JOB as crazy_eggs
 from ..activities.event_center.three_day.run import JOB as three_day_event
 from ..activities.open_gift_box.run import run as open_gift_box
-from ..activities import gift_claims, join_monster_war
+from ..activities import join_monster_war
 
 DATA ={
-    "_doc": "Độ ưu tiên của từng nhiệm vụ cho bộ chọn nhiệm vụ của worker. Gift Claims chạy cuối Daily Activities, sau Activity Rewards; khi có Join Boss nó chịu giới hạn 120 giây và tiếp tục bằng các checkpoint DB ở lượt sau.",
+    "_doc": "Độ ưu tiên của từng nhiệm vụ cho bộ chọn nhiệm vụ của worker.",
     "Bubble": [
         {
             "key": "bubble", 
@@ -347,15 +346,6 @@ DATA ={
             "priority": 300,
             "tail": True,
         },
-        {
-            "key": gift_claims.KEY,
-            "run": gift_claims.run_job,
-            "saves": True,
-            "label": gift_claims.LABEL,
-            "priority": 299,
-            "tail": True,
-            "note": "Chạy sau Daily Activities; có Join Boss thì nhường sau 120 giây và tiếp tục các key DB chưa DONE.",
-        },
     ],
     "Black Market": [
         { 
@@ -367,12 +357,4 @@ DATA ={
             "needs_city_map": True,   # nhiệm vụ cần route: chỉ vào danh sách khi máy đã có bản đồ thành (worker quét lúc Join Boss rảnh)
         }
     ],
-    "Battlefield Shop": [
-        { 
-            "key": "battlefield_shop",
-            "run": battlefield_shop,
-            "label": "Battlefield Shop",
-            "priority": -1,
-        }
-    ]
 }

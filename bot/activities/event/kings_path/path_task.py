@@ -43,6 +43,7 @@ from ..common import (
     mark_target_reached,
     read_go_progress,
     run_task,
+    tap_tab,
 )
 from ..constants import DAY_TABS_REGION, GO_BUTTON, GO_REGION, KINGS_PATH_ICON
 from .constants import (
@@ -119,9 +120,10 @@ def run(bot, task: dict, state: EventState, path: PathTask):
         if not progress["entered"] and enter(screen) == STOP:
             return STOP
         if action in (OPEN_DAY, OPEN_TAB):
-            bot.tap(*pos, delay=2)
+            tap_tab(bot, *pos, action, _targets(path, day), _regions(path, day), _thresholds(path, day))
         elif action == ON_DAY:
-            bot.tap(SUB_TAB_X[path.tab_index], SUB_TAB_Y, delay=2)
+            tap_tab(bot, SUB_TAB_X[path.tab_index], SUB_TAB_Y, action,
+                    _targets(path, day), _regions(path, day), _thresholds(path, day))
         elif action == ON_TAB:
             go = _find_go(bot, screen, path)
             if go is None:

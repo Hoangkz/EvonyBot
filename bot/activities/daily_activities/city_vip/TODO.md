@@ -9,3 +9,12 @@ Flow: [FLOW.md](FLOW.md). Việc chung của Daily Activities: [../TODO.md](../T
 - [ ] Máy chưa có route trong DB thì nhiệm vụ không tự chạy: cần đo route civ3 (21933: `goto` tường không thấy mốc nào) hoặc để worker quét route khi rảnh.
 - [ ] Kiểm tra ảnh hộp quà trên các civ khác (civ2, civ4..7), thấy không khớp thì cắt thêm ảnh trong `GiftBox/`.
 - Không viết flow test cho nhiệm vụ này (người dùng chốt: không cần test).
+
+## Chờ cố định cần xem (có nên đổi sang wait_for không?)
+
+Chỗ chờ số giây viết cứng, không có vòng kiểm tra rồi thử lại. Xác nhận từng chỗ: cần `wait_for` thì sửa, không thì gạch.
+
+### [run.py](run.py)
+
+- [ ] [run.py:75](run.py#L75) (1s): `bot.tap(*walls, delay=1)   # bấm lại đúng chỗ: menu đóng, thấy rõ hộp quà`
+- [ ] [run.py:103](run.py#L103) (1s): `bot.back(delay=1)`

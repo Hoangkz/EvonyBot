@@ -34,6 +34,7 @@ from ...common import (
     nearest_go,
     read_go_progress,
     run_task,
+    tap_tab,
 )
 from ...constants import KINGS_PATH_ICON, THRESHOLDS as EVENT_THRESHOLDS
 from ...gather_troops.train_troop.constants import (
@@ -126,7 +127,7 @@ def run(bot, task: dict, state: EventState):
             bot.back(delay=1)
             return HANDLED
         if action in (OPEN_DAY, OPEN_TAB):
-            bot.tap(*pos, delay=2)
+            tap_tab(bot, *pos, action, _TARGETS, _REGIONS, _THRESHOLDS)
         elif action == ON_TAB:
             go = nearest_go(bot, screen, pos)
             if go is None:

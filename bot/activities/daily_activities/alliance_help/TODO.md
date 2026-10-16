@@ -10,3 +10,11 @@ Flow: [FLOW.md](FLOW.md). Việc chung của Daily Activities: [../TODO.md](../T
 3. Ảnh màn ngay sau khi bấm Help All (có popup gì không) — hiện chỉ Back.
 4. ~~`test_flow.py`~~: đã có (`tests/daily_activities/alliance_help/test_flow.py`: Help All → Completed → xong;
    "No records" → dừng, không lưu gì; Help All nhưng thẻ còn Go). Đã chạy thật trên 21913 (Help All + "No records").
+
+## Chờ cố định cần xem (có nên đổi sang wait_for không?)
+
+Chỗ chờ số giây viết cứng, không có vòng kiểm tra rồi thử lại. Xác nhận từng chỗ: cần `wait_for` thì sửa, không thì gạch.
+
+### [run.py](run.py)
+
+- [ ] [run.py:63](run.py#L63) (1s): `bot.back(delay=1)`

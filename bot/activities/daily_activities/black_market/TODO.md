@@ -17,3 +17,11 @@ Flow: [FLOW.md](FLOW.md). Việc chung của Daily Activities: [../TODO.md](../T
    Đã có: nhận ra món trả vàng (`GOLD_PRICE`, vùng `GOLD_PRICE_AREA`).
    Lưu ý: 21913 là tài khoản VIP (ít món trả vàng). Tài khoản thường: món trả **vàng** nhiều hơn, chủ yếu mua bằng
    vàng, giá **100.000 .. 1.700.000** (cao nhất ~1,7 triệu). 
+
+## Chờ cố định cần xem (có nên đổi sang wait_for không?)
+
+Chỗ chờ số giây viết cứng, không có vòng kiểm tra rồi thử lại. Xác nhận từng chỗ: cần `wait_for` thì sửa, không thì gạch.
+
+### [run.py](run.py)
+
+- [ ] [run.py:22](run.py#L22) (1s): `bot.back(delay=1)`

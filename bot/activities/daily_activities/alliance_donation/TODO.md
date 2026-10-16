@@ -18,3 +18,11 @@ Còn: **chạy thật** trên giả lập (đặc biệt bước nhận thưởn
    thẻ (160, 544)); thẻ chưa xong <= 0,79 (ngưỡng 0,85).
 4. ~~Kiểm tra dòng Activity trước / sau khi donate~~ → bỏ: không còn mở bảng Activity để kiểm tra, không có "xong hôm nay".
 5. ~~Lưu giờ thử (`TRIED_KEY`) ngay khi bắt đầu~~ → đã đổi: lưu **sau khi donate** (và `common.hourly_job` lưu thêm sau mỗi lần chạy); bị ngắt giữa chừng thì chưa lưu, lượt sau làm tiếp.
+
+## Chờ cố định cần xem (có nên đổi sang wait_for không?)
+
+Chỗ chờ số giây viết cứng, không có vòng kiểm tra rồi thử lại. Xác nhận từng chỗ: cần `wait_for` thì sửa, không thì gạch.
+
+### [run.py](run.py)
+
+- [ ] [run.py:33](run.py#L33) (1s): `bot.back(delay=1)   # đóng Alliance Science`

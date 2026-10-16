@@ -34,7 +34,6 @@ CLAIM_ALL_THRESHOLD = 0.75   # ngưỡng khớp mẫu (thấp hơn mặc định
 CLAIM_ALL_TAPS = 3           # số lần bấm Claim All tối đa khi vừa mở danh sách
 # Ảnh tiêu đề dòng cắt từ danh sách thật (396x704) trong thư mục ảnh của nhiệm vụ: chỉ phần chữ cố
 # định, bỏ số lượng / "for N time(s)" (khác theo tài khoản, lần). Dòng đúng 1,00; dòng khác <= 0,78.
-# Resource Gathering = dòng "Gather ... resources from resource fields in the City" (thu mỏ trong thành).
 ROW_TITLE = "Title.png"
 # Nút Go / Claim nằm dưới tâm tiêu đề dòng ROW_BUTTON_DY px (Offer 434 -> 475, Tax 526 -> 568,
 # Research 356 -> Claim 399), lệch tối đa ROW_BUTTON_TOLERANCE.
@@ -87,6 +86,10 @@ OLD_CONGRATS = f"{ROOT}/CollectionActivities/CongratulationsCurrent.png"
 # che một chút còn 0,89); cùng thẻ chưa nhận <= 0,77; Done của nhiệm vụ khác <= 0,53 -> ngưỡng 0,85.
 OLD_DONE_CARD = "Done.png"
 OLD_DONE_CARD_THRESHOLD = 0.85
+# Chữ "Completed" xanh lá chung cho mọi thẻ đã nhận (DailyActivites/OldCompleted.png: ảnh nhị phân, chỉ điểm chữ xanh).
+# Khớp trên ảnh nhị phân cùng cách lọc màu (G > 180, R và B < 110): thẻ Completed 0,64-1,00, lưới chưa xong <= 0,29.
+OLD_COMPLETED_MASK = f"{ROOT}/OldCompleted.png"
+OLD_COMPLETED_THRESHOLD = 0.55
 # Kết quả open_task.
 TASK_OPENED, TASK_DONE, TASK_NOT_FOUND, TASK_NO_LIST = "opened", "done", "not_found", "no_list"
 # Thấy tiêu đề dòng mà không nhận ra nút nào (không Go / Claim / tích V): không đoán là xong.

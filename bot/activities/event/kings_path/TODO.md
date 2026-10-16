@@ -17,7 +17,7 @@ Cập nhật: 2026-10-03. Xong mục nào thì xoá mục đó. Kịch bản t�
   → Back, xong hôm nay.
 - [ ] **Black Market** — thử thật: 6 món cố định, bỏ món trả kim cương (nhận theo icon kim cương trên nút giá, 9 mẫu),
   mỗi món mua 1 lần (Confirm) → Instant Refresh (hết miễn phí thì bằng kim cương) → chờ 2 s, so ô vật phẩm 1 với ảnh
-  trước khi refresh: khác = đã ra hàng mới, mua tiếp; giống thì chờ thêm 1 s (tối đa 10 lần) rồi bấm Refresh lại.
+  trước khi refresh: khác = đã ra hàng mới, mua tiếp; giống thì chờ thêm 1 s (tối đa 10 lần chờ thêm) rồi bấm Refresh lại.
 - [ ] **Refine Equipment** (Day 4, Sharp Weapons) — thử thật: Go → Lò rèn → Craft → tab Refine → món xanh (rồi tím)
   trái nhất; loại đang mở không có thì bấm loại bên trái (nhẫn → giày → quần → giáp → mũ; chờ 1 s, vòng giữa chưa đổi
   thì chờ thêm 1 s, quá 10 lần → Back, không lưu done); tới mũ vẫn không có → lỗi, xong hôm nay → nút Refine → màn
@@ -62,3 +62,13 @@ Donate: giá mua lại lượt cao nhất 448 kim cương, giảm dần theo th�
 ## 5. Khác
 
 - [ ] Toàn bộ thay đổi King's Path **chưa commit**.
+
+## Chờ cố định cần xem (có nên đổi sang wait_for không?)
+
+Chỗ chờ số giây viết cứng, không có vòng kiểm tra rồi thử lại. Xác nhận từng chỗ: cần `wait_for` thì sửa, không thì gạch.
+
+### [path_task.py](path_task.py)
+
+- [ ] [path_task.py:117](path_task.py#L117) (1s): `bot.back(delay=1)`
+- [x] [path_task.py:122](path_task.py#L122) (2s): `bot.tap(*pos, delay=2)` — đã đổi: tap_tab (1s, tối đa 10 lần chờ thêm)
+- [x] [path_task.py:124](path_task.py#L124) (2s): `bot.tap(SUB_TAB_X[path.tab_index], SUB_TAB_Y, delay=2)` — đã đổi: tap_tab (1s, tối đa 10 lần chờ thêm)

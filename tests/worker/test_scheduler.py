@@ -84,10 +84,6 @@ class RealRegistryTests(unittest.TestCase):
         tasks = self.build(["Daily Activities", "Open Gift Box"], settings)
         ordered = [t.key for t in tasks]   # build_tasks đã xếp theo độ ưu tiên
         by_key = {t.key: t for t in tasks}
-        self.assertLess(ordered.index("daily_rewards"), ordered.index("gift_claims"))
-        self.assertEqual(299, by_key["gift_claims"].priority)
-        self.assertTrue(by_key["gift_claims"].tail)
-        self.assertFalse(by_key["gift_claims"].must_finish)
         self.assertIsNotNone(by_key["crazy_eggs"].due)   # việc theo giờ: tới giờ mới đẩy lên đầu danh sách
         self.assertTrue(by_key["daily_patrol"].must_finish)
         self.assertEqual(by_key["daily_offering"].group, "Daily Activities")
@@ -107,10 +103,6 @@ class RealRegistryTests(unittest.TestCase):
         self.assertTrue(task.once)
         self.assertIsNone(task.done)
         self.assertIsNone(task.due)
-
-    def test_battlefield_shop_excluded_black_market_once(self):
-        tasks = self.build(["Battlefield Shop", "Black Market"], {})
-        self.assertEqual([(t.key, t.once) for t in tasks], [("black_market_market", True)])
 
     def test_task_run_is_the_task_own_function(self):
         """Task.run là hàm riêng của nhiệm vụ, không phải hàm run của activity."""

@@ -67,6 +67,7 @@ RECRUIT_SETTLE_WAIT = 0.5       # giây giữa hai lần chụp
 RECRUIT_SETTLE_DIFF = 2.0       # độ lệch ảnh trung bình (0-255) dưới mức này = đứng yên
 RECRUIT_LIST_REGION = (0, 35, 100, 100)   # % màn hình: vùng danh sách nhiệm vụ
 RECRUIT_STUCK_VISITS = 2
+GO_LEAVE_TRIES = 10   # bấm Go (tab Recruit More): chờ 2s rồi kiểm tra đã rời tab chưa, chưa thì chờ thêm 1s, tối đa ngần này lần chờ thêm
 RECRUIT_DISMISS = (50, 24)      # % màn hình: dòng "Event Quest Countdown" (không bấm được)
 
 THRESHOLDS = {

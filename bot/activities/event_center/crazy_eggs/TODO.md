@@ -45,3 +45,15 @@ tối lạ giữ cách bấm (50 %, 95 %) tối đa 10 lần rồi BACK.)
 - [ ] Bị cắt giữa chừng (hết khung 120 s / có boss mới) thì lần gọi lại chạy từ đầu và mất `state` (`before_tap`,
   `lucky_tapped`). Hiện vẫn chạy đúng, nhưng phải đi lại từ màn chính.
 - [ ] `settings` chưa dùng: nếu cần tab cấu hình (bật/tắt, bật/tắt búa vàng...) thì thêm khi tích hợp.
+
+## Chờ cố định cần xem (có nên đổi sang wait_for không?)
+
+Chỗ chờ số giây viết cứng, không có vòng kiểm tra rồi thử lại. Xác nhận từng chỗ: cần `wait_for` thì sửa, không thì gạch.
+
+### [run.py](run.py)
+
+- [ ] [run.py:159](run.py#L159) (2s): `bot.tap(*egg_2, delay=2)`
+- [ ] [run.py:168](run.py#L168) (1s): `bot.back(delay=1)`
+- [ ] [run.py:170](run.py#L170) (1s): `bot.tap(*pos, delay=1)`
+- [ ] [run.py:178](run.py#L178) (1s): `bot.back(delay=1)`
+- [ ] [run.py:212](run.py#L212) (1s): `bot.back(delay=1)`
