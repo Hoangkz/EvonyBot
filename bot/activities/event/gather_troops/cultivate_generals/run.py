@@ -24,7 +24,9 @@ Flow:
      thì đánh dấu xong và dừng. Không đọc được số đã làm ở bước 3 thì không bấm (tránh
      tiêu gems khi không biết lúc nào dừng).
 """
-from .....common import wait_gone
+import numpy as np
+
+from .....common import delay, wait_gone
 from .....ocr import read_progress
 from ...common import (HANDLED, STOP, EventState, mark_complete,
                        mark_target_reached, run_task)
@@ -57,6 +59,12 @@ from .constants import (
     THRESHOLDS,
     TOTAL,
     TICK_FAVORITE,
+    RECRUIT_DISMISS,
+    RECRUIT_LIST_REGION,
+    RECRUIT_SETTLE_DIFF,
+    RECRUIT_SETTLE_TRIES,
+    RECRUIT_SETTLE_WAIT,
+    RECRUIT_STUCK_VISITS,
     X100_WAIT,
 )
 
@@ -68,9 +76,11 @@ def run(bot, task: dict, state: EventState):
     """`task` là settings của nhiệm vụ: {"enabled": bool, "day": int}."""
     done = None   # số lần đã cultivate, đọc ở dòng có nút Go (None = chưa đọc / đọc lỗi)
     went = False   # đã bấm Go trong lượt này (bắt buộc trước các màn sau Go)
+    recruit_visits = 0   # số lần liên tiếp thấy tab Recruit More mà chưa rời đi (bấm Go không chuyển màn)
 
     def handle(action, pos, screen):
-        nonlocal done, went
+        nonlocal done, went, recruit_visits
+        recruit_visits = recruit_visits + 1 if action == ON_RECRUIT_MORE else 0
         if action in _AFTER_GO_ACTIONS and not went:
             bot.log(f"Cultivate Generals: {action} before Go, back")
             bot.back(delay=1)
@@ -101,6 +111,13 @@ def run(bot, task: dict, state: EventState):
         elif action == ON_GENERALS_LIST:
             _open_last_general(bot)
         elif action == ON_RECRUIT_MORE:
+            if recruit_visits >= RECRUIT_STUCK_VISITS:
+                # Bấm Go mà vẫn ở đây: khung thông tin biểu tượng thưởng đang nuốt lần bấm -> bấm chỗ trống để đóng.
+                bot.log("Cultivate Generals: Go did not leave Recruit More, dismiss popup")
+                bot.tap_percent(*RECRUIT_DISMISS, delay=1)
+                recruit_visits = 0
+                return HANDLED
+            screen = _settled(bot, screen)
             go = _nearest_go(bot, screen, pos)
             if go is None:
                 bot.log("Cultivate Generals: no Go left, done")
@@ -133,6 +150,21 @@ _TARGETS = [
 # Màn sau khi bấm Go: cần bấm Go trong lượt này trước, xem `went` trong run().
 _AFTER_GO_ACTIONS = (ON_QUICK_CULTIVATE, OPEN_QUICK_CULTIVATE, OPEN_CULTIVATE, TICK_FAVORITE,
                      ON_GENERALS_LIST)
+
+
+def _settled(bot, screen):
+    """Chờ danh sách nhiệm vụ đứng yên (hai ảnh liên tiếp gần như giống nhau) rồi trả ảnh đó; hết RECRUIT_SETTLE_TRIES lần
+    thì trả ảnh cuối."""
+    h, w = screen.shape[:2]
+    x0, y0, x1, y1 = RECRUIT_LIST_REGION
+    box = (slice(int(h * y0 / 100), int(h * y1 / 100)), slice(int(w * x0 / 100), int(w * x1 / 100)))
+    for _ in range(RECRUIT_SETTLE_TRIES):
+        delay(bot, RECRUIT_SETTLE_WAIT)
+        shot = bot.screenshot()
+        if float(np.abs(shot[box].astype(np.int16) - screen[box].astype(np.int16)).mean()) < RECRUIT_SETTLE_DIFF:
+            return shot
+        screen = shot
+    return screen
 
 
 def _nearest_go(bot, screen, tab):

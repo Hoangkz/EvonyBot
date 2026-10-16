@@ -9,12 +9,10 @@ nay -> Back về thành.
 """
 from ..common import Task, mark_task_done
 from .constants import (
-    ACTIONS,
     BACKS_AFTER,
     DISPATCH,
     DISPATCH_MAX,
     DISPATCH_TRIES,
-    DONE_IMAGES,
     FOLDER,
     GIFT_BOXES,
     GIFT_MAX,
@@ -149,4 +147,4 @@ def _leave(bot):
         bot.back(delay=RESULT_WAIT)
 
 
-TASK = Task(LABEL, FOLDER, DONE_IMAGES, ACTIONS, lambda bot, action, pos, screen: False, key=KEY)
+TASK = Task(LABEL, FOLDER, key=KEY)

@@ -58,14 +58,16 @@ class DailyTaskTests(unittest.TestCase):
     def test_not_finished_task_is_not_marked(self):
         """Chưa xong: không lưu "xong hôm nay" (worker chuyển nhiệm vụ xuống cuối danh sách)."""
         bot = FakeBot()
-        with mock.patch.object(catalog, "run_task", return_value=NOT_DONE):
+        with mock.patch.object(catalog, "open_task_or_finish", return_value=False), \
+                mock.patch.object(catalog, "take", return_value=None):
             DEFS["daily_offering"].run(bot, {"Offering": True})
         self.assertNotIn("daily_offering", bot.done)
         self.assertFalse(DEFS["daily_offering"].done(bot, {"Offering": True}))
 
     def test_finished_task_marked_done(self):
         bot = FakeBot()
-        with mock.patch.object(catalog, "run_task", return_value=TaskResult(done=True)):
+        with mock.patch.object(catalog, "open_task_or_finish", return_value=False), \
+                mock.patch.object(catalog, "take", return_value=TaskResult(done=True)):
             DEFS["daily_offering"].run(bot, {"Offering": True})
         self.assertIn("daily_offering", bot.done)
         self.assertTrue(DEFS["daily_offering"].done(bot, {"Offering": True}))

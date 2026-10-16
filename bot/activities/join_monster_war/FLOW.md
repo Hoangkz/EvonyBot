@@ -204,7 +204,7 @@ Chi tiết triển khai nằm ở [boss_board.py](../../worker/boss_board.py) v�
 5. Khi vừa vào màn March, tìm các icon LOCATION và OCR tọa độ bên phải (tọa độ bên trái là người gọi rally). Đây là **tọa độ mục tiêu thật** dùng cho lần hành quân; không so với tọa độ đã đọc ở danh sách. Không đọc được thì Back, không March.
 6. Tìm lại MARCH; tap vị trí mới nếu có, nếu không dùng vị trí MARCH đã nhận diện ở vòng chính.
 7. Polling mỗi 0,2 giây, tối đa 2 giây để kiểm tra:
-   - Popup **không đủ thể lực** ("Get more now?", nút Confirm `hettheluc.png`): trả màn này cho vòng lặp chính (tọa độ đã đọc nằm ở `self.march_coords`). Vòng lặp chính gặp `OUT_OF_STAMINA`: `use_stamina = No` thì **dừng hẳn Join Boss**; `ALL` / `100` thì bấm Confirm rồi `_use_stamina()`. Sau khi dùng vật phẩm và Back về March, bot bấm March lại ngay với tọa độ đã đọc ở lần March trước (`self.march_coords`), không OCR lại, không chọn đội / tướng lại. Popup đè lên màn March nhưng nút March mờ vẫn khớp ảnh mẫu (0,99), nên phải kiểm tra popup trước.
+   - Popup **không đủ thể lực** ("Get more now?", nút Confirm `hettheluc.png`): trả màn này cho vòng lặp chính (tọa độ đã đọc nằm ở `self.march_coords`). Vòng lặp chính gặp `OUT_OF_STAMINA`: `use_stamina = No` thì ghi log, **Back 3 lần** (popup, March, danh sách War), đánh dấu **rảnh** để worker chuyển sang làm nhiệm vụ (không ghi `JOINED`); `ALL` / `100` thì bấm Confirm rồi `_use_stamina()`. Sau khi dùng vật phẩm và Back về March, bot bấm March lại ngay với tọa độ đã đọc ở lần March trước (`self.march_coords`), không OCR lại, không chọn đội / tướng lại. Popup đè lên màn March nhưng nút March mờ vẫn khớp ảnh mẫu (0,99), nên phải kiểm tra popup trước.
    - Thấy tab PvP War **và** hàng `Joined` có cùng tọa độ mục tiêu: coi hành quân thành công và ghi `JOINED` cho tọa độ thật đọc trên March.
    - Chỉ thấy tab PvP War nhưng không thấy hàng `Joined` đúng tọa độ: không ghi nhớ, tránh trường hợp game từ chối March nhưng vẫn quay về danh sách.
 8. Nếu nút MARCH vẫn còn sau các lần chờ, Back.
@@ -227,14 +227,14 @@ Hàm không trả cờ thành công/thất bại. Khi nó trả về, `_march()`
 
 Được gọi khi vòng lặp chính gặp popup không đủ thể lực (`OUT_OF_STAMINA`) mà `use_stamina` là `ALL` / `100`: bấm Confirm rồi:
 
-1. Màn **Use Item**: tìm các nút "Use ( N )" (`staminaItemUse.png`, chỉ trong cột nút bên phải), bấm nút **trên cùng** (vật phẩm đầu tiên). Không có nút nào: log "hết vật phẩm thể lực", **Back 2 lần**, không ghi `JOINED`, rồi đánh dấu rảnh. Lượt Join Boss sau có thể thử lại khi thể lực đã hồi.
+1. Màn **Use Item**: tìm các nút "Use ( N )" (`staminaItemUse.png`, chỉ trong cột nút bên phải), bấm nút **trên cùng** (vật phẩm đầu tiên). Không có nút Use nào (chỉ còn vật phẩm nút kim cương) = hết vật phẩm: log "hết vật phẩm thể lực", **Back 3 lần**, không ghi `JOINED`, rồi đánh dấu rảnh. Lượt Join Boss sau có thể thử lại khi thể lực đã hồi.
 2. **Popup số lượng** (nút Use lớn `staminaUse.png`):
    - `100`: bấm Use luôn (số lượng mặc định);
    - `ALL`: bấm gần cuối thanh trượt (`STAMINA_SLIDER_END`, dùng hết), rồi bấm Use.
    - `200` / `300` / `400` / `500` (`_add_stamina`): popup mở sẵn ở mốc 100 thể lực. Nhận loại vật phẩm (10 / 25 / 50 / 100) theo số vàng trên biểu tượng popup (`staminaItem<N>.png`, thử từ lớn xuống nhỏ, ngưỡng 0,995 vì "10" nằm trong "100"), tìm nút + (`staminaPlus.png`), bấm + (mốc − 100) / N lần (VD vật phẩm 10 mốc 200: 10 lần; vật phẩm 50 mốc 500: 8 lần) không delay giữa các lần, xong chờ 1 giây rồi bấm Use. Không nhận ra vật phẩm hoặc không thấy nút + thì ghi log, dùng mốc 100. Không OCR. Đo thật máy 21923 (vật phẩm 25, mở ở 3/15): mốc 200 → bấm 4 lần, 31 → 206; mốc 400 → bấm 12 lần, 32 → 407.
 3. Chờ 2 giây (game tự đóng popup sau khi bấm Use), Back một lần rồi chờ màn dùng thể lực (popup số lượng và danh sách Use Item) đóng: kiểm tra mỗi 1 giây, tối đa 10 lần; chưa đóng thì Back thêm một lần rồi chờ tiếp 10 lần; tổng 20 giây vẫn chưa đóng thì Back 2 lần, coi như đã dùng thể lực xong và quay về vòng chính tiếp tục các bước Join Boss theo màn hình hiện tại (không bấm March ngay). Khi đã đóng: **bấm March lại** nếu thấy nút March trên ảnh đó (không thấy thì để vòng chính nhận diện) (`_press_march`) với tọa độ `self.march_coords` đã đọc ở lần March trước; không OCR lại, không chọn đội / tướng lại (đội đã chọn vẫn giữ nguyên). Không có `pending`. Chỉ khi thấy hàng `Joined` đúng tọa độ thì boss mới được nhớ là đã tham gia.
 
-`use_stamina = No` (hoặc đã hết vật phẩm): gặp popup không đủ thể lực thì Join Boss dừng hẳn (trả `None`).
+Hết thể lực luôn đánh dấu rảnh (trả `IDLE`, worker chuyển sang làm nhiệm vụ): `use_stamina = No` -> Back 3 lần ngay khi gặp popup; hết vật phẩm -> Back 3 lần. Mọi trường hợp hết thể lực đều lưu mốc "bây giờ + 20 phút" vào DB (`stamina_wait.save`); worker làm nhiệm vụ tới mốc đó rồi mới Join Boss lại.
 
 Tên cấu hình ALL/100 được chuyển thành các thao tác UI trên; hàm không OCR lượng thể lực thực tế đã sử dụng.
 
@@ -251,6 +251,8 @@ Tên cấu hình ALL/100 được chuyển thành các thao tác UI trên; hàm 
 | --- | --- |
 | 0, 1, 2 | Vuốt xuống: từ `(50%, 65%)` tới `(50%, 40%)`, thời lượng 0,8 giây. |
 | 3, 4, 5 | Vuốt lên: từ `(50%, 40%)` tới `(50%, 65%)`, thời lượng 0,8 giây. |
+
+Mọi cú vuốt dùng `SCROLL_X = 50`. Thử vuốt ở mép trái (1,5 %, 4 %) thì danh sách không cuộn. Đôi khi game coi cú vuốt trên thẻ là tap và mở màn chi tiết đội (Total Troops): bot nhận ra qua chữ "Total Troops:" (`totalTroops.png`, không kèm số), ghi log, **Back một lần rồi chờ 1 giây** (`TROOP_BACK_WAIT`) và chụp lại, không qua `go_home`.
 
 Sau mỗi lần vuốt, `swipe = (swipe + 1) % 6` (`SCROLLS_EACH_WAY = 3`: 3 lần xuống rồi 3 lần lên).
 

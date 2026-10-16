@@ -1,7 +1,7 @@
 # Flow: Resource Tax
 
-Nhiệm vụ Daily Activities. Ảnh / action: [constants.py](constants.py), handler: [run.py](run.py).
-Phần dùng chung (mở Quests → Activity, tìm dòng, bấm Go, state machine `run_task`): [../FLOW.md](../FLOW.md).
+Nhiệm vụ Daily Activities. Ảnh: [constants.py](constants.py), phần làm sau Go (`after_go`): [run.py](run.py).
+Phần dùng chung (mở bảng Activity, tìm dòng / thẻ, bấm Go): [../OPEN_TASK.md](../OPEN_TASK.md), [../FLOW.md](../FLOW.md).
 
 1. Tìm hàng `ActivitiesTaxResource.png`, bấm Go.
 2. `CityTax/menuTax.png` (menu Chợ, ảnh dùng chung với King's Path City Tax): bấm Tax.

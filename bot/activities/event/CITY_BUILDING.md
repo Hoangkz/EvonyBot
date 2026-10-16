@@ -25,7 +25,7 @@ Hình công trình **khác nhau theo nền văn minh** của tài khoản (7 lo�
 | GT Ground / Ranged / Mounted / Siege | `barracks` / `archer_camp` / `stables` / `workshop` | Train / Speed Up |
 | GT Trap Factory | `trap_factory` | Build / Speed Up |
 
-Có mẫu nhưng chưa nối vào nhiệm vụ nào: `academy`, `shrine`, `keep` (Daily: Resource Collecting, Offering,
+Có mẫu nhưng chưa nối vào nhiệm vụ nào: `academy`, `shrine`, `keep` (Daily: Offering,
 Gold Levy), `pasture`, `art_hall`, `battlefield`.
 
 ## 2. Luồng sau khi bấm Go

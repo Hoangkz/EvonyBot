@@ -50,8 +50,8 @@ Lặp, mỗi vòng một ảnh chụp (tối đa `LIST_MAX_SCROLLS` = 25 lần c
 
 0. Vừa mở danh sách (bản mới) `_claim_all_first`: chờ 1 giây cho danh sách đứng yên, Claim All xanh thì bấm (tối đa `CLAIM_ALL_TAPS` = 3 lần) rồi mới tìm nhiệm vụ. Mỗi lần kiểm tra đều log độ bão hoà màu và "green"/"gray".
 1. Claim All chỉ kiểm tra **một lần** lúc vừa mở danh sách (bước 0), không kiểm tra lại khi cuộn; `_active_claim_all`: nút xám cũng khớp ảnh mẫu 0,86 nên xét thêm độ bão hoà màu ≥ `CLAIM_ALL_MIN_SATURATION`. Mỗi lần mở lại danh sách (sang màn khác rồi quay lại, Back và mở lại) thì kiểm tra một lần nữa.
-2. Tìm **tiêu đề dòng** của nhiệm vụ (`task_titles`: ảnh trong `ACTIONS` có action OPEN…, VD
-   `ActivitiesOffer/Offer.png` = "Use the Offer feature in Shrine" — chỉ phần chữ, không lấy "for N time(s)"
+2. Tìm **tiêu đề dòng** của nhiệm vụ (`task_titles`: ảnh `<thư mục ảnh>/Title.png`, VD
+   `ActivitiesOffer/Title.png` = "Use the Offer feature in Shrine" — chỉ phần chữ, không lấy "for N time(s)"
    nên dòng lần 1 / lần 2 đều khớp).
 3. Thấy tiêu đề:
    - nằm sát đáy (y > `ROW_TITLE_MAX_Y` = 580, nút có thể bị thanh Claim All che) và còn cuộn được → cuộn tiếp;
@@ -75,7 +75,7 @@ nhận khi **chưa cuộn**; đã cuộn xuống mà thấy "100%" là thẻ **�
 
 Thẻ **đã nhận** chuyển xuống **cuối lưới**, icon cũ có dấu tích xanh + chữ **"Completed"**. Mỗi nhiệm vụ một ảnh
 `<thư mục ảnh>/Done.png` (`task_done_cards`, cắt cùng chỗ với `Card.png`, ngưỡng `OLD_DONE_CARD_THRESHOLD` = 0,85):
-thấy → `TASK_DONE` (không bấm thẻ). Đã có: Resource Collecting, Offering, Resource Tax, Gold Levy, Troop Training, Troop Healing, Trap Building (thẻ xong 0,89..1,00; cùng thẻ chưa nhận <= 0,77;
+thấy → `TASK_DONE` (không bấm thẻ). Đã có: Offering, Resource Tax, Gold Levy, Troop Training, Troop Healing, Trap Building (thẻ xong 0,89..1,00; cùng thẻ chưa nhận <= 0,77;
 Done nhiệm vụ khác <= 0,53).
 Ảnh lưới: `tests/daily_activities/screens/22_old_grid_top_100.png`, `23_old_grid_end_completed.png`,
 `24_old_grid_end_offering_completed.png`, `25_old_grid_end_tax_completed.png`, `27_old_grid_end_levy_completed.png`, `28_old_grid_end_train_completed.png`, `29_old_grid_end_heal_completed.png`, `30_old_grid_end_trap_completed.png`; popup sau khi nhận:
@@ -126,7 +126,7 @@ mặc định 0 = không làm, lưu `Offering = False`; > 0 lưu `Offering = Tru
 
 ## 8. Thêm một nhiệm vụ mới
 
-1. `constants.py` của nhiệm vụ: `KEY` (theo `priority.py`), `LABEL`, ảnh tiêu đề dòng trong `ACTIONS` (action OPEN),
+1. `constants.py` của nhiệm vụ: `KEY` (theo `priority.py`), `LABEL`, ảnh tiêu đề dòng `Title.png`,
    ảnh thẻ bản cũ `Card.png` trong thư mục ảnh.
 2. `run.py`: `after_go(bot)` cho phần sau Go (thường `event/kings_path/building.py open_building` + icon chức năng),
    cuối cùng `mark_task_done` / đánh dấu theo số lượng.

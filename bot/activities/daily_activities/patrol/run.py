@@ -1,6 +1,6 @@
 """
-run.py — Daily Activities "Patrol": handler các action riêng của nhiệm vụ (Tường thành -> Patrol 3 lần).
-Vòng lặp chung (mở Activity, dòng Go, cuộn, ảnh xong): ../common.py run_task.
+run.py — Daily Activities "Patrol": phần làm nhiệm vụ sau Go (after_go) (Tường thành -> Patrol 3 lần).
+Mở dòng Activity + bấm Go: ../common.py (open_task_or_finish, daily_job).
 
 Luồng mới (after_go, sau khi open_task bấm Go): giống hệt King's Path Patrol sau Go (event/kings_path/patrol) —
 Tường thành -> "Patrol" -> màn Patrol -> patrol_rounds (Select All -> Patrol -> Refresh) làm hết 10 lượt trong ngày
@@ -11,21 +11,7 @@ from ...event.kings_path.building import open_building
 from ...event.kings_path.patrol.constants import MENU_PATROL, PATROL_TITLE
 from ...event.kings_path.patrol.run import patrol_rounds
 from ..common import Task, mark_task_done
-from .constants import ACTIONS, DONE_IMAGES, FOLDER, KEY, LABEL, PATROL_GOAL
-
-
-def handle(bot, action, pos, screen):
-    if action == "patrol":
-        for attempt in range(3):
-            if attempt:
-                bot.tap(108, 668, delay=3)  # Refresh rewards (gold)
-            bot.tap(169, 607, delay=1)      # Select All
-            bot.tap(286, 668, delay=3)      # Patrol
-        bot.back(delay=2)
-        return True
-    if action == "patrol_button":
-        bot.tap(*pos, delay=2)
-    return False
+from .constants import FOLDER, KEY, LABEL, PATROL_GOAL
 
 
 def after_go(bot) -> bool:
@@ -42,4 +28,4 @@ def after_go(bot) -> bool:
     return patrol_rounds(bot, 0, PATROL_GOAL, finish, name=LABEL, key=KEY)
 
 
-TASK = Task(LABEL, FOLDER, DONE_IMAGES, ACTIONS, handle, key=KEY)
+TASK = Task(LABEL, FOLDER, key=KEY)

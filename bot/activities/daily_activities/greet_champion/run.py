@@ -16,7 +16,6 @@ from ...event.kings_path.building import open_menu
 from ..common import Task, mark_task_done
 from ..constants import MAIN_MORE
 from .constants import (
-    ACTIONS,
     ARROW_BOX_LEFT,
     ARROW_BOX_RIGHT,
     ARROW_BRIGHT,
@@ -27,7 +26,6 @@ from .constants import (
     CHAMPION_TITLE,
     CONFIRM,
     DONT_SHOW,
-    DONE_IMAGES,
     FOLDER,
     GREET_FULL,
     GREET_FULL_THRESHOLD,
@@ -145,4 +143,4 @@ def _leave(bot):
                 break
 
 
-TASK = Task(LABEL, FOLDER, DONE_IMAGES, ACTIONS, lambda bot, action, pos, screen: False, key=KEY)
+TASK = Task(LABEL, FOLDER, key=KEY)

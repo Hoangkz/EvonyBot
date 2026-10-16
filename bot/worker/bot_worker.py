@@ -40,6 +40,7 @@ from PyQt5.QtCore import QThread, pyqtSignal
 from ..activities import ACTIVITIES
 from ..city.city_map import scan_city
 from ..activities.join_monster_war import IDLE as BOSS_IDLE
+from ..activities.join_monster_war import stamina_wait
 from ..activities.join_monster_war.constants import LISTBOSS
 from ..ocr.read_boss_count import crop as boss_count_crop, run as read_boss_count
 from ..common import get_server
@@ -93,6 +94,7 @@ class BotWorker(QThread):
     server_found = pyqtSignal(str, str)       # (serial, server)
 
     daily_task_done = pyqtSignal(str, str)    # (serial, task Daily Activities vừa xong)
+    daily_task_cleared = pyqtSignal(str, str) # (serial, khoá daily_done cần xoá khỏi DB)
     bubble_found = pyqtSignal(str, int)       # (serial, giây bubble còn lại; 0 = không có)
     civilization_found = pyqtSignal(str, int) # (serial, nền văn minh bot tự xếp từ ảnh công trình)
     city_map_found = pyqtSignal(str, str)     # (serial, bản đồ thành JSON bot quét được)
@@ -153,6 +155,7 @@ class BotWorker(QThread):
             self.ctx.is_daily_done = self._is_daily_done
             self.ctx.mark_daily_done = self._mark_daily_done
             self.ctx.done_at = self.daily_done.get
+            self.ctx.forget_daily = self._forget_daily
             self.ctx.daily_keys = lambda: list(self.daily_done)
             self.ctx.server_time = lambda: self.server_time
             self.ctx.record = self.record
@@ -210,7 +213,10 @@ class BotWorker(QThread):
         stalled = 0        # số nhiệm vụ liên tiếp chạy xong một lượt mà vẫn chưa xong
         scan_tried = False  # đã thử quét bản đồ thành trong lượt Start này (rảnh mới quét, xem nhánh `not pending` bên dưới)
         while not self._stop.is_set():
-            if boss:
+            # Hết thể lực: Join Boss lưu mốc "+20 phút" vào DB; chưa tới mốc thì làm nhiệm vụ (không gọi Join Boss, boss mới cũng
+            # không ngắt), qua mốc thì Join Boss lại.
+            stamina_wait_on = boss and stamina_wait.waiting(self.ctx.daily_keys())
+            if boss and not stamina_wait_on:
                 self._ensure_server()
                 boss = self._check_boss()
             now_reset = last_reset(self.server_time)
@@ -243,12 +249,13 @@ class BotWorker(QThread):
                         self.record("Rảnh (hết nhiệm vụ, Join Boss rảnh): tìm route các công trình")
                         self.activity_changed.emit(self.serial, JOIN_BOSS)
                         self._boss_count = None
-                        self.guards.call(None, scan_city, self.ctx, "City scan", self._watch_boss_count if boss else None)
+                        self.guards.call(None, scan_city, self.ctx, "City scan",
+                                         self._watch_boss_count if boss and not stamina_wait_on else None)
                         continue
                     self.guards.call(None, self.ctx.sleep, IDLE_WAIT)
                     continue
                 task = pending[0]
-            completed = self._run_task(task, boss)   # False: bị ngắt giữa chừng (không tính là một lần thử)
+            completed = self._run_task(task, boss and not stamina_wait_on)   # False: bị ngắt giữa chừng (không tính là một lần thử)
             if completed and task.done is None:
                 ran.add(task.key)
                 if task.once:
@@ -391,6 +398,10 @@ class BotWorker(QThread):
     def _set_city_map(self, city_map: dict):
         self.ctx.city_map = dict(city_map)
         self.city_map_found.emit(self.serial, json.dumps(city_map))
+
+    def _forget_daily(self, task: str):
+        self.daily_done.pop(task, None)
+        self.daily_task_cleared.emit(self.serial, task)
 
     def _mark_daily_done(self, task: str):
         self.daily_done[task] = datetime.now().isoformat(timespec="seconds")

@@ -1,6 +1,6 @@
 """
-run.py — Daily Activities "Trap Buiding": handler các action riêng của nhiệm vụ (công trình bẫy -> Build (nhãn Trap Buiding giữ như bản C# / tab UI)).
-Vòng lặp chung (mở Activity, dòng Go, cuộn, ảnh xong): ../common.py run_task.
+run.py — Daily Activities "Trap Buiding": phần làm nhiệm vụ sau Go (after_go) (công trình bẫy -> Build (nhãn Trap Buiding giữ như bản C# / tab UI)).
+Mở dòng Activity + bấm Go: ../common.py (open_task_or_finish, daily_job).
 
 Luồng mới (after_go, sau khi open_task bấm Go): ../train.py train_after_go, giống Gather Troops Trap Factory
 (event/gather_troops/trap_factory) — Trap Factory -> "Build" -> bẫy đang hiện khi vào (không tìm loại / cấp)
@@ -8,33 +8,11 @@ Luồng mới (after_go, sau khi open_task bấm Go): ../train.py train_after_go
 """
 import math
 
-from ....common import delay
 from ...event.city_building import TRAP_FACTORY
 from ...event.gather_troops.trap_factory.constants import BUILD, SPEEDUP_TITLE
-from ..common import Task, replace_text
+from ..common import Task
 from ..train import train_after_go
-from .constants import ACTIONS, DONE_IMAGES, FOLDER, KEY, LABEL, TRAP_GOAL
-
-
-def handle(bot, action, pos, screen):
-    if action == "interface":
-        # In 5.25 the four trap types are fixed buttons, not a troop carousel.
-        # Pick the visible tier-I trap and submit the requested amount directly.
-        bot.tap(95, 453, delay=1)
-        bot.tap(336, 582)
-        replace_text(bot, "150", 3)
-        delay(bot, 2)
-        bot.tap(300, 660)
-    elif action == "build":
-        bot.tap(336, 582)
-        replace_text(bot, "150", 3)
-        delay(bot, 2)
-        bot.tap(300, 660)
-    elif action == "speed":
-        bot.tap(*pos, delay=2)
-        bot.tap(100, 670, delay=2)
-        bot.back(delay=2)
-    return False
+from .constants import FOLDER, KEY, LABEL, TRAP_GOAL
 
 
 def after_go(bot) -> bool:
@@ -44,4 +22,4 @@ def after_go(bot) -> bool:
                           speedup_title=SPEEDUP_TITLE)
 
 
-TASK = Task(LABEL, FOLDER, DONE_IMAGES, ACTIONS, handle, key=KEY)
+TASK = Task(LABEL, FOLDER, key=KEY)

@@ -19,6 +19,7 @@ import math
 import numpy as np
 
 from ..activities.daily_activities.constants import MAIN_MORE
+from ..common.go_home import TO_CITY, TO_CITY_REGION, TO_CITY_WAIT
 from ..activities.event.city_building import (
     ACADEMY,
     ARCHER_CAMP,
@@ -71,8 +72,6 @@ CENTER_TRIES = 2             # số cú kéo bù tối đa
 GOTO_TRIES = 3               # số lượt (tìm mốc -> vuốt) tối đa khi đi tới công trình
 SEARCH_LIMIT = 40           # số cú vuốt tối đa khi dò mốc (find_keep)
 BOSS_CHECK_EVERY = 3         # cứ chừng ấy cú vuốt thì gọi bot.swipe_watch (kiểm tra boss mới, xem scan_city)
-TO_CITY = "CityMap/toCity.png"   # nút góc dưới phải khi đang ở bản đồ thế giới (hình toà thành): bấm để về thành
-TO_CITY_WAIT = 4             # giây chờ game chuyển về màn thành sau khi bấm
 TO_CITY_TRIES = 3
 HOME_BACKS = 6               # số lần Back tối đa để về màn thành (scan_city)
 CITY_BACKS = 3               # số lần Back tối đa để đóng popup che màn thành
@@ -356,7 +355,7 @@ def ensure_city(bot, name: str):
     """Đang ở bản đồ thế giới (có nút toà thành ở góc dưới phải, TO_CITY) thì bấm nút đó để về thành (camera thành đặt về chỗ
     mặc định của game, bước tìm Thành chính lo phần còn lại)."""
     for _ in range(TO_CITY_TRIES):
-        button = bot.find(TO_CITY)
+        button = bot.find(TO_CITY, region=TO_CITY_REGION)
         if button is None:
             return
         bot.log(f"{name}: on the world map, tap the city button")

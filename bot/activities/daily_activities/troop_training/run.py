@@ -1,6 +1,6 @@
 """
-run.py — Daily Activities "Troop Training": handler các action riêng của nhiệm vụ (doanh trại -> Train).
-Vòng lặp chung (mở Activity, dòng Go, cuộn, ảnh xong): ../common.py run_task.
+run.py — Daily Activities "Troop Training": phần làm nhiệm vụ sau Go (after_go) (doanh trại -> Train).
+Mở dòng Activity + bấm Go: ../common.py (open_task_or_finish, daily_job).
 
 Luồng mới (after_go, sau khi open_task bấm Go): ../train.py train_after_go, giống King's Path Train Troop —
 công trình train ngẫu nhiên 1 trong 4 loại -> "Train" -> cấp I -> không nhập số (số mặc định mỗi mẻ) -> số
@@ -8,26 +8,11 @@ mẻ = ceil(TRAIN_GOAL / số mỗi mẻ) -> mỗi mẻ Train -> Training Speedu
 """
 import math
 
-from ....common import delay
 from ...event.city_building import TROOP, TROOP_BUILDINGS
 from ...event.gather_troops.train_troop.constants import TRAIN
-from ..common import Task, replace_text
+from ..common import Task
 from ..train import train_after_go
-from .constants import ACTIONS, DONE_IMAGES, FOLDER, KEY, LABEL, TRAIN_GOAL
-
-
-def handle(bot, action, pos, screen):
-    if action == "interface":
-        bot.swipe_percent(30, 65, 80, 65, duration=0.3, delay=1)
-    elif action == "soldier":
-        bot.tap(336, 582)
-        replace_text(bot, "500", 3)
-        delay(bot, 5)
-        bot.tap(300, 660)
-    elif action == "speed":
-        bot.tap(*pos, delay=4)
-        bot.tap(100, 670)
-    return False
+from .constants import FOLDER, KEY, LABEL, TRAIN_GOAL
 
 
 def after_go(bot) -> bool:
@@ -37,4 +22,4 @@ def after_go(bot) -> bool:
                           also=TROOP_BUILDINGS, first_tier=True)
 
 
-TASK = Task(LABEL, FOLDER, DONE_IMAGES, ACTIONS, handle, key=KEY)
+TASK = Task(LABEL, FOLDER, key=KEY)

@@ -11,6 +11,7 @@ from bot.activities.event.kings_path.refine.constants import MENU_CRAFT, REFINE_
 from bot.activities.event.kings_path.refine.constants import (
     CANCEL as REFINE_CANCEL,
     EQUIPMENT_REFINE as REFINE_EQUIPMENT_BUTTON)
+from bot.activities.event.kings_path.refine.constants import WARN_CONFIRM
 from bot.activities.event.kings_path.refine.run import _last_done as refine_last_done, blue_items
 from tests.flow import Step, back, end, swipe, tap, tap_at, tap_pct
 from tests.event.kings_path.common import SCREENS, _run
@@ -36,6 +37,25 @@ class RefineFlow(unittest.TestCase):
         ]
         device = _run(self, flow, {refine.KEY: {"value": 10, "day": 4}})
         self.assertIn("Refine: refine 1 time(s) (done 9, target 10)", device.logs)
+        refine_last_done.clear()
+
+    def test_refine_high_quality_warning_ticks_box_then_confirms(self):
+        """Bấm Refine hiện hộp "You have unlocked high quality attribute(s)...": tích ô trống "Don't show this again for today"
+        (158, 385) rồi Confirm (không Cancel: Cancel của hộp này giống Cancel của màn thuộc tính New), sau đó như thường."""
+        refine_last_done.clear()
+        flow = [
+            Step("day4_sharp_weapons.png", tap_at(335, 344)),
+            Step("refine_city.png", tap_pct(50, 50)),
+            Step("refine_menu.png", tap(MENU_CRAFT)),
+            Step("refine_craft.png", tap(TAB_REFINE)),
+            Step("refine_items.png", tap_at(94, 579), tap(REFINE_BUTTON)),
+            Step("refine_equipment.png", tap(REFINE_EQUIPMENT_BUTTON)),
+            Step("refine_equipment_warning.png", tap_at(158, 385), tap(WARN_CONFIRM)),
+            Step("refine_equipment_new.png", tap(REFINE_CANCEL)),
+            Step("refine_equipment.png", back(), back()),
+        ]
+        device = _run(self, flow, {refine.KEY: {"value": 10, "day": 4}})
+        self.assertIn("Refine: high quality warning, tick 'don't show again' and confirm", device.logs)
         refine_last_done.clear()
 
     def test_refine_purple_when_no_blue(self):

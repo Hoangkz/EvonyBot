@@ -1,6 +1,6 @@
 """
-run.py — Daily Activities "Offering": handler các action riêng của nhiệm vụ (Đền thờ (Shrine) -> Offer).
-Vòng lặp chung (mở Activity, dòng Go, cuộn, ảnh xong): ../common.py run_task.
+run.py — Daily Activities "Offering": phần làm nhiệm vụ sau Go (after_go) (Đền thờ (Shrine) -> Offer).
+Mở dòng Activity + bấm Go: ../common.py (open_task_or_finish, daily_job).
 """
 from ....ocr import read_offer_cost
 from ....ocr.read_offer_cost import CROP as COST_CROP
@@ -9,11 +9,8 @@ from ...event.kings_path.building import open_building
 from ...result import done as report_done
 from ..common import Task
 from .constants import (
-    ACTIONS,
     BACKS_AFTER_OFFER,
-    DONE_IMAGES,
     FOLDER,
-    FOLDER_PATH,
     KEY,
     LABEL,
     MENU_OFFER,
@@ -32,20 +29,6 @@ from .constants import (
     POPUP_TITLE,
     POPUP_WAIT,
 )
-
-
-def handle(bot, action, pos, screen):
-    if action in ("offer", "offer_gems"):
-        bot.tap(*pos, delay=4)
-    elif action == "finish_offer":
-        plus = bot.find(f"{FOLDER_PATH}/Offer+.png", screen=screen)
-        if plus is None:
-            bot.back(delay=2)
-        else:
-            bot.tap(*plus, delay=1)
-            bot.tap(*plus, delay=1)
-            bot.tap(*pos, delay=4)
-    return False
 
 
 def offer_price(n: int) -> int:
@@ -178,4 +161,4 @@ def _close_popup(bot):
     else:
         bot.back(delay=1)
 
-TASK = Task(LABEL, FOLDER, DONE_IMAGES, ACTIONS, handle, key=KEY)
+TASK = Task(LABEL, FOLDER, key=KEY)

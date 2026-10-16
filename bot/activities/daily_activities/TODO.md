@@ -3,7 +3,7 @@
 Flow mở nhiệm vụ / bấm Go / đánh dấu xong: [OPEN_TASK.md](OPEN_TASK.md).
 
 Bố cục giống Event: mỗi nhiệm vụ một thư mục (`constants.py` ảnh + `KEY` trong `bot/worker/priority.py`,
-`run.py` handler + `TASK`); test ở `tests/daily_activities/<nhiệm vụ>/` (`test_flow.py` + `screens/`).
+`run.py` `after_go` + `TASK`); test ở `tests/daily_activities/<nhiệm vụ>/` (`test_flow.py` + `screens/`).
 
 ## Đã có
 
@@ -19,17 +19,14 @@ Bố cục giống Event: mỗi nhiệm vụ một thư mục (`constants.py` �
   `tests/daily_activities/gold_levy/screens/`). Resource Tax có `test_flow` phần sau Go (ảnh màn Tax chép từ
   `tests/event/kings_path/screens/`).
 - Test: `tests/daily_activities/test_open_task.py` (phần chung), `offering/`, `resource_tax/`,
-  `resource_collecting/`, `troop_training/` (bản mới), `troop_healing/` (bản cũ).
+  `troop_training/` (bản mới), `troop_healing/` (bản cũ).
 
 ## TODO — ưu tiên bấm Claim khi vào danh sách nhiệm vụ (giao diện MỚI)
 
 - [ ] **Giao diện mới: vào danh sách nhiệm vụ Activity mà chưa ưu tiên bấm Claim.** Khi vào list (nút Quests → tab Activity →
   danh sách), việc đầu tiên phải là nhận thưởng đang có (nút **Claim** của dòng / **Claim All** sáng), rồi mới tìm dòng hoặc làm việc
-  khác. Hiện trong code: `common.open_task` → `_search_list` có bấm Claim All trước (mỗi màn), nhưng vòng `common.run_task`
-  (`task_targets`, xem comment "Claim All belongs to the final reward phase") **cố ý không bấm Claim All** khi đang làm từng việc,
-  nên đi thẳng tới dòng nhiệm vụ mà không nhận thưởng trước. Cần: xác định đường vào list nào đang bỏ qua Claim, cho Claim lên đầu
-  mà không làm mất dòng đã xong trước khi kịp xác nhận hoàn thành (lý do của comment trên), rồi thêm test với ảnh danh sách có
-  nút Claim.
+  khác. Hiện trong code `common.open_task` → `_search_list` đã bấm Claim All trước (mỗi màn); cần kiểm tra nút Claim của từng dòng
+  có được nhận trước khi tìm dòng không, rồi thêm test với ảnh danh sách có nút Claim.
 
 ## TODO — phần mở nhiệm vụ / bấm Go (common.open_task, OPEN_TASK.md)
 
@@ -49,7 +46,7 @@ Logic đã xong; còn thiếu **ảnh** (thêm ảnh là dùng được, không 
 4. **Thẻ đã 100% (bản cũ)**: icon thành hộp quà, bot nhận ra bằng chữ "100%" (`OLD_DONE_BADGE`) → bấm nhận, **chỉ
    khi chưa cuộn** (thẻ chưa nhận nằm đầu lưới; đã cuộn mà thấy "100%" là đã nhận). ~~Ảnh lưới sau khi nhận~~: đã
    có — thẻ xuống cuối lưới, icon cũ + tích xanh "Completed"; mỗi nhiệm vụ `<thư mục ảnh>/Done.png` → `TASK_DONE`.
-   Đã có Done.png: Resource Collecting, Offering, Resource Tax, Gold Levy, Troop Training, Troop Healing, Trap Building, Alliance Help, Alliance Donation, Black Market (21943). Nhiệm vụ còn thiếu Done.png
+   Đã có Done.png: Offering, Resource Tax, Gold Levy, Troop Training, Troop Healing, Trap Building, Alliance Help, Alliance Donation, Black Market (21943). Nhiệm vụ còn thiếu Done.png
    ghi trong TODO.md của nhiệm vụ đó; flow test dùng ảnh `22..30_old_grid_*.png` (26: popup Congratulations sau khi nhận → Back).
 5. ~~**Claim All xám**~~: `_active_claim_all` xét thêm độ bão hoà màu trong khung nút (sáng ~205, xám ~14, ngưỡng
    `CLAIM_ALL_MIN_SATURATION` = 100) → nút xám không bấm. Test: `black_market/test_flow`
@@ -59,12 +56,9 @@ Logic đã xong; còn thiếu **ảnh** (thêm ảnh là dùng được, không 
 
 ## TODO — phần khác
 
-7. **Nối luồng mới vào `run.py`**: hiện `run()` vẫn chạy luồng cũ port từ C# (`common.run_task`). Với nhiệm vụ đã có
-   `after_go`: `common.open_task_or_finish` → `after_go`. Sau đó bỏ phần luồng C# không còn dùng (`run_task`,
-   `task_targets`, `open_daily_activity` ...) và cập nhật `FLOW.md`.
+7. ~~Nối luồng mới vào `run.py`~~: xong — mọi nhiệm vụ Daily chạy `daily_job` (`open_task_or_finish` → `after_go`); luồng cũ port từ C# (`run_task`, `task_targets`, `handle`, `ACTIONS`) và 3 nhiệm vụ Monster Killing / Resource Collecting / Resource Gathering đã xoá.
 8. **Ảnh sau Go / `after_go` / `test_flow.py`** của từng nhiệm vụ: ghi trong TODO.md của nhiệm vụ (bảng cuối file).
-9. **Nhận thưởng cuối** (rương 20/50/80/110/145) cho cả hai phiên bản: `common.collect_activity_rewards` đang là
-    bản C#, cần ảnh để kiểm tra.
+9. **Nhận thưởng cuối** (rương 20/50/80/110/145) cho cả hai phiên bản: `common.collect_activity_rewards` cần ảnh để kiểm tra.
 10. **`daily_done` theo `KEY`** (giống Event) thay vì theo nhãn — cần đổi cả tab UI và chuyển dữ liệu cũ.
 
 ## TODO — làm sau (thiếu điều kiện)
@@ -78,10 +72,7 @@ Việc riêng của nhiệm vụ nào ghi trong `<thư mục nhiệm vụ>/TODO.
 
 | Nhiệm vụ | TODO | Số việc |
 | --- | --- | --- |
-| Monster Killing | [monster_killing/TODO.md](monster_killing/TODO.md) | 3 |
-| Resource Collecting | [resource_collecting/TODO.md](resource_collecting/TODO.md) | 1 |
 | Offering | [offering/TODO.md](offering/TODO.md) | 3 |
-| Resource Gathering | [resource_gathering/TODO.md](resource_gathering/TODO.md) | 2 |
 | Resource Tax | [resource_tax/TODO.md](resource_tax/TODO.md) | 3 |
 | Gold Levy | [gold_levy/TODO.md](gold_levy/TODO.md) | 4 |
 | Troop Training | [troop_training/TODO.md](troop_training/TODO.md) | 3 |

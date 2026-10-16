@@ -90,6 +90,7 @@ class MainWindow(QMainWindow):
         self.bots.auto_timeout_minutes = self.home_view.auto_timeout_minutes
         self.home_view.auto_timeout_changed.connect(self._on_auto_timeout_changed)
         self.bots.daily_task_done.connect(self.db.mark_daily_task_done)
+        self.bots.daily_task_cleared.connect(lambda serial, task: self.db.mark_daily_task_done(serial, task, False))
         self.bots.daily_task_done.connect(lambda serial, _task: self._refresh_event_times(serial))
         self.bots.bubble_found.connect(self._on_bubble_found)
         self.bots.civilization_found.connect(self._on_civilization_found)

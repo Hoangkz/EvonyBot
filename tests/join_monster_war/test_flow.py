@@ -62,13 +62,6 @@ def W(screen):
     return f"{screen}?war_off"
 
 
-def no_items(screen):
-    """ẢNH TỔNG HỢP: xoá cột nút "Use ( N )" của màn Use Item (không còn vật phẩm thể lực).
-    Thay bằng ảnh chụp thật khi có."""
-    screen[300:, 255:370] = (20, 20, 20)
-    return screen
-
-
 def unknown(screen):
     """ẢNH TỔNG HỢP: màn hình không ảnh mẫu nào khớp (nhiễu), như hiệu ứng tạm sau khi bấm
     Join. (Làm tối ảnh thật không đủ: so khớp ảnh mẫu không phụ thuộc độ sáng.)"""
@@ -87,7 +80,7 @@ def run_join(testcase, flow, settings, **kwargs):
     with mock.patch.object(_Boss, "_read_march_target_coords", reported_target), \
             mock.patch.object(_Boss, "_joined_target_visible", return_value=True):
         return run_flow(testcase, join_monster_war.run, SCREENS, flow, settings,
-                        variants={"war_off": war_off, "no_items": no_items, "unknown": unknown}, **kwargs)
+                        variants={"war_off": war_off, "unknown": unknown}, **kwargs)
 
 
 def remember(coords, status):
@@ -170,6 +163,13 @@ ALREADY_KNOWN_MINOTAUR = [
 ]
 # Còn thẻ bị che ở đáy màn hình -> vẫn phải cuộn xuống tìm rally khác.
 ALREADY_KNOWN_MORE_BELOW = [
+    Step(W("war_list_more_below.png"), swipe(50, 65, 50, 40)),
+]
+
+# Cú vuốt bị game coi là tap vào thẻ -> màn chi tiết đội (Total Troops): Back đúng 1 lần về danh sách, cuộn tiếp.
+SWIPE_OPENED_TROOP_DETAIL = [
+    Step(W("war_list_more_below.png"), swipe(50, 65, 50, 40)),
+    Step("war_troop_detail.png", back()),
     Step(W("war_list_more_below.png"), swipe(50, 65, 50, 40)),
 ]
 
@@ -371,13 +371,14 @@ MARCH_THEN_BACK_TO_LIST = [
     Step(W("war_after_march_joined.png"), end(IDLE)),
 ]
 # Bấm March mà không đủ thể lực -> popup "Get more now?" (Cancel / Confirm).
-# use_stamina = No -> dừng hẳn Join Boss (trả None); ALL / 100 -> bấm Confirm để lấy thể lực.
+# use_stamina = No -> Back 3 lần, đánh dấu rảnh (trả IDLE); ALL / 100 -> bấm Confirm để lấy thể lực.
 STAMINA_POPUP = "march_not_enough_stamina.png"
 NO_STAMINA_STOP = [
     Step(W("02_war_list_join.png"), tap(JOIN)),
     Step(MARCH_SCREEN, preset(1)),
     Step(MARCH_SCREEN, tap(MARCH)),
-    Step(STAMINA_POPUP, end(None)),
+    Step(STAMINA_POPUP, back(3)),
+    Step(W("war_after_march_joined.png"), end(IDLE)),
 ]
 NO_STAMINA_CONFIRM = [
     Step(MARCH_SCREEN, preset(1)),
@@ -400,14 +401,14 @@ def refill(slider_step):
     ]
 
 
-# Hết vật phẩm thể lực: màn Use Item không còn nút Use -> Back 2 lần -> không dừng (thể lực
+# Hết vật phẩm thể lực: màn Use Item không còn nút Use -> Back 3 lần -> không dừng (thể lực
 # tự hồi): nhớ boss là đã tham gia và coi như rảnh (trả IDLE khi còn activity khác).
 OUT_OF_STAMINA_ITEMS = [
     Step(W("02_war_list_join.png"), tap(JOIN)),
     Step(MARCH_SCREEN, preset(1)),
     Step(MARCH_SCREEN, tap(MARCH)),
     Step(STAMINA_POPUP, tap(NOT_ENOUGH_STAMINA)),
-    Step("stamina_after_use.png?no_items", back(2)),
+    Step("stamina_no_items.png", back(3)),
     Step(W("war_after_march_joined.png"), end(IDLE)),
 ]
 REFILL_100 = refill([Step("stamina_use_popup_100.png", tap(STAMINA_USE))])   # mặc định 10/87 (= 100)
@@ -586,7 +587,7 @@ class JoinMonsterWarFlow(unittest.TestCase):
         self.assertIn("Chọn đội quân 1", device.logs)
         self.assertIn("Bỏ tích ô War (chỉ giữ rally đánh boss)", device.logs)
 
-    def test_not_enough_stamina_stops_join_boss(self):
+    def test_not_enough_stamina_marks_idle(self):
         device = run_join(self, NO_STAMINA_STOP, {**ALL_TROOPS, "use_stamina": "No"})
         with device.fake_time():
             self.assertIsNone(device.ctx.boss_memory.status(PERYTON))   # chưa tham gia được
@@ -616,9 +617,12 @@ class JoinMonsterWarFlow(unittest.TestCase):
                                   {**ALL_TROOPS, "use_stamina": str(target)})
                 self.assertIn(f"Join Monster War: dùng vật phẩm thể lực ({target})", device.logs)
 
+    def test_swipe_opening_troop_detail_backs_once(self):
+        run_join(self, SWIPE_OPENED_TROOP_DETAIL, {**ALL_TROOPS})
+
     def test_out_of_stamina_items_does_not_mark_joined(self):
         device = run_join(self, OUT_OF_STAMINA_ITEMS, {**ALL_TROOPS, "use_stamina": "ALL"})
-        self.assertIn("Join Monster War: hết vật phẩm thể lực", device.logs)
+        self.assertIn("Join Monster War: hết vật phẩm thể lực -> rảnh, chuyển sang làm nhiệm vụ", device.logs)
         with device.fake_time():
             self.assertIsNone(device.ctx.boss_memory.status(PERYTON))
 

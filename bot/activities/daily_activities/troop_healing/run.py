@@ -1,6 +1,6 @@
 """
-run.py — Daily Activities "Troop Heading": handler các action riêng của nhiệm vụ (Bệnh viện -> Heal (nhãn Troop Heading giữ như bản C# / tab UI)).
-Vòng lặp chung (mở Activity, dòng Go, cuộn, ảnh xong): ../common.py run_task.
+run.py — Daily Activities "Troop Heading": phần làm nhiệm vụ sau Go (after_go) (Bệnh viện -> Heal (nhãn Troop Heading giữ như bản C# / tab UI)).
+Mở dòng Activity + bấm Go: ../common.py (open_task_or_finish, daily_job).
 
 Luồng mới (after_go, sau khi open_task bấm Go) giống King's Path Heal (event/kings_path/heal), dùng lại các
 bước của nó (Reset + cuộn, chọn số lính từng dòng bằng OCR, Healing Speedup -> Finish All):
@@ -12,7 +12,6 @@ bước của nó (Reset + cuộn, chọn số lính từng dòng bằng OCR, He
 3. Heal xong -> đánh dấu xong hôm nay. Không có lính bị thương -> Back, cũng đánh dấu xong hôm nay (mai
    kiểm tra lại; ít hơn HEAL_GOAL thì heal hết số có).
 """
-from ....common import delay
 from ...event.city_building import HOSPITAL
 from ...event.kings_path.building import open_menu
 from ...event.kings_path.constants import SCREEN_WAIT
@@ -26,26 +25,10 @@ from ...event.kings_path.heal.constants import (
     SPEED_UP,
 )
 from ...event.kings_path.heal.run import _finish_all, _heal_rows, _reset_and_scroll
-from ..common import Task, mark_task_done, replace_text
-from .constants import ACTIONS, DONE_IMAGES, FOLDER, HEAL_GOAL, KEY, LABEL, MENU_ROUNDS
+from ..common import Task, mark_task_done
+from .constants import FOLDER, HEAL_GOAL, KEY, LABEL, MENU_ROUNDS
 
 _SPEED_UP, _HEAL, _EMPTY = "speed_up", "heal", "empty"
-
-
-def handle(bot, action, pos, screen):
-    if action == "heal_all":
-        bot.tap(*pos, delay=4)
-    elif action == "select":
-        bot.tap(*pos, delay=2)
-        replace_text(bot, "150", 1)
-        delay(bot, 2)
-        bot.tap(330, 670, delay=4)
-        bot.tap(330, 670, delay=2)
-    elif action == "heal_info":
-        bot.tap(*pos, delay=2)
-        bot.swipe_percent(65, 70, 65, 60, duration=1.0, delay=1)
-        bot.swipe_percent(65, 70, 65, 60, duration=1.0, delay=1)
-    return False
 
 
 def after_go(bot) -> bool:
@@ -100,4 +83,4 @@ def _no_wounded(bot) -> bool:
     return True
 
 
-TASK = Task(LABEL, FOLDER, DONE_IMAGES, ACTIONS, handle, key=KEY)
+TASK = Task(LABEL, FOLDER, key=KEY)

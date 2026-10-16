@@ -139,6 +139,15 @@ QPushButton#ApplyAllButton {{
     color: {COLORS['accent']};
     font-weight: 600;
 }}
+QPushButton#ApplyAllButton:hover {{
+    background: {COLORS['accent']};
+    color: white;
+}}
+QPushButton#ApplyAllButton:pressed {{
+    background: {COLORS['accent_hover']};
+    border-color: {COLORS['accent_hover']};
+    color: white;
+}}
 
 /* ---- Disabled: nền xám -> dễ nhận biết nút đang tắt ----
    Phải liệt kê rõ biến thể có id/attr (PrimaryButton, ApplyAllButton) vì

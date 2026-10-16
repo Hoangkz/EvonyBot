@@ -1,16 +1,12 @@
 """
 constants.py — ảnh của nhiệm vụ Daily Activities "Trade Carriage" (thư mục ảnh ActivitiesTradeCarriage/).
 """
-from ..constants import ROOT, OPEN
+from ..constants import ROOT
 
 KEY = "daily_trade_carriage"   # key nhiệm vụ trong bot/worker/priority.py
 LABEL = "Trade Carriage"   # ô tích ở tab Daily Activities, key daily_done
 FOLDER = "ActivitiesTradeCarriage"
 FOLDER_PATH = f"{ROOT}/{FOLDER}"
-# Ảnh "đã xong": không có, xong khi đã Dispatch đủ DISPATCH_MAX lần (hay dòng nhiệm vụ hết Go).
-DONE_IMAGES = ()
-# Tiêu đề dòng "Dispatch Trade Carriages" lấy từ Title.png (common.task_titles); ACTIONS chỉ để đủ Task.
-ACTIONS = (("Title.png", OPEN),)
 
 # ---- Sau Go (run.after_go) --------------------------------------------------------------------
 # Go -> ra thẳng màn Trade Carriage (tab My Carriage). Có hộp quà nổi trên xe (xe đã tới nơi) -> bấm nhận trước.

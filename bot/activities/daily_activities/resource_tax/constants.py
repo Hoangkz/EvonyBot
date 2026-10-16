@@ -1,24 +1,12 @@
 """
 constants.py — ảnh của nhiệm vụ Daily Activities "Resource Tax" (thư mục ảnh ActivitiesTaxResource/).
 """
-from ...event.kings_path.city_tax.constants import POPUP, TAX_MENU, TAX_SCREEN
-from ..constants import ROOT, OPEN
+from ..constants import ROOT
 
 KEY = "daily_resource_tax"   # key nhiệm vụ trong bot/worker/priority.py
 LABEL = "Resource Tax"   # ô tích ở tab Daily Activities, key daily_done
 FOLDER = "ActivitiesTaxResource"
 FOLDER_PATH = f"{ROOT}/{FOLDER}"
-# Ảnh "đã xong" (thấy là nhiệm vụ hôm nay xong).
-DONE_IMAGES = ("TaxFinish2.png", "TaxFinish.png", "TaxFinish1.png", )
-# (ảnh, action) theo thứ tự ưu tiên. Action chung (OPEN / TAP / ...) do common.run_task xử lý,
-# action riêng (chuỗi) chuyển cho run.handle.
-# Ảnh màn Tax dùng chung với King's Path City Tax (Images/CityTax/, xem event/kings_path/city_tax).
-ACTIONS = (
-    (POPUP, "popup"),          # popup Tax còn mở (bị ngắt giữa chừng) -> đóng
-    (TAX_SCREEN, "tax"),       # màn Tax -> run.tax_all
-    (TAX_MENU, "tax_menu"),    # menu Chợ, icon "Tax"
-    ("ActivitiesTaxResource.png", OPEN),
-)
 
 # ---- Group "City Tax" (tab Daily Activities, trong "Selection Daily"; key cấu hình TAX_KEY) -------
 # settings["Tax on resource"] = {"Food": n, "Wood": n, "Stone": n, "Iron": n, "free": "Food" | None}:

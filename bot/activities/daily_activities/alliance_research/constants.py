@@ -1,16 +1,12 @@
 """
 constants.py — ảnh của nhiệm vụ Daily Activities "Research technologies" (thư mục ảnh ActivitiesResearch/).
 """
-from ..constants import ROOT, OPEN
+from ..constants import ROOT
 
 KEY = "daily_alliance_research"   # key nhiệm vụ trong bot/worker/priority.py
 LABEL = "Research"   # ô tích ở tab Daily Activities, key daily_done
 FOLDER = "ActivitiesResearch"
 FOLDER_PATH = f"{ROOT}/{FOLDER}"
-# Ảnh "đã xong": không có, xong khi nghiên cứu được 1 công nghệ (hay dòng nhiệm vụ hết Go).
-DONE_IMAGES = ()
-# Tiêu đề dòng "Research technologies" lấy từ Title.png (common.task_titles); ACTIONS chỉ để đủ Task.
-ACTIONS = (("Title.png", OPEN),)
 
 # ---- Sau Go (run.after_go) --------------------------------------------------------------------
 # Học viện ở giữa -> open_menu (icon "Research") -> màn Academy: các tab (Advancement, Defense, ...) và cây
