@@ -3,8 +3,9 @@
 - ``valuable_event.run``: Valuable Event + Super Value Return (khu quà ngoài Event Center).
 - ``event_center.run``:   Back to Territory (icon ngoài) + các event con trong Event Center.
 
-Mỗi hoạt động có danh sách nhiệm vụ (key trong ``daily_done``); vòng kiểm tra 3 lần nằm ở ``scan.py``. Hiện chưa nối vào
-bảng nhiệm vụ của worker (``bot/worker/priority.py``).
+Mỗi hoạt động có danh sách nhiệm vụ (key trong ``daily_done``); vòng kiểm tra 3 lần nằm ở ``scan.py``. Worker chạy cả hai
+hoạt động SAU CÙNG mỗi ngày (``bot/worker/priority.py``, nhóm "Gift Claims"), khi ô "Claim Event Gifts" ở tab Daily
+Activities được tích (``settings["General"]["gift_claims"]``, mặc định bật).
 """
 from importlib import import_module
 
@@ -20,4 +21,13 @@ from .common import (TEXT_CLAIM_CONTROLS, back_if_close_x,
                      return_home)
 from .screens import GiftScreen
 
-__all__ = ["event_center", "valuable_event"]
+
+
+def job(zone) -> dict:
+    """Dòng nhiệm vụ cho bảng ``priority.py``: chạy ``zone.run`` khi ô nhận quà được tích; xong khi key tổng của zone có trong DB."""
+    return {"run": lambda ctx, settings: zone.run(ctx),
+            "enabled": lambda settings: bool((settings.get("General") or {}).get("gift_claims", True)),
+            "done": lambda ctx, settings: ctx.is_daily_done(zone.KEY)}
+
+
+__all__ = ["event_center", "valuable_event", "job"]

@@ -59,7 +59,7 @@ from ..activities.event.run import claim_job, event_job
 from ..activities.event_center.crazy_eggs.run import JOB as crazy_eggs
 from ..activities.event_center.three_day.run import JOB as three_day_event
 from ..activities.open_gift_box.run import run as open_gift_box
-from ..activities import join_monster_war
+from ..activities import gift_claims, join_monster_war
 
 DATA ={
     "_doc": "Độ ưu tiên của từng nhiệm vụ cho bộ chọn nhiệm vụ của worker.",
@@ -352,9 +352,27 @@ DATA ={
             "key": "black_market_market",
             "run": black_market_market,
             "label": "Black Market: mua ở Market",
-            "priority": 0,
+            "priority": 10,
             "once": True,
             "needs_city_map": True,   # nhiệm vụ cần route: chỉ vào danh sách khi máy đã có bản đồ thành (worker quét lúc Join Boss rảnh)
         }
+    ],
+    # Nhận quà event: làm SAU CÙNG mỗi ngày, sau mọi nhiệm vụ của mọi activity (priority 0 và đứng cuối bảng nên xếp sau cả
+    # Black Market, cùng priority 0). Thuộc nhóm Daily Activities: ô tích "Claim Event Gifts" ở tab đó (settings["General"]["gift_claims"]).
+    "Gift Claims": [
+        {
+            "key": gift_claims.valuable_event.KEY,
+            "group": "Daily Activities",
+            "run": gift_claims.job(gift_claims.valuable_event),
+            "label": "Gift Claims: Valuable Event",
+            "priority": 2,
+        },
+        {
+            "key": gift_claims.event_center.KEY,
+            "group": "Daily Activities",
+            "run": gift_claims.job(gift_claims.event_center),
+            "label": "Gift Claims: Event Center",
+            "priority": 1,
+        },
     ],
 }

@@ -50,6 +50,7 @@ SUPPORTED_TASKS = (
 )
 
 GENERAL_KEY = "General"
+GIFT_CLAIMS_KEY = "gift_claims"   # trong settings["General"]: bật nhận quà event (mặc định bật)
 # Nhiệm vụ theo giờ: ô chọn giờ (0 / 1h .. 4h) thay cho checkbox; 0 = không làm. {key: (constants, tooltip)}.
 HOURLY_TASKS = {
     alliance_donation.constants.INTERVAL_KEY: (
@@ -96,7 +97,12 @@ class DailyActivitiesTab(BaseTab):
                                    "giờ. 0 = không làm.")
         general_grid.addWidget(QLabel("Crazy Eggs"), 0, 4)
         general_grid.addWidget(self.crazy_eggs, 0, 5)
-        general_grid.setColumnStretch(6, 1)
+        # Nhận quà event (Gift Claims): mặc định tích. Nằm trong General nên không bị tính là một việc Daily đã tích.
+        self.gift_claims = QCheckBox("Claim Event Gifts")
+        self.gift_claims.setChecked(True)
+        self.gift_claims.setToolTip("Claim gifts in Valuable Event, Super Value Return, Back to Territory and Event Center.")
+        general_grid.addWidget(self.gift_claims, 0, 6)
+        general_grid.setColumnStretch(7, 1)
         self.add_row(general)
 
         selection = QGroupBox("Selection Daily")
@@ -162,6 +168,7 @@ class DailyActivitiesTab(BaseTab):
         self.add_row(selection)
 
         self.buy_hammers.clicked.connect(self.settings_changed)
+        self.gift_claims.clicked.connect(self.settings_changed)
         self.stamina_quantity.activated.connect(self.settings_changed)
         self.crazy_eggs.activated.connect(self.settings_changed)
         self.offer_gems.activated.connect(self.settings_changed)
@@ -202,12 +209,13 @@ class DailyActivitiesTab(BaseTab):
             "stamina_quantity": quantity,
             "buy_all_hammers": self.buy_hammers.isChecked(),
             eggs.INTERVAL_KEY: _hours_value(self.crazy_eggs.currentText()),
+            GIFT_CLAIMS_KEY: self.gift_claims.isChecked(),
         }
         return settings
 
     def set_settings(self, data: dict):
         # Avoid writing partially restored state while loading a device.
-        widgets = [self.stamina_quantity, self.buy_hammers, self.crazy_eggs, self.offer_gems, *self.hourly_combos.values(),
+        widgets = [self.stamina_quantity, self.buy_hammers, self.gift_claims, self.crazy_eggs, self.offer_gems, *self.hourly_combos.values(),
                    *self.task_boxes.values(), *self.tax_counts.values(), *self.tax_free.values()]
         blockers = [QSignalBlocker(widget) for widget in widgets]
         try:
@@ -225,6 +233,7 @@ class DailyActivitiesTab(BaseTab):
             if self.stamina_quantity.findText(quantity) >= 0:
                 self.stamina_quantity.setCurrentText(quantity)
             self.buy_hammers.setChecked(bool(general.get("buy_all_hammers", False)))
+            self.gift_claims.setChecked(bool(general.get(GIFT_CLAIMS_KEY, True)))
             hours = general.get(eggs.INTERVAL_KEY, eggs.INTERVAL_DEFAULT)
             if hours not in eggs.INTERVAL_CHOICES:
                 hours = eggs.INTERVAL_DEFAULT

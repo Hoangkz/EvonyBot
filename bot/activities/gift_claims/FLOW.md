@@ -2,8 +2,9 @@
 
 ## Phạm vi
 
-Gift Claims gồm **hai hoạt động độc lập**, mỗi hoạt động có hàm `run(bot)` riêng và chưa được nối vào bảng nhiệm vụ
-của worker (`bot/worker/priority.py`):
+Gift Claims gồm **hai hoạt động độc lập**, mỗi hoạt động có hàm `run(bot)` riêng. Worker chạy cả hai **sau cùng mỗi ngày, sau mọi nhiệm vụ của mọi activity**
+(`bot/worker/priority.py`, nhóm "Gift Claims", priority 0, thuộc activity Daily Activities) khi ô **Claim Event Gifts** ở tab Daily
+Activities được tích (`settings["General"]["gift_claims"]`, mặc định bật):
 
 - `gift_claims.valuable_event.run`: Valuable Event + Super Value Return (khu ngoài Event Center). Key tổng
   `gift_valuable_event`.
