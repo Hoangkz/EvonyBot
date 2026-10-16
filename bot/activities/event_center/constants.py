@@ -27,6 +27,10 @@ TABS = {
 }
 TAB_REGION = (0, 5, 100, 18)   # % màn hình: hàng tab (cả 3 tab)
 TAB_THRESHOLD = 0.85
+# Bấm Event Center ở màn chính: chờ 1s rồi tìm tab Competition; chưa thấy thì chờ thêm 1s, tối đa OPEN_WAITS lần chờ thêm;
+# thấy thì chờ thêm OPEN_SETTLE giây cho màn load xong. Hết lượt không thấy thì thôi, run_task thấy màn chính sẽ bấm lại.
+OPEN_WAITS = 10
+OPEN_SETTLE = 3
 
 # Danh sách event trong tab: không thấy icon thì cuộn xuống, quá LIST_MAX_SCROLLS lần vẫn
 # không thấy thì BACK.

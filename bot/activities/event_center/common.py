@@ -25,6 +25,8 @@ from .constants import (
     EVENT_CENTER_TAP_OFFSET,
     AFTER_RESTART_ATTEMPTS,
     ATTEMPTS,
+    OPEN_SETTLE,
+    OPEN_WAITS,
     LIST_MAX_SCROLLS,
     LIST_SWIPE,
     LIST_SWIPE_DURATION,
@@ -145,7 +147,14 @@ def open_event_center(bot, screen):
         swipe_around(bot)
         return
     dx, dy = EVENT_CENTER_TAP_OFFSET
-    bot.tap(center[0] + dx, center[1] + dy, delay=5)
+    bot.tap(center[0] + dx, center[1] + dy, delay=1)
+    for attempt in range(OPEN_WAITS + 1):
+        if attempt:
+            bot.sleep(1)
+        if bot.find(COMPETITION_TAB, region=TAB_REGION) is not None:
+            bot.sleep(OPEN_SETTLE)
+            return
+    bot.log(f"Event Center: not shown after {OPEN_WAITS} extra waits, tap again")
 
 
 def open_event(bot, icon, threshold: float = DEFAULT_THRESHOLD) -> bool:

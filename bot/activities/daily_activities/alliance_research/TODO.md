@@ -24,7 +24,7 @@ Chỗ chờ số giây viết cứng, không có vòng kiểm tra rồi thử l�
 
 ### [run.py](run.py)
 
-- [ ] [run.py:84](run.py#L84) (2s): `bot.tap(*pos, delay=2)`
+- [x] [run.py:84](run.py#L84) (2s): `bot.tap(*pos, delay=2)` — đã đổi: delay=1, hai nhánh tự wait_for
 - [ ] [run.py:132](run.py#L132) (1.5s): `bot.swipe_percent(*TREE_SWIPE, duration=0.6, delay=1.5)`
 - [ ] [run.py:140](run.py#L140) (1s): `bot.tap(*pos, delay=1)`
 - [ ] [run.py:148](run.py#L148) (1s): `bot.back(delay=1)`

@@ -117,7 +117,7 @@ GREY_STOP = 5   # quà xám (chưa đổi được lần nào) liên tiếp thì
 # "+" (đầu phải thanh trượt) để chọn đổi TẤT CẢ, rồi bấm nút xanh. Nhận popup bằng nút "+" (30x30,
 # đúng 1,00; cũng có ở màn speed up nên chỉ chờ ngay sau khi bấm Redeem).
 QTY_PLUS = f"{FOLDER}/qtyPlus.png"
-QTY_WAIT = 3                    # giây chờ popup
+QTY_WAIT = 8                    # giây chờ popup
 QTY_MAX_TAP = (276, 354)        # cạnh dấu "+" (đầu phải thanh trượt)
 QTY_CONFIRM_TAP = (198, 452)    # nút xanh giữa popup
 # Vị trí hàng quà: hàng k có tâm icon ở y = ROW_FIRST_Y + ROW_PITCH * k khi chưa cuộn (đo: 347,

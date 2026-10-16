@@ -46,7 +46,7 @@ TREE_SCROLLS = 2                   # cuộn cây tối đa chừng này lần �
 # chọn nằm giữa (x ~195), tab kế bên phải ở x ~320; riêng lúc đầu Advancement ở x ~75 nên Defense ở x ~195.
 TAB_TAPS = ((49, 19), (81, 19), (81, 19))   # % màn hình, bấm lần lượt để sang tab 2, 3, 4
 MENU_WAIT = 10                     # giây chờ màn Academy sau khi bấm icon Research
-POPUP_WAIT = 4                     # giây chờ màn Technology / popup / màn Speedup hiện
+POPUP_WAIT = 10                     # giây chờ màn Technology / popup / màn Speedup hiện
 RESULT_WAIT = 2                    # giây chờ sau khi bấm Research / Confirm
 INFO_BOX = (20, 235, 356, 210)     # (x, y, rộng, cao) vùng cấp / điều kiện / chi phí của màn Technology (không có nút Research,
                                    # không có thông báo nổi): đổi sau khi bấm Research = nghiên cứu xong ngay (cấp, chi phí đổi)

@@ -32,7 +32,7 @@ POPUP_TITLE = f"{FOLDER_PATH}/PopupTitle.png"
 POPUP_PLUS = f"{FOLDER_PATH}/PopupPlus.png"
 POPUP_PLUS_REGION = (70, 44, 90, 54)   # % màn hình: chỉ nút "+" của popup
 POPUP_OFFER = f"{FOLDER_PATH}/PopupOffer.png"
-POPUP_WAIT = 3     # giây chờ popup hiện
+POPUP_WAIT = 8     # giây chờ popup hiện
 BACKS_AFTER_OFFER = 2   # bấm Offer xong: Back 2 lần (đóng kết quả / màn Offer) về thành
 PLUS_WAIT = 0.5    # giây giữa hai lần bấm "+"
 

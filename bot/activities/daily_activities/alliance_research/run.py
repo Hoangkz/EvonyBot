@@ -81,7 +81,7 @@ def after_go(bot) -> bool:
     key, pos = open_menu(bot, LABEL, ACADEMY, {"speed": MENU_SPEED_UP, "research": MENU_RESEARCH})
     if pos is None:
         return False
-    bot.tap(*pos, delay=2)
+    bot.tap(*pos, delay=1)   # rồi chờ màn đích bằng wait_for ở từng nhánh (như tap_tab của train troop)
     if key == "speed":
         bot.record(f"{LABEL}: Academy already researching, using Speed Up items")
         researched = _speed_up(bot, None)

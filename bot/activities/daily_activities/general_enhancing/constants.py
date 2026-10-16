@@ -28,6 +28,6 @@ CULTIVATE_CANCEL = f"{FOLDER_PATH}/CultivateCancel.png"
 CANCEL_REGION = (0, 88, 50, 100)        # % màn hình
 FAVORITE_OFF_THRESHOLD = 0.8
 CULTIVATE_GOAL = 5
-RESULT_WAIT = 5         # giây chờ kết quả (nút Cancel) sau khi bấm Gold Cultivate
+RESULT_WAIT = 8         # giây chờ kết quả (nút Cancel) sau khi bấm Gold Cultivate
 MAX_STEPS = 40
 BACKS_AFTER = 3         # xong: Back (màn Cultivate -> màn tướng -> danh sách -> thành)

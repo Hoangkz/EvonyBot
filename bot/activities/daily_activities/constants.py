@@ -67,7 +67,7 @@ OLD_CARD = "Card.png"                       # tên ảnh thẻ trong thư mục 
 OLD_CARD_THRESHOLD = 0.85
 OLD_POPUP_GO = "Black Market/goto.png"
 OLD_POPUP_WAIT = 2                          # giây chờ popup sau khi bấm thẻ
-OLD_POPUP_TIMEOUT = 4                       # giây chờ tối đa nút Go của popup
+OLD_POPUP_TIMEOUT = 10                       # giây chờ tối đa nút Go của popup
 # Thẻ nhiệm vụ đã đủ 100%: icon đổi thành hộp quà (có hiệu ứng, không dùng làm ảnh mẫu) -> nhận ra bằng
 # chữ "100%" ở góc trên trái thẻ (OLD_DONE_BADGE: 1,00; thẻ "0%" / màn khác <= 0,68) rồi bấm giữa thẻ
 # (OLD_DONE_TAP: lệch so với tâm chữ "100%" (30, 272) -> tâm thẻ (75, 325)) để nhận, như Claim All của bản

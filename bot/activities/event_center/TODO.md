@@ -6,5 +6,5 @@ Chỗ chờ số giây viết cứng, không có vòng kiểm tra rồi thử l�
 
 ### [common.py](common.py)
 
-- [ ] [common.py:148](common.py#L148) (5s): `bot.tap(center[0] + dx, center[1] + dy, delay=5)`
+- [x] [common.py:148](common.py#L148) (5s): `bot.tap(center[0] + dx, center[1] + dy, delay=5)` — đã đổi: delay 1s, chờ thêm 1s × 10, thấy thì chờ 3s
 - [ ] [common.py:165](common.py#L165) (1s): `bot.back(delay=1)`
