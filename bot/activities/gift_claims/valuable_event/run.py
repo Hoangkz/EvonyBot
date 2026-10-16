@@ -21,6 +21,7 @@ from .named_flow import process_lower
 PAGE = "ValuableEvent/title"
 DOT = "ValuableEvent/notification_dot"
 MAX_SWIPES = 8
+MAX_PARENT_PASSES = 2
 LOWER_CONTENT = (0, 20, 100, 88)
 COMMON_LOWER_CLAIMS = TEXT_CLAIM_CONTROLS
 
@@ -118,7 +119,7 @@ def _process_lower(bot, navigation: tuple[str, ...],
 
 def run_opened(bot, due_keys: set[str], *, handled: set[str] | None = None
                ) -> tuple[dict[str, str], bool]:
-    """Sweep the carousel once and process every visible red dot.
+    """Sweep the full carousel up to twice and process every pending tab.
 
     Result values are ``no_dot``, ``cleared`` or ``remaining``. A complete
     sweep is complete only after a second top-carousel check finds no red dot.
@@ -130,76 +131,113 @@ def run_opened(bot, due_keys: set[str], *, handled: set[str] | None = None
         return results, False
 
     handled = handled if handled is not None else set()
-    attempted_this_run = set(handled)
-    for direction in (-1, 1):
-        for step in range(MAX_SWIPES + 1):
-            bot.check()
-            screen = bot.screenshot()
-            dots = _dots(bot, screen)
-            tabs = [(spec, find(bot, spec.tab, screen, threshold=0.70,
-                                region=(0, 7, 100, 19))) for spec in SPECS]
-            for dot in dots:
-                match = _owner_for_dot(dot, tabs)
-                if match is None:
+    remaining = set(due_keys) - set(handled)
+    clean = False
+    for pass_number in range(1, MAX_PARENT_PASSES + 1):
+        attempted_this_pass = set()
+        bot.record(f"Gift Claims: Valuable Event bắt đầu vòng tổng "
+                   f"{pass_number}/{MAX_PARENT_PASSES}")
+        for direction in (-1, 1):
+            for step in range(MAX_SWIPES + 1):
+                bot.check()
+                screen = bot.screenshot()
+                dots = _dots(bot, screen)
+                tabs = [(spec, find(bot, spec.tab, screen, threshold=0.70,
+                                    region=(0, 7, 100, 19))) for spec in SPECS]
+            # DB-pending fixed labels are authoritative.  A claim badge may
+            # disappear before a free control becomes visible, so visit every
+            # known label encountered from left to right even without a dot.
+                candidates = list(dots)
+                for spec, tab in tabs:
+                    if (tab is not None and spec.task.key in remaining
+                            and spec.task.key not in attempted_this_pass
+                            and not any((_owner_for_dot(dot, tabs) or (None,))[0]
+                                        is spec for dot in dots)):
+                        candidates.append((tab[0] + 25, tab[1] - 16))
+                for dot in sorted(candidates, key=lambda point: point[0]):
+                    match = _owner_for_dot(dot, tabs)
+                    if match is None:
                     # Click the marker's owning tab even when this rotation has
                     # no captured module yet. Never click inside its body.
-                    bot.tap(max(0, dot[0] - 25), min(screen.shape[0] - 1, dot[1] + 16),
-                            delay=1)
-                    _process_lower(bot, (), ())
-                    bot.log("Gift Claims: Valuable Event đã xử lý phần dưới của tab đỏ chưa nhận diện")
-                    continue
-                spec, tab = match
-                key = spec.task.key
-                if key not in due_keys or key in attempted_this_run:
-                    continue
+                        bot.tap(max(0, dot[0] - 25),
+                                min(screen.shape[0] - 1, dot[1] + 16), delay=1)
+                        _process_lower(bot, (), ())
+                        bot.log("Gift Claims: Valuable Event đã xử lý phần dưới "
+                                "của tab đỏ chưa nhận diện")
+                        continue
+                    spec, tab = match
+                    key = spec.task.key
+                    if key not in remaining or key in attempted_this_pass:
+                        continue
 
-                bot.record(f"Gift Claims: Valuable Event mở {spec.task.label} (có dấu đỏ)")
-                bot.tap(*tab, delay=1)
-                if key == strategic_stockpile.KEY:
-                    verified = strategic_stockpile.claim_opened(bot)
-                    report = ClaimReport(verified, verified)
-                    navigated = 1
+                    has_dot = any((_owner_for_dot(red_dot, tabs) or (None,))[0]
+                                  is spec for red_dot in dots)
+                    bot.record(f"Gift Claims: Valuable Event mở {spec.task.label} "
+                               f"({'có dấu đỏ' if has_dot else 'label DB-pending'})")
+                    bot.tap(*tab, delay=1)
+                    if key == strategic_stockpile.KEY:
+                        verified = strategic_stockpile.claim_opened(bot)
+                        report = ClaimReport(verified, verified)
+                        navigated = 1
+                    else:
+                        report, navigated = _process_lower(
+                            bot, spec.navigation, spec.claims)
+                    _close_known_popup(bot)
+
+                    after = bot.screenshot()
+                    after_dots = _dots(bot, after)
+                    after_tabs = [(candidate, find(
+                        bot, candidate.tab, after, threshold=0.70,
+                        region=(0, 7, 100, 19))) for candidate in SPECS]
+                    dot_gone = not any(
+                        (owner := _owner_for_dot(red_dot, after_tabs)) is not None
+                        and owner[0].task.key == key for red_dot in after_dots)
+                    state = "đã mất" if dot_gone else "vẫn còn"
+                    bot.log(f"Gift Claims: {spec.task.label} - dấu đỏ {state} "
+                            f"sau vòng {pass_number}")
+                    results[key] = ("cleared" if dot_gone else
+                                    "claimed_remaining" if report.claimed else
+                                    "visited_remaining" if report.acted or navigated
+                                    else "remaining")
+                    attempted_this_pass.add(key)
+
+                    # A no-badge DB label is complete after its lower content
+                    # is exhausted. A persistent badge gets exactly one full
+                    # second parent pass before it is classified as paid or
+                    # decorative and checkpointed for today.
+                    if dot_gone or not has_dot or pass_number == MAX_PARENT_PASSES:
+                        handled.add(key)
+                        remaining.discard(key)
+                        mark_task_done(bot, key)
+                        if not dot_gone:
+                            bot.record(f"Gift Claims: {spec.task.label} badge vẫn "
+                                       "còn sau 2 vòng tổng; coi là paid/trang trí "
+                                       "và DONE hôm nay")
+                    screen = after
+
+                if step == MAX_SWIPES:
+                    break
+                if direction < 0:
+                    bot.swipe_percent(85, 14, 20, 14, duration=0.5, delay=1)
                 else:
-                    report, navigated = _process_lower(
-                        bot, spec.navigation, spec.claims)
-                _close_known_popup(bot)
+                    bot.swipe_percent(20, 14, 85, 14, duration=0.5, delay=1)
 
-                after = bot.screenshot()
-                after_dots = _dots(bot, after)
-                after_tabs = [(candidate, find(
-                    bot, candidate.tab, after, threshold=0.70,
-                    region=(0, 7, 100, 19))) for candidate in SPECS]
-                dot_gone = not any(
-                    (owner := _owner_for_dot(red_dot, after_tabs)) is not None
-                    and owner[0].task.key == key for red_dot in after_dots)
-                state = "đã mất" if dot_gone else "vẫn còn"
-                bot.log(f"Gift Claims: {spec.task.label} - dấu đỏ {state} sau xử lý")
-                results[key] = ("cleared" if dot_gone else
-                                "claimed_remaining" if report.claimed else
-                                "visited_remaining" if report.acted or navigated
-                                else "remaining")
-                attempted_this_run.add(key)
-                if dot_gone or key != strategic_stockpile.KEY:
-                    handled.add(key)
-                    mark_task_done(bot, key)
-                screen = after
+        clean = _verify_clean(bot, handled)
+        bot.record(f"Gift Claims: Valuable Event kết thúc vòng tổng "
+                   f"{pass_number}/{MAX_PARENT_PASSES}: "
+                   + ("phần trên đã sạch" if clean else
+                      "phần trên vẫn còn badge, sẽ kiểm tra lại"))
+        if clean:
+            break
 
-            if step == MAX_SWIPES:
-                break
-            if direction < 0:
-                bot.swipe_percent(85, 14, 20, 14, duration=0.5, delay=1)
-            else:
-                bot.swipe_percent(20, 14, 85, 14, duration=0.5, delay=1)
-
-    clean = _verify_clean(bot, handled)
     if clean and due_keys - handled:
         # The region-1 coordinator owns the daily checkpoints.  A complete
         # two-direction scan with no red tab lets it finish the remaining
         # child keys without reopening clean tabs.
-        bot.record("Gift Claims: Valuable Event hết badge nhưng vẫn còn task "
-                   "DB chưa được mở; bộ điều phối sẽ coi cả nhóm DONE")
+        bot.record("Gift Claims: Valuable Event không còn badge chưa xử lý nhưng "
+                   "vẫn có label DB chưa xuất hiện; giữ chúng cho lượt dò tổng")
     bot.record("Gift Claims: Valuable Event - "
-               + ("DONE, phần trên đã hết dấu đỏ" if clean
+               + ("DONE, phần trên không còn badge chưa xử lý" if clean
                   else "chưa DONE, phần trên vẫn còn dấu đỏ"))
     return_home(bot)
     return results, clean

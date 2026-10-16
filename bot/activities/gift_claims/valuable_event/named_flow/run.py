@@ -5,6 +5,7 @@ from ...common import (ClaimReport, TEXT_CLAIM_CONTROLS, back_if_close_x,
 from ...lobby import open_named
 
 LOWER_CONTENT = (0, 20, 100, 88)
+QUIET_ROUNDS = 3
 
 
 def process_lower(bot, navigation: tuple[str, ...],
@@ -17,7 +18,7 @@ def process_lower(bot, navigation: tuple[str, ...],
     total = ClaimReport()
     empty_rounds = 0
     rounds = 0
-    while empty_rounds < 4 and rounds < 12:
+    while empty_rounds < QUIET_ROUNDS and rounds < 12:
         rounds += 1
         fixed = claim_fixed_controls(
             bot, controls, max_taps=16,
@@ -38,11 +39,12 @@ def process_lower(bot, navigation: tuple[str, ...],
         else:
             empty_rounds += 1
         bot.log("Gift Claims: Valuable Event vòng kiểm tra "
-                f"{rounds}, không phản hồi {empty_rounds}/4")
+                f"{rounds}, không phản hồi {empty_rounds}/{QUIET_ROUNDS}")
 
-    if empty_rounds >= 4:
+    if empty_rounds >= QUIET_ROUNDS:
         bot.record("Gift Claims: Valuable Event không còn quà xác minh sau "
-                   "4 vòng; bỏ qua phần lấp lánh/trả phí và coi mục đã xét xong")
+                   f"{QUIET_ROUNDS} vòng; bỏ qua phần lấp lánh/trả phí và "
+                   "coi mục đã xét xong")
     return total, navigated
 
 

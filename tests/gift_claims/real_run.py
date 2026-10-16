@@ -2,7 +2,9 @@ r"""Run one or all gift-claim modules on a real ADB device.
 
 Examples:
     venv\Scripts\python.exe -m tests.gift_claims.real_run --serial 127.0.0.1:21513
-    # Event Center test chạy tới khi quét xong, không giới hạn 120 giây:
+    # Mô phỏng đúng một lát worker 120 giây:
+    venv\Scripts\python.exe -m tests.gift_claims.real_run --serial 127.0.0.1:21513 --task gift_event_center_limited --slice-seconds 120
+    # Bỏ --slice-seconds chỉ khi cần chẩn đoán Event Center tới hết luồng:
     venv\Scripts\python.exe -m tests.gift_claims.real_run --serial 127.0.0.1:21513 --task gift_event_center_limited
     # Chỉ bật --shots khi cần phân tích nhận diện ảnh; ảnh được lưu trong thư mục tạm.
     venv\Scripts\python.exe -m tests.gift_claims.real_run --serial 127.0.0.1:21513 --task gift_event_center_limited --shots

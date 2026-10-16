@@ -60,10 +60,10 @@ from ..activities.event.run import claim_job, event_job
 from ..activities.event_center.crazy_eggs.run import JOB as crazy_eggs
 from ..activities.event_center.three_day.run import JOB as three_day_event
 from ..activities.open_gift_box.run import run as open_gift_box
-from ..activities import join_monster_war
+from ..activities import gift_claims, join_monster_war
 
 DATA ={
-    "_doc": "Độ ưu tiên của từng nhiệm vụ cho bộ chọn nhiệm vụ của worker (chưa dùng). Nhóm = activity (nút Select Activity / tab UI). key = key nhiệm vụ trong settings / daily_done. Ưu tiên cao hơn làm trước; cùng ưu tiên thì xoay vòng. Mặc định 1. Bubble và Join Boss cũng là nhiệm vụ nhưng có luật riêng (bot/worker/TODO.md mục 1): bubble luôn cao nhất, Join Boss chạy giữa mỗi 2 nhiệm vụ thường. Gift Claims hiện được tách khỏi Daily Activities và chưa đăng ký vào scheduler; người dùng sẽ thiết lập điểm chạy sau. Mọi nhiệm vụ của nhóm Daily Activities (có run) đều must_finish: làm tới xong rồi mới tới nhiệm vụ khác, không giới hạn 120 giây, không bị Bubble / Auto Times Out / Join Boss ngắt. Thêm \"must_finish\": true vào nhiệm vụ cần làm tới xong: đã bắt đầu thì không bị Bubble / Join Boss / giới hạn 120 giây ngắt (chỉ Stop), xong rồi mới tới Bubble và Join Boss; khi cả activity còn chạy nguyên khối thì mọi nhiệm vụ của nhóm phải có cờ này.",
+    "_doc": "Độ ưu tiên của từng nhiệm vụ cho bộ chọn nhiệm vụ của worker. Gift Claims chạy cuối Daily Activities, sau Activity Rewards; khi có Join Boss nó chịu giới hạn 120 giây và tiếp tục bằng các checkpoint DB ở lượt sau.",
     "Bubble": [
         {
             "key": "bubble", 
@@ -346,6 +346,15 @@ DATA ={
             "label": "Activity Rewards (nhận thưởng cuối)",
             "priority": 300,
             "tail": True,
+        },
+        {
+            "key": gift_claims.KEY,
+            "run": gift_claims.run_job,
+            "saves": True,
+            "label": gift_claims.LABEL,
+            "priority": 299,
+            "tail": True,
+            "note": "Chạy sau Daily Activities; có Join Boss thì nhường sau 120 giây và tiếp tục các key DB chưa DONE.",
         },
     ],
     "Black Market": [

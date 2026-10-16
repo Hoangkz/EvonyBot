@@ -140,7 +140,15 @@ def run_opened(bot, due_keys: set[str], *, handled: set[str] | None = None
             dots = _dots(bot, screen)
             tabs = [(spec, find(bot, spec.tab, screen, threshold=0.70,
                                 region=(0, 7, 100, 20))) for spec in SPECS]
-            for dot in dots:
+            candidates = list(dots)
+            for spec, tab in tabs:
+                if (tab is not None and spec.task.key in due_keys
+                        and spec.task.key not in attempted_this_run
+                        and spec.task.key not in handled
+                        and not any((_owner_for_dot(dot, tabs) or (None,))[0]
+                                    is spec for dot in dots)):
+                    candidates.append((tab[0] + 25, tab[1] - 16))
+            for dot in sorted(candidates, key=lambda point: point[0]):
                 match = _owner_for_dot(dot, tabs)
                 if match is None:
                     signature = _tab_signature(screen, dot)
@@ -153,7 +161,7 @@ def run_opened(bot, due_keys: set[str], *, handled: set[str] | None = None
                         bot, COMMON_LOWER_CLAIMS, max_taps=16,
                         region=LOWER_CONTENT)
                     if not back_if_close_x(bot):
-                        claim_sparkles(bot, region=LOWER_CONTENT, attempts=4)
+                        claim_sparkles(bot, region=LOWER_CONTENT, attempts=3)
                     bot.log("Gift Claims: Super Value Return đã xử lý phần dưới "
                             "của tab đỏ chưa nhận diện")
                     continue
@@ -161,7 +169,8 @@ def run_opened(bot, due_keys: set[str], *, handled: set[str] | None = None
                 key = spec.task.key
                 if key not in due_keys or key in attempted_this_run:
                     continue
-                has_dot = True
+                has_dot = any((_owner_for_dot(red_dot, tabs) or (None,))[0]
+                              is spec for red_dot in dots)
                 marker = "có dấu đỏ" if has_dot else "kiểm tra quà ngày"
                 bot.record(f"Gift Claims: Super Value Return mở {spec.task.label} ({marker})")
                 bot.tap(*tab, delay=1)
@@ -179,7 +188,7 @@ def run_opened(bot, due_keys: set[str], *, handled: set[str] | None = None
                         report = fixed
                     else:
                         sparkle = claim_sparkles(bot, region=LOWER_CONTENT,
-                                                 attempts=4)
+                                                 attempts=3)
                         report = ClaimReport(
                             fixed.attempted + sparkle.attempted,
                             fixed.verified + sparkle.verified)

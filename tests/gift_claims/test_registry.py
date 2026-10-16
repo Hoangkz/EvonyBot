@@ -129,7 +129,7 @@ class GiftClaimRegistryTests(unittest.TestCase):
 
         self.assertEqual(done, {"gift_example", gift_claims.KEY})
 
-    def test_pending_location_does_not_write_aggregate_checkpoint(self):
+    def test_pending_location_writes_scan_checkpoint_not_aggregate(self):
         bot = mock.Mock()
         bot.is_daily_done.return_value = False
         task = common.GiftTask("gift_example", "Example", lambda _bot: False)
@@ -137,7 +137,9 @@ class GiftClaimRegistryTests(unittest.TestCase):
         with mock.patch.object(registry, "pending", return_value=(location,)):
             self.assertFalse(gift_claims.run(bot))
 
-        bot.mark_daily_done.assert_not_called()
+        bot.mark_daily_done.assert_called_once_with(gift_claims.SCAN_KEYS[0])
+        self.assertNotIn(mock.call(gift_claims.KEY),
+                         bot.mark_daily_done.call_args_list)
 
     def test_database_keeps_individual_gift_checkpoint_after_reopen(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -219,7 +221,7 @@ class GiftClaimRegistryTests(unittest.TestCase):
         self.assertIn("gift_region_2_test", done)
         self.assertNotIn("gift_region_1_test", done)
 
-    def test_gift_region_disables_join_boss_interrupt_during_its_run(self):
+    def test_gift_region_keeps_join_boss_deadline_active(self):
         bot = mock.Mock()
         bot._boss_interrupt_enabled = True
         bot._deadline = 123.0
@@ -233,11 +235,11 @@ class GiftClaimRegistryTests(unittest.TestCase):
             self.assertTrue(gift_claims.run_region(bot, registry.REGION_2))
 
         self.assertTrue(observed)
-        self.assertTrue(all(state == (False, None) for state in observed))
+        self.assertTrue(all(state == (True, 123.0) for state in observed))
         self.assertIs(bot._boss_interrupt_enabled, True)
         self.assertEqual(123.0, bot._deadline)
 
-    def test_region_1_clean_parents_mark_all_children_done_without_reopening(self):
+    def test_clean_region_scan_does_not_finish_missing_labels_before_three_passes(self):
         done = set()
         bot = mock.Mock()
         bot.is_daily_done.side_effect = done.__contains__
@@ -247,13 +249,13 @@ class GiftClaimRegistryTests(unittest.TestCase):
                                 return_value=({}, True)) as valuable_scan,
               mock.patch.object(gift_claims.super_value_return, "run_opened",
                                 return_value=({}, True)) as super_scan):
-            self.assertTrue(gift_claims.run_region(bot, registry.REGION_1))
+            self.assertFalse(gift_claims.run_region(bot, registry.REGION_1))
 
-        self.assertEqual({task.key for task in registry.REGION_1_TASKS}, done)
+        self.assertEqual(set(), done)
         valuable_scan.assert_called_once()
         super_scan.assert_called_once()
 
-    def test_clean_super_value_return_marks_its_remaining_children_done(self):
+    def test_clean_super_value_return_keeps_unseen_children_pending(self):
         done = {task.key for task in registry.VALUABLE_EVENT_TASKS}
         bot = mock.Mock()
         bot.is_daily_done.side_effect = done.__contains__
@@ -261,12 +263,83 @@ class GiftClaimRegistryTests(unittest.TestCase):
         with (mock.patch.object(lobby, "open_named", return_value=True) as opener,
               mock.patch.object(gift_claims.super_value_return, "run_opened",
                                 return_value=({}, True)) as super_scan):
-            self.assertTrue(gift_claims.run_region(bot, registry.REGION_1))
+            self.assertFalse(gift_claims.run_region(bot, registry.REGION_1))
 
-        self.assertTrue({task.key for task in registry.SUPER_VALUE_RETURN_TASKS}
-                        <= done)
+        self.assertFalse({task.key for task in registry.SUPER_VALUE_RETURN_TASKS}
+                         <= done)
         opener.assert_called_once_with(bot, GiftScreen.SUPER_VALUE_RETURN)
         super_scan.assert_called_once()
+
+    def test_three_complete_empty_scans_finish_remaining_keys_and_aggregate(self):
+        done = set()
+        bot = mock.Mock()
+        bot.is_daily_done.side_effect = done.__contains__
+        bot.mark_daily_done.side_effect = done.add
+        task = common.GiftTask("gift_missing_event", "Missing Event",
+                               lambda _bot: False)
+        location = registry.ClaimLocation(registry.REGION_1, task)
+
+        def pending(_bot, zone=None):
+            if task.key in done:
+                return ()
+            return (location,) if zone in (None, registry.REGION_1) else ()
+
+        with (mock.patch.object(registry, "pending", side_effect=pending),
+              mock.patch.object(gift_claims, "_run_region_once",
+                                return_value=(False, True))):
+            self.assertFalse(gift_claims.run(bot))
+            self.assertFalse(gift_claims.run(bot))
+            self.assertTrue(gift_claims.run(bot))
+
+        self.assertTrue(set(gift_claims.SCAN_KEYS) <= done)
+        self.assertIn(task.key, done)
+        self.assertIn(gift_claims.KEY, done)
+
+    def test_three_scan_checkpoints_and_aggregate_persist_in_sqlite(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "gift-three-scans.db"
+            db = Database(path)
+            serial = "test-device"
+            db.add_device(serial)
+            bot = mock.Mock()
+            bot.is_daily_done.side_effect = lambda key: done_today(
+                db.daily_done(serial).get(key), db.server_time())
+            bot.mark_daily_done.side_effect = lambda key: \
+                db.mark_daily_task_done(serial, key)
+            with mock.patch.object(gift_claims, "_run_region_once",
+                                   return_value=(False, True)):
+                self.assertFalse(gift_claims.run(bot))
+                self.assertFalse(gift_claims.run(bot))
+                self.assertTrue(gift_claims.run(bot))
+            db.close()
+
+            reopened = Database(path)
+            try:
+                saved = reopened.daily_done(serial)
+            finally:
+                reopened.close()
+
+        self.assertTrue(set(gift_claims.SCAN_KEYS) <= saved.keys())
+        self.assertIn(gift_claims.KEY, saved)
+        self.assertTrue({item.task.key for item in registry.locations()}
+                        <= saved.keys())
+
+    def test_day_without_any_gift_parent_finishes_after_three_empty_scans(self):
+        done = set()
+        bot = mock.Mock()
+        bot.is_daily_done.side_effect = done.__contains__
+        bot.mark_daily_done.side_effect = done.add
+        with (mock.patch.object(lobby, "open_named", return_value=False),
+              mock.patch.object(gift_claims.event_center,
+                                "open_event_center", return_value=None)):
+            self.assertFalse(gift_claims.run(bot))
+            self.assertFalse(gift_claims.run(bot))
+            self.assertTrue(gift_claims.run(bot))
+
+        self.assertTrue(set(gift_claims.SCAN_KEYS) <= done)
+        self.assertTrue({item.task.key for item in registry.locations()}
+                        <= done)
+        self.assertIn(gift_claims.KEY, done)
 
     def test_named_parent_uses_fixed_launcher_not_a_notification_badge(self):
         bot = mock.Mock()

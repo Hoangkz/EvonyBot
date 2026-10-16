@@ -28,6 +28,7 @@ REWARD_NAV_REGION = (0, 7, 100, 30)
 SPARKLE_SAFE = (5, 18, 90, 78)
 INNER_TOP = (0, 7, 100, 15)
 MAX_INNER_SWIPES = 4
+MAX_EVENT_VERIFY_PASSES = 2
 CATEGORIES = (
     ("limited", 18),
 )
@@ -53,6 +54,8 @@ SKIPPED_SCREENS = {policy.screen: policy for policy in EVENT_POLICIES
 FIXED_CLAIMS = TEXT_CLAIM_CONTROLS
 REWARD_NAVIGATION = grace_of_star_trail.POLICY.reward_navigation
 FORCED_LIMITED_ROWS = (
+    ("DragonBattle/list_row", FORCED_EVENT_PREFIX + b"dragon_battle",
+     GiftScreen.DRAGON_BATTLE, "Dragon Battle"),
     ("GraceOfStarTrail/list_row", FORCED_EVENT_PREFIX + b"grace_of_star_trail",
      GiftScreen.GRACE_OF_STAR_TRAIL, "Grace of Star Trail"),
     # Dwarf's Treasure may lose its outer Event Center badge while the
@@ -254,10 +257,10 @@ def _tap_reward_navigation(bot) -> ClaimReport:
     return ClaimReport()
 
 
-def _process_current_event_content(bot):
+def _process_current_event_content(bot, *, special_attempts=4):
     """Process one selected inner tab; return (claims, panel_was_closed)."""
     opened_name = identify(bot)
-    special = (_tap_special_navigation(bot, attempts=4)
+    special = (_tap_special_navigation(bot, attempts=special_attempts)
                if opened_name in SPECIAL_NAVIGATION else ClaimReport())
     if opened_name in SPECIAL_NAVIGATION:
         # Dwarf/Precious/Hypnos each has one exact free-reward launcher.  Once
@@ -279,7 +282,7 @@ def _process_current_event_content(bot):
                            fixed.attempted,
                            special.verified + reward_navigation.verified +
                            fixed.verified), True
-    sparkle = claim_sparkles(bot, region=SPARKLE_SAFE, attempts=4)
+    sparkle = claim_sparkles(bot, region=SPARKLE_SAFE, attempts=3)
     if sparkle.claimed:
         bot.record("Gift Claims: Event Center nhận quà sparkle (Congratulations)")
     return (ClaimReport(special.attempted + reward_navigation.attempted +
@@ -293,6 +296,30 @@ def _finish_event(bot, policy, report: ClaimReport) -> ClaimReport:
     if policy is not None and policy.key is not None:
         mark_task_done(bot, policy.key)
     return report
+
+
+def _process_known_event(bot, policy) -> ClaimReport:
+    """Check a named event twice when no reward success can be verified."""
+    total = ClaimReport()
+    for pass_number in range(1, MAX_EVENT_VERIFY_PASSES + 1):
+        bot.check()
+        # One exact control probe per outer verification pass. Poseidon's
+        # first pass may open Ocean Offering and the second then claims Daily
+        # Free; Dwarf/Hypnos/Precious never receive more than two blind taps.
+        report, _ = _process_current_event_content(bot, special_attempts=1)
+        total = ClaimReport(total.attempted + report.attempted,
+                            total.verified + report.verified)
+        if report.claimed:
+            bot.record(f"Gift Claims: {policy.label} đã xác minh nhận quà ở "
+                       f"lượt {pass_number}/{MAX_EVENT_VERIFY_PASSES}")
+            return _finish_event(bot, policy, total)
+        bot.log(f"Gift Claims: {policy.label} chưa có Congratulations/nút biến "
+                f"mất ở lượt {pass_number}/{MAX_EVENT_VERIFY_PASSES}")
+
+    bot.record(f"Gift Claims: {policy.label} không nhận thêm được quà sau "
+               f"{MAX_EVENT_VERIFY_PASSES} lượt kiểm tra; coi mục đã cạn và "
+               "DONE hôm nay")
+    return _finish_event(bot, policy, total)
 
 
 def _process_opened_event(bot):
@@ -323,12 +350,7 @@ def _process_opened_event(bot):
     # without a reliable red dot on the Event Center list row. Open it once
     # per task and use the exact current icon crop before any generic red scan.
     if name == GiftScreen.GRACE_OF_STAR_TRAIL:
-        report, _ = _process_current_event_content(bot)
-        if report.acted and not report.claimed:
-            bot.record("Gift Claims: Grace of Star Trail đã mở Star Trail Gift "
-                       "nhưng chưa xác minh được Claim; giữ PENDING để sửa/retry")
-            return report
-        return _finish_event(bot, policy, report)
+        return _process_known_event(bot, policy)
 
     # Every captured Event Center page owns a dedicated policy.  Its exact
     # Rewards/Daily Free/Claim controls are safer and faster than interpreting
@@ -338,13 +360,7 @@ def _process_opened_event(bot):
     # had already been collected.  Keep generic inner-tab scanning only for a
     # genuinely UNKNOWN page until that event receives its own title/policy.
     if policy is not None:
-        report, _ = _process_current_event_content(bot)
-        if report.acted and not report.claimed:
-            bot.record(f"Gift Claims: {policy.label} đã bấm nút/tab nhận "
-                       "nhưng sau 4 lần chưa có xác minh; giữ PENDING, "
-                       "cần chỉnh nhận dạng/trạng thái")
-            return report
-        return _finish_event(bot, policy, report)
+        return _process_known_event(bot, policy)
 
     # Most Event Center rows have no nested carousel badge. Scanning the full
     # horizontal strip for every such row can consume the whole 120-second
@@ -624,7 +640,7 @@ def _scan_category(bot, category: str, visited: set[bytes]) -> bool:
 
 
 def run_opened(bot, handled=None):
-    """Prioritize Limited, Activities, then Competition in Event Center."""
+    """Scan only Limited, resuming its handled rows after a Boss yield."""
     screen = bot.screenshot()
     if find(bot, PAGE, screen, threshold=0.72,
             region=(0, 0, 100, 13)) is None:

@@ -2,9 +2,10 @@
 
 ## Phạm vi
 
-Task `gift_claims` hiện là luồng độc lập, chưa được đăng ký tự động vào
-scheduler và không còn chạy sau Daily Activities. Điểm chạy sẽ được thiết lập
-sau. Mỗi điểm nhận có một key DB riêng (ví dụ `gift_limited_offer`), còn `gift_claims`
+Task `gift_claims` được đăng ký ở cuối nhóm Daily Activities, sau
+`daily_rewards`, với priority 299. Khi có Join Boss, mỗi lượt chạy tối đa 120
+giây; hết thời gian hoặc có boss mới thì nhường Join Boss rồi gọi lại từ các
+key DB còn PENDING. Mỗi điểm nhận có một key DB riêng (ví dụ `gift_limited_offer`), còn `gift_claims`
 chỉ là key tổng để scheduler biết cả hai khu đã xong. Registry tại
 `gift_claims/registry.py` là danh sách bắt buộc phải kiểm tra; chấm đỏ không
 được dùng để kết luận một task đã xong.
@@ -25,15 +26,15 @@ gift_claims/
 │   ├── login_gifts/run.py
 │   └── <từng event>/run.py
 └── event_center/                # Chỉ các event mở từ Event Center
-    ├── run.py                   # quét Limited / Activities / Competition
+    ├── run.py                   # chỉ quét danh sách Limited
     ├── grace_of_star_trail/run.py
     ├── dwarfs_treasure/run.py
     └── <từng event>/run.py
 ```
 
-Mỗi event có entry `run(bot)` trong thư mục của chính nó. Chưa có event con hay
-entry tổng nào được worker đăng ký thành job/priority. `gift_claims.run(ctx)`
-vẫn là entry chung quét cả hai khu để dùng khi điểm chạy riêng được thiết lập.
+Mỗi event có entry `run(bot)` trong thư mục của chính nó. Entry tổng
+`gift_claims.run_job(ctx, settings)` là job scheduler; key tổng trong DB là
+điều kiện để worker bỏ qua toàn bộ hoạt động trong phần còn lại của ngày server.
 
 ## Trình tự chung
 
@@ -50,7 +51,9 @@ vẫn là entry chung quét cả hai khu để dùng khi điểm chạy riêng �
    Facebook/Follow Us luôn bị loại.
    Các mảng đỏ sát nhau trên cùng một icon phải được gộp thành một badge thật;
    không được mở lại artwork của cùng icon như một mục Unknown.
-4. Bấm một dấu đỏ chưa xét và nhận diện màn vừa mở bằng tiêu đề cố định.
+4. Dò label cố định từ đầu tới cuối. Label nào còn PENDING trong DB thì mở và
+   chạy flow của event đó, kể cả không có dấu đỏ. Dấu đỏ chỉ là tín hiệu phụ
+   cho event chưa có label cố định.
 5. Nếu là màn cha có carousel hoặc danh sách, duyệt toàn bộ dấu đỏ trong màn cha.
 6. Trong mỗi màn con, xử lý theo thứ tự:
    - bấm nút điều hướng/phần thưởng cố định như Rewards, Star Trail Gift,
@@ -59,8 +62,8 @@ vẫn là entry chung quét cả hai khu để dùng khi điểm chạy riêng �
      Claim All;
    - nếu thấy nút X của popup/mục không nhận được thì dùng Back để thoát, không
      bấm trực tiếp vào X;
-   - dò điểm lấp lánh trong vùng nội dung an toàn tối đa 4 lần, kể cả khi một
-     frame không thấy sáng; sau 4 lần không có quà xác minh thì kết thúc mục;
+   - dò điểm lấp lánh trong vùng nội dung an toàn; Valuable Event cần 3 vòng
+     liên tiếp không nhận thêm quà, Event Center lấy 3 mẫu cho mỗi lượt kiểm;
    - không bấm vùng mua hàng, thanh tài nguyên hoặc phần thưởng trả phí.
 7. Xác minh từng lần nhận bằng một trong các điều kiện:
    - xuất hiện Congratulations;
@@ -72,15 +75,17 @@ vẫn là entry chung quét cả hai khu để dùng khi điểm chạy riêng �
    chỉ DONE khi tất cả key trong registry của cả hai khu đều current.
    Trên carousel, mỗi dấu đỏ chỉ thuộc tab có tâm gần nó nhất; dấu của tab bên
    cạnh không được dùng để kết luận tab vừa xử lý vẫn còn đỏ.
-   Mục đã được mở, kiểm tra nút cố định và sparkle đủ 4 lần được coi là đã xét;
+   Mục đã được mở, vét nút cố định và đủ số vòng kiểm tra sparkle được coi là đã xét;
    badge trang trí hoặc badge không tự tắt không được làm luồng lặp vô hạn.
-10. Gift Claims tạm tắt cờ ngắt bởi Join Boss và deadline của lượt boss trong
-    suốt một lần chạy. Nút Stop và mốc reset server vẫn được kiểm tra. Lỗi điều
-    hướng giữ mục ở trạng thái PENDING để lần chạy Gift Claims sau thử lại.
-11. Nếu DB nói chưa làm, Vùng 1 mở màn cha và quét carousel đủ hai chiều. Khi
-    màn cha không còn tab đỏ, toàn bộ key còn lại của riêng màn cha đó được ghi
-    DONE, không mở lại từng tab. Vùng 2 vẫn phải vào đúng event con theo quy
-    tắc Event Center.
+10. Gift Claims giữ nguyên deadline và cờ ngắt Join Boss của worker. Hết 120
+    giây hoặc có boss mới thì không ghi DONE cho bước đang dở; sau Join Boss,
+    hàm chạy lại và chỉ lấy các key chưa DONE trong DB.
+11. Sau một lượt dò đầy đủ cả hai vùng mà vẫn còn label không xuất hiện, lưu
+    lần lượt `gift_claims_scan_1`, `gift_claims_scan_2`,
+    `gift_claims_scan_3`. Chỉ khi đủ ba lượt trong cùng ngày server mới ghi
+    DONE cho các event còn thiếu và ghi key tổng `gift_claims`. Không thấy
+    launcher/màn cha sau một lần tìm đầy đủ được tính là lượt rỗng; bị ngắt
+    giữa lượt bởi 120 giây/Join Boss thì không tăng số lượt quét.
 
 ## Quy tắc từng nhóm
 
@@ -91,9 +96,11 @@ vẫn là entry chung quét cả hai khu để dùng khi điểm chạy riêng �
   dùng nhầm tên Refining Stone Sprint. Ancient Dynasty Treasury có tab riêng
   và mở đúng nút Daily Free bên phải trước khi xét nội dung.
 - Trong mỗi tab Valuable Event, bot vét toàn bộ Claim/Daily Free/Free đã biết
-  trước, sau đó mới thử một điểm lấp lánh và quay lại vét nút chữ. Sau 4 vòng
+  trước, sau đó mới thử một điểm lấp lánh và quay lại vét nút chữ. Sau 3 vòng
   liên tiếp không xác minh thêm được quà, phần lấp lánh còn lại được coi là
-  nội dung trả phí/trang trí và mục được coi là đã xét xong.
+  nội dung trả phí/trang trí. Sau đó bot quét lại toàn bộ carousel phía trên;
+  nếu badge vẫn còn thì chạy lại mục ở vòng tổng thứ hai. Badge vẫn tồn tại
+  sau vòng tổng thứ hai được coi là trả phí/trang trí và key được DONE hôm nay.
 - Super Value Return: luôn kiểm tra Login Gifts một lần; Empire Depot và Lucky
   Raffle dùng Claimable; City Growth Plan ưu tiên Claim All rồi chỉ nhận cột
   miễn phí bên trái.
@@ -104,22 +111,22 @@ vẫn là entry chung quét cả hai khu để dùng khi điểm chạy riêng �
   để nhận tất cả nút Claim trùng nhau. Chỉ sau đó mới dò sparkle; một sparkle
   không sinh Congratulations thì dừng tab đó. Nếu người dùng bấm Stop giữa
   tab, tab đó chưa được ghi nhớ và phải được mở lại ở lần chạy sau.
-- Event Center: ưu tiên quét đủ ba nhóm theo thứ tự Limited, Activities rồi
-  Competition. Precious Blazon Exchange và Hypnos' Dream chỉ mở Rewards khi
+- Event Center: chỉ quét nhóm Limited; không vào Activities hoặc Competition.
+  Precious Blazon Exchange và Hypnos' Dream chỉ mở Rewards khi
   thấy đúng phần chữ Rewards; Dwarf's Treasure tương tự với chữ Daily Free.
   Poseidon's Day phải nhận diện đúng tiêu đề, bấm tab Ocean Offering có dấu đỏ,
   rồi bấm đúng rương Daily Free. Các event có nút riêng này kết thúc ngay sau
   khi kiểm tra nút, không chạy fallback sparkle để tránh mở nhầm màn trả phí.
-  Mỗi nút đặc biệt được tìm tối đa bốn lần rồi bỏ qua. Trong Activities, nếu
-  thấy hàng Facebook kèm dấu đỏ thì không mở Facebook và coi nhóm đã DONE.
-  Competition kiểm tra các nút nhận cố định trước, sau đó thử tối đa bốn điểm
-  sparkle; sparkle chỉ thành công khi xuất hiện Congratulations. Bacchus Tavern
-  vẫn được nhận diện và bỏ qua. Sau mỗi event phải quay lại danh sách trước khi
+  Mỗi event được kiểm tra nội dung tối đa hai lượt nếu chưa có Congratulations,
+  nút biến mất hoặc trạng thái nhận thành công. Sau hai lượt không nhận thêm
+  được gì, event được coi là đã cạn quà và DONE hôm nay. Mỗi lượt vẫn cho phép
+  nút đặc biệt xuất hiện trễ trong số lần dò hữu hạn. Bacchus Tavern vẫn được
+  nhận diện và bỏ qua. Sau mỗi event phải quay lại danh sách trước khi
   cuộn tiếp. Sau một vòng quét đầy đủ, badge mua hàng/khóa vẫn đỏ nhưng event đã
   có checkpoint và đã thử đủ bốn lần được ghi `skip/done`; badge mới chưa từng
   xử lý vẫn chặn DONE.
 - Revelation of Horus và Sealed Imperial Treasury được nhận diện theo tiêu đề,
-  bỏ qua ngay và coi là DONE. Activities tạm thời bỏ qua toàn bộ theo cấu hình.
+  bỏ qua ngay và coi là DONE.
 - Grace of Star Trail bấm icon `Star Trail Gift`, chờ màn con rồi bấm tiếp icon
   đồng xu có chữ `Claim`; chỉ bước thứ hai mới tính là nhận xu. Dwarf's Treasure
   dùng crop gồm cả rương `Daily Free` để tâm ảnh nằm trong vùng bấm thật.

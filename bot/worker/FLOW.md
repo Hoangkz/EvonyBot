@@ -92,11 +92,12 @@ flowchart TD
   lần thì bỏ khỏi danh sách tới ngày mới. Bị ngắt giữa chừng (hết 120 giây, có boss) không tính là một lần thử.
 - **Cả danh sách đều chưa xong** (hoặc danh sách rỗng): nghỉ `IDLE_WAIT` = 5 giây rồi xét lại, không chạy liên tục. Thread vẫn
   sống tới khi Stop.
-- **Gift Claims** hiện đã tách khỏi Daily Activities, không còn task `daily_gift_claims` trong scheduler; điểm chạy riêng sẽ được thiết lập sau.
+- **Gift Claims** là tail task priority 299 của nhóm Daily Activities, chạy sau
+  `daily_rewards`. Nó không `must_finish`: khi có Join Boss thì bị ngắt ở 120
+  giây/có boss mới, sau đó chạy lại từ các key DB chưa DONE.
 - **Nhiệm vụ `must_finish`** (priority.py): đã bắt đầu thì chạy tới xong; Bubble / Auto Times Out / boss mới / 120 giây không
-  ngắt (chỉ Stop); xong rồi mới tới Bubble, Auto Times Out và Join Boss. **Mọi nhiệm vụ nhóm Daily Activities** (các dòng `daily_*`,
-  kể cả Alliance Donation / Help và thưởng Activity) đều `must_finish`; Crazy Eggs, Event, Open Gift Box,
-  Alliance Capacity, Black Market không.
+  ngắt (chỉ Stop); xong rồi mới tới Bubble, Auto Times Out và Join Boss. Gift
+  Claims là ngoại lệ có chủ ý để xen kẽ lại Join Boss sau mỗi 120 giây.
 - **Không chọn Join Boss: không có luật 120 giây** (không deadline, không ngắt bởi boss mới).
 - **Không tích Bubble: không có luật Bubble** (`BubbleGuard.ensure` không làm gì, không hẹn `BubbleDue`).
 - Join Boss trả về khác IDLE (dừng hẳn, ): không gọi lại Join Boss, vẫn chạy các nhiệm vụ.

@@ -48,7 +48,5 @@ def run_opened_event(bot, policy: EventPolicy):
         if policy.key is not None:
             scanner.mark_task_done(bot, policy.key)
         return True
-    report, _ = scanner._process_current_event_content(bot)
-    if policy.key is not None:
-        scanner.mark_task_done(bot, policy.key)
+    scanner._process_known_event(bot, policy)
     return True

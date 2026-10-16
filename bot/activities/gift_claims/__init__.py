@@ -4,7 +4,6 @@ Every named reward location has a durable child key.  ``KEY`` is written only
 after all locations in both outer zones have a current server-day checkpoint.
 """
 from dataclasses import dataclass, field
-from functools import wraps
 from importlib import import_module
 
 from . import event_center, lobby, registry, valuable_event
@@ -17,32 +16,13 @@ limited_offer = import_module(f"{__name__}.valuable_event.limited_offer.run")
 login_gifts = import_module(f"{__name__}.valuable_event.login_gifts.run")
 super_value_return = import_module(f"{__name__}.valuable_event.super_value_return.run")
 from .common import (TEXT_CLAIM_CONTROLS, back_if_close_x,
-                     claim_fixed_controls, claim_sparkles, return_home)
+                     claim_fixed_controls, claim_sparkles, mark_task_done,
+                     return_home)
 from .screens import GiftScreen
 
 KEY = "gift_claims"
 LABEL = "Nhận toàn bộ quà"
-
-
-def _without_join_boss_interrupt(func):
-    """Keep one gift run intact while preserving Stop/reset safety checks."""
-    @wraps(func)
-    def wrapped(bot, *args, **kwargs):
-        missing = object()
-        saved_boss = getattr(bot, "_boss_interrupt_enabled", missing)
-        saved_deadline = getattr(bot, "_deadline", missing)
-        if saved_boss is not missing:
-            bot._boss_interrupt_enabled = False
-        if saved_deadline is not missing:
-            bot._deadline = None
-        try:
-            return func(bot, *args, **kwargs)
-        finally:
-            if saved_boss is not missing:
-                bot._boss_interrupt_enabled = saved_boss
-            if saved_deadline is not missing:
-                bot._deadline = saved_deadline
-    return wrapped
+SCAN_KEYS = tuple(f"gift_claims_scan_{index}" for index in range(1, 4))
 
 
 @dataclass
@@ -166,9 +146,8 @@ def _dispatch(bot, screen_name: GiftScreen, progress: GiftProgress):
     return_home(bot)
 
 
-@_without_join_boss_interrupt
-def run_region(bot, region: str) -> bool:
-    """Run every DB-pending gift location in exactly one user-defined region."""
+def _run_region_once(bot, region: str) -> tuple[bool, bool]:
+    """Return (all child keys done, full label sweep completed)."""
     if region not in (registry.REGION_1, registry.REGION_2):
         raise ValueError(f"unknown gift region: {region}")
     label = "Vùng 1 (ngoài Event Center)" if region == registry.REGION_1 else \
@@ -179,6 +158,10 @@ def run_region(bot, region: str) -> bool:
     if (region == registry.REGION_1
             and all(item.task.key in known_region_1 for item in pending_now)):
         return _run_region_1(bot, label)
+    known_region_2 = {item.task.key for item in registry.locations(registry.REGION_2)}
+    if (region == registry.REGION_2
+            and all(item.task.key in known_region_2 for item in pending_now)):
+        return _run_region_2(bot, label)
     for location in pending_now:
         bot.check()
         bot.record(f"Gift Claims: {label} kiểm tra {location.task.label}")
@@ -190,35 +173,30 @@ def run_region(bot, region: str) -> bool:
     if remaining:
         bot.record(f"Gift Claims: {label} còn PENDING: " +
                    ", ".join(item.task.label for item in remaining))
-        return False
+        return False, True
     bot.record(f"Gift Claims: {label} DONE")
-    return True
+    return True, True
 
 
-def _finish_clean_parent(bot, tasks, due_keys, parent_label: str) -> None:
-    """A fully scanned carousel with no red tab completes its remaining keys."""
-    for task in tasks:
-        if task.key in due_keys:
-            from .common import mark_task_done
-            mark_task_done(bot, task.key)
-    bot.record(f"Gift Claims: {parent_label} hết tab đỏ; coi toàn bộ nhóm DONE")
+def run_region(bot, region: str) -> bool:
+    """Run one region while respecting the worker's 120-second/Boss checks."""
+    done, _ = _run_region_once(bot, region)
+    return done
 
 
-def _run_region_1(bot, label: str) -> bool:
+def _run_region_1(bot, label: str) -> tuple[bool, bool]:
     """Run region 1 parent-by-parent instead of reopening every child tab."""
+    scan_completed = True
     valuable_due = {
         item.task.key for item in registry.pending(bot, registry.REGION_1)
         if item.task in registry.VALUABLE_EVENT_TASKS
     }
     if valuable_due:
         if lobby.open_named(bot, GiftScreen.VALUABLE_EVENT):
-            _, clean = valuable_event.run_opened(bot, valuable_due, handled=set())
-            if clean:
-                _finish_clean_parent(
-                    bot, registry.VALUABLE_EVENT_TASKS, valuable_due,
-                    "Valuable Event")
+            valuable_event.run_opened(bot, valuable_due, handled=set())
         else:
-            bot.record("Gift Claims: chưa mở được Valuable Event; giữ nhóm PENDING")
+            bot.record("Gift Claims: lượt này không thấy Valuable Event; "
+                       "giữ key con PENDING và tính là một lượt dò rỗng")
 
     super_due = {
         item.task.key for item in registry.pending(bot, registry.REGION_1)
@@ -226,54 +204,83 @@ def _run_region_1(bot, label: str) -> bool:
     }
     if super_due:
         if lobby.open_named(bot, GiftScreen.SUPER_VALUE_RETURN):
-            _, clean = super_value_return.run_opened(bot, super_due, handled=set())
-            if clean:
-                _finish_clean_parent(
-                    bot, registry.SUPER_VALUE_RETURN_TASKS, super_due,
-                    "Super Value Return")
+            super_value_return.run_opened(bot, super_due, handled=set())
         else:
-            bot.record("Gift Claims: chưa mở được Super Value Return; giữ nhóm PENDING")
+            bot.record("Gift Claims: lượt này không thấy Super Value Return; "
+                       "giữ key con PENDING và tính là một lượt dò rỗng")
 
     remaining = registry.pending(bot, registry.REGION_1)
     if remaining:
         bot.record(f"Gift Claims: {label} còn PENDING: " +
                    ", ".join(item.task.label for item in remaining))
-        return False
+        return False, scan_completed
     bot.record(f"Gift Claims: {label} DONE")
-    return True
+    return True, scan_completed
 
 
-@_without_join_boss_interrupt
+def _run_region_2(bot, label: str) -> tuple[bool, bool]:
+    """Open Event Center once and scan its Limited list from top to bottom."""
+    if not registry.pending(bot, registry.REGION_2):
+        return True, True
+    if event_center.open_event_center(bot) is None:
+        bot.record("Gift Claims: lượt này không thấy Event Center; giữ vùng 2 "
+                   "PENDING và tính là một lượt dò rỗng")
+        return False, True
+    event_center.run_opened(bot, set())
+    remaining = registry.pending(bot, registry.REGION_2)
+    if remaining:
+        bot.record(f"Gift Claims: {label} còn PENDING: " +
+                   ", ".join(item.task.label for item in remaining))
+        return False, True
+    bot.record(f"Gift Claims: {label} DONE")
+    return True, True
+
+
 def run(bot) -> bool:
-    """Run region 1 then region 2 with durable child checkpoints.
+    """Run DB-pending labels, yielding to Boss at the worker's 120 s limit.
 
-    Region 1 is grouped by parent carousel. A complete two-direction scan with
-    no red tab completes that parent's remaining children instead of reopening
-    each DB-pending tab. Region 2 keeps its Event Center inspection rules.
+    A child is saved immediately after its own flow completes.  Missing labels
+    remain pending for three complete top-to-bottom sweeps; only the third
+    empty sweep closes those children and the daily aggregate key.
     """
     # ``gift_claims`` is deliberately only an aggregate scheduler checkpoint.
     # Every named location is authoritative: an old aggregate record must not
     # suppress a newly introduced/missing child location on the same server
     # day.  This is also what makes the next run after reset inspect each
     # location again even if the city currently displays no red badge.
-    if registry.complete(bot):
-        if not bot.is_daily_done(KEY):
-            bot.mark_daily_done(KEY)
-        return True
     if bot.is_daily_done(KEY):
-        bot.record("Gift Claims: aggregate DONE cũ nhưng còn điểm nhận chưa "
-                   "kiểm tra; bỏ qua aggregate và tiếp tục theo DB con")
+        return True
+    if registry.complete(bot):
+        bot.mark_daily_done(KEY)
+        return True
 
-    run_region(bot, registry.REGION_1)
-    run_region(bot, registry.REGION_2)
+    bot.check()
+    _, region_1_scanned = _run_region_once(bot, registry.REGION_1)
+    bot.check()
+    _, region_2_scanned = _run_region_once(bot, registry.REGION_2)
 
     # A clean red-badge scan is not evidence that every named gift location
     # was inspected.  Each child flow writes its own key after opening the
     # page; only those keys may complete the aggregate task.
     if not registry.complete(bot):
-        pending = ", ".join(item.task.label for item in registry.pending(bot))
-        bot.record("Gift Claims: còn PENDING theo DB (không suy từ chấm đỏ): "
-                   + pending)
+        pending_locations = registry.pending(bot)
+        pending = ", ".join(item.task.label for item in pending_locations)
+        if region_1_scanned and region_2_scanned:
+            scan_key = next((key for key in SCAN_KEYS
+                             if not bot.is_daily_done(key)), None)
+            if scan_key is not None:
+                bot.mark_daily_done(scan_key)
+                bot.record(f"Gift Claims: đã dò hết label từ đầu tới cuối; "
+                           f"DB DONE {scan_key}")
+            scans = sum(bot.is_daily_done(key) for key in SCAN_KEYS)
+            if scans >= len(SCAN_KEYS):
+                for location in pending_locations:
+                    mark_task_done(bot, location.task.key)
+                bot.mark_daily_done(KEY)
+                bot.record("Gift Claims: đủ 3 lượt quét không còn event tìm thấy; "
+                           "đánh dấu các event còn lại và gift_claims DONE hôm nay")
+                return True
+        bot.record("Gift Claims: còn PENDING theo DB: " + pending)
         return False
 
     bot.mark_daily_done(KEY)
@@ -284,4 +291,10 @@ def run(bot) -> bool:
     return True
 
 
-__all__ = ["KEY", "LABEL", "GiftProgress", "run_region", "run"]
+def run_job(bot, _settings=None) -> bool:
+    """Scheduler adapter; the worker owns the 120-second deadline."""
+    return run(bot)
+
+
+__all__ = ["KEY", "LABEL", "SCAN_KEYS", "GiftProgress", "run_region",
+           "run_job", "run"]
