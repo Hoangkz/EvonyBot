@@ -26,6 +26,8 @@ from ..activities.daily_activities.alliance_research import TASK as daily_allian
 from ..activities.daily_activities.alliance_research.run import after_go as alliance_research_after_go
 from ..activities.daily_activities.greet_champion import TASK as daily_greet_champion
 from ..activities.daily_activities.greet_champion.run import after_go as greet_champion_after_go
+from ..activities.daily_activities.ranger_knight import TASK as daily_ranger_knight
+from ..activities.daily_activities.ranger_knight.run import after_go as ranger_knight_after_go
 from ..activities.daily_activities.trade_carriage import TASK as daily_trade_carriage
 from ..activities.daily_activities.trade_carriage.run import after_go as trade_carriage_after_go
 from ..activities.event.gather_troops.cultivate_generals.run import run as gather_troops_cultivate_generals
@@ -330,6 +332,13 @@ DATA ={
             "priority": 385, 
             "must_finish": True,
             "note": "Về thành: bấm trái tim trên Keep (hoặc Keep -> Champion), chào 2 lần",
+        },
+        {
+            "key": "daily_ranger_knight",
+            "run": daily_job(daily_ranger_knight, after_go=ranger_knight_after_go),
+            "label": "Ranger Knight",
+            "priority": 384,
+            "must_finish": True,
         },
         {
             "key": "daily_trade_carriage",

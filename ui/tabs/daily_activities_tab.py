@@ -46,6 +46,7 @@ SUPPORTED_TASKS = (
     ("Research", "Research"),
     ("Trade Carriage", "Trade Carriage"),
     ("Greet Champion", "Greet Champion"),
+    ("Ranger Knight", "Ranger Knight"),   # mặc định tích
     ("Alliance VIP", "Alliance VIP"),   # mặc định tích
 )
 
@@ -140,7 +141,7 @@ class DailyActivitiesTab(BaseTab):
                 continue
             box = QCheckBox(label)
             # Preserve the old form's default while keeping the stored key compatible.
-            box.setChecked(key in ("Troop Heading", "Alliance VIP"))
+            box.setChecked(key in ("Troop Heading", "Alliance VIP", "Ranger Knight"))
             self.task_boxes[key] = box
             selection_grid.addWidget(box, index // 4, index % 4)
         # City Tax: số lần thu mỗi loại + ô Free (chỉ một loại được tích).
