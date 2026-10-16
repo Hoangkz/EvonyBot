@@ -25,7 +25,9 @@ gift_claims/
 │   ├── super_value_return/run.py
 │   ├── login_gifts/run.py
 │   └── <từng event>/run.py
-└── event_center/                # Chỉ các event mở từ Event Center
+├── back_to_territory/           # Thanh phải ngoài thành, ngang cấp Event Center
+│   └── run.py
+└── event_center/                # Chỉ các event mở sau khi vào Event Center
     ├── run.py                   # chỉ quét danh sách Limited
     ├── grace_of_star_trail/run.py
     ├── dwarfs_treasure/run.py
@@ -45,7 +47,8 @@ Mỗi event có entry `run(bot)` trong thư mục của chính nó. Entry tổng
    - Vùng 1 là toàn bộ điểm nhận quà không nằm trong Event Center, gồm
      Valuable Event và Super Value Return (Empire Depot, Lucky Raffle,
      City Growth Plan, Login Gifts).
-   - Vùng 2 là Event Center và toàn bộ event con được mở từ đó.
+   - Vùng 2 là thanh icon bên phải: Back to Territory là màn ngang cấp;
+     Event Center là launcher riêng chứa các event Limited bên trong.
 3. Mở Valuable Event bằng vị trí launcher cố định ở thanh dưới và Event Center
    bằng template launcher cố định ở thanh phải; không chạm vào chấm đỏ.
    Facebook/Follow Us luôn bị loại.
@@ -106,7 +109,9 @@ Mỗi event có entry `run(bot)` trong thư mục của chính nó. Entry tổng
   miễn phí bên trái.
 - Login Gifts: chỉ bấm rương vàng/phát sáng được nhận diện trong cột miễn phí;
   không dò mù các hàng. Chỉ tính khi có Congratulations.
-- Back to Territory: với mỗi tab đỏ trên carousel, duyệt tiếp toàn bộ badge đỏ
+- Back to Territory nằm ở thanh phải cùng vùng ngoài thành với Event Center,
+  nhưng là màn ngang cấp và không phải event con của Event Center. Với mỗi tab
+  đỏ trên carousel, duyệt tiếp toàn bộ badge đỏ
   ở hàng Day và Daily Login/Stamina/Daily Activity bên dưới; quét dọc danh sách
   để nhận tất cả nút Claim trùng nhau. Chỉ sau đó mới dò sparkle; một sparkle
   không sinh Congratulations thì dừng tab đó. Nếu người dùng bấm Stop giữa

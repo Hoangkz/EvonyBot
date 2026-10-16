@@ -20,20 +20,12 @@ MAX_TAB_SWIPES = 7
 EVENT_CENTER_WAIT_ATTEMPTS = 6
 EVENT_CENTER_LAUNCHERS = ("EventCenter/launcher_side", "EventCenter/launcher")
 FIXED_CONTROL_THRESHOLDS = {
-    # The text is rendered over animated event art.  On the real 396x704 MEmu
-    # frame the user-provided crop scores about 0.65, while the surrounding
-    # icon/background changes between events.
     "Common/button_daily_free_text": 0.62,
-    # Blessing of Pallas renders the same word with a narrower green glow.
-    # Real 396x704 ADB frames score ~0.663 at the exact Claim button while
-    # the Event Center list stays below 0.47, so 0.65 keeps useful margin.
     "Common/button_claim_text": 0.65,
     "Common/button_free_text": 0.70,
     "Common/button_claim_all_text": 0.70,
 }
 
-# Only tight text crops may drive a generic reward tap. Large module images
-# remain useful for page identification, but their centre may not be a button.
 TEXT_CLAIM_CONTROLS = (
     "Common/button_claim_text",
     "Common/button_claim_all_text",
@@ -146,8 +138,6 @@ def return_home(bot) -> bool:
     """Back out until the city/world screen is visible."""
     for _ in range(MAX_HOME_STEPS):
         screen = bot.screenshot()
-        # The city remains visible behind Evony's Quit dialog, so close that
-        # dialog before accepting MAIN_MARKER as a usable lobby.
         if bot.find("exit/1escEvony.png", threshold=0.82, screen=screen,
                     region=(45, 50, 85, 70)) is not None:
             bot.tap_percent(34, 59, delay=0.7)  # Cancel
@@ -172,17 +162,12 @@ def open_launcher(bot, launcher: str | tuple[str, ...]):
     if pos is None:
         bot.log(f"Gift Claims: {' / '.join(launchers)} has no claim indicator")
         return None
-    # Launcher templates deliberately contain only their stable text labels;
-    # tap the icon body just above the label, where the game accepts input.
     bot.tap(pos[0], max(0, pos[1] - round(20 * screen.shape[1] / REFERENCE_WIDTH)), delay=1)
     return bot.screenshot()
 
 
 def open_event_center(bot):
     """Open the explicitly named Event Center icon wherever the lobby moved it."""
-    # A rotating sale popup can race the launcher tap and cover Event Center.
-    # Close an explicit X with Android Back, then reacquire the named launcher
-    # instead of spending the whole attempt looking for the hidden title.
     for launch_attempt in range(3):
         if not return_home(bot):
             return None
@@ -196,7 +181,6 @@ def open_event_center(bot):
         if launcher is None:
             bot.log("Gift Claims: named Event Center launcher not found")
             return None
-        # The template is the fixed caption; tap the icon body immediately above.
         bot.tap(launcher[0], max(0, launcher[1] - 20), delay=1)
         for attempt in range(EVENT_CENTER_WAIT_ATTEMPTS):
             screen = bot.screenshot()
@@ -220,7 +204,6 @@ def select_carousel_tab(bot, page_title: str, tab: str, screen=None) -> bool:
         bot.log(f"Gift Claims: current screen is not {page_title}")
         return False
 
-    # Start at the current position, move left through later tabs, then back right.
     for direction in (-1, 1):
         for _ in range(MAX_TAB_SWIPES + 1):
             screen = bot.screenshot()

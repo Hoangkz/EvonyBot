@@ -10,7 +10,7 @@ from . import event_center, lobby, registry, valuable_event
 # Compatibility aliases for callers that previously imported a specific
 # non-Event-Center claim flow from ``gift_claims``.  Implementations live in
 # ``valuable_event/``; only the public entry points remain here.
-back_to_territory = import_module(f"{__name__}.valuable_event.back_to_territory.run")
+back_to_territory = import_module(f"{__name__}.back_to_territory.run")
 empire_depot = import_module(f"{__name__}.valuable_event.empire_depot.run")
 limited_offer = import_module(f"{__name__}.valuable_event.limited_offer.run")
 login_gifts = import_module(f"{__name__}.valuable_event.login_gifts.run")
@@ -219,14 +219,25 @@ def _run_region_1(bot, label: str) -> tuple[bool, bool]:
 
 
 def _run_region_2(bot, label: str) -> tuple[bool, bool]:
-    """Open Event Center once and scan its Limited list from top to bottom."""
+    """Run right-rail parents: Event Center Limited and Back to Territory."""
     if not registry.pending(bot, registry.REGION_2):
         return True, True
-    if event_center.open_event_center(bot) is None:
-        bot.record("Gift Claims: lượt này không thấy Event Center; giữ vùng 2 "
-                   "PENDING và tính là một lượt dò rỗng")
-        return False, True
-    event_center.run_opened(bot, set())
+
+    event_center_due = tuple(
+        item for item in registry.pending(bot, registry.REGION_2)
+        if item.task not in registry.REGION_2_OUTER_TASKS
+    )
+    if event_center_due:
+        if event_center.open_event_center(bot) is None:
+            bot.record("Gift Claims: lượt này không thấy Event Center; giữ các "
+                       "event con PENDING và tính là một lượt dò rỗng")
+        else:
+            event_center.run_opened(bot, set())
+
+    if not bot.is_daily_done(back_to_territory.KEY):
+        bot.record("Gift Claims: Vùng 2 kiểm tra Back to Territory ngoài Event Center")
+        back_to_territory.TASK.run(bot)
+
     remaining = registry.pending(bot, registry.REGION_2)
     if remaining:
         bot.record(f"Gift Claims: {label} còn PENDING: " +

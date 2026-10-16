@@ -2,14 +2,13 @@
 import cv2
 import numpy as np
 
-from ...common import (GiftTask, ClaimReport, TEXT_CLAIM_CONTROLS, back_if_close_x,
-                     claim_fixed_controls, claim_sparkles,
-                     close_congratulations, find, find_all, return_home)
+from ..common import (GiftTask, ClaimReport, TEXT_CLAIM_CONTROLS, back_if_close_x,
+                      claim_fixed_controls, claim_sparkles,
+                      close_congratulations, find, find_all, return_home)
 
 KEY = "gift_back_to_territory"
 PAGE = "BackToTerritory/title"
 DOT = "ValuableEvent/notification_dot"
-CONGRATULATIONS = "LoginGifts/congratulations"
 TOP = (0, 7, 100, 19)
 LOWER = (0, 20, 100, 88)
 SPARKLE_REWARDS = (0, 45, 100, 82)
@@ -186,8 +185,15 @@ def run_opened(bot, handled=None) -> bool:
 
 
 def run(bot):
-    # Entered by the generic zone-2 dispatcher.
-    return False
+    # Import lazily to avoid a package cycle during registry construction.
+    from ..lobby import open_named
+    from ..screens import GiftScreen
+
+    if not open_named(bot, GiftScreen.BACK_TO_TERRITORY):
+        return False
+    clean = run_opened(bot, set())
+    return_home(bot)
+    return clean
 
 
 TASK = GiftTask(KEY, "Back to Territory", run)

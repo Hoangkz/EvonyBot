@@ -24,6 +24,10 @@ EVENT_CENTER_LAUNCHERS = ("EventCenter/launcher_side", "EventCenter/launcher")
 FIXED_PARENT_TARGETS = {
     GiftScreen.VALUABLE_EVENT: (77, 83),
     GiftScreen.SUPER_VALUE_RETURN: (9, 83),
+    # Back to Territory is a city-side launcher in the same right rail as
+    # Event Center, not a child inside Event Center. Its title is verified
+    # after this fallback tap before any reward logic can run.
+    GiftScreen.BACK_TO_TERRITORY: (91, 20),
 }
 FIXED_PARENT_LAUNCHERS = {
     GiftScreen.VALUABLE_EVENT: (

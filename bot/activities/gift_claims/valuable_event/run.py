@@ -22,7 +22,6 @@ PAGE = "ValuableEvent/title"
 DOT = "ValuableEvent/notification_dot"
 MAX_SWIPES = 8
 MAX_PARENT_PASSES = 2
-LOWER_CONTENT = (0, 20, 100, 88)
 COMMON_LOWER_CLAIMS = TEXT_CLAIM_CONTROLS
 
 
@@ -63,10 +62,6 @@ SPECS = (
                          "SuccessivePurchaseBenefits/button_daily_free",
                          "LimitedOffer/button_free")),
 )
-
-
-def _near_tab(dot, tab) -> bool:
-    return abs(dot[0] - tab[0]) <= 55 and abs(dot[1] - tab[1]) <= 40
 
 
 def _owner_for_dot(dot, tabs):

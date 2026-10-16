@@ -39,10 +39,6 @@ SPECS = (
 )
 
 
-def _near_tab(dot, tab) -> bool:
-    return abs(dot[0] - tab[0]) <= 55 and abs(dot[1] - tab[1]) <= 40
-
-
 def _owner_for_dot(dot, tabs):
     """Assign one marker to the nearest visible tab, never two neighbours."""
     candidates = [(spec, tab) for spec, tab in tabs

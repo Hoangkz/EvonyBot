@@ -8,6 +8,7 @@ the configured server reset (14:00 by default).
 """
 from dataclasses import dataclass
 
+from . import back_to_territory
 from .valuable_event import (
     ancient_dynasty_treasury, city_growth_plan, empire_depot, general_vault,
     limited_offer, login_gifts, lucky_raffle, refining_stone_sprint,
@@ -33,7 +34,8 @@ class ClaimLocation:
 
 # Quy ước nghiệp vụ:
 # - Vùng 1: mọi điểm nhận quà KHÔNG nằm trong Event Center.
-# - Vùng 2: Event Center và toàn bộ event con của nó.
+# - Vùng 2: thanh phải ngoài thành, gồm Back to Territory và Event Center;
+#   chỉ các policy Event Center mới cần mở Event Center trước.
 REGION_1 = "region_1"
 REGION_2 = "region_2"
 
@@ -75,9 +77,11 @@ SUPER_VALUE_RETURN_TASKS = (
 )
 
 REGION_1_TASKS = VALUABLE_EVENT_TASKS + SUPER_VALUE_RETURN_TASKS
+REGION_2_OUTER_TASKS = (back_to_territory.TASK,)
 
 LOCATIONS = (
     *(ClaimLocation(REGION_1, task) for task in REGION_1_TASKS),
+    *(ClaimLocation(REGION_2, task) for task in REGION_2_OUTER_TASKS),
     ClaimLocation(REGION_2, _policy_task(blessing_of_pallas)),
     ClaimLocation(REGION_2, dragon_battle.TASK),
     ClaimLocation(REGION_2, _policy_task(precious_blazon_exchange)),

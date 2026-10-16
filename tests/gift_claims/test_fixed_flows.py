@@ -15,7 +15,7 @@ valuable_event = import_module("bot.activities.gift_claims.valuable_event.run")
 valuable_named_flow = import_module(
     "bot.activities.gift_claims.valuable_event.named_flow.run")
 back_to_territory = import_module(
-    "bot.activities.gift_claims.valuable_event.back_to_territory.run")
+    "bot.activities.gift_claims.back_to_territory.run")
 empire_depot = import_module("bot.activities.gift_claims.valuable_event.empire_depot.run")
 limited_offer = import_module("bot.activities.gift_claims.valuable_event.limited_offer.run")
 login_gifts = import_module("bot.activities.gift_claims.valuable_event.login_gifts.run")

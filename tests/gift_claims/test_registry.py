@@ -55,7 +55,6 @@ class GiftClaimRegistryTests(unittest.TestCase):
             "FollowUs/facebook_icon.png",
             "GeneralVault/tab.png", "GeneralVault/button_daily_free.png",
             "DragonBattle/title.png",
-            "Lobby/notification_dot.png", "Lobby/notification_dot_bottom.png",
             "ValuableEvent/title.png", "ValuableEvent/launcher.png",
             "ValuableEvent/notification_dot.png", "SuperValueReturn/title.png",
             "SuperValueReturn/notification_dot.png", "EventCenter/notification_dot.png",
@@ -72,9 +71,7 @@ class GiftClaimRegistryTests(unittest.TestCase):
             "AncientDynastyTreasury/tab.png",
             "AncientDynastyTreasury/button_daily_free.png",
             "RefiningStoneSprint/tab.png",
-            "RefiningStoneSprint/subtab_sprint_quest.png",
             "StrategicStockpile/tab.png",
-            "StrategicStockpile/button_free.png",
             "StrategicStockpile/button_redeem.png",
             "StrategicStockpile/button_confirm_redeem.png",
             "StrategicStockpile/subtab_stockpile.png",
@@ -195,7 +192,31 @@ class GiftClaimRegistryTests(unittest.TestCase):
                          "gift_city_growth_plan", "gift_login_gifts"} <= region_1)
         self.assertIn("gift_resource_consumption_sprint", region_1)
         self.assertIn("gift_grace_of_star_trail", region_2)
+        self.assertIn("gift_back_to_territory", region_2)
+        self.assertNotIn("gift_back_to_territory", region_1)
         self.assertTrue(region_1.isdisjoint(region_2))
+
+    def test_region_2_runs_back_to_territory_without_opening_event_center(self):
+        bot = mock.Mock()
+        done = set()
+        bot.is_daily_done.side_effect = done.__contains__
+        outer_task = mock.Mock()
+        outer_task.key = "gift_back_to_territory"
+        outer_task.label = "Back to Territory"
+        outer_task.run.side_effect = lambda _bot: done.add(outer_task.key) or True
+        location = registry.ClaimLocation(registry.REGION_2, outer_task)
+
+        def pending(_bot, zone=None):
+            return (() if outer_task.key in done else (location,))
+
+        with (mock.patch.object(registry, "pending", side_effect=pending),
+              mock.patch.object(registry, "REGION_2_OUTER_TASKS", (outer_task,)),
+              mock.patch.object(gift_claims.back_to_territory, "TASK", outer_task),
+              mock.patch.object(gift_claims.event_center, "open_event_center") as open_center):
+            self.assertTrue(gift_claims.run_region(bot, registry.REGION_2))
+
+        outer_task.run.assert_called_once_with(bot)
+        open_center.assert_not_called()
 
     def test_run_region_executes_only_requested_region(self):
         done = set()
