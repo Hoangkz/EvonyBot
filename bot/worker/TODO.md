@@ -27,9 +27,8 @@ Cập nhật: 2026-10-11. Xong mục nào thì xoá mục đó. Flow hiện tạ
 - [ ] **Chạy `tests/event`** (flow test Event dùng hàm `run` cũ) — chưa chạy lại sau khi sửa.
 - [ ] **Ground Troop không đọc được số lượng huấn luyện** (`cannot read train count`, thấy khi chạy thật 2026-10-11):
   nhiệm vụ kết thúc mà không đánh dấu xong. Xem [gather_troops/ground_troop](../activities/event/gather_troops/ground_troop).
-- [x] **Quà cuối Daily**: `gift_claims` là tail task priority 299, sau
-  `daily_rewards`; mỗi event có key riêng, có ba checkpoint quét rỗng và key
-  tổng theo ngày server.
+- [ ] **Gift Claims chưa nối vào worker**: `gift_claims.valuable_event.run` và `gift_claims.event_center.run` là hai hoạt động
+  độc lập (3 lần không thấy mới xong), chưa có dòng nào trong `priority.py`.
 
 ## 3. Daily Activities (để sau, khi người dùng yêu cầu)
 

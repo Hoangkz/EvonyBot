@@ -59,10 +59,10 @@ from ..activities.event.run import claim_job, event_job
 from ..activities.event_center.crazy_eggs.run import JOB as crazy_eggs
 from ..activities.event_center.three_day.run import JOB as three_day_event
 from ..activities.open_gift_box.run import run as open_gift_box
-from ..activities import gift_claims, join_monster_war
+from ..activities import join_monster_war
 
 DATA ={
-    "_doc": "Độ ưu tiên của từng nhiệm vụ cho bộ chọn nhiệm vụ của worker. Gift Claims chạy cuối Daily Activities, sau Activity Rewards; khi có Join Boss nó chịu giới hạn 120 giây và tiếp tục bằng các checkpoint DB ở lượt sau.",
+    "_doc": "Độ ưu tiên của từng nhiệm vụ cho bộ chọn nhiệm vụ của worker.",
     "Bubble": [
         {
             "key": "bubble", 
@@ -345,15 +345,6 @@ DATA ={
             "label": "Activity Rewards (nhận thưởng cuối)",
             "priority": 300,
             "tail": True,
-        },
-        {
-            "key": gift_claims.KEY,
-            "run": gift_claims.run_job,
-            "saves": True,
-            "label": gift_claims.LABEL,
-            "priority": 299,
-            "tail": True,
-            "note": "Chạy sau Daily Activities; có Join Boss thì nhường sau 120 giây và tiếp tục các key DB chưa DONE.",
         },
     ],
     "Black Market": [
