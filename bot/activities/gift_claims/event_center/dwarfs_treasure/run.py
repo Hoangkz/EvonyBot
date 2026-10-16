@@ -5,6 +5,7 @@ from ..policy import EventPolicy, run_opened_event
 
 POLICY = EventPolicy(
     "Dwarf's Treasure",
+    key="gift_dwarfs_treasure",
     screen=GiftScreen.DWARFS_TREASURE,
     navigation=("Daily Free", "DwarfsTreasure/button_daily_free"),
 )

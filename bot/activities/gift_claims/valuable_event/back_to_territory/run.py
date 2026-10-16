@@ -131,7 +131,7 @@ def claim_opened(bot) -> int:
         attempted.append(dot)
         target = (max(0, dot[0] - 25), min(screen.shape[0] - 1, dot[1] + 15))
         bot.record(f"Gift Claims: mở tab đỏ bên dưới Back to Territory {dot}")
-        bot.tap(*target, delay=1.2)
+        bot.tap(*target, delay=1)
         claimed += _claim_current_inner_tab(bot)
     return claimed
 
@@ -168,7 +168,7 @@ def run_opened(bot, handled=None) -> bool:
                     break
                 dot, signature = candidate
                 bot.tap(max(0, dot[0] - 25), min(screen.shape[0] - 1, dot[1] + 16),
-                        delay=1.5)
+                        delay=1)
                 claim_opened(bot)
                 # If the two-minute slice interrupts claim_opened, this tab is
                 # intentionally not remembered and will resume next time.

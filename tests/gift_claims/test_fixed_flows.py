@@ -9,10 +9,11 @@ import numpy as np
 from bot.activities import gift_claims
 from bot.activities.gift_claims import common, lobby
 from bot.activities.gift_claims.screens import GiftScreen, TITLE_TEMPLATES, identify
-from bot.context.errors import YieldToBoss
 
 event_center = import_module("bot.activities.gift_claims.event_center.run")
 valuable_event = import_module("bot.activities.gift_claims.valuable_event.run")
+valuable_named_flow = import_module(
+    "bot.activities.gift_claims.valuable_event.named_flow.run")
 back_to_territory = import_module(
     "bot.activities.gift_claims.valuable_event.back_to_territory.run")
 empire_depot = import_module("bot.activities.gift_claims.valuable_event.empire_depot.run")
@@ -140,6 +141,8 @@ class FixedGiftFlowTests(unittest.TestCase):
 
     def test_valuable_event_has_one_standard_spec_per_child_module(self):
         expected = {
+            "gift_resource_consumption_sprint",
+            "gift_ancient_dynasty_treasury",
             "gift_general_vault",
             "gift_refining_stone_sprint", "gift_strategic_stockpile",
             "gift_limited_offer", "gift_speedup_sprint", "gift_super_blazon_sale",
@@ -155,6 +158,81 @@ class FixedGiftFlowTests(unittest.TestCase):
             (96, 70), [(left, (50, 70)), (right, (100, 70))])
         self.assertIs(right, owner[0])
 
+    def test_valuable_known_controls_are_checked_before_each_sparkle(self):
+        bot = mock.Mock()
+        order = []
+
+        def fixed(*_args, **_kwargs):
+            order.append("fixed")
+            return common.ClaimReport()
+
+        def sparkle(*_args, **_kwargs):
+            order.append("sparkle")
+            return common.ClaimReport()
+
+        with (mock.patch.object(valuable_named_flow, "claim_fixed_controls",
+                                side_effect=fixed) as fixed_claims,
+              mock.patch.object(valuable_named_flow, "claim_sparkles",
+                                side_effect=sparkle),
+              mock.patch.object(valuable_named_flow, "back_if_close_x",
+                                return_value=False)):
+            report, navigated = valuable_named_flow.process_lower(
+                bot, (), ("ResourceConsumptionSprint/button_free",))
+
+        self.assertEqual(common.ClaimReport(), report)
+        self.assertEqual(0, navigated)
+        self.assertEqual(["fixed", "sparkle"] * 3, order)
+        controls = fixed_claims.call_args_list[0].args[1]
+        self.assertEqual("ResourceConsumptionSprint/button_free", controls[0])
+        self.assertTrue(all(name in controls for name in common.TEXT_CLAIM_CONTROLS))
+
+    def test_valuable_verified_claim_resets_three_empty_rounds(self):
+        bot = mock.Mock()
+        reports = [common.ClaimReport(1, 1)] + [common.ClaimReport()] * 3
+        with (mock.patch.object(valuable_named_flow, "claim_fixed_controls",
+                                side_effect=reports) as fixed,
+              mock.patch.object(valuable_named_flow, "claim_sparkles",
+                                return_value=common.ClaimReport()),
+              mock.patch.object(valuable_named_flow, "back_if_close_x",
+                                return_value=False)):
+            report, _ = valuable_named_flow.process_lower(bot, (), ())
+
+        self.assertEqual(common.ClaimReport(1, 1), report)
+        self.assertEqual(4, fixed.call_count)
+
+    def test_valuable_persistent_badge_is_done_only_after_second_full_pass(self):
+        bot = mock.Mock()
+        bot.is_daily_done.return_value = False
+        screen = np.zeros((704, 396, 3), dtype=np.uint8)
+        bot.screenshot.return_value = screen
+        spec = valuable_event.SPECS[0]
+
+        def find_named(_bot, name, *_args, **_kwargs):
+            if name == valuable_event.PAGE:
+                return (198, 25)
+            if name == spec.tab:
+                return (70, 70)
+            return None
+
+        handled = set()
+        with (mock.patch.object(valuable_event, "SPECS", (spec,)),
+              mock.patch.object(valuable_event, "MAX_SWIPES", 0),
+              mock.patch.object(valuable_event, "find", side_effect=find_named),
+              mock.patch.object(valuable_event, "_dots", return_value=[(95, 54)]),
+              mock.patch.object(valuable_event, "_process_lower",
+                                return_value=(common.ClaimReport(), 0)) as lower,
+              mock.patch.object(valuable_event, "_verify_clean",
+                                side_effect=lambda _bot, ignored=():
+                                spec.task.key in ignored),
+              mock.patch.object(valuable_event, "return_home")):
+            _, clean = valuable_event.run_opened(
+                bot, {spec.task.key}, handled=handled)
+
+        self.assertTrue(clean)
+        self.assertEqual(2, lower.call_count)
+        bot.mark_daily_done.assert_called_once_with(spec.task.key)
+        self.assertIn(spec.task.key, handled)
+
     def test_super_value_return_has_one_standard_spec_per_child_module(self):
         expected = {
             "gift_empire_depot", "gift_lucky_raffle", "gift_city_growth_plan",
@@ -165,6 +243,16 @@ class FixedGiftFlowTests(unittest.TestCase):
         specs = {spec.task.key: spec for spec in super_value_return.SPECS}
         self.assertFalse(specs[login_gifts.KEY].requires_dot)
         self.assertTrue(specs[empire_depot.KEY].requires_dot)
+
+    def test_super_value_unknown_tab_signature_is_not_reopened_on_reverse_scan(self):
+        original = bytes([0b10101010] * 16)
+        animated = bytearray(original)
+        animated[0] ^= 0b00000111
+        animated[5] ^= 0b00000001
+        self.assertTrue(super_value_return._signature_seen(
+            bytes(animated), {original}))
+        self.assertFalse(super_value_return._signature_seen(
+            bytes([0b01010101] * 16), {original}))
 
     def test_login_gifts_never_probes_rows_without_a_glowing_chest(self):
         bot = mock.Mock()
@@ -234,13 +322,12 @@ class FixedGiftFlowTests(unittest.TestCase):
     def test_event_center_remaining_red_is_not_marked_done(self):
         bot = mock.Mock()
         bot.is_daily_done.return_value = False
-        with (mock.patch.object(lobby, "open_next",
-                                side_effect=(GiftScreen.EVENT_CENTER, None, None)),
-              mock.patch.object(event_center, "run_opened", return_value=False)):
-            with self.assertRaises(YieldToBoss):
-                gift_claims.run(bot)
+        progress = gift_claims.GiftProgress()
+        with mock.patch.object(event_center, "run_opened", return_value=False):
+            gift_claims._dispatch(bot, GiftScreen.EVENT_CENTER, progress)
 
         bot.mark_daily_done.assert_not_called()
+        self.assertIn(GiftScreen.EVENT_CENTER, progress.unresolved_parents)
 
     def test_event_center_keeps_finished_rows_across_boss_resume(self):
         bot = mock.Mock()
@@ -338,10 +425,24 @@ class FixedGiftFlowTests(unittest.TestCase):
         self.assertEqual(common.ClaimReport(1, 1), report)
         bot.tap.assert_called_once_with(49, 235, delay=1)
 
-    def test_event_center_missing_special_control_stops_after_four_checks(self):
+    def test_named_event_without_special_control_stops_immediately(self):
         bot = mock.Mock()
         bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
-        with mock.patch.object(event_center, "find", return_value=None):
+        with (mock.patch.object(event_center, "identify",
+                                return_value=GiftScreen.GRACE_OF_STAR_TRAIL),
+              mock.patch.object(event_center, "find", return_value=None)):
+            report = event_center._tap_special_navigation(bot, attempts=4)
+
+        self.assertEqual(common.ClaimReport(), report)
+        self.assertEqual(1, bot.screenshot.call_count)
+        bot.sleep.assert_not_called()
+        bot.tap.assert_not_called()
+
+    def test_unknown_event_checks_special_control_four_times(self):
+        bot = mock.Mock()
+        bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
+        with (mock.patch.object(event_center, "identify", return_value=None),
+              mock.patch.object(event_center, "find", return_value=None)):
             report = event_center._tap_special_navigation(bot, attempts=4)
 
         self.assertEqual(common.ClaimReport(), report)
@@ -376,6 +477,39 @@ class FixedGiftFlowTests(unittest.TestCase):
         self.assertEqual(common.ClaimReport(1, 1), report)
         bot.tap.assert_called_once_with(357, 164, delay=1)
 
+    def test_named_navigation_event_never_falls_through_to_sparkles(self):
+        bot = mock.Mock()
+        expected = common.ClaimReport(1, 1)
+        with (mock.patch.object(event_center, "identify",
+                                return_value=GiftScreen.DWARFS_TREASURE),
+              mock.patch.object(event_center, "_tap_special_navigation",
+                                return_value=expected),
+              mock.patch.object(event_center, "_tap_reward_navigation") as reward,
+              mock.patch.object(event_center, "claim_fixed_controls") as fixed,
+              mock.patch.object(event_center, "claim_sparkles") as sparkle):
+            report, closed = event_center._process_current_event_content(bot)
+
+        self.assertEqual(expected, report)
+        self.assertFalse(closed)
+        reward.assert_not_called()
+        fixed.assert_not_called()
+        sparkle.assert_not_called()
+
+    def test_unverified_named_navigation_event_is_done_after_two_checks(self):
+        bot = mock.Mock()
+        bot.is_daily_done.return_value = False
+        unresolved = common.ClaimReport(4, 0)
+        with (mock.patch.object(event_center, "identify",
+                                return_value=GiftScreen.PRECIOUS_BLAZON_EXCHANGE),
+              mock.patch.object(event_center, "_process_current_event_content",
+                                return_value=(unresolved, False))):
+            self.assertEqual(common.ClaimReport(8, 0),
+                             event_center._process_opened_event(bot))
+
+        self.assertEqual(2, bot.check.call_count)
+        bot.mark_daily_done.assert_called_once_with(
+            "gift_precious_blazon_exchange")
+
     def test_dwarf_daily_free_disappearance_is_verified_during_transition(self):
         bot = mock.Mock()
         bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
@@ -389,6 +523,32 @@ class FixedGiftFlowTests(unittest.TestCase):
 
         self.assertEqual(common.ClaimReport(1, 1), report)
         bot.tap.assert_called_once_with(356, 180, delay=1)
+
+    def test_poseidon_opens_captured_tab_then_claims_daily_free(self):
+        bot = mock.Mock()
+        bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
+
+        def find_named(_bot, name, *_args, **_kwargs):
+            calls[name] = calls.get(name, 0) + 1
+            if name == "PoseidonsDay/tab_ocean_offering":
+                return (34, 78)
+            if (name == "PoseidonsDay/button_daily_free" and
+                    calls[name] >= 2):
+                return (355, 155)
+            return None
+
+        calls = {}
+        with (mock.patch.object(event_center, "identify",
+                                return_value=GiftScreen.POSEIDONS_DAY),
+              mock.patch.object(event_center, "find", side_effect=find_named),
+              mock.patch.object(event_center, "close_congratulations",
+                                return_value=True)):
+            report = event_center._tap_special_navigation(bot)
+
+        self.assertEqual(common.ClaimReport(2, 1), report)
+        self.assertEqual([mock.call(34, 78, delay=1),
+                          mock.call(355, 155, delay=1)],
+                         bot.tap.call_args_list)
 
     def test_star_trail_gift_is_tapped_and_verified(self):
         bot = mock.Mock()
@@ -413,8 +573,13 @@ class FixedGiftFlowTests(unittest.TestCase):
         screen = np.zeros((704, 396, 3), dtype=np.uint8)
         bot.screenshot.return_value = screen
         visited = set()
-        with (mock.patch.object(event_center, "find", return_value=(120, 220)),
+        with (mock.patch.object(event_center, "find",
+                                side_effect=lambda _bot, name, *_args, **_kwargs:
+                                (120, 220) if name.startswith("GraceOfStarTrail/")
+                                else None),
               mock.patch.object(event_center, "_row_dots", return_value=[]),
+              mock.patch.object(event_center, "identify",
+                                return_value=GiftScreen.GRACE_OF_STAR_TRAIL),
               mock.patch.object(event_center, "_process_opened_event") as process,
               mock.patch.object(event_center, "_back_to_list", return_value=True),
               mock.patch.object(event_center, "_list_signature", return_value=b"same"),
@@ -423,6 +588,28 @@ class FixedGiftFlowTests(unittest.TestCase):
 
         process.assert_called_once_with(bot)
         self.assertIn(event_center.FORCED_EVENT_PREFIX + b"grace_of_star_trail",
+                      visited)
+
+    def test_dwarf_row_is_checked_without_an_outer_red_dot(self):
+        bot = mock.Mock()
+        screen = np.zeros((704, 396, 3), dtype=np.uint8)
+        bot.screenshot.return_value = screen
+        visited = {event_center.FORCED_EVENT_PREFIX + b"grace_of_star_trail"}
+        with (mock.patch.object(event_center, "find",
+                                side_effect=lambda _bot, name, *_args, **_kwargs:
+                                (120, 220) if name.startswith("DwarfsTreasure/")
+                                else None),
+              mock.patch.object(event_center, "_row_dots", return_value=[]),
+              mock.patch.object(event_center, "identify",
+                                return_value=GiftScreen.DWARFS_TREASURE),
+              mock.patch.object(event_center, "_process_opened_event") as process,
+              mock.patch.object(event_center, "_back_to_list", return_value=True),
+              mock.patch.object(event_center, "_list_signature", return_value=b"same"),
+              mock.patch.object(event_center, "_verify_clean", return_value=True)):
+            self.assertTrue(event_center._scan_category(bot, "limited", visited))
+
+        process.assert_called_once_with(bot)
+        self.assertIn(event_center.FORCED_EVENT_PREFIX + b"dwarfs_treasure",
                       visited)
 
     def test_grace_opened_page_uses_exact_star_trail_control(self):
@@ -434,9 +621,45 @@ class FixedGiftFlowTests(unittest.TestCase):
               mock.patch.object(event_center, "_process_current_event_content",
                                 return_value=(expected, False)) as process):
             self.assertEqual(expected, event_center._process_opened_event(bot))
-        process.assert_called_once_with(bot)
+        process.assert_called_once_with(bot, special_attempts=1)
 
-    def test_event_center_scans_categories_in_required_order(self):
+    def test_grace_missing_claim_is_done_after_two_checks(self):
+        bot = mock.Mock()
+        bot.is_daily_done.return_value = False
+        unresolved = common.ClaimReport(1, 0)
+        with (mock.patch.object(event_center, "identify",
+                                return_value=GiftScreen.GRACE_OF_STAR_TRAIL),
+              mock.patch.object(event_center, "_process_current_event_content",
+                                return_value=(unresolved, False))):
+            self.assertEqual(common.ClaimReport(2, 0),
+                             event_center._process_opened_event(bot))
+
+        self.assertEqual(2, bot.check.call_count)
+        bot.mark_daily_done.assert_called_once_with("gift_grace_of_star_trail")
+
+    def test_grace_claim_search_includes_top_right_control(self):
+        bot = mock.Mock()
+        bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
+        seen_regions = []
+
+        def find_named(_bot, name, *_args, **kwargs):
+            seen_regions.append((name, kwargs.get("region")))
+            if name.endswith("button_star_trail_gift_current"):
+                return (360, 90)
+            if name == "GraceOfStarTrail/button_claim":
+                return (355, 116)
+            return None
+
+        with (mock.patch.object(event_center, "find", side_effect=find_named),
+              mock.patch.object(event_center, "close_congratulations",
+                                side_effect=(False, True))):
+            report = event_center._tap_reward_navigation(bot)
+
+        self.assertEqual(common.ClaimReport(2, 1), report)
+        self.assertIn(("GraceOfStarTrail/button_claim",
+                       event_center.REWARD_NAV_REGION), seen_regions)
+
+    def test_event_center_scans_limited_only(self):
         bot = mock.Mock()
         screen = np.zeros((704, 396, 3), dtype=np.uint8)
         bot.screenshot.return_value = screen
@@ -448,17 +671,14 @@ class FixedGiftFlowTests(unittest.TestCase):
               mock.patch.object(event_center, "return_home")):
             self.assertTrue(event_center.run_opened(bot, set()))
 
-        self.assertEqual([mock.call(bot, "limited", 18),
-                          mock.call(bot, "competition", 82)],
-                         select.call_args_list)
+        self.assertEqual([mock.call(bot, "limited", 18)], select.call_args_list)
         self.assertEqual([call.args[1] for call in scan.call_args_list],
-                         ["limited", "competition"])
+                         ["limited"])
 
     def test_event_center_skips_categories_completed_before_boss_yield(self):
         bot = mock.Mock()
         bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
-        handled = {event_center._category_done_key("limited"),
-                   event_center._category_done_key("activities")}
+        handled = {event_center._category_done_key("limited")}
         with (mock.patch.object(event_center, "find", return_value=(198, 25)),
               mock.patch.object(event_center, "_select_category",
                                 return_value=True) as select,
@@ -467,9 +687,8 @@ class FixedGiftFlowTests(unittest.TestCase):
               mock.patch.object(event_center, "return_home")):
             self.assertTrue(event_center.run_opened(bot, handled))
 
-        select.assert_called_once_with(bot, "competition", 82)
-        scan.assert_called_once_with(bot, "competition", handled)
-        self.assertIn(event_center._category_done_key("competition"), handled)
+        select.assert_not_called()
+        scan.assert_not_called()
 
     def test_event_center_special_templates_are_tightly_cropped(self):
         rewards = cv2.imread(str(IMAGES / "GiftClaims" /
@@ -559,28 +778,23 @@ class FixedGiftFlowTests(unittest.TestCase):
         bot.is_daily_done.return_value = False
         super_result = {empire_depot.KEY: "cleared"}
         valuable_result = {limited_offer.KEY: "no_dot"}
-        with (mock.patch.object(lobby, "open_next",
-                                side_effect=(GiftScreen.SUPER_VALUE_RETURN,
-                                             GiftScreen.VALUABLE_EVENT,
-                                             None, None)),
-              mock.patch.object(super_value_return, "run_opened",
+        progress = gift_claims.GiftProgress()
+        with (mock.patch.object(super_value_return, "run_opened",
                                 return_value=(super_result, True)) as run_super,
               mock.patch.object(valuable_event, "run_opened",
                                 return_value=(valuable_result, True)) as run_valuable):
-            gift_claims.run(bot)
+            gift_claims._dispatch(bot, GiftScreen.SUPER_VALUE_RETURN, progress)
+            gift_claims._dispatch(bot, GiftScreen.VALUABLE_EVENT, progress)
 
         run_super.assert_called_once()
         run_valuable.assert_called_once()
-        bot.mark_daily_done.assert_called_once_with(gift_claims.KEY)
+        bot.mark_daily_done.assert_not_called()
 
     def test_unknown_rotating_screen_is_checked_then_skipped(self):
         bot = mock.Mock()
         bot.is_daily_done.return_value = False
-        with (mock.patch.object(lobby, "open_next",
-                                side_effect=(GiftScreen.UNKNOWN,
-                                             GiftScreen.VALUABLE_EVENT,
-                                             None, None)),
-              mock.patch.object(gift_claims, "return_home") as return_home,
+        progress = gift_claims.GiftProgress()
+        with (mock.patch.object(gift_claims, "return_home") as return_home,
               mock.patch.object(gift_claims, "claim_fixed_controls",
                                 return_value=common.ClaimReport()) as fixed,
               mock.patch.object(gift_claims, "back_if_close_x", return_value=False),
@@ -588,42 +802,35 @@ class FixedGiftFlowTests(unittest.TestCase):
                                 return_value=common.ClaimReport()) as sparkle,
               mock.patch.object(valuable_event, "run_opened",
                                 return_value=({limited_offer.KEY: "no_dot"}, True)) as run):
-            self.assertTrue(gift_claims.run(bot))
+            gift_claims._dispatch(bot, GiftScreen.UNKNOWN, progress)
+            gift_claims._dispatch(bot, GiftScreen.VALUABLE_EVENT, progress)
 
         return_home.assert_called_once_with(bot)
         fixed.assert_called_once()
         sparkle.assert_called_once_with(bot, region=(5, 18, 90, 82), attempts=4)
         run.assert_called_once()
-        bot.mark_daily_done.assert_called_once_with(gift_claims.KEY)
-
-    def test_parent_with_remaining_red_marker_yields_without_db_done(self):
-        bot = mock.Mock()
-        bot.is_daily_done.return_value = False
-        with (mock.patch.object(lobby, "open_next",
-                                side_effect=(GiftScreen.SUPER_VALUE_RETURN,
-                                             None, None)),
-              mock.patch.object(super_value_return, "run_opened",
-                                return_value=({empire_depot.KEY: "remaining"},
-                                              False))):
-            with self.assertRaises(YieldToBoss):
-                gift_claims.run(bot)
-
         bot.mark_daily_done.assert_not_called()
 
-    def test_parent_disappearing_on_complete_rescan_clears_stale_blocker(self):
+    def test_parent_with_remaining_red_marker_stays_unresolved_without_db_done(self):
         bot = mock.Mock()
         bot.is_daily_done.return_value = False
-        with (mock.patch.object(lobby, "open_next",
-                                side_effect=(GiftScreen.BACK_TO_TERRITORY,
-                                             None, None, None, None)),
-              mock.patch.object(back_to_territory, "run_opened",
-                                return_value=False),
-              mock.patch.object(gift_claims, "return_home")):
-            with self.assertRaises(YieldToBoss):
-                gift_claims.run(bot)
-            self.assertTrue(gift_claims.run(bot))
+        progress = gift_claims.GiftProgress()
+        with mock.patch.object(super_value_return, "run_opened",
+                               return_value=({empire_depot.KEY: "remaining"}, False)):
+            gift_claims._dispatch(bot, GiftScreen.SUPER_VALUE_RETURN, progress)
 
-        bot.mark_daily_done.assert_called_once_with(gift_claims.KEY)
+        bot.mark_daily_done.assert_not_called()
+        self.assertIn(GiftScreen.SUPER_VALUE_RETURN, progress.unresolved_parents)
+
+    def test_legacy_parent_state_does_not_write_aggregate_checkpoint(self):
+        bot = mock.Mock()
+        bot.is_daily_done.return_value = False
+        progress = gift_claims.GiftProgress()
+        with (mock.patch.object(back_to_territory, "run_opened", return_value=False),
+              mock.patch.object(gift_claims, "return_home")):
+            gift_claims._dispatch(bot, GiftScreen.BACK_TO_TERRITORY, progress)
+
+        bot.mark_daily_done.assert_not_called()
 
 
 if __name__ == "__main__":

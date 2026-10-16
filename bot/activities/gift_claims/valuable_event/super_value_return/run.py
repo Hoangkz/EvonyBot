@@ -1,10 +1,13 @@
 """Process known red-dot tabs on the fixed Super Value Return screen."""
 from dataclasses import dataclass
 
+import cv2
+import numpy as np
+
 from .. import city_growth_plan, empire_depot, login_gifts, lucky_raffle
 from ...common import (ClaimReport, TEXT_CLAIM_CONTROLS, back_if_close_x,
                      claim_fixed_controls, claim_sparkles, find, find_all,
-                     return_home)
+                     mark_task_done, return_home)
 
 PAGE = "SuperValueReturn/title"
 DOT = "SuperValueReturn/notification_dot"
@@ -57,6 +60,27 @@ def _dots(bot, screen):
     return find_all(bot, DOT, screen, threshold=0.65, region=(0, 7, 100, 19))
 
 
+def _tab_signature(screen, dot) -> bytes:
+    """Position-independent fingerprint used to avoid reopening one red tab."""
+    x, _ = dot
+    left, right = max(0, x - 48), min(screen.shape[1], x + 24)
+    patch = cv2.cvtColor(screen[42:125, left:right], cv2.COLOR_BGR2GRAY)
+    tiny = cv2.resize(patch, (17, 8), interpolation=cv2.INTER_AREA)
+    return np.packbits(tiny[:, 1:] > tiny[:, :-1]).tobytes()
+
+
+def _signature_seen(signature: bytes, seen: set[bytes]) -> bool:
+    """Allow a little animation noise while recognizing the same carousel tab."""
+    for old in seen:
+        if len(old) != len(signature):
+            continue
+        distance = sum((left ^ right).bit_count()
+                       for left, right in zip(old, signature))
+        if distance <= 12:
+            return True
+    return False
+
+
 def _verify_clean(bot, ignored_keys=()) -> bool:
     """Verify that no red tab remains anywhere in the parent carousel."""
     for direction in (-1, 1):
@@ -88,11 +112,13 @@ def run_opened(bot, due_keys: set[str], *, handled: set[str] | None = None
 
     handled = handled if handled is not None else set()
     attempted_this_run = set(handled)
+    unknown_tabs: set[bytes] = set()
     if (login_gifts.KEY in due_keys
             and find(bot, login_gifts.PAGE, screen, threshold=0.70,
                      region=(0, 15, 45, 25)) is not None):
         login_gifts.claim_opened(bot)
         handled.add(login_gifts.KEY)
+        mark_task_done(bot, login_gifts.KEY)
         results[login_gifts.KEY] = "processed"
 
     for direction in (-1, 1):
@@ -105,24 +131,37 @@ def run_opened(bot, due_keys: set[str], *, handled: set[str] | None = None
                 if login_tab is not None:
                     bot.record("Gift Claims: Super Value Return mở Login Gifts "
                                "(kiểm tra quà ngày)")
-                    bot.tap(*login_tab, delay=2)
+                    bot.tap(*login_tab, delay=1)
                     claimed = bool(login_gifts.claim_opened(bot))
                     results[login_gifts.KEY] = "processed" if claimed else "checked"
                     handled.add(login_gifts.KEY)
+                    mark_task_done(bot, login_gifts.KEY)
                     screen = bot.screenshot()
             dots = _dots(bot, screen)
             tabs = [(spec, find(bot, spec.tab, screen, threshold=0.70,
                                 region=(0, 7, 100, 20))) for spec in SPECS]
-            for dot in dots:
+            candidates = list(dots)
+            for spec, tab in tabs:
+                if (tab is not None and spec.task.key in due_keys
+                        and spec.task.key not in attempted_this_run
+                        and spec.task.key not in handled
+                        and not any((_owner_for_dot(dot, tabs) or (None,))[0]
+                                    is spec for dot in dots)):
+                    candidates.append((tab[0] + 25, tab[1] - 16))
+            for dot in sorted(candidates, key=lambda point: point[0]):
                 match = _owner_for_dot(dot, tabs)
                 if match is None:
+                    signature = _tab_signature(screen, dot)
+                    if _signature_seen(signature, unknown_tabs):
+                        continue
+                    unknown_tabs.add(signature)
                     bot.tap(max(0, dot[0] - 25), min(screen.shape[0] - 1, dot[1] + 16),
                             delay=1)
                     report = claim_fixed_controls(
                         bot, COMMON_LOWER_CLAIMS, max_taps=16,
                         region=LOWER_CONTENT)
                     if not back_if_close_x(bot):
-                        claim_sparkles(bot, region=LOWER_CONTENT, attempts=4)
+                        claim_sparkles(bot, region=LOWER_CONTENT, attempts=3)
                     bot.log("Gift Claims: Super Value Return đã xử lý phần dưới "
                             "của tab đỏ chưa nhận diện")
                     continue
@@ -130,10 +169,11 @@ def run_opened(bot, due_keys: set[str], *, handled: set[str] | None = None
                 key = spec.task.key
                 if key not in due_keys or key in attempted_this_run:
                     continue
-                has_dot = True
+                has_dot = any((_owner_for_dot(red_dot, tabs) or (None,))[0]
+                              is spec for red_dot in dots)
                 marker = "có dấu đỏ" if has_dot else "kiểm tra quà ngày"
                 bot.record(f"Gift Claims: Super Value Return mở {spec.task.label} ({marker})")
-                bot.tap(*tab, delay=2)
+                bot.tap(*tab, delay=1)
                 if key == login_gifts.KEY:
                     count = login_gifts.claim_opened(bot)
                     report = ClaimReport(count, count)
@@ -148,7 +188,7 @@ def run_opened(bot, due_keys: set[str], *, handled: set[str] | None = None
                         report = fixed
                     else:
                         sparkle = claim_sparkles(bot, region=LOWER_CONTENT,
-                                                 attempts=4)
+                                                 attempts=3)
                         report = ClaimReport(
                             fixed.attempted + sparkle.attempted,
                             fixed.verified + sparkle.verified)
@@ -168,6 +208,7 @@ def run_opened(bot, due_keys: set[str], *, handled: set[str] | None = None
                 if (cleared or not spec.requires_dot
                         or key not in (login_gifts.KEY, city_growth_plan.KEY)):
                     handled.add(key)
+                    mark_task_done(bot, key)
                 bot.log(f"Gift Claims: {spec.task.label} - dấu đỏ "
                         f"{'đã mất' if cleared else 'vẫn còn'} sau xử lý")
 
@@ -179,6 +220,13 @@ def run_opened(bot, due_keys: set[str], *, handled: set[str] | None = None
                 bot.swipe_percent(20, 14, 85, 14, duration=0.5, delay=1)
 
     clean = _verify_clean(bot, handled)
+    if clean and due_keys - handled:
+        # The region-1 coordinator owns the daily checkpoints.  Once this
+        # complete two-direction scan sees no red tab, it marks every
+        # remaining child in this parent DONE instead of reopening tabs that
+        # no longer advertise a claimable reward.
+        bot.record("Gift Claims: Super Value Return hết badge nhưng vẫn còn "
+                   "task DB chưa được mở; bộ điều phối sẽ coi cả nhóm DONE")
     bot.record("Gift Claims: Super Value Return - "
                + ("DONE, phần trên đã hết dấu đỏ" if clean
                   else "chưa DONE, phần trên vẫn còn dấu đỏ"))

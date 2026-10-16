@@ -15,7 +15,8 @@ Cập nhật: 2026-10-11. Xong mục nào thì xoá mục đó. Flow hiện tạ
 - Thứ tự ưu tiên: Bubble > Auto Times Out > Join Boss > nhiệm vụ. Có Join Boss: mỗi vòng 1 lượt Join Boss rồi 1 nhiệm vụ
   tối đa 120 giây (`OTHERS_WINDOW`); nhiệm vụ `must_finish` không bị ngắt (chỉ Stop). Không chọn Join Boss thì không có luật
   120 giây; không tích Bubble thì không có luật Bubble.
-- Mọi nhiệm vụ Daily Activities đều `must_finish`: làm tới xong, không giới hạn 120 giây, không bị Bubble / Auto Times Out / boss ngắt.
+- Gift Claims chạy cuối Daily Activities nhưng không `must_finish`: nhường Join
+  Boss sau tối đa 120 giây rồi tiếp tục theo checkpoint DB.
 - Danh sách rỗng, hoặc cả danh sách đều chưa xong: nghỉ 5 giây rồi xét lại tới khi Stop.
 
 ## 2. Việc còn lại
@@ -26,9 +27,9 @@ Cập nhật: 2026-10-11. Xong mục nào thì xoá mục đó. Flow hiện tạ
 - [ ] **Chạy `tests/event`** (flow test Event dùng hàm `run` cũ) — chưa chạy lại sau khi sửa.
 - [ ] **Ground Troop không đọc được số lượng huấn luyện** (`cannot read train count`, thấy khi chạy thật 2026-10-11):
   nhiệm vụ kết thúc mà không đánh dấu xong. Xem [gather_troops/ground_troop](../activities/event/gather_troops/ground_troop).
-- [ ] **Quà cuối Daily** (`gift_*`, ưu tiên -100): đang chạy bên trong nhiệm vụ `daily_rewards` (một khối dài, bị ngắt ở
-  120 giây thì chạy lại từ đầu phần quét). Tách từng quà thành nhiệm vụ riêng nếu cần (nhưng ưu tiên < 0 sẽ bị loại khỏi
-  danh sách — phải đổi luật hoặc ưu tiên).
+- [x] **Quà cuối Daily**: `gift_claims` là tail task priority 299, sau
+  `daily_rewards`; mỗi event có key riêng, có ba checkpoint quét rỗng và key
+  tổng theo ngày server.
 
 ## 3. Daily Activities (để sau, khi người dùng yêu cầu)
 

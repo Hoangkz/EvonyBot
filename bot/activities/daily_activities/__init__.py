@@ -2,7 +2,7 @@
 daily_activities — "Daily Activities" activity (bố cục giống activity Event: mỗi nhiệm vụ một thư mục).
 
 - common.py:    mở bảng Activity (giao diện mới / cũ), dòng Go (open_task), cuộn, nhận thưởng cuối; cuối file là
-                luật của các việc Daily cho bảng bot/worker/priority.py (daily_job, hourly_job, REWARDS_JOB, GIFTS_JOB): việc TỰ
+                luật của các việc Daily cho bảng bot/worker/priority.py (daily_job, hourly_job, REWARDS_JOB): việc TỰ
                 LƯU kết quả vào DB, worker chỉ kiểm tra đã xong chưa (bot/worker/tasks.py).
 - constants.py: thư mục ảnh, hằng số mở nhiệm vụ, key daily_done dùng chung
 - buy_daily/:   General: mua Stamina + Hammer (run.py + luật ở cuối file)

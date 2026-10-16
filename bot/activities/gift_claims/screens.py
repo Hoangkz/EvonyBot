@@ -15,6 +15,7 @@ class GiftScreen(str, Enum):
     BACK_TO_TERRITORY = "BackToTerritory"
     FOLLOW_US = "FollowUs"
     PRECIOUS_BLAZON_EXCHANGE = "PreciousBlazonExchange"
+    POSEIDONS_DAY = "PoseidonsDay"
     HYPNOS_DREAM = "HypnosDream"
     DWARFS_TREASURE = "DwarfsTreasure"
     REVELATION_OF_HORUS = "RevelationOfHorus"
@@ -31,6 +32,7 @@ TITLE_TEMPLATES = {
     GiftScreen.BACK_TO_TERRITORY: "BackToTerritory/title",
     GiftScreen.FOLLOW_US: "FollowUs/title",
     GiftScreen.PRECIOUS_BLAZON_EXCHANGE: "PreciousBlazonExchange/title",
+    GiftScreen.POSEIDONS_DAY: "PoseidonsDay/title",
     GiftScreen.HYPNOS_DREAM: "HypnosDream/title",
     GiftScreen.DWARFS_TREASURE: "DwarfsTreasure/title",
     GiftScreen.REVELATION_OF_HORUS: "RevelationOfHorus/title",

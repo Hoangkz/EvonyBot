@@ -5,6 +5,7 @@ from ..policy import EventPolicy, run_opened_event
 
 POLICY = EventPolicy(
     "Sealed Imperial Treasury",
+    key="gift_sealed_imperial_treasury",
     screen=GiftScreen.SEALED_IMPERIAL_TREASURY,
     skip_reason="mở rương/Refresh có thể tiêu tài nguyên; bỏ qua và coi là DONE",
 )

@@ -1,4 +1,4 @@
 """Login Gifts (city-side event)."""
-from .run import KEY, TASK, run
+from .run import KEY, PAGE, TASK, claim_opened, run
 
-__all__ = ["KEY", "TASK", "run"]
+__all__ = ["KEY", "PAGE", "TASK", "claim_opened", "run"]
