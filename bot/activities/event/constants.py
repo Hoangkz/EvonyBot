@@ -111,6 +111,16 @@ LEARNED_TITLES_DIR = Path(os.environ.get("LOCALAPPDATA", Path.home())) / "EvonyB
 # độ) không nhận được (thử thật máy 21923: (48, 306) không nhận; (48, 266) trên rương thì nhận).
 # Không thấy đầu thanh -> không lưu (lần sau kiểm lại).
 LOGIN_REWARD_KEY = "event_login_reward"
+# Chữ "day(s)" dưới hàng rương quà hàng ngày (số ngày đứng trước đổi nên chỉ cắt chữ "day(s)", mỗi hàng thấy ~4-5 chỗ). Khớp
+# >= 0,977 trên 12 ảnh danh sách event, 952 màn khác <= 0,66.
+DAYS_TEXT = f"{EV}/EventList/days.png"
+DAYS_THRESHOLD = 0.85
+DAYS_REGION = (0, 36, 100, 48)   # % màn hình: hàng nhãn dưới rương (y ~290)
+# Bấm nút event ở màn chính: chờ 1s rồi tìm chữ "day(s)"; chưa thấy thì chờ thêm 1s, tối đa
+# EVENT_OPEN_WAITS lần chờ thêm; thấy thì chờ thêm EVENT_OPEN_SETTLE giây cho danh sách tải xong. Hết lượt không thấy
+# thì thôi, run_task thấy màn chính sẽ bấm lại.
+EVENT_OPEN_WAITS = 10
+EVENT_OPEN_SETTLE = 3
 PROGRESS_TIP = f"{EV}/EventList/progressTip.png"
 PROGRESS_TIP_THRESHOLD = 0.85
 PROGRESS_TIP_REGION = (0, 40, 100, 48)   # % màn hình: thanh tiến độ (y ~306)

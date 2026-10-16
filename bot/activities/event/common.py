@@ -67,6 +67,11 @@ from .constants import (
     CHEST_TAP,
     CHEST_WAIT,
     LOGIN_REWARD_KEY,
+    DAYS_REGION,
+    DAYS_TEXT,
+    DAYS_THRESHOLD,
+    EVENT_OPEN_SETTLE,
+    EVENT_OPEN_WAITS,
     VOYAGE_BACKS,
     VOYAGE_FREE,
     VOYAGE_FREE_REGION,
@@ -261,6 +266,12 @@ def common_targets(state: EventState) -> list[tuple[str, str]]:
     return targets
 
 
+def _event_list_shown(bot, screen) -> bool:
+    """Đã ở danh sách event: thấy chữ "day(s)" dưới hàng rương quà hàng ngày (cố định, không đổi theo đợt lễ hội như
+    tiêu đề)."""
+    return bot.find(DAYS_TEXT, threshold=DAYS_THRESHOLD, screen=screen, region=DAYS_REGION) is not None
+
+
 def handle_common(bot, state: EventState, action, pos, screen):
     """Xử lý các action của common_targets(). Trả EVENT_OPENED khi vừa bấm nút event,
     còn lại None."""
@@ -283,8 +294,15 @@ def handle_common(bot, state: EventState, action, pos, screen):
             swipe_around(bot)
             return None
         bot.log(f"Event: tap event button {button}")
-        bot.tap(*button, delay=5)
-        return EVENT_OPENED
+        bot.tap(*button, delay=1)
+        for attempt in range(EVENT_OPEN_WAITS + 1):
+            if attempt:
+                bot.sleep(1)
+            if _event_list_shown(bot, bot.screenshot()):
+                bot.sleep(EVENT_OPEN_SETTLE)
+                return EVENT_OPENED
+        bot.log(f"Event: event list not shown after {EVENT_OPEN_WAITS} extra waits, tap again")
+        return None
     elif action == BACK:
         bot.back(delay=1)
     elif action == TAP:
