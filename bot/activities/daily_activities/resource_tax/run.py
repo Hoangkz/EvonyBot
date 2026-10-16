@@ -1,6 +1,6 @@
 """
-run.py — Daily Activities "Resource Tax": handler các action riêng của nhiệm vụ (Chợ -> Tax).
-Vòng lặp chung (mở Activity, dòng Go, cuộn, ảnh xong): ../common.py run_task.
+run.py — Daily Activities "Resource Tax": phần làm nhiệm vụ sau Go (after_go) (Chợ -> Tax).
+Mở dòng Activity + bấm Go: ../common.py (open_task_or_finish, daily_job).
 
 Sau Go: Chợ ở giữa màn hình -> common bấm giữa -> menu Chợ, icon "Tax" -> màn Tax (4 dòng trên ->
 dưới: Lúa / Gỗ / Đá / Sắt) -> tax_all thu theo group "City Tax" ở tab Daily Activities:
@@ -36,9 +36,7 @@ from ...event.kings_path.city_tax.run import _popup_closed, _row_buttons
 from ...result import done as report_done
 from ..common import Task, mark_task_done
 from .constants import (
-    ACTIONS,
     BACKS_AFTER_TAX,
-    DONE_IMAGES,
     FOLDER,
     KEY,
     LABEL,
@@ -51,16 +49,6 @@ from .constants import (
 )
 
 ROW_FREE_DY = 10   # nút "Tax" (còn lượt free) lệch nút của dòng tối đa chừng này px theo y
-
-
-def handle(bot, action, pos, screen):
-    if action == "tax_menu":
-        bot.tap(*pos, delay=4)
-    elif action == "tax":
-        return tax_all(bot)
-    elif action == "popup":
-        bot.back(delay=1)
-    return False
 
 
 def after_go(bot) -> bool:
@@ -184,4 +172,4 @@ def _set_count(bot, popup, target: int) -> bool:
     return False
 
 
-TASK = Task(LABEL, FOLDER, DONE_IMAGES, ACTIONS, handle, key=KEY)
+TASK = Task(LABEL, FOLDER, key=KEY)

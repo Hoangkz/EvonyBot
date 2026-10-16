@@ -127,6 +127,13 @@ EQUIPMENT_REFINE = f"{R}/equipmentRefine.png"
 # Refine xong hiện thuộc tính "New" + Cancel / Confirm: bấm Cancel (108, 669) giữ thuộc tính cũ.
 # 1,00; các màn khác có nút Cancel giống (0,96) -> chỉ bấm khi thấy EQUIPMENT_TITLE.
 CANCEL = f"{R}/cancel.png"
+# Hộp cảnh báo khi bấm Refine mà đã khoá thuộc tính chất lượng cao ("You have unlocked high quality attribute(s)... Are you sure you
+# want to refine now?"): ô trống "Don't show this again for today" + Cancel / Confirm. Cancel của hộp này giống CANCEL bên trên
+# nên phải xét hộp trước: tích ô (lệch WARN_BOX_FROM_LABEL so với tâm dòng chữ, 1,00 trên ảnh chụp thật) rồi bấm Confirm để Refine
+# tiếp (Refine xong hiện thuộc tính New, bấm CANCEL giữ thuộc tính cũ như thường). Hộp không hiện lại trong ngày.
+WARN_LABEL = f"{R}/warnLabel.png"
+WARN_CONFIRM = f"{R}/warnConfirm.png"
+WARN_BOX_FROM_LABEL = (-106, -1)
 EQUIPMENT_STEPS = 10   # chờ màn Refine Equipment (mỗi bước 1 giây)
 
 SCREEN_STEPS = 10     # chờ màn Craft / tab Refine (mỗi bước 1 giây)

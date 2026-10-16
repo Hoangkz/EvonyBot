@@ -15,12 +15,10 @@ from ...event.kings_path.building import open_menu
 from ..common import Task, mark_task_done
 from .constants import (
     ACADEMY_TITLE,
-    ACTIONS,
     BACKS_AFTER,
     COMMON_THRESHOLD,
     COMMON_UNCHECKED,
     CONFIRM,
-    DONE_IMAGES,
     FINISH_ALL,
     FOLDER,
     GREEN_HIGH,
@@ -226,4 +224,4 @@ def _leave(bot):
         bot.back(delay=1.5)
 
 
-TASK = Task(LABEL, FOLDER, DONE_IMAGES, ACTIONS, lambda bot, action, pos, screen: False, key=KEY)
+TASK = Task(LABEL, FOLDER, key=KEY)

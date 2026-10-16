@@ -9,7 +9,7 @@ from ...ocr import read_boss_name, read_coords
 from ...ocr._digits import read_chars, split as split_chars
 from ...ocr.read_coords import FONT as COORDS_FONT, MAX_RATIO as COORDS_MAX_RATIO
 from ...ocr.read_power import text as read_power_text
-from . import boss_names
+from . import boss_names, stamina_wait
 from .boss_memory import JOINED as MEMORY_JOINED
 from .boss_memory import BossMemory
 from .constants import (ALLIANCE_ICON, ASSISTANT_GENERAL, BACK, BOSS_MONSTER, CHOOSE_DEVELOPMENT,
@@ -23,7 +23,7 @@ from .constants import (ALLIANCE_ICON, ASSISTANT_GENERAL, BACK, BOSS_MONSTER, CH
                         SELECT_GENERAL, STAMINA_ITEM_USE, STAMINA_REFILL_WAIT, STAMINA_SLIDER_END,
                         STAMINA_ADDED_WAIT, STAMINA_BASE, STAMINA_BAR_REGION, STAMINA_ITEM_MIN_SCORE, STAMINA_ITEM_REGION, STAMINA_ITEMS,
                         STAMINA_PLUS, STAMINA_PLUS_DELAY,
-                        STAMINA_USE, TAP, WAR_TAB, WAR_TICKED, WAR_UNTICK_TRIES)
+                        STAMINA_USE, TAP, TROOP_BACK_WAIT, TROOP_DETAIL, TROOP_DETAIL_SEEN, WAR_TAB, WAR_TICKED, WAR_UNTICK_TRIES)
 
 # --- CACHE CHECKS TỒN TẠI FILE (Chạy 1 lần duy nhất khi import, không đọc ổ cứng liên tục) ---
 def _check_exists(path: str) -> bool:
@@ -34,7 +34,7 @@ CAN_READ_COORDS = _check_exists(LOCATION)
 
 def run(bot, settings: dict):
     """`bot` là BotContext của thiết bị; `settings` là cấu hình của tab "Join Monster War".
-    Trả về IDLE nếu thoát vì rảnh, None nếu dừng hẳn."""
+    Trả về IDLE nếu thoát vì rảnh (kể cả hết thể lực), None nếu dừng hẳn."""
     # BossMemory sống cùng BotContext (một lượt Start -> Stop của giả lập), nên
     # còn nguyên qua các lần worker gọi lại Join Boss sau khi làm activity khác.
     if getattr(bot, "boss_memory", None) is None:
@@ -164,10 +164,14 @@ class _Boss:
                 continue
 
             if action == OUT_OF_STAMINA:
-                # Không đủ thể lực: use_stamina = No -> dừng hẳn Join Boss
+                # Không đủ thể lực: use_stamina = No -> Back 3 lần (popup, March, danh sách War) rồi
+                # đánh dấu rảnh để worker chuyển sang làm nhiệm vụ; không ghi JOINED, lượt sau thử lại.
                 if self.use_stamina not in STAMINA_CHOICES:
-                    bot.record("Join Monster War: hết thể lực, không dùng vật phẩm -> dừng Join Boss")
-                    return
+                    bot.record("Join Monster War: hết thể lực, không dùng vật phẩm -> rảnh, chuyển sang làm nhiệm vụ")
+                    for _ in range(3):
+                        bot.back(delay=1)
+                    self._stamina_empty()
+                    continue
                 bot.tap(*pos)
                 self._use_stamina()
                 continue   # _use_stamina đã March lại, hoặc (hết vật phẩm) đánh dấu rảnh
@@ -203,6 +207,12 @@ class _Boss:
 
             elif action == BACK:
                 bot.back()
+
+            elif action == TROOP_DETAIL_SEEN:
+                # Cú vuốt bị tính là tap vào thẻ -> Back một lần rồi chờ 1 s cho danh sách hiện lại
+                bot.record("Join Monster War: cuộn nhầm vào màn chi tiết đội -> Back")
+                bot.back(delay=TROOP_BACK_WAIT)
+                continue
 
             elif action == LEAVE_ALLIANCE_POPUP:
                 bot.tap(pos[0] + 40, pos[1] + 40)
@@ -304,9 +314,9 @@ class _Boss:
         self.idle_scrolls += 1
         bot.log(f"Cuộn {'xuống' if self.swipe < SCROLLS_EACH_WAY else 'lên'} ({self.idle_scrolls}/{IDLE_SCROLLS})")
         if self.swipe < SCROLLS_EACH_WAY:
-            bot.swipe_percent(50, 65, 50, 40, duration=0.8)
+            bot.swipe_percent(SCROLL_X, 65, SCROLL_X, 40, duration=0.8)
         else:
-            bot.swipe_percent(50, 40, 50, 65, duration=0.8)
+            bot.swipe_percent(SCROLL_X, 40, SCROLL_X, 65, duration=0.8)
         self.swipe = (self.swipe + 1) % (2 * SCROLLS_EACH_WAY)
         delay(bot, SCROLL_SETTLE)
         self.next_screen = bot.screenshot()
@@ -320,11 +330,17 @@ class _Boss:
         strip = screen[int(h * y0 / 100):int(h * y1 / 100), int(w * x0 / 100):int(w * x1 / 100)]
         return strip.size > 0 and int(strip.max()) < LIST_END_MAX_LIGHT
 
+    def _stamina_empty(self):
+        """Hết thể lực: đánh dấu rảnh và lưu mốc "bây giờ + 20 phút" vào DB; worker làm nhiệm vụ tới mốc đó rồi mới gọi
+        Join Boss lại (stamina_wait.py)."""
+        self.idle_scrolls = IDLE_SCROLLS
+        until = stamina_wait.save(self.bot)
+        self.bot.record(f"Join Monster War: hết thể lực, làm nhiệm vụ tới {until:%H:%M:%S} rồi Join Boss lại")
+
     def _use_stamina(self):
         """Sau khi bấm Confirm ở popup không đủ thể lực: màn "Use Item" -> bấm nút Use đầu
         tiên (vật phẩm trên cùng) -> popup số lượng -> Use -> chờ, Back về màn March, March lại."""
         bot = self.bot
-        buttons = []
         _, buttons = self._poll_screen(
             "open_stamina_items",
             lambda image: sorted(bot.find_all(STAMINA_ITEM_USE, screen=image,
@@ -332,12 +348,13 @@ class _Boss:
                                  key=lambda p: p[1]),
         )
         if not buttons:
-            # Hết vật phẩm: Back 2 lần. Boss chưa được tham gia nên tuyệt đối không ghi JOINED;
-            # lượt Join Boss sau có thể thử lại khi thể lực đã hồi.
-            bot.record("Join Monster War: hết vật phẩm thể lực")
-            bot.back(delay=1)
-            bot.back(delay=1)
-            self.idle_scrolls = IDLE_SCROLLS
+            # Hết vật phẩm (màn Use Item không có nút Use, chỉ còn nút kim cương): Back 3 lần. Boss chưa
+            # được tham gia nên tuyệt đối không ghi JOINED; lượt Join Boss sau có thể thử lại khi
+            # thể lực đã hồi.
+            bot.record("Join Monster War: hết vật phẩm thể lực -> rảnh, chuyển sang làm nhiệm vụ")
+            for _ in range(3):
+                bot.back(delay=1)
+            self._stamina_empty()
             return
         bot.tap(*buttons[0])
 
@@ -807,7 +824,7 @@ class _Boss:
             shift = top - py + POWER_PEEK_MARGIN
             bot.log(f"Boss {coords}: thanh lực bị che, cuộn nhẹ {shift}px để đọc lực")
             height = screen.shape[0]
-            bot.swipe_percent(50, 40, 50, 40 + 100 * shift / height, duration=0.8)
+            bot.swipe_percent(SCROLL_X, 40, SCROLL_X, 40 + 100 * shift / height, duration=0.8)
             delay(bot, SCROLL_SETTLE)
             screen = bot.screenshot()
             self.next_screen = screen
@@ -866,6 +883,10 @@ WAR_ROW_Y, LIST_TOP_BELOW_WAR, POWER_PEEK_MARGIN = 116, 22, 20
 SCROLLS_EACH_WAY = 3                  # mỗi chu kỳ: 3 lần cuộn xuống rồi 3 lần cuộn lên
 IDLE_SCROLLS = 2 * SCROLLS_EACH_WAY   # cuộn hết 1 chu kỳ (6 lần) mà không thấy boss mới -> rảnh
 IDLE_WAIT = 2      # polling khi rảnh; không phải độ trễ của một thao tác UI
+# x (% màn hình) của mọi cú vuốt cuộn danh sách War. Vuốt ở mép trái (1,5 %, 4 %) không cuộn được
+# nên dùng giữa màn hình; đôi khi game coi cú vuốt trên thẻ là tap -> mở màn chi tiết đội (Total Troops),
+# lúc đó vòng chính tự Back về danh sách (go_home).
+SCROLL_X = 50
 SCROLL_SETTLE = 0.5   # giây chờ danh sách dừng trôi sau khi vuốt, trước khi chụp
 POLL_INTERVAL = 0.2     # kiểm tra sớm để đa số bước hoàn thành gần 1 giây
 STEP_TARGET = 1.0       # quá mức này ghi SLOW trong log performance
@@ -939,6 +960,7 @@ def _targets() -> list[tuple[str, str]]:
         (MARCH, MARCH_SCREEN),
         (JOIN, JOIN_LIST),
         (JOINED_BUTTON, JOINED),
+        (TROOP_DETAIL, TROOP_DETAIL_SEEN),     # lỡ bấm vào thẻ khi cuộn -> Back về danh sách
         (PVP_WAR, NO_BOSS),       # sau JOIN / JOINED: tới đây là list không có boss nào
         (WAR_TAB, SCROLL),
         ("Items/outLM.png", LEAVE_ALLIANCE_POPUP),

@@ -131,6 +131,19 @@ class EventFlow(unittest.TestCase):
         device = run_flow(self, run_event_tasks, SCREENS, flow, SETTINGS, variants=VARIANTS)
         self.assertIn("Event: Claim All still there after 10 taps, back", device.logs)
 
+    def test_go_swallowed_by_reward_tooltip_dismisses_it(self):
+        """Bấm Go mà vẫn ở tab Recruit More (khung "Refining Stone..." của biểu tượng thưởng nuốt lần bấm): lần thấy tab
+        thứ hai bấm chỗ trống (50 %, 24 %) để đóng khung, rồi bấm Go lại."""
+        flow = [
+            *TO_RECRUIT_MORE_CLAIMED,
+            Step("06_gather_recruit_more.png", tap_at(*FIRST_GO)),            # bị nuốt: màn không đổi
+            Step("06_gather_recruit_more.png", tap_at(198, 169, tol=3)),      # đóng khung
+            Step("06_gather_recruit_more.png", tap_at(*FIRST_GO)),
+            *TO_CULTIVATE,
+        ]
+        device = run_flow(self, run_event_tasks, SCREENS, flow, SETTINGS, variants=VARIANTS)
+        self.assertIn("Cultivate Generals: Go did not leave Recruit More, dismiss popup", device.logs)
+
     def test_progress_unknown_does_not_use_gems(self):
         """Không đọc được số đã làm ở dòng Go: tới Quick Cultivate thì dừng, không bấm
         Cultivate x100 (tránh tiêu gems khi không biết lúc nào dừng), không đánh dấu xong."""

@@ -1,6 +1,6 @@
 """
-run.py — Daily Activities "General Enhancing": handler các action riêng của nhiệm vụ (tướng -> Cultivate 5 lần (sau Go bấm (30, 50) như bản C#)).
-Vòng lặp chung (mở Activity, dòng Go, cuộn, ảnh xong): ../common.py run_task.
+run.py — Daily Activities "General Enhancing": phần làm nhiệm vụ sau Go (after_go) (tướng -> Cultivate 5 lần (sau Go bấm (30, 50) như bản C#)).
+Mở dòng Activity + bấm Go: ../common.py (open_task_or_finish, daily_job).
 
 Luồng mới (after_go, sau khi open_task bấm Go) — giống Gather Troops Cultivate Generals
 (event/gather_troops/cultivate_generals, dùng lại ảnh / ngưỡng / vùng / `_open_last_general`) cho tới màn Cultivate:
@@ -25,34 +25,8 @@ from ...event.gather_troops.cultivate_generals.constants import (
     TICK_FAVORITE,
 )
 from ...event.gather_troops.cultivate_generals.run import _open_last_general
-from ..common import Task, mark_task_done, tap_first
-from .constants import (
-    ACTIONS,
-    AFTER_OPEN_TAP,
-    DONE_IMAGES,
-    FOLDER,
-    FOLDER_PATH,
-    GOLD_CULTIVATE,
-    GOLD_GOAL,
-    GOLD_REGION,
-    KEY,
-    LABEL,
-    MAX_STEPS,
-    RESULT_WAIT,
-)
-
-
-def handle(bot, action, pos, screen):
-    if action == "cultivate":
-        bot.tap(*pos, delay=3)
-    elif action == "cultivate_loop":
-        base = f"{FOLDER_PATH}/TapEnhancing"
-        templates = (f"{base}/Agree.png", f"{base}/Disagree.png")
-        if tap_first(bot, templates, 5):
-            bot.tap(110, 666)
-            bot.back(delay=2)
-        return True
-    return False
+from ..common import Task, mark_task_done
+from .constants import FOLDER, GOLD_CULTIVATE, GOLD_GOAL, GOLD_REGION, KEY, LABEL, MAX_STEPS, RESULT_WAIT
 
 
 _CANCEL, _GOLD = "cancel", "gold"
@@ -105,4 +79,4 @@ def after_go(bot) -> bool:
     return False
 
 
-TASK = Task(LABEL, FOLDER, DONE_IMAGES, ACTIONS, handle, AFTER_OPEN_TAP, key=KEY)
+TASK = Task(LABEL, FOLDER, key=KEY)

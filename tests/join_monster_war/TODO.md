@@ -18,8 +18,8 @@
 ## Sau khi bấm Join
 
 - [ ] **Hết vật phẩm thể lực: cần ảnh thật**
-  - Hành vi đã chốt: màn Use Item không còn nút Use -> Back 2 lần, **không** ghi boss là đã tham gia (để thử lại khi thể lực hồi), đánh dấu rảnh (không dừng Join Boss vì thể lực tự hồi).
-  - Test `test_out_of_stamina_items_does_not_mark_joined` đang dùng ảnh tổng hợp `stamina_after_use.png?no_items` (xoá cột nút Use). Cần ảnh thật của màn Use Item khi hết vật phẩm để thay.
+  - Hành vi đã chốt: màn Use Item không còn nút Use (chỉ còn vật phẩm kim cương) -> Back 3 lần, **không** ghi boss là đã tham gia (để thử lại khi thể lực hồi), đánh dấu rảnh (không dừng Join Boss vì thể lực tự hồi).
+  - Test `test_out_of_stamina_items_does_not_mark_joined` dùng ảnh thật `screens/stamina_no_items.png` (màn Use Item chỉ còn vật phẩm kim cương).
 
 ## Đang dùng ảnh tổng hợp
 

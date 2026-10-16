@@ -1,7 +1,7 @@
 # Flow: Troop Healing
 
-Nhiệm vụ Daily Activities. Ảnh / action: [constants.py](constants.py), handler: [run.py](run.py).
-Phần dùng chung (mở Quests → Activity, tìm dòng, bấm Go, state machine `run_task`): [../FLOW.md](../FLOW.md).
+Nhiệm vụ Daily Activities. Ảnh: [constants.py](constants.py), phần làm sau Go (`after_go`): [run.py](run.py).
+Phần dùng chung (mở bảng Activity, tìm dòng / thẻ, bấm Go): [../OPEN_TASK.md](../OPEN_TASK.md), [../FLOW.md](../FLOW.md).
 
 ## Luồng mới (`run.after_go`, sau khi `common.open_task` bấm Go)
 
@@ -18,12 +18,3 @@ Giống King's Path Heal (`event/kings_path/heal`), dùng lại các bước và
    (cấp thấp nhất) lên: OCR số lính bị thương mỗi dòng, bấm ô số → gõ min(còn thiếu, số lính) → OK.
 4. Heal → Speed Up → Finish All → đánh dấu xong hôm nay (`mark_task_done`).
 5. Không có lính bị thương → Back, cũng đánh dấu xong hôm nay (mai kiểm tra lại). Ít hơn 150 thì heal hết số có.
-
-## Luồng cũ C# (`common.run_task` + `run.handle`, `run.py` chung vẫn đang dùng)
-
-1. Mở từ hàng `HealActivity.png`.
-2. `Heal.png`: vào chức năng Heal.
-3. `Heal-i.png`: mở thông tin và cuộn hai lần.
-4. `HealSelect.png`: nhập 150, xác nhận hai lần.
-5. `HealFinishAll.png`: bấm Finish All.
-6. `HealFinish.png` hoặc `HealFinish1.png` báo hoàn thành.

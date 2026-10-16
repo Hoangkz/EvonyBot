@@ -59,6 +59,15 @@ CANCEL = f"{EV}/GatherTroops/CultivateGenerals/cancel.png"
 QUICK_BUTTON_REGION = (0, 85, 50, 100)      # % màn hình: góc dưới trái
 CULTIVATE_X100_TIMES = 100                  # số lần cultivate của mỗi lần bấm x100
 X100_WAIT = 10                              # giây chờ nút x100 đổi thành Cancel
+# Tab Recruit More: sau Claim All danh sách còn đang xếp lại nên toạ độ Go chụp ngay có thể lệch, bấm trượt vào biểu tượng thưởng
+# (hiện khung "Refining Stone Quantity..." đè lên dòng, nuốt các lần bấm Go sau). Nên chờ danh sách đứng yên rồi mới tìm Go; bấm Go
+# mà vẫn ở tab Recruit More lần thứ RECRUIT_STUCK_VISITS thì bấm chỗ trống (RECRUIT_DISMISS) để đóng khung rồi bấm lại.
+RECRUIT_SETTLE_TRIES = 6        # số lần chụp tối đa chờ danh sách đứng yên
+RECRUIT_SETTLE_WAIT = 0.5       # giây giữa hai lần chụp
+RECRUIT_SETTLE_DIFF = 2.0       # độ lệch ảnh trung bình (0-255) dưới mức này = đứng yên
+RECRUIT_LIST_REGION = (0, 35, 100, 100)   # % màn hình: vùng danh sách nhiệm vụ
+RECRUIT_STUCK_VISITS = 2
+RECRUIT_DISMISS = (50, 24)      # % màn hình: dòng "Event Quest Countdown" (không bấm được)
 
 THRESHOLDS = {
     **EVENT_THRESHOLDS,

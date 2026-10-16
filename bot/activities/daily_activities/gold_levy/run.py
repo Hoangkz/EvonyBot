@@ -1,6 +1,6 @@
 """
-run.py — Daily Activities "Gold Levy": handler các action riêng của nhiệm vụ (Thành chính (Keep) -> Levy).
-Vòng lặp chung (mở Activity, dòng Go, cuộn, ảnh xong): ../common.py run_task.
+run.py — Daily Activities "Gold Levy": phần làm nhiệm vụ sau Go (after_go) (Thành chính (Keep) -> Levy).
+Mở dòng Activity + bấm Go: ../common.py (open_task_or_finish, daily_job).
 
 Sau Go: menu tròn của Thành chính -> "Levy" -> popup Levy -> bấm "Free Levy All" -> báo xong hôm nay
 -> Back đóng popup. Nút đã xám (hết lượt free) cũng coi là xong.
@@ -9,35 +9,12 @@ from ...event.city_building import KEEP
 from ...event.kings_path.building import open_menu
 from ...result import done as report_done
 from ..common import Task, mark_task_done
-from .constants import (
-    ACTIONS,
-    BACKS_AFTER_LEVY,
-    DONE_IMAGES,
-    FOLDER,
-    FOLDER_PATH,
-    KEY,
-    LABEL,
-    LEVY_ALL_WAIT,
-    POPUP_WAIT,
-)
+from .constants import BACKS_AFTER_LEVY, FOLDER, FOLDER_PATH, KEY, LABEL, LEVY_ALL_WAIT, POPUP_WAIT
 
 FREE_LEVY_ALL = f"{FOLDER_PATH}/FreeLevyAll.png"
 FREE_LEVY_ALL_DONE = f"{FOLDER_PATH}/FreeLevyAllDone.png"
 POPUP_BUTTONS = (FREE_LEVY_ALL, FREE_LEVY_ALL_DONE)
 MENU_LEVY = f"{FOLDER_PATH}/Levy.png"
-
-
-def handle(bot, action, pos, screen):
-    if action == "levy":
-        bot.tap(*pos, delay=3)
-    elif action == "levy_all":
-        bot.tap(*pos, delay=LEVY_ALL_WAIT)
-        bot.record(f"{LABEL}: Free Levy All")
-        return _finish(bot)
-    elif action == "levy_done":
-        bot.log(f"{LABEL}: Free Levy All already used")
-        return _finish(bot)
-    return False
 
 
 def after_go(bot) -> bool:
@@ -79,4 +56,4 @@ def _finish(bot) -> bool:
     return True
 
 
-TASK = Task(LABEL, FOLDER, DONE_IMAGES, ACTIONS, handle, key=KEY)
+TASK = Task(LABEL, FOLDER, key=KEY)

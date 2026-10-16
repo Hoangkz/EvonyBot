@@ -17,6 +17,7 @@ class BotManager(QObject):
     server_found = pyqtSignal(str, str)       # (serial, server)
 
     daily_task_done = pyqtSignal(str, str)    # (serial, task Daily Activities vừa xong)
+    daily_task_cleared = pyqtSignal(str, str) # (serial, khoá daily_done cần xoá khỏi DB)
     bubble_found = pyqtSignal(str, int)       # (serial, giây bubble còn lại; 0 = không có)
     civilization_found = pyqtSignal(str, int) # (serial, nền văn minh bot tự xếp từ ảnh công trình)
     city_map_found = pyqtSignal(str, str)     # (serial, bản đồ thành JSON bot quét được)
@@ -54,6 +55,7 @@ class BotManager(QObject):
         worker.status_changed.connect(self.status_changed.emit)
         worker.server_found.connect(self.server_found.emit)
         worker.daily_task_done.connect(self.daily_task_done.emit)
+        worker.daily_task_cleared.connect(self.daily_task_cleared.emit)
         worker.bubble_found.connect(self.bubble_found.emit)
         worker.civilization_found.connect(self.civilization_found.emit)
         worker.city_map_found.connect(self.city_map_found.emit)

@@ -32,6 +32,8 @@ class BotContext(FlowMixin, InputMixin, ScreenMixin):
         self.mark_daily_done = lambda task: None
         # Giờ (ISO) lưu `task` trong daily_done, kể cả ngày cũ; None nếu chưa có.
         self.done_at = lambda task: None
+        # Xoá key khỏi daily_done (worker xoá cả trong DB).
+        self.forget_daily = lambda task: None
         # Mọi key đang có trong daily_done (kể cả ngày cũ), VD tìm "<key>_reached_<mục tiêu>".
         self.daily_keys = lambda: []
         # Giờ reset server "HH:MM" (màn Home); worker gán BotWorker.server_time.

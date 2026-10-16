@@ -1,15 +1,11 @@
 """
-common.py — phần dùng chung của mọi nhiệm vụ Daily Activities (port từ DailyActivities1234.cs):
-vòng lặp chụp màn -> ảnh khớp đầu tiên -> action (run_task), mở bảng Activity, mở dòng nhiệm vụ
-bằng nút Go, cuộn danh sách, nhận thưởng cuối.
+common.py — phần dùng chung của mọi nhiệm vụ Daily Activities: mở bảng Activity (giao diện mới "Quests" / cũ "•••"),
+mở dòng / thẻ nhiệm vụ bằng nút Go (open_task), cuộn danh sách, nhận thưởng cuối.
 
-Mỗi nhiệm vụ (thư mục con) khai báo một Task: ảnh xong (done), ảnh + action (actions) và handler
-xử lý các action riêng của nó. Action chung (DONE / BACK / TAP / SCROLL / OPEN ...) do run_task xử
-lý; action khác chuyển cho handler (handler trả True = dừng nhiệm vụ lượt này, chưa xong).
+Mỗi nhiệm vụ (thư mục con) khai báo một Task (nhãn, thư mục ảnh, key) và hàm `after_go(bot)` làm phần sau khi bấm Go;
+daily_job nối hai thứ đó thành việc cho bot/worker/priority.py.
 """
 from dataclasses import dataclass
-from functools import lru_cache
-from typing import Callable
 
 import cv2
 
@@ -53,23 +49,14 @@ from .constants import (
     ROW_TITLE,
     OLD_POPUP_TIMEOUT,
     OLD_POPUP_WAIT,
-    OPEN,
     OPEN_ACTIVITY_TRIES,
-    OPEN_COLLECTING_HELPER,
-    OPEN_MONSTER_FIRST,
-    OPEN_MONSTER_SECOND,
     QUESTS_BUTTON,
     QUESTS_BUTTON_REGION,
     ROOT,
     ROW_BUTTON_DY,
     ROW_BUTTON_TOLERANCE,
     ROW_SETTLE_WAIT,
-    ROW_ANCHORS,
-    ROW_COMPLETE,
-    ROW_MOVED,
-    ROW_OPENED,
     ROW_TITLE_MAX_Y,
-    SCROLL,
     TAP,
     TASK_DONE,
     TASK_HAS_GO,
@@ -81,159 +68,21 @@ from .constants import (
     TASK_UNKNOWN,
     TICK_BUTTON,
     TICK_DY,
-    USE_ALL,
-    VERIFY_COLLECTING,
 )
-
-MONSTER_KILLING = "Monster Killing"   # nhãn nhiệm vụ đánh quái (run_task / run.py xử lý riêng)
 
 
 @dataclass(frozen=True)
 class Task:
     label: str          # tên nhiệm vụ (ô tích ở tab Daily Activities); key "xong hôm nay" trong daily_done là `key`
-    folder: str         # thư mục ảnh dưới DailyActivites/
-    done: tuple[str, ...]                    # ảnh "đã xong"
-    actions: tuple[tuple[str, str], ...]     # (ảnh, action) theo thứ tự ưu tiên
-    handler: Callable                        # handler(bot, action, pos, screen) -> bool
-    after_open_tap: tuple[float, float] | None = (50, 50)   # % màn hình bấm sau Go (None = không)
-    key: str = ""   # key nhiệm vụ trong bot/worker/priority.py (VD "daily_offering")
-
-
-def run_task(bot, task: Task) -> TaskResult:
-    """Vòng lặp chung của một nhiệm vụ Daily. TaskResult(done=True) khi thấy ảnh Finish của task (đã hoàn thành
-    trong ngày) hoặc handler đã báo xong (result.done); handler dừng mà chưa xong -> NOT_DONE."""
-    clear(bot)
-    targets = task_targets(task)
-    last_scroll_pos = None
-    scroll_stalls = 0
-    while True:
-        screen = bot.screenshot()
-        # OPEN needs the template's top-left Y, matching the C# FindOutPoint
-        # contract. The row crop and fallback Go coordinate are relative to it.
-        active_targets = (monster_targets(targets, bot)
-                          if task.label == MONSTER_KILLING else targets)
-        action, pos = find_first(bot, screen, active_targets, top_left=ROW_ANCHORS,
-                                 position_cache=image_positions(bot), fallback_full=True)
-        if action == DONE:
-            return take(bot) or TaskResult(done=True)
-        if action == BACK:
-            bot.back(delay=1)
-        elif action == TAP:
-            delay(bot, 2)
-            bot.tap(*pos, delay=2)
-        elif action == SCROLL:
-            if (last_scroll_pos is not None and pos is not None
-                    and abs(pos[0] - last_scroll_pos[0]) <= 3
-                    and abs(pos[1] - last_scroll_pos[1]) <= 3):
-                scroll_stalls += 1
-            else:
-                scroll_stalls = 0
-            last_scroll_pos = pos
-            if scroll_stalls >= 2:
-                bot.log("Daily Activities: end of list reached; returning to top")
-                scroll_to_top(bot)
-                last_scroll_pos = None
-                scroll_stalls = 0
-            else:
-                scroll_up(bot)
-        elif action == OPEN:
-            row_state = open_task_row(bot, screen, pos, task.after_open_tap, task.folder)
-            if row_state == ROW_COMPLETE:
-                return TaskResult(done=True)
-        elif action in (OPEN_MONSTER_FIRST, OPEN_MONSTER_SECOND):
-            if action == OPEN_MONSTER_SECOND:
-                # Supports resuming after the first 2-kill task was already
-                # claimed in an earlier run.
-                bot._daily_monster_marches = max(
-                    2, getattr(bot, "_daily_monster_marches", 0))
-                bot._daily_monster_first_claimed = True
-                bot._daily_monster_deferred = False
-            row_state = open_task_row(bot, screen, pos, None, task.folder)
-            if row_state == ROW_COMPLETE:
-                if action == OPEN_MONSTER_FIRST:
-                    claim_task_row(bot, screen, pos)
-                    bot._daily_monster_marches = 2
-                    bot._daily_monster_first_claimed = True
-                    bot._daily_monster_deferred = True
-                    bot.log("Daily Activities: Monster Killing deferred after 2 attacks")
-                    delay(bot, 2)
-                    return NOT_DONE
-                return TaskResult(done=True)
-        elif action == VERIFY_COLLECTING:
-            # ClaimCollecting is the real Resource Collecting task. The
-            # Research technologies row is only a shortcut to Collection.
-            row_state = open_task_row(bot, screen, pos, None, task.folder,
-                                      open_when_available=False)
-            if row_state == ROW_COMPLETE:
-                return TaskResult(done=True)
-            if row_state == ROW_OPENED:
-                bot.log("Daily Activities: Resource Collecting still has Go")
-                scroll_to_top(bot)
-        elif action == OPEN_COLLECTING_HELPER:
-            # Indirect Research technologies row: use its Go button only to
-            # reach Academy/Collection; never use this row as completion proof.
-            row_state = open_task_row(bot, screen, pos, task.after_open_tap, task.folder)
-            if row_state == ROW_COMPLETE:
-                scroll_up(bot, 2)
-        elif action is None and (tab := bot.find(ACTIVITY_TAB, threshold=ACTIVITY_TAB_THRESHOLD, screen=screen,
-                                                 region=ACTIVITY_TAB_REGION)) is not None:
-            # Popup Quests 2 tab (không Chapter Quests) đang ở tab Main Quest: chữ "Activity" khớp ~0,90 (sát ngưỡng mặc
-            # định 0,9 nên các ảnh tab ở trên bỏ sót) -> bấm tab bằng ngưỡng riêng của hàng tab.
-            bot.log("Daily Activities: Activity tab (2-tab Quests), tapping it")
-            bot.tap(*tab, delay=2)
-        elif action is None:
-            # A task's Go button often spends a few seconds transitioning to
-            # the world/search screen. Pressing Android Back during that gap
-            # opens Evony's Quit dialog and hides every Daily control.
-            delay(bot, 1)
-        elif task.handler(bot, action, pos, screen):
-            return take(bot) or NOT_DONE
-
-
-@lru_cache(maxsize=None)
-def task_targets(task: Task) -> tuple[tuple[str, str], ...]:
-    folder = f"{ROOT}/{task.folder}"
-    # Tên có "/" là đường dẫn đầy đủ dưới Images/ (ảnh dùng chung, VD CityTax/), không thì trong thư mục task.
-    result = [(name if "/" in name else f"{folder}/{name}", DONE) for name in task.done]
-    result.extend((name if "/" in name else f"{folder}/{name}", action)
-                  for name, action in task.actions)
-    # Initial Daily start can begin on either city/world layout. These are the
-    # actual Quests/Daily buttons (including the exact crop supplied by the
-    # user); without them the generic recovery path runs before a task has
-    # opened the Activity list.
-    result.extend((f"{USE_ALL}/{name}", TAP) for name in (
-        "QuestButtonDaily.png", "QuestButtonCurrent.png", "QuestButtonCity.png"))
-    result.extend((path, BACK) for path in exit_images())
-    result.extend((path, TAP) for path in click_images())
-    # On the selected Activity tab, Click_Activities1 (the word "Activity")
-    # and Click_ActivitiesLight (a task reward star) are both visible. Check
-    # the star first so the list advances instead of tapping the selected tab
-    # forever. Task labels stay ahead of this entry and therefore still open
-    # immediately when their row is visible.
-    result.append((f"{folder}/Click_ActivitiesLight.png", SCROLL))
-    # Claim All belongs to the final reward phase. Tapping it while checking an
-    # individual task can remove that completed row before its no-Go state is
-    # observed, leaving the task runner unable to prove completion.
-    for name in ("Click_Activities.png", "Click_Activities1.png", "Click_Activities2.png"):
-        result.append((f"{folder}/{name}", TAP))
-    result.append((f"{folder}/CheckAgain.png", BACK))
-    return tuple(result)
-
-
-# Action của ảnh tiêu đề dòng nhiệm vụ trong danh sách Activity.
-ROW_TITLE_ACTIONS = (OPEN, OPEN_MONSTER_FIRST, OPEN_MONSTER_SECOND, VERIFY_COLLECTING,
-                     OPEN_COLLECTING_HELPER)
+    folder: str         # thư mục ảnh dưới DailyActivites/ (Title.png: tiêu đề dòng, Card.png / Done.png: thẻ bản cũ)
+    key: str = ""       # key nhiệm vụ trong bot/worker/priority.py (VD "daily_offering")
 
 
 def task_titles(task: Task) -> list[str]:
-    """Ảnh tiêu đề dòng của nhiệm vụ trong danh sách Activity (đường dẫn dưới Images/) — dùng cho
-    open_task. Có <thư mục ảnh>/Title.png (cắt từ danh sách thật) thì chỉ dùng ảnh đó; không thì
-    lấy ảnh trong ACTIONS có action tiêu đề dòng (ảnh bản C#), theo thứ tự ACTIONS."""
+    """Ảnh tiêu đề dòng của nhiệm vụ trong danh sách Activity (đường dẫn dưới Images/): <thư mục ảnh>/Title.png (cắt từ
+    danh sách thật), [] nếu chưa có."""
     path = f"{ROOT}/{task.folder}/{ROW_TITLE}"
-    if (TEMPLATE_DIR / path).exists():
-        return [path]
-    return [f"{ROOT}/{task.folder}/{name}" for name, action in task.actions
-            if action in ROW_TITLE_ACTIONS]
+    return [path] if (TEMPLATE_DIR / path).exists() else []
 
 
 def task_cards(task: Task) -> list[str]:
@@ -249,152 +98,19 @@ def task_done_cards(task: Task) -> list[str]:
     return [path] if (TEMPLATE_DIR / path).exists() else []
 
 
-def image_positions(bot) -> dict[str, tuple[int, int]]:
-    """Per-worker image positions used by adaptive region matching."""
-    cache = getattr(bot, "_daily_image_positions", None)
-    if cache is None:
-        cache = {}
-        bot._daily_image_positions = cache
-    return cache
-
-
-def monster_targets(targets, bot):
-    """Hide the first monster row after its 2-kill reward was processed."""
-    if not getattr(bot, "_daily_monster_first_claimed", False):
-        return targets
-    first = f"{ROOT}/ActivitiesAttackMonster/ActivitiesAttackMonster.png"
-    return tuple((path, action) for path, action in targets if path != first)
-
-
-def open_task_row(bot, screen, pos, after_open_tap=(50, 50), task_folder=None,
-                  open_when_available: bool = True) -> str:
-    """Open a task row, or confirm completion when its ``Go`` is gone.
-
-    A completed task keeps its label but replaces ``Go`` with ``Claim``. The
-    old coordinate fallback therefore clicked Claim and re-ran finished work.
-    The label is our row anchor; once the complete row is visible, absence of
-    Go is the server/UI completion signal.
-    """
-    _, y = pos
-    if y > 500:
-        bot.swipe_percent(70, 70, 65, 65, duration=1.0, delay=2)
-        return ROW_MOVED
-    _, width = screen.shape[:2]
-    # `pos` is the top-left of the task label (as in the C# implementation),
-    # so the whole 100 px row — including the tiny 20x15 Go image — is kept.
-    row_y = max(0, y)
-    row = bot.crop(screen, 0, row_y, width, 100)
-    go_templates = []
-    if task_folder:
-        go_templates.append(f"{ROOT}/{task_folder}/Go.png")
-    go_templates.append(f"{USE_ALL}/Go.png")
-    go = next((match for path in go_templates
-               if (match := bot.find(path, screen=row)) is not None), None)
-    if go is None:
-        bot.log("Daily Activities: task row has no Go button; completed")
-        return ROW_COMPLETE
-    if not open_when_available:
-        return ROW_OPENED
-    bot.tap(go[0], go[1] + row_y, delay=4)
-    if after_open_tap is not None:
-        bot.tap_percent(*after_open_tap, delay=1)
-    return ROW_OPENED
-
-
-def claim_task_row(bot, screen, pos) -> bool:
-    """Claim one completed row so Evony can reveal its follow-up task."""
-    _, y = pos
-    row_y = max(0, y)
-    row = bot.crop(screen, 0, row_y, screen.shape[1], 100)
-    claim = bot.find(f"{ROOT}/ActivitiesSourceCollecting/Claim.png", screen=row)
-    if claim is None:
-        return False
-    bot.tap(claim[0], claim[1] + row_y, delay=3)
-    return True
-
-
-def open_daily_activity(bot, attempts: int = 6, close_search: bool = False) -> bool:
-    """Open Quests by image, select Activity, and verify the list is ready.
-
-    The bottom-left control moves between the city and world layouts. A fixed
-    8%,88% tap can therefore hit Settings. Never guess its coordinate.
-    """
-    activity_tab = f"{USE_ALL}/Click_Activities1.png"
-    activity_marker = f"{USE_ALL}/Click_ActivitiesLight.png"
-    quest_buttons = (f"{USE_ALL}/QuestButtonDaily.png",
-                     f"{USE_ALL}/QuestButtonCurrent.png",
-                     f"{USE_ALL}/QuestButtonCity.png",
-                     f"{USE_ALL}/Click_Activities.png")
-    search_closed = False
-    for _ in range(attempts):
+def _claim_old_cards(bot, max_taps: int = 10):
+    """Lưới thẻ Activity (giao diện cũ): bấm nhận từng thẻ "100%" (như _search_grid), đóng popup Congratulations bằng Back."""
+    for _ in range(max_taps):
+        bot.check()
         screen = bot.screenshot()
-        if bot.find(activity_marker, screen=screen) is not None:
-            return True
-        tab = bot.find(activity_tab, screen=screen)
-        if tab is not None:
-            bot.tap(*tab, delay=2)
+        if bot.find(OLD_CONGRATS, screen=screen) is not None:
+            bot.back(delay=1)
             continue
-        quest = next((match for path in quest_buttons
-                      if (match := bot.find(path, threshold=0.72, screen=screen,
-                                            region=(0, 70, 25, 100))) is not None), None)
-        if quest is not None:
-            bot.tap(*quest, delay=3)
-            continue
-        if close_search and not search_closed:
-            # Current Evony leaves the bottom Search drawer over Quests.
-            # Android Back opens the Quit dialog, so return to the city using
-            # the verified world-map control instead.
-            territory = bot.find(
-                f"{ROOT}/ActivitiesAttackMonster/BackToTerritoryCurrent.png",
-                threshold=0.72, screen=screen, region=(70, 10, 100, 35))
-            if territory is not None:
-                bot.tap(*territory, delay=4)
-            else:
-                delay(bot, 1)
-            search_closed = True
-            continue
-        delay(bot, 1)
-    bot.log("Daily Activities: Quests/Activity button was not found")
-    return False
-
-
-def scroll_up(bot, count: int = 1):
-    for _ in range(count):
-        bot.swipe_percent(70, 70, 55, 55, duration=1.0, delay=1)
-
-
-def scroll_to_top(bot, count: int = 12):
-    for _ in range(count):
-        bot.swipe_percent(55, 55, 70, 70, duration=0.35, delay=0.15)
-
-
-def replace_text(bot, text: str, deletes: int = 8):
-    for _ in range(deletes):
-        bot.shell("input keyevent KEYCODE_DEL")
-    bot.shell(f"input text {text}")
-    bot.shell("input keyevent KEYCODE_ENTER")
-
-
-def tap_first(bot, templates: tuple[str, ...], attempts: int, after=None,
-              missing=None, delay_seconds: float = 2) -> bool:
-    """Bounded equivalent of the C# inner template-tapping loops."""
-    hits = idle = 0
-    while hits < attempts and idle < 8:
-        screen = bot.screenshot()
-        _, pos = find_first(bot, screen, [(path, "match") for path in templates],
-                            position_cache=image_positions(bot), fallback_full=True)
-        if pos is None:
-            idle += 1
-            if missing:
-                missing()
-            delay(bot)
-            continue
-        bot.tap(*pos, delay=delay_seconds)
-        hits += 1
-        idle = 0
-        if after:
-            after()
-    return hits >= attempts
+        badge = bot.find(OLD_DONE_BADGE, threshold=OLD_DONE_THRESHOLD, screen=screen)
+        if badge is None:
+            return
+        bot.log("Daily Activities: claim 100% task card")
+        bot.tap(badge[0] + OLD_DONE_TAP[0], badge[1] + OLD_DONE_TAP[1], delay=OLD_DONE_WAIT)
 
 
 def collect_activity_rewards(bot):
@@ -402,9 +118,6 @@ def collect_activity_rewards(bot):
     folder = f"{ROOT}/CollectionActivities"
     targets = [
         (f"{folder}/Click_ActivitiesLight.png", DONE),
-        (f"{folder}/Click_Activities2.png", TAP),
-        (f"{folder}/Click_Activities1.png", TAP),
-        (f"{folder}/Click_Activities.png", TAP),
         *[(path, BACK) for path in exit_images()],
         *[(path, TAP) for path in click_images()],
     ]
@@ -414,6 +127,12 @@ def collect_activity_rewards(bot):
         if reward_popup is not None:
             bot.back(delay=2)
             continue
+        # Giao diện cũ (lưới thẻ Activity): không có Claim All / ngôi sao Activity, nên nhận các thẻ 100% rồi dừng. Trước đây
+        # vòng lặp này mở lại bảng (Back rồi mở) mãi vì không bao giờ thấy ngôi sao.
+        if bot.find(OLD_ACTIVITY_TITLE, screen=screen) is not None:
+            _claim_old_cards(bot)
+            bot.record("Daily Activities: old Activity screen, claimed 100% cards (point chests not supported yet)")
+            return
         # Claim task rows first because their activity points can unlock an
         # additional chest in the same pass.
         claim_all = bot.find(f"{folder}/Claim_All.png", screen=screen)
@@ -438,8 +157,7 @@ def collect_activity_rewards(bot):
                 bot.log("Daily Activities: Activity tab, tapping it")
                 bot.tap(*tab, delay=2)
                 continue
-        action, pos = find_first(bot, screen, targets,
-                                 position_cache=image_positions(bot), fallback_full=True)
+        action, pos = find_first(bot, screen, targets, fallback_full=True)
         if action == DONE:
             return
         if action == BACK:
@@ -448,8 +166,9 @@ def collect_activity_rewards(bot):
             delay(bot, 2)
             bot.tap(*pos, delay=2)
         else:
-            go_home(bot, screen)
-            delay(bot)
+            # Không phải bảng Activity: mở bảng bằng open_activity_list (tự nhận giao diện mới "Quests" / cũ "•••"),
+            # không bấm icon Quests theo ảnh mẫu (màn thành của giao diện cũ cũng có icon đó).
+            open_activity_list(bot)
 
 
 # ---- Mở một nhiệm vụ: phiên bản giao diện MỚI (danh sách) và CŨ (lưới thẻ) -------------------
@@ -811,22 +530,19 @@ def _int(value) -> int:
         return 0
 
 
-def daily_job(task: Task, target: str | None = None, after_go=None) -> dict:
-    """Một việc Daily. `target`: tên ô cấu hình của tab chứa mục tiêu (VD "Offer Gems") — xong khi mục tiêu đã đạt lưu trong DB >=
-    số ở ô đó, nên tăng số ở tab là tự thành chưa xong, giảm lại là xong. Việc làm trong game không cần biết điều này.
-    `after_go`: luồng mới — open_task_or_finish bấm Go rồi `after_go(bot)` làm phần sau Go (không dùng run_task / handler cũ)."""
+def daily_job(task: Task, after_go, target: str | None = None) -> dict:
+    """Một việc Daily. `after_go(bot)`: open_task_or_finish bấm Go trong danh sách Activity rồi `after_go` làm phần sau Go.
+    `target`: tên ô cấu hình của tab chứa mục tiêu (VD "Offer Gems") — xong khi mục tiêu đã đạt lưu trong DB >=
+    số ở ô đó, nên tăng số ở tab là tự thành chưa xong, giảm lại là xong. Việc làm trong game không cần biết điều này."""
     _KEY_BY_LABEL[task.label] = task.key
 
     @save_errors(task.key)   # lỗi thì lưu `<key>_error` vào DB
     def run(ctx, settings):
         ctx.log(f"Daily Activities: {task.label}")
-        if after_go is None:
-            result = run_task(ctx, task)
-        else:
-            clear(ctx)
-            if open_task_or_finish(ctx, task):
-                after_go(ctx)
-            result = take(ctx) or NOT_DONE
+        clear(ctx)
+        if open_task_or_finish(ctx, task):
+            after_go(ctx)
+        result = take(ctx) or NOT_DONE
         record_result(ctx, task.key, result)   # xong thì lưu "xong hôm nay" (key) vào DB
 
     def done(ctx, settings):

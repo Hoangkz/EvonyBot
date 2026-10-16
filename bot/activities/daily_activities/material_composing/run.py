@@ -10,11 +10,8 @@ không có thì cuộn tối đa SCROLLS lần, vẫn không có thì báo xong 
 import cv2
 import numpy as np
 
-from ....common import delay
 from ..common import Task, mark_task_done
 from .constants import (
-    ACTIONS,
-    AFTER_OPEN_TAP,
     ARROW_AREA,
     ARROW_HSV,
     ARROW_SIZE,
@@ -28,9 +25,7 @@ from .constants import (
     COMPOSE_SMALL_REGION,
     COMPOSE_TITLE,
     COMPOSE_WAIT,
-    DONE_IMAGES,
     FOLDER,
-    FOLDER_PATH,
     ITEMS_TITLE,
     ITEM_TAP_OFFSET,
     KEY,
@@ -44,32 +39,6 @@ from .constants import (
     SELECT_TRIES,
     SELECT_WAITS,
 )
-
-
-def handle(bot, action, pos, screen):
-    """Flow cũ (C#, ghép Lv3 Crystal 3 lần): không còn dùng, giữ cho Task."""
-    if action == "level_one":
-        delay(bot, 4)
-        bot.tap(*pos, delay=2)
-    elif action == "crystal":
-        _, y = pos
-        row_y = max(0, y)
-        region = bot.crop(screen, 0, row_y, screen.shape[1], 250)
-        compose = bot.find(f"{FOLDER_PATH}/Compose1.png", screen=region)
-        if compose is not None:
-            bot.tap(compose[0], compose[1] + row_y, delay=4)
-    elif action == "compose":
-        _, y = pos
-        row_y = max(0, y)
-        region = bot.crop(screen, 0, row_y, screen.shape[1], 666)
-        lv3 = bot.find(f"{FOLDER_PATH}/Lv3Crystal.png", screen=region)
-        if lv3 is not None:
-            bot.tap(lv3[0], lv3[1] + row_y, delay=2)
-            for _ in range(3):
-                bot.tap(100, 670, delay=2)
-            bot.back(delay=2)
-        return True
-    return False
 
 
 def after_go(bot) -> bool:
@@ -187,4 +156,4 @@ def _compose(bot, composed: int) -> tuple[int, bool]:
     return composed, True
 
 
-TASK = Task(LABEL, FOLDER, DONE_IMAGES, ACTIONS, handle, AFTER_OPEN_TAP, key=KEY)
+TASK = Task(LABEL, FOLDER, key=KEY)

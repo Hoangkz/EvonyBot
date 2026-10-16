@@ -20,13 +20,8 @@ from ..common import Task, collect_activity_rewards
 from .constants import FOLDER, KEY, LABEL, MAX_FREE_DONATIONS, TRIED_KEY
 
 
-def _no_action(bot, action, pos, screen):
-    """Việc này không đi qua common.run_task (không tìm dòng nhiệm vụ để bấm Go) nên không có action riêng."""
-    return False
-
-
 # TASK chỉ để hourly_job biết nhãn / key của việc (nhãn là ô chọn giờ ở tab và key "xong" trong daily_done).
-TASK = Task(LABEL, FOLDER, (), (), _no_action, key=KEY)
+TASK = Task(LABEL, FOLDER, key=KEY)
 
 
 def donate_free(bot) -> TaskResult:

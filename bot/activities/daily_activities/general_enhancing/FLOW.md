@@ -1,7 +1,7 @@
 # Flow: General Enhancing
 
-Nhiệm vụ Daily Activities. Ảnh / action: [constants.py](constants.py), handler: [run.py](run.py).
-Phần dùng chung (mở Quests → Activity, tìm dòng, bấm Go, state machine `run_task`): [../FLOW.md](../FLOW.md).
+Nhiệm vụ Daily Activities. Ảnh: [constants.py](constants.py), phần làm sau Go (`after_go`): [run.py](run.py).
+Phần dùng chung (mở bảng Activity, tìm dòng / thẻ, bấm Go): [../OPEN_TASK.md](../OPEN_TASK.md), [../FLOW.md](../FLOW.md).
 
 ## Luồng mới (`run.after_go`, sau khi `common.open_task` bấm Go)
 
@@ -16,12 +16,3 @@ nhưng **Gold Cultivate** (6000 vàng/lần, không tốn kim cương) thay Quic
    không đổi chỉ số tướng).
 4. Đủ 5 lần → Back 3 lần về thành, đánh dấu xong hôm nay.
 5. Bấm Gold Cultivate mà không ra kết quả (thiếu vàng / game chậm) → không tính, dừng, không đánh dấu.
-
-## Luồng cũ C# (`common.run_task` + `run.handle`, `run.py` chung vẫn đang dùng)
-
-1. Mở từ `ActivitiesGeneralEnhancing.png`.
-2. `Cultivate.png`: vào Cultivate.
-3. `Cultivate1.png`: chạy tối đa năm lượt, chấp nhận cả `Agree.png` và
-   `Disagree.png` theo logic ảnh hiện có.
-4. Bấm nút dưới trái rồi Back.
-5. `CultivateFinishCurrent.png` hoặc `CultivateFinish.png` báo hoàn thành.

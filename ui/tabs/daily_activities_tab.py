@@ -31,7 +31,6 @@ from .tab_placeholder import BaseTab, confirm_reset
 # text fixes spelling mistakes from the original WinForms form.
 SUPPORTED_TASKS = (
     ("Offering", "Offering"),   # ô chọn số lần (không phải checkbox) -> đặt đầu; thứ tự chạy ở run.py TASKS
-    ("Monster Killing", "Monster Killing"),
     ("Resource Tax", "Resource Tax"),
     ("Gold Levy", "Gold Levy"),
     ("Troop Training", "Troop Training"),
