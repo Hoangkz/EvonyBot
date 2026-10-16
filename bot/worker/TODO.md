@@ -50,3 +50,11 @@ Cập nhật: 2026-10-11. Xong mục nào thì xoá mục đó. Flow hiện tạ
   trong Daily (ô giờ ở tab, `activated.png`, đủ 4 quả vỡ), giờ reset chọn ở màn Home, test mới / sửa.
 - [ ] Crazy Eggs còn việc riêng: [crazy_eggs/TODO.md](../activities/event_center/crazy_eggs/TODO.md) (mục 4 "Tích hợp" đã
   xong — dọn).
+
+## Chờ cố định cần xem (có nên đổi sang wait_for không?)
+
+Chỗ chờ số giây viết cứng, không có vòng kiểm tra rồi thử lại. Xác nhận từng chỗ: cần `wait_for` thì sửa, không thì gạch.
+
+### [bot_worker.py](bot_worker.py)
+
+- [ ] [bot_worker.py:432](bot_worker.py#L432) (1.0s): `self.ctx.sleep(1.0)`

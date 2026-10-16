@@ -15,3 +15,12 @@ Danh mục vật phẩm: [items.py](items.py) (ảnh icon `Images/Black Market/I
 4. ~~`FLOW.md` + flow test~~: [FLOW.md](FLOW.md), `tests/black_market/test_flow.py` (8 test).
 
 Bản đồ thành / route công trình (quét khi rảnh, civ khác): việc còn lại ở [bot/city/TODO.md](../../city/TODO.md).
+
+## Chờ cố định cần xem (có nên đổi sang wait_for không?)
+
+Chỗ chờ số giây viết cứng, không có vòng kiểm tra rồi thử lại. Xác nhận từng chỗ: cần `wait_for` thì sửa, không thì gạch.
+
+### [run.py](run.py)
+
+- [ ] [run.py:170](run.py#L170) (1s): `bot.sleep(1)`
+- [ ] [run.py:289](run.py#L289) (1s): `bot.back(delay=1)`

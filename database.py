@@ -54,7 +54,6 @@ TAB_COLUMNS = {
     "Open Gift Box": "open_gift_box",
     "Black Market": "black_market",
     "Event": "event",
-    "Battlefield Shop": "battlefield_shop",
 }
 # Khoá daily_done của tab Event (nhiệm vụ gather_troops / kings_path / three_day, mốc reset event, đăng nhập, Voyage);
 # mọi khoá khác thuộc Daily Activities.

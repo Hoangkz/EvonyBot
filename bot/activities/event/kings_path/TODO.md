@@ -62,3 +62,13 @@ Donate: giá mua lại lượt cao nhất 448 kim cương, giảm dần theo th�
 ## 5. Khác
 
 - [ ] Toàn bộ thay đổi King's Path **chưa commit**.
+
+## Chờ cố định cần xem (có nên đổi sang wait_for không?)
+
+Chỗ chờ số giây viết cứng, không có vòng kiểm tra rồi thử lại. Xác nhận từng chỗ: cần `wait_for` thì sửa, không thì gạch.
+
+### [path_task.py](path_task.py)
+
+- [ ] [path_task.py:117](path_task.py#L117) (1s): `bot.back(delay=1)`
+- [ ] [path_task.py:122](path_task.py#L122) (2s): `bot.tap(*pos, delay=2)`
+- [ ] [path_task.py:124](path_task.py#L124) (2s): `bot.tap(SUB_TAB_X[path.tab_index], SUB_TAB_Y, delay=2)`

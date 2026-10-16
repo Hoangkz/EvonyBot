@@ -44,7 +44,6 @@ from ..activities.event.kings_path.refine.run import run as kings_path_refine
 from ..activities.event.kings_path.black_market.run import run as kings_path_black_market
 from ..activities.alliance_capacity.run import run as alliance_capacity
 from ..activities.black_market.run import run as black_market_market
-from ..activities.battlefield_shop.run import run as battlefield_shop
 from ..activities.daily_activities.alliance_donation import TASK as alliance_donation_task
 from ..activities.daily_activities.alliance_donation.run import donate_free
 from ..activities.daily_activities.alliance_help import TASK as alliance_help_task
@@ -366,12 +365,4 @@ DATA ={
             "needs_city_map": True,   # nhiệm vụ cần route: chỉ vào danh sách khi máy đã có bản đồ thành (worker quét lúc Join Boss rảnh)
         }
     ],
-    "Battlefield Shop": [
-        { 
-            "key": "battlefield_shop",
-            "run": battlefield_shop,
-            "label": "Battlefield Shop",
-            "priority": -1,
-        }
-    ]
 }

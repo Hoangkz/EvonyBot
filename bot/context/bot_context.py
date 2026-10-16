@@ -53,5 +53,5 @@ class BotContext(FlowMixin, InputMixin, ScreenMixin):
         self._templates: dict[str, np.ndarray] = {}
         self._window_size: tuple[int, int] | None = None
         # Every tab's config ({tab title: settings}), for activities that
-        # chain into another one (e.g. Battlefield Shop -> Black Market).
+        # chain into another one (e.g. Open Gift Box -> Black Market).
         self.settings: dict = {}

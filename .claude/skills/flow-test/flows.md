@@ -88,21 +88,6 @@ Nhánh nút đã xám: bỏ 07, `08_levy_done` `back()` luôn. 4. Mỗi task cò
 
 Nhánh phụ: Resource giá kim cương bị bỏ (`bm_screen_3`), giới hạn Refresh / Quantity Buy, kim cương < 50, CheckGold.
 
-## Battlefield Shop — `tests/battlefield_shop/`
-
-Settings: `{"quantity_to_refresh": "0"}`, `open_box` / `black_market` để False. Code đang có `TODO: cần làm lại`, nên nếu viết test ngay thì phải xác nhận lại flow với người dùng.
-
-| #   | Màn hình                                                             | Action                                                                              |
-| --- | -------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| 01  | Màn hình chính                                                       | `tap("Black Market/chucnang.png")`                                                  |
-| 02  | Menu                                                                 | `tap("Black Market/activites.png")`                                                 |
-| 03  | Danh sách Daily Activities                                           | `swipe(50, 50, 50, 32)` cho tới khi thấy `BattlefieldShop/rss.png` / `openshop.png` |
-| 04  | Dòng Battlefield Shop                                                | `tap("BattlefieldShop/openshop.png")` (hoặc `rss.png`, `goto.png`)                  |
-| 05  | `vaoshop.png`                                                        | `tap(...)`                                                                          |
-| 06  | Shop (`Black Market/Refresh.png`) có món trong `BattlefieldShop/buy` | `tap_at(<ô sau _cell>)`                                                             |
-| 07  | `xacnhan.png`                                                        | `tap(...)`                                                                          |
-| 08  | Shop không còn món cần mua                                           | `end()` (giới hạn refresh là 0)                                                     |
-
 ## Join Monster War — `tests/join_monster_war/`
 
 Xem thêm [bot/activities/join_monster_war/FLOW.md](../../../bot/activities/join_monster_war/FLOW.md).

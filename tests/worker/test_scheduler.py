@@ -108,10 +108,6 @@ class RealRegistryTests(unittest.TestCase):
         self.assertIsNone(task.done)
         self.assertIsNone(task.due)
 
-    def test_battlefield_shop_excluded_black_market_once(self):
-        tasks = self.build(["Battlefield Shop", "Black Market"], {})
-        self.assertEqual([(t.key, t.once) for t in tasks], [("black_market_market", True)])
-
     def test_task_run_is_the_task_own_function(self):
         """Task.run là hàm riêng của nhiệm vụ, không phải hàm run của activity."""
         from bot.activities.event_center import crazy_eggs  # noqa: F401

@@ -84,3 +84,14 @@ Việc riêng của nhiệm vụ nào ghi trong `<thư mục nhiệm vụ>/TODO.
 | Wheel of Fortune | [wheel_of_fortune/TODO.md](wheel_of_fortune/TODO.md) | 3 |
 | Patrol | [patrol/TODO.md](patrol/TODO.md) | 3 |
 | Material Composing | [material_composing/TODO.md](material_composing/TODO.md) | 3 |
+
+## Chờ cố định cần xem (có nên đổi sang wait_for không?)
+
+Chỗ chờ số giây viết cứng, không có vòng kiểm tra rồi thử lại. Xác nhận từng chỗ: cần `wait_for` thì sửa, không thì gạch.
+
+### [common.py](common.py)
+
+- [ ] [common.py:262](common.py#L262) (1s): `bot.back(delay=1)`
+- [ ] [common.py:270](common.py#L270) (1s): `bot.back(delay=1)`
+- [ ] [common.py:402](common.py#L402) (1s): `bot.sleep(1)`
+- [ ] [common.py:480](common.py#L480) (1s): `bot.back(delay=1)   # đóng bảng Activity`
