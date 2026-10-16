@@ -1,27 +1,37 @@
 """
 recruit_general_tab.py — tab "Recruit General" (activity bot/activities/recruit_general/).
 
-- Group "Setting": ô tích "Open Gold" + nhóm hai nút radio "Recruit General" / "Buy General Token" (hai nút ở màn chi tiết
+- Group "Setting": ô tích "Open Gold", hai ô chọn số lần Refresh / số lần mua (ALL = không giới hạn) + nhóm hai nút radio "Recruit General" / "Buy General Token" (hai nút ở màn chi tiết
   tướng), chỉ một nút được tích (mặc định Recruit General).
 
 - Group "Generals": danh sách tướng (ui/tabs/generals.py), ô search theo tên + lọc theo civ và type, tích chọn tướng.
   Tướng đã tích vẫn giữ khi đổi search / civ; mặc định tích sẵn các tướng có `default` (generals.py).
 
-Settings (cột `recruit_general` của DB): {"buy_with": "Recruit General" | "Buy General Token", "generals": [tên, ...], "open_gold": bool}
+Settings (cột `recruit_general` của DB): {"buy_with": "Recruit General" | "Buy General Token", "generals": [tên, ...], "open_gold": bool,
+"refresh_count": "ALL" | 100..1000, "buy_count": "ALL" | 10..100}
 """
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtWidgets import (
-    QCheckBox, QComboBox, QGridLayout, QGroupBox, QHBoxLayout, QLineEdit, QPushButton, QScrollArea, QVBoxLayout, QWidget,
+    QCheckBox, QComboBox, QGridLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit, QPushButton, QScrollArea, QVBoxLayout, QWidget,
 )
 
 from .constants import (
     GENERAL_COLUMNS,
+    RECRUIT_ALL,
+    RECRUIT_BUY_COUNT_DEFAULT,
+    RECRUIT_BUY_COUNT_KEY,
+    RECRUIT_BUY_COUNT_OPTIONS,
+    RECRUIT_BUY_COUNT_TEXT,
     RECRUIT_CIV_ALL,
     RECRUIT_DESELECT_ALL_TEXT,
     RECRUIT_OPEN_GOLD_KEY,
     RECRUIT_OPEN_GOLD_TEXT,
     RECRUIT_GENERALS_GROUP,
     RECRUIT_GENERALS_KEY,
+    RECRUIT_REFRESH_DEFAULT,
+    RECRUIT_REFRESH_KEY,
+    RECRUIT_REFRESH_OPTIONS,
+    RECRUIT_REFRESH_TEXT,
     RECRUIT_RESET_TEXT,
     RECRUIT_SEARCH_PLACEHOLDER,
     RECRUIT_SELECT_ALL_TEXT,
@@ -147,14 +157,42 @@ class RecruitGeneralTab(BaseTab):
         box_layout = QVBoxLayout(setting_box)
         box_layout.addWidget(self.open_gold)
         box_layout.addWidget(self.setting, 0, Qt.AlignLeft)   # chỉ rộng vừa hai nút, căn trái
+        self.refresh_count = self._count_combo(RECRUIT_REFRESH_OPTIONS, RECRUIT_REFRESH_DEFAULT)
+        self.buy_count = self._count_combo(RECRUIT_BUY_COUNT_OPTIONS, RECRUIT_BUY_COUNT_DEFAULT)
+        counts = QHBoxLayout()
+        counts.addWidget(QLabel(RECRUIT_REFRESH_TEXT))
+        counts.addWidget(self.refresh_count)
+        counts.addSpacing(16)
+        counts.addWidget(QLabel(RECRUIT_BUY_COUNT_TEXT))
+        counts.addWidget(self.buy_count)
+        counts.addStretch(1)
+        box_layout.addLayout(counts)
         self.add_row(setting_box)
         self.generals = GeneralPicker(RECRUIT_GENERALS_GROUP, GENERALS)
         self.generals.changed.connect(self.settings_changed.emit)
         self.add_row(self.generals)
 
+    def _count_combo(self, options, default) -> QComboBox:
+        """Ô chọn số lần ("ALL" hoặc một số); phát settings_changed khi đổi."""
+        combo = QComboBox()
+        for option in options:
+            combo.addItem(str(option), option)
+        combo.setCurrentIndex(options.index(default))
+        combo.currentIndexChanged.connect(lambda _index: self.settings_changed.emit())
+        return combo
+
+    @staticmethod
+    def _set_count(combo: QComboBox, value, options, default):
+        """Chọn `value` trong ô; không hợp lệ (settings cũ / hỏng) thì về `default`."""
+        combo.blockSignals(True)
+        combo.setCurrentIndex(options.index(value) if value in options else options.index(default))
+        combo.blockSignals(False)
+
     def get_settings(self) -> dict:
         return {RECRUIT_OPEN_GOLD_KEY: self.open_gold.isChecked(),
                 RECRUIT_BUY_KEY: self.setting.value() or RECRUIT_BUY_DEFAULT,
+                RECRUIT_REFRESH_KEY: self.refresh_count.currentData(),
+                RECRUIT_BUY_COUNT_KEY: self.buy_count.currentData(),
                 RECRUIT_GENERALS_KEY: self.generals.checked()}
 
     def set_settings(self, data: dict):
@@ -162,6 +200,8 @@ class RecruitGeneralTab(BaseTab):
         value = data.get(RECRUIT_BUY_KEY)
         if value in RECRUIT_BUY_OPTIONS:
             self.setting.set_value(value)
+        self._set_count(self.refresh_count, data.get(RECRUIT_REFRESH_KEY), RECRUIT_REFRESH_OPTIONS, RECRUIT_REFRESH_DEFAULT)
+        self._set_count(self.buy_count, data.get(RECRUIT_BUY_COUNT_KEY), RECRUIT_BUY_COUNT_OPTIONS, RECRUIT_BUY_COUNT_DEFAULT)
         names = data.get(RECRUIT_GENERALS_KEY)
         if isinstance(names, list):
             self.generals.set_checked(names)

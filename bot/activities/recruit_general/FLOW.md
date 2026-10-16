@@ -3,7 +3,7 @@
 Activity **chạy một mình** (`EXCLUSIVE_ACTIVITIES` trong [../constants.py](../constants.py): không Bubble, không nhiệm vụ khác).
 Code: [run.py](run.py), ảnh / hằng số: [constants.py](constants.py).
 
-**Điểm vào:** `run(bot, settings)`; settings của tab: `{"buy_with": "Recruit General" | "Buy General Token"}` (group Setting, radio, chỉ một nút được tích; chọn nút bấm ở màn chi tiết tướng khi có hai nút). Trả `True` khi tới màn Recruit General, `False` khi không tới được. Chọn
+**Điểm vào:** `run(bot, settings)`; settings của tab: `{"buy_with": "Recruit General" | "Buy General Token", "generals": [tên tướng đã tích], "open_gold": bool, "refresh_count": "ALL" | 100..1000, "buy_count": "ALL" | 10..100}` (`buy_with`: radio, chọn nút bấm ở màn chi tiết tướng khi có hai nút; `generals`: tướng cần mua; `open_gold`: thiếu vàng thì mở hết rương vàng; `refresh_count`: số lần Refresh tối đa; `buy_count`: số tướng mua tối đa; "ALL" = không giới hạn, mặc định ALL; thiếu key (settings cũ) thì dùng `REFRESH_MAX` = 1000 / `BUY_LIMIT` = 3). Trả `True` khi chạy xong (mua đủ 3 tướng / rời màn / đủ 1000 lần Refresh), `False` khi lỗi (không tới được màn, không đổi được ô, thiếu vàng, mất nút Refresh...). Chọn
 bằng nút Recruit General ở tab Initialization (tích nút này thì bỏ tích các nút khác).
 
 ```mermaid
@@ -29,20 +29,28 @@ flowchart TD
     L0 -->|có| J[Historic chưa tích thì tích; Epic đang tích thì bỏ tích]
     J -->|không đổi được ô| X
     J --> K[Bấm Refresh liên tục, mỗi lần chờ 1 giây]
-    K -->|popup high quality General| L[Bấm Cancel] --> M{Tên tướng có trong Images/RecruitGeneral/Generals?}
-    M -->|không| K
+    K -->|popup high quality General| L[Bấm Cancel] --> M["Tướng xịn (chấm có vương miện): OCR tên, so mờ >= 50% với tướng đã tích ở UI (chữ OCR nằm trong tên là đủ)"]
+    M -->|không có tướng cần mua| CF["Bấm Refresh, popup hiện lại thì bấm Confirm (_refresh_confirm)"]
+    CF --> K
     M -->|có| N[Bấm vào ảnh tướng] --> W["Chờ 1 giây, mất nút Refresh = ra màn chi tiết; còn Refresh thì chờ thêm 1 giây / lần, tối đa 8 giây"]
     W -->|hết 8 giây| X
     W --> O{Mấy nút mua?}
     O -->|một nút Recruit General| P[Bấm thẳng nút đó]
     O -->|hai nút| Q[Bấm theo setting buy_with]
-    P --> R["Chờ 1 giây: thấy nút Refresh = game đã tự về danh sách; chưa thì chờ thêm 1 giây / lần, tối đa 10 giây, vẫn chưa thì bấm Back. Về rồi chờ thêm 2 giây cho game load lại dữ liệu"]
-    Q --> R
+    P --> HG{"wait_for 1 giây / lần, tối đa 10 giây: màn How to get hiện (thiếu vàng)?"}
+    Q --> HG
+    HG -->|không: mua được| R["Chờ về danh sách: thấy Refresh = đã về (tối đa 10 giây, quá hạn thì Back), rồi chờ thêm 2 giây"]
+    HG -->|có, Open Gold tắt| BK["Back 2 lần về danh sách"] --> X
+    HG -->|có, Open Gold bật| G1["Mở hết vàng: bấm Use từng rương (popup số lượng: Max nếu chưa tối đa rồi Use), tới khi không còn nút Use"]
+    G1 --> G2["Back về màn chi tiết (wait_for 10 giây), bấm nút mua lại"]
+    G2 -->|vẫn thiếu vàng| BK
+    G2 --> R
     R --> T[Tích lại Historic nếu game bỏ tích; kéo tiếp sang tướng tím / vàng kế]
-    T --> LIM{"Đã mua đủ 3 tướng (BUY_LIMIT)?"}
+    T --> LIM{"Đã mua đủ buy_count tướng?"}
     LIM -->|rồi| Z
-    LIM -->|chưa| K
-    K -->|rời màn / mất nút Refresh / đủ 1000 lần| Z
+    LIM -->|chưa| CF
+    K -->|rời màn / đủ refresh_count lần| Z
+    K -->|mất nút Refresh| X
 ```
 
 Đã ở màn Recruit General thì bỏ qua các bước tới đó, chỉ chỉnh hai ô rồi Refresh. Confirm của popup chỉ bấm sau khi đã kiểm tra hết tướng xịn (không mua, hoặc mua xong): Refresh lại rồi bấm Confirm (`_refresh_confirm`).

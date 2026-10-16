@@ -30,7 +30,9 @@ BOX_WAIT = 3                # giây tối đa chờ ô đổi trạng thái sau 
 # Dừng khi: có popup tướng xịn (đã Cancel), rời màn Recruit General (không thấy tiêu đề: popup / cảnh báo hiện lên), không thấy nút Refresh, hoặc đủ REFRESH_MAX lần.
 REFRESH = f"{FOLDER}/Refresh.png"
 REFRESH_WAIT = 1   # giây chờ sau mỗi lần bấm Refresh: bấm Refresh cho đến khi ra tướng lịch sử (delay cố định, không cần sửa)
-REFRESH_MAX = 1000   # số lần bấm tối đa mỗi lượt chạy
+REFRESH_MAX = 1000   # số lần bấm tối đa mỗi lượt chạy khi settings không có "refresh_count"
+REFRESH_KEY = "refresh_count"   # key trong settings của tab: "ALL" (không giới hạn) | 100..1000 (ui/tabs/constants.py RECRUIT_REFRESH_KEY)
+BUY_COUNT_KEY = "buy_count"     # key trong settings của tab: "ALL" (không giới hạn) | 10..100 (ui/tabs/constants.py RECRUIT_BUY_COUNT_KEY)
 HIGH_QUALITY_POPUP = f"{FOLDER}/HighQualityPopup.png"   # dòng chữ của popup (1,00; màn Recruit General thường 0,30)
 CANCEL = f"{FOLDER}/Cancel.png"                         # nút Cancel đỏ của popup (1,00; màn thường 0,45)
 CANCEL_WAIT = 1   # giây chờ sau khi bấm Cancel (delay cố định, không cần sửa)
@@ -134,7 +136,7 @@ LIST_RELOAD_WAIT = 2   # giây chờ thêm sau khi về màn danh sách tướng
 
 # ---- Giới hạn số tướng mua mỗi lượt chạy ----
 # Mua xong vẫn Refresh tiếp (săn tướng xịn kế tiếp); mua đủ BUY_LIMIT tướng trong lượt chạy này thì ghi log rồi dừng activity.
-BUY_LIMIT = 3
+BUY_LIMIT = 3   # số tướng mua tối đa khi settings không có "buy_count"
 
 # ---- Thiếu vàng: bấm nút mua ra màn "How to get" (danh sách rương vàng) -> mở hết rương nếu tab tích "Open Gold" ----
 # Ảnh cắt từ ảnh chụp 396x704: tiêu đề "How to get" (1,00; màn chi tiết tướng 0,30), chữ "Use" của nút Use trong danh sách (1,00 .. 0,93; chữ "Use it to
@@ -156,3 +158,7 @@ USE_LOAD_WAIT = 3             # giây chờ sau khi bấm Use (giữa màn hiệ
 GOLD_MAX_USES = 40            # số rương tối đa dùng mỗi lần
 GOLD_LIST_MIN_DIFF = 1.0     # độ khác nhau trung bình (0..255) giữa hai ảnh danh sách rương trước / sau khi bấm Use; cao hơn = danh sách đã đổi = đã dùng
 DETAIL_BACK_WAIT = 10        # giây tối đa chờ về màn chi tiết tướng sau khi Back khỏi How to get (wait_for 1 giây / lần)
+
+# ---- Đủ số tướng tối đa: sau khi bấm nút mua hiện popup giữa màn "You can only have up to 61 Generals. Please upgrade your Keep, Rank and VIP Level to
+# recruit more Generals." + nút Confirm -> dừng activity (không bấm Confirm). Ảnh cắt hai dòng cuối (không đổi theo số tướng tối đa): 1,00; các màn khác <= 0,31.
+GENERALS_FULL = f"{FOLDER}/GeneralsFull.png"

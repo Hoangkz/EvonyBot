@@ -11,7 +11,8 @@ import unittest
 from pathlib import Path
 
 from bot.activities import recruit_general
-from bot.activities.recruit_general.constants import CANCEL, CONFIRM, DETAIL_BUY_TOKEN, DETAIL_RECRUIT, MENU_RECRUIT, REFRESH, REFRESH_MAX, REFRESH_WAIT
+from bot.activities.recruit_general.constants import (CANCEL, CONFIRM, DETAIL_BUY_TOKEN, DETAIL_RECRUIT, LIST_USE, MENU_RECRUIT, POPUP_MAX, POPUP_USE,
+                                                      REFRESH, REFRESH_MAX, REFRESH_WAIT)
 from tests.flow import Step, end, run_flow, swipe, tap, tap_at, tap_pct
 
 SCREENS = Path(__file__).parent / "screens"
@@ -269,7 +270,7 @@ class SwitchGeneral(unittest.TestCase):
         from unittest import mock
         module = importlib.import_module("bot.activities.recruit_general.run")
         names = iter(names)
-        with mock.patch.object(module, "crowned_slots", return_value=crowned),                 mock.patch.object(module, "dot_colors", return_value=["purple", "blue", "gold", "green", "purple", "white"]),                 mock.patch.object(module, "shown_slot", side_effect=list(shown) + [shown[-1]] * 20),                 mock.patch.object(module, "_wanted_general", side_effect=lambda bot: next(names)),                 mock.patch.object(module, "_buy", return_value=True) as buy,                 mock.patch.object(module, "_goto_slot", return_value=True) as goto:
+        with mock.patch.object(module, "crowned_slots", return_value=crowned),                 mock.patch.object(module, "dot_colors", return_value=["purple", "blue", "gold", "green", "purple", "white"]),                 mock.patch.object(module, "shown_slot", side_effect=list(shown) + [shown[-1]] * 20),                 mock.patch.object(module, "_wanted_general", side_effect=lambda bot, wanted: next(names)),                 mock.patch.object(module, "_buy", return_value=True) as buy,                 mock.patch.object(module, "_goto_slot", return_value=True) as goto:
             bought = module._handle_generals(self.Bot(), settings or {})
         return bought, [c.args[1] for c in goto.call_args_list], buy
 
@@ -278,7 +279,7 @@ class SwitchGeneral(unittest.TestCase):
         bought, gotos, buy = self._handle([0, 4], [4], [None, "Frederick the Great"], {"buy_with": "Buy General Token"})
         self.assertEqual(bought, 1)
         self.assertEqual(gotos, [0])
-        self.assertEqual(buy.call_args.args[1:], ("Frederick the Great", "Buy General Token"))
+        self.assertEqual(buy.call_args.args[1:], ("Frederick the Great", "Buy General Token", False))
 
     def test_handle_keeps_swiping_after_buying(self):
         """Mua tướng đang hiện xong vẫn kéo tiếp sang tướng xịn còn lại."""
@@ -348,8 +349,10 @@ class BuyWait(unittest.TestCase):
     """Sau khi bấm vào tướng: chờ 1 giây / lần, mất nút Refresh = ra màn chi tiết -> mua; còn Refresh thì chờ tới tối đa 8 giây."""
 
     class Bot:
-        def __init__(self, refresh_script):
+        def __init__(self, refresh_script, how_to_get=(), full=False):
             self.script, self.slept, self.taps, self.logs, self.backs = list(refresh_script), 0, [], [], 0
+            self.full = full   # popup hết chỗ tướng đang hiện
+            self.how = list(how_to_get)   # lần lượt: màn "How to get" có hiện sau khi bấm nút mua không (hết dãy = không)
 
         def tap_percent(self, *args, **kwargs):
             self.taps.append(("pct",) + args)
@@ -366,7 +369,17 @@ class BuyWait(unittest.TestCase):
         def find(self, path, screen=None, threshold=0.8, region=None):
             if path.endswith("Refresh.png"):
                 return (10, 10) if (self.script.pop(0) if self.script else False) else None
+            if path.endswith("GeneralsFull.png"):
+                return (50, 50) if self.full else None
             return (50, 50)   # nút ở màn chi tiết: DetailRecruit / DetailBuyToken (kiểu hai nút)
+
+        def wait_for(self, path, timeout=10, threshold=0.8, interval=0.5):
+            if path.endswith("HowToGetTitle.png"):
+                shown = self.how.pop(0) if self.how else False
+                if not shown:
+                    self.slept += timeout   # chờ hết thời gian mà không thấy
+                return (50, 50) if shown else None
+            return (50, 50)   # nút mua của màn chi tiết (sau khi mở vàng)
 
         def back(self, delay=0):
             self.backs += 1
@@ -378,33 +391,33 @@ class BuyWait(unittest.TestCase):
 
     def test_detail_opens_after_one_second(self):
         module = importlib.import_module("bot.activities.recruit_general.run")
-        bot = self.Bot([False, True])    # sau 1 giây đã mất Refresh (ra chi tiết); sau khi mua 1 giây đã về danh sách (thấy Refresh)
+        bot = self.Bot([False, True, True])    # sau 1 giây mất Refresh (ra chi tiết); sau khi bấm mua: không thấy How to get, thấy Refresh (đã về); chờ danh sách 1 giây
         self.assertTrue(module._buy(bot, "X"))
-        self.assertEqual(bot.slept, 2 + 2)   # + 2 giây chờ game load lại dữ liệu
+        self.assertEqual(bot.slept, 1 + 1 + 1 + 2)   # chi tiết + chờ How to get + chờ danh sách + 2 giây chờ game load lại dữ liệu
         self.assertEqual(bot.backs, 0)
         self.assertEqual(bot.taps[0], ("pct", 50, 40))
         self.assertEqual(len(bot.taps), 2)   # bấm tướng + bấm nút mua
 
     def test_waits_more_while_refresh_visible(self):
         module = importlib.import_module("bot.activities.recruit_general.run")
-        bot = self.Bot([True, True, False, True])   # còn Refresh 2 lần, lần 3 mất; sau khi mua về ngay
+        bot = self.Bot([True, True, False, True, True])   # còn Refresh 2 lần, lần 3 mất; sau khi mua về ngay
         self.assertTrue(module._buy(bot, "X"))
-        self.assertEqual(bot.slept, 4 + 2)
+        self.assertEqual(bot.slept, 3 + 1 + 1 + 2)
 
     def test_waits_for_list_after_buy(self):
         """Sau khi mua: chờ 1 giây / lần để về danh sách (thấy Refresh); về sau 4 giây thì không Back."""
         module = importlib.import_module("bot.activities.recruit_general.run")
-        bot = self.Bot([False, False, False, False, True])
+        bot = self.Bot([False, True, False, False, False, True])
         self.assertTrue(module._buy(bot, "X"))
-        self.assertEqual(bot.slept, 1 + 4 + 2)
+        self.assertEqual(bot.slept, 1 + 1 + 4 + 2)
         self.assertEqual(bot.backs, 0)
 
     def test_back_when_list_never_returns(self):
         """Sau khi mua, 10 giây vẫn chưa về danh sách: bấm Back."""
         module = importlib.import_module("bot.activities.recruit_general.run")
-        bot = self.Bot([False] * 11)
+        bot = self.Bot([False, True] + [False] * 10)
         self.assertTrue(module._buy(bot, "X"))
-        self.assertEqual(bot.slept, 1 + 10 + 2)
+        self.assertEqual(bot.slept, 1 + 1 + 10 + 2)
         self.assertEqual(bot.backs, 1)
 
     def test_gives_up_after_8s(self):
@@ -413,6 +426,158 @@ class BuyWait(unittest.TestCase):
         self.assertFalse(module._buy(bot, "X"))
         self.assertEqual(bot.slept, 8)
         self.assertEqual(len(bot.taps), 1)   # chỉ bấm vào tướng, không bấm nút mua
+
+
+    def test_generals_full_popup_stops(self):
+        """Sau khi bấm mua hiện popup "You can only have up to N Generals" (nút Confirm giữa màn): dừng activity, không bấm Confirm / Back."""
+        module = importlib.import_module("bot.activities.recruit_general.run")
+        bot = self.Bot([False], full=True)
+        with self.assertRaises(module.GeneralsFull):
+            module._buy(bot, "X")
+        self.assertEqual(len(bot.taps), 2)   # bấm tướng + bấm nút mua, không bấm Confirm
+        self.assertEqual(bot.backs, 0)
+
+    def test_not_enough_gold_without_open_gold_stops(self):
+        """Bấm nút mua ra màn How to get (thiếu vàng), tab không tích Open Gold: Back hai lần về danh sách rồi NotEnoughGold (dừng activity)."""
+        module = importlib.import_module("bot.activities.recruit_general.run")
+        bot = self.Bot([False, True], how_to_get=[True])
+        with self.assertRaises(module.NotEnoughGold):
+            module._buy(bot, "X", open_gold=False)
+        self.assertEqual(bot.backs, 2)
+        self.assertEqual(len(bot.taps), 2)   # bấm tướng + bấm nút mua, không mở vàng
+
+    def test_not_enough_gold_with_open_gold_opens_and_buys_again(self):
+        """Thiếu vàng + tích Open Gold: mở hết vàng, Back về chi tiết, bấm mua lại; đủ vàng thì mua xong."""
+        from unittest import mock
+        module = importlib.import_module("bot.activities.recruit_general.run")
+        bot = self.Bot([False, True, True], how_to_get=[True, False])   # lần bấm đầu: How to get; lần bấm lại: không còn (đã mua, về danh sách)
+        with mock.patch.object(module, "_open_all_gold", return_value=3) as opened:
+            self.assertTrue(module._buy(bot, "X", open_gold=True))
+        opened.assert_called_once()
+        self.assertEqual(bot.backs, 1)       # How to get -> màn chi tiết
+        self.assertEqual(len(bot.taps), 3)   # bấm tướng + nút mua + nút mua lại
+
+    def test_still_not_enough_gold_after_opening_stops(self):
+        """Đã mở hết vàng mà bấm mua lại vẫn ra How to get: Back về danh sách rồi NotEnoughGold."""
+        from unittest import mock
+        module = importlib.import_module("bot.activities.recruit_general.run")
+        bot = self.Bot([False, True], how_to_get=[True, True])
+        with mock.patch.object(module, "_open_all_gold", return_value=3):
+            with self.assertRaises(module.NotEnoughGold):
+                module._buy(bot, "X", open_gold=True)
+        self.assertEqual(bot.backs, 3)       # How to get -> chi tiết, rồi hai lần Back về danh sách
+
+
+class GeneralsFullFlow(unittest.TestCase):
+    def test_full_popup_stops_the_activity_on_a_real_screen(self):
+        """Ảnh thật 20 (popup hết chỗ tướng sau khi bấm mua): activity trả False, không thao tác gì thêm."""
+        module = importlib.import_module("bot.activities.recruit_general.run")
+        flow = [
+            Step("04_high_quality_popup.png", tap(CANCEL)),
+            Step("03_recruit_both_checked.png?epic_off", tap_pct(50, 40)),
+            Step("05_general_detail.png", tap(DETAIL_RECRUIT)),
+            Step("20_generals_full.png", end(result=False)),
+        ]
+        device = run_flow(self, recruit_general.run, SCREENS, flow, {"generals": ["Frederick the Great"]}, setup=_setup, variants=VARIANTS)
+        self.assertTrue(any("General limit is reached" in line for line in device.logs))
+
+
+class OpenAllGold(unittest.TestCase):
+    """Màn "How to get": bấm Use từng rương (ảnh thật 16 danh sách, 17 popup đã ở tối đa = nút "Minimum", 18 popup chưa tối đa = nút "Max",
+    19 danh sách không còn nút Use)."""
+
+    def _run(self, flow):
+        module = importlib.import_module("bot.activities.recruit_general.run")
+        return run_flow(self, lambda ctx, _s: module._open_all_gold(ctx), SCREENS, flow, {}, setup=_setup, variants=VARIANTS)
+
+    def test_no_use_button_means_no_gold(self):
+        """Không thấy nút Use nào: hết vàng, dừng ngay (không bấm gì)."""
+        self._run([Step("19_how_to_get_empty.png", end(result=0))])
+
+    def test_popup_at_max_presses_use(self):
+        """Bấm Use -> popup đã ở tối đa (nút trái "Minimum"): bấm Use trong popup luôn; về danh sách không còn Use thì dừng."""
+        flow = [
+            Step("16_how_to_get_list.png", tap(LIST_USE)),
+            Step("17_gold_popup_minimum.png", tap(POPUP_USE)),
+            Step("19_how_to_get_empty.png", end(result=1)),
+        ]
+        self._run(flow)
+
+    def test_popup_not_at_max_presses_max_first(self):
+        """Popup chưa ở tối đa (nút trái "Max"): bấm Max (nút đổi thành "Minimum") rồi mới bấm Use."""
+        flow = [
+            Step("16_how_to_get_list.png", tap(LIST_USE)),
+            Step("18_gold_popup_max.png", tap(POPUP_MAX)),
+            Step("17_gold_popup_minimum.png", tap(POPUP_USE)),
+            Step("19_how_to_get_empty.png", end(result=1)),
+        ]
+        self._run(flow)
+
+    def test_single_item_has_no_popup(self):
+        """Chỉ có một rương: bấm Use không hiện popup, danh sách đổi (không còn Use) = đã dùng."""
+        flow = [
+            Step("16_how_to_get_list.png", tap(LIST_USE)),
+            Step("19_how_to_get_empty.png", end(result=1)),
+        ]
+        self._run(flow)
+
+    def test_use_that_does_nothing_is_skipped(self):
+        """Bấm Use mà màn không đổi, không popup: bỏ qua nút đó, thử nút kế; thử hết bốn nút thì dừng (không lặp mãi)."""
+        flow = [Step("16_how_to_get_list.png", tap(LIST_USE)) for _ in range(4)] + [Step("16_how_to_get_list.png", end(result=0))]
+        self._run(flow)
+
+
+class OcrName(unittest.TestCase):
+    """OCR tên tướng (bot/ocr/read_general_name.py) trên dải tên của ảnh thật, và so khớp một phần tên."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.ocr = importlib.import_module("bot.ocr.read_general_name")
+
+    def _read(self, screen):
+        import cv2
+        image = cv2.imread(str(SCREENS / screen))
+        return self.ocr.run(image[478:512, 99:297])
+
+    def test_reads_names_of_every_colour(self):
+        for screen, name in [("02_recruit_unchecked.png", "hong fu nu"), ("03_recruit_both_checked.png", "frederick the great"),
+                             ("09_rustam.png", "rustam"), ("10_arminius.png", "arminius"), ("11_barrack.png", "barrack"),
+                             ("15_five_crowned.png", "constance i")]:
+            self.assertEqual(self._read(screen), name, screen)
+
+    def test_no_name_bar_reads_none(self):
+        """Popup làm mờ màn (không còn thanh tên sáng): không đọc ra chữ."""
+        self.assertIsNone(self._read("04_high_quality_popup.png"))
+
+    def test_similarity_part_of_the_name_is_enough(self):
+        s = self.ocr.similarity
+        self.assertGreaterEqual(s("?athanael", "Nathanael Greene"), 0.5)   # thiếu chữ đầu
+        self.assertGreaterEqual(s("nathanael", "Nathanael Greene"), 0.99)  # chỉ một phần tên
+        self.assertGreaterEqual(s("witch siegei", "Witch Siegel"), 0.99)   # i / l là một chữ
+        self.assertGreaterEqual(s("casimir pulaski", "Casimir Pulaski (old name: Robert Lee)"), 0.99)   # bỏ phần trong ngoặc
+
+    def test_similarity_rejects_other_names_and_short_reads(self):
+        s = self.ocr.similarity
+        self.assertEqual(s("rustam", "Frederick the Great"), 0.0)
+        self.assertEqual(s("ee", "Nathanael Greene"), 0.0)   # khớp dưới 3 chữ
+        self.assertEqual(s("???", "Nero"), 0.0)
+        self.assertEqual(s(None, "Nero"), 0.0)
+        self.assertGreater(s("queen boudica", "Queen Boudica"), s("queen boudica", "Queen Victoria"))
+
+    def test_unknown_letters_are_logged_once(self):
+        """Tên OCR có "?": lưu ảnh dải tên vào logs/generals (mỗi tên một lần mỗi lần chạy)."""
+        import tempfile
+        from unittest import mock
+
+        import numpy as np
+        module = importlib.import_module("bot.activities.recruit_general.run")
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(module, "LOGS_DIR", Path(tmp)), mock.patch.object(module, "_logged", set()):
+            strip = np.zeros((34, 198, 3), np.uint8)
+            module._log_unknown("hattoi nin?a", strip)
+            module._log_unknown("hattoi nin?a", strip)
+            module._log_unknown("rustam", strip)   # không có "?": không lưu
+            self.assertEqual(sorted(p.name for p in Path(tmp).iterdir()), ["hattoi_ninxa.png", "unknown.logs"])
+            self.assertEqual(len((Path(tmp) / "unknown.logs").read_text(encoding="utf-8").splitlines()), 1)
 
 
 class RecruitGeneralFlow(unittest.TestCase):
@@ -455,35 +620,13 @@ class RecruitGeneralFlow(unittest.TestCase):
             Step("02_recruit_unchecked.png?right", tap(REFRESH)),   # popup đã đóng, danh sách tướng cần mua rỗng: Refresh tiếp
             Step("01_tavern_menu.png", end(result=True)),
         ]
-        self._wanted_dir(False)
         device = run_flow(self, recruit_general.run, SCREENS, flow, {}, setup=_setup, variants=VARIANTS)
         self.assertEqual(len([e for _, e in device.events if e[0] == "tap"]), 4)
 
-    def _wanted_dir(self, with_general: bool, source="02_recruit_unchecked.png", name="Hong Fu Nu", crop=(485, 505, 130, 262)):
-        """Thư mục ảnh tạm (bản sao Images/RecruitGeneral) có (hoặc không có) ảnh tên tướng cắt từ ảnh `source` trong Generals/."""
-        import shutil
-        import tempfile
-        from unittest import mock
-
-        import cv2
-        from bot.context import screen as screen_module, TEMPLATE_DIR
-        tmp = tempfile.TemporaryDirectory()
-        self.addCleanup(tmp.cleanup)
-        root = Path(tmp.name)
-        shutil.copytree(TEMPLATE_DIR / "RecruitGeneral", root / "RecruitGeneral", ignore=shutil.ignore_patterns("Generals"))
-        (root / "RecruitGeneral" / "Generals").mkdir()
-        if with_general:
-            img = cv2.imread(str(SCREENS / source))
-            y0, y1, x0, x1 = crop
-            cv2.imwrite(str(root / "RecruitGeneral" / "Generals" / f"{name}.png"), img[y0:y1, x0:x1])
-        module = importlib.import_module("bot.activities.recruit_general.run")
-        for target in (mock.patch.object(module, "TEMPLATE_DIR", root), mock.patch.object(screen_module, "TEMPLATE_DIR", root)):
-            target.start()
-            self.addCleanup(target.stop)
+    FREDERICK = {"generals": ["Frederick the Great"]}   # tên đọc OCR từ ảnh 03 (tướng tím chấm 1)
 
     def test_cancel_then_wanted_general(self):
         """Sau Cancel tướng đang hiện có vương miện (tím) và tên cần mua: sang luồng mua (chưa làm: không bấm gì thêm), dừng."""
-        self._wanted_dir(True, "03_recruit_both_checked.png", "Frederick the Great", (486, 504, 138, 258))
         flow = [
             Step("02_recruit_unchecked.png?right", tap(REFRESH)),
             Step("04_high_quality_popup.png", tap(CANCEL)),
@@ -493,14 +636,13 @@ class RecruitGeneralFlow(unittest.TestCase):
             Step("02_recruit_unchecked.png?right", tap(REFRESH)),             # rồi Refresh tiếp
             Step("01_tavern_menu.png", end(result=True)),
         ]
-        device = run_flow(self, recruit_general.run, SCREENS, flow, {}, setup=_setup, variants=VARIANTS)
+        device = run_flow(self, recruit_general.run, SCREENS, flow, self.FREDERICK, setup=_setup, variants=VARIANTS)
         self.assertTrue(any("crowned General slot(s)" in line and "1 purple" in line for line in device.logs))
         self.assertTrue(any("wanted General Frederick the Great" in line for line in device.logs))
         self.assertTrue(any("tapped Recruit General" in line for line in device.logs))
 
     def _to_detail(self, detail, settings, button):
         """Tới màn chi tiết tướng `detail` rồi bấm `button` (tên tướng cần mua Frederick the Great, ảnh 03)."""
-        self._wanted_dir(True, "03_recruit_both_checked.png", "Frederick the Great", (486, 504, 138, 258))
         flow = [
             Step("04_high_quality_popup.png", tap(CANCEL)),
             Step("03_recruit_both_checked.png?epic_off", tap_pct(50, 40)),
@@ -508,7 +650,7 @@ class RecruitGeneralFlow(unittest.TestCase):
             Step("02_recruit_unchecked.png?right", tap(REFRESH)),       # game tự về màn danh sách tướng: Refresh tiếp
             Step("01_tavern_menu.png", end(result=True)),
         ]
-        return run_flow(self, recruit_general.run, SCREENS, flow, settings, setup=_setup, variants=VARIANTS)
+        return run_flow(self, recruit_general.run, SCREENS, flow, {**settings, **self.FREDERICK}, setup=_setup, variants=VARIANTS)
 
     def test_detail_single_button_taps_it(self):
         """Màn chi tiết chỉ có MỘT nút Recruit General: bấm thẳng, kể cả khi setting là Buy General Token."""
@@ -521,7 +663,6 @@ class RecruitGeneralFlow(unittest.TestCase):
     def test_two_generals_swipe_to_the_other_and_buy(self):
         """HAI tướng xịn (ảnh 08: Barbarossa vàng đang hiện ở chấm 5 và tướng tím ở chấm 1): tên đang hiện không cần mua, kéo sang phải
         tới tướng chấm 1 (Frederick the Great, cần mua), mua, tích lại Historic rồi Refresh tiếp."""
-        self._wanted_dir(True, "03_recruit_both_checked.png", "Frederick the Great", (486, 504, 138, 258))
         flow = [
             Step("04_high_quality_popup.png", tap(CANCEL)),
             Step("08_two_generals.png", swipe(5, 40, 95, 40)),                  # đích bên trái: kéo sang phải
@@ -531,7 +672,7 @@ class RecruitGeneralFlow(unittest.TestCase):
             Step("02_recruit_unchecked.png?right", tap(REFRESH)),
             Step("01_tavern_menu.png", end(result=True)),
         ]
-        device = run_flow(self, recruit_general.run, SCREENS, flow, {}, setup=_setup, variants=VARIANTS)
+        device = run_flow(self, recruit_general.run, SCREENS, flow, self.FREDERICK, setup=_setup, variants=VARIANTS)
         self.assertTrue(any("crowned General slot(s)" in line and "1 purple" in line and "5 gold" in line for line in device.logs))
 
     def test_low_level_three_or_four_generals_stops(self):
@@ -565,6 +706,40 @@ class RecruitGeneralFlow(unittest.TestCase):
             device = run_flow(self, recruit_general.run, SCREENS, flow, {}, setup=_setup, variants=VARIANTS)
         self.assertTrue(any("bought 3 General(s), stop" in line for line in device.logs))
 
+    def _buy_count_run(self, settings, popups):
+        """Chạy `popups` lượt popup, mỗi lượt mua 1 tướng (mock): trả log."""
+        from unittest import mock
+        module = importlib.import_module("bot.activities.recruit_general.run")
+        flow = [Step("04_high_quality_popup.png", tap(CANCEL)) for _ in range(popups)] + [Step("01_tavern_menu.png", end(result=True))]
+        with mock.patch.object(module, "_handle_generals", return_value=1), mock.patch.object(module, "_set_warnings", return_value=True),                 mock.patch.object(module, "_refresh_confirm", return_value=True):
+            return run_flow(self, recruit_general.run, SCREENS, flow, settings, setup=_setup, variants=VARIANTS).logs
+
+    def test_buy_count_setting_stops_after_n(self):
+        """Setting buy_count = 10: mua 10 tướng thì dừng (mỗi lượt popup mua 1 tướng)."""
+        logs = self._buy_count_run({"buy_count": 10}, 10)
+        self.assertTrue(any("bought 10 General(s), stop" in line for line in logs))
+
+    def test_buy_count_all_never_stops_on_count(self):
+        """buy_count = ALL: mua bao nhiêu cũng không dừng vì số tướng (ở đây hết ảnh mới rời màn)."""
+        logs = self._buy_count_run({"buy_count": "ALL"}, 12)
+        self.assertFalse(any("General(s), stop" in line for line in logs))
+        self.assertTrue(any("bought 12/ALL General(s) so far" in line for line in logs))
+
+    def test_refresh_count_setting_stops_after_n(self):
+        """Setting refresh_count = 100: bấm Refresh đủ 100 lần rồi dừng."""
+        flow = [Step("02_recruit_unchecked.png?right", *[tap(REFRESH)] * 100), Step("02_recruit_unchecked.png?right", end(result=True))]
+        device = run_flow(self, recruit_general.run, SCREENS, flow, {"refresh_count": 100}, setup=_setup, variants=VARIANTS)
+        self.assertEqual(len([e for _, e in device.events if e[0] == "tap"]), 100)
+        self.assertTrue(any("100 refreshes done" in line for line in device.logs))
+
+    def test_limit_values(self):
+        """"ALL" = không giới hạn; số hợp lệ giữ nguyên; thiếu / sai kiểu (settings cũ) về mặc định."""
+        module = importlib.import_module("bot.activities.recruit_general.run")
+        self.assertIsNone(module._limit("ALL", 7))
+        self.assertEqual(module._limit(300, 7), 300)
+        for bad in (None, "x", 0, -5, True, 2.5):
+            self.assertEqual(module._limit(bad, 7), 7, bad)
+
     def test_refresh_after_checking_confirms_the_popup(self):
         """Kiểm tra xong các tướng xịn: bấm Refresh; popup "high quality General" hiện lại thì bấm Confirm."""
         module = importlib.import_module("bot.activities.recruit_general.run")
@@ -585,8 +760,7 @@ class RecruitGeneralFlow(unittest.TestCase):
         run_flow(self, lambda ctx, _s: module._refresh_confirm(ctx), SCREENS, flow, {}, setup=_setup, variants=VARIANTS)
 
     def test_cancel_then_crowned_but_unwanted_keeps_refreshing(self):
-        """Có vương miện nhưng tên không có trong danh sách: Refresh tiếp."""
-        self._wanted_dir(False)
+        """Có vương miện nhưng tên không có trong danh sách tướng đã tích: Refresh tiếp."""
         flow = [
             Step("04_high_quality_popup.png", tap(CANCEL)),
             Step("03_recruit_both_checked.png?epic_off", tap(REFRESH)),
@@ -596,13 +770,12 @@ class RecruitGeneralFlow(unittest.TestCase):
 
     def test_cancel_then_no_crown_keeps_refreshing(self):
         """Tên tướng đang hiện có trong danh sách nhưng không có vương miện (chấm xanh): bỏ qua, Refresh tiếp."""
-        self._wanted_dir(True)   # Hong Fu Nu: có trong danh sách nhưng ảnh 02 không có vương miện
         flow = [
             Step("04_high_quality_popup.png", tap(CANCEL)),
             Step("02_recruit_unchecked.png?right", tap(REFRESH)),
             Step("01_tavern_menu.png", end(result=True)),
         ]
-        device = run_flow(self, recruit_general.run, SCREENS, flow, {}, setup=_setup, variants=VARIANTS)
+        device = run_flow(self, recruit_general.run, SCREENS, flow, {"generals": ["Hong Fu Nu"]}, setup=_setup, variants=VARIANTS)   # Hong Fu Nu có trong danh sách nhưng ảnh 02 không có vương miện
         self.assertFalse(any("wanted General" in line for line in device.logs))
 
     def test_refresh_stops_at_max(self):

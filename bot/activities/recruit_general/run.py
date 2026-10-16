@@ -14,6 +14,7 @@ run.py — activity "Recruit General": `run(bot, settings)` (chưa có cấu hì
    rời màn Recruit General, mất nút Refresh hoặc đủ REFRESH_MAX lần.
 Trả True khi tới màn Recruit General và hai ô đúng trạng thái, False khi không tới được / không đổi được ô.
 """
+import itertools
 import os
 import re
 import time
@@ -45,6 +46,7 @@ from .constants import (
     CROWN_THRESHOLD,
     CROWN_Y,
     BUY_KEY,
+    GENERALS_FULL,
     GOLD_MAX_USES,
     GOLD_LIST_MIN_DIFF,
     HOW_TO_GET_TITLE,
@@ -61,6 +63,7 @@ from .constants import (
     POPUP_USE,
     POPUP_WAIT,
     USE_LOAD_WAIT,
+    BUY_COUNT_KEY,
     BUY_LIMIT,
     BUY_RECRUIT,
     BUY_TOKEN,
@@ -104,6 +107,7 @@ from .constants import (
     NAME_MATCH,
     NAME_STRIP,
     REFRESH,
+    REFRESH_KEY,
     REFRESH_MAX,
     REFRESH_WAIT,
     SCREEN_WAIT,
@@ -236,10 +240,18 @@ def _set_warnings(bot) -> bool:
     return historic and epic
 
 
+def _limit(value, default: int) -> int | None:
+    """Số lần tối đa từ setting của tab: số nguyên dương; "ALL" = không giới hạn (None); thiếu / không hợp lệ (settings cũ) = `default`."""
+    if value == "ALL":
+        return None
+    return value if isinstance(value, int) and not isinstance(value, bool) and value > 0 else default
+
+
 def _refresh(bot, settings: dict) -> bool:
-    """Bấm Refresh liên tục, mỗi lần chờ REFRESH_WAIT giây. Hiện popup tướng xịn thì bấm Cancel, kiểm tra / mua tướng (`_handle_generals`) rồi Refresh tiếp. Cũng dừng khi không còn ở màn Recruit General, không thấy nút Refresh, hoặc đủ REFRESH_MAX lần. True (đã bấm ít nhất một lần hoặc dừng vì màn đổi)."""
+    """Bấm Refresh liên tục, mỗi lần chờ REFRESH_WAIT giây. Hiện popup tướng xịn thì bấm Cancel, kiểm tra / mua tướng (`_handle_generals`) rồi Refresh tiếp. Cũng dừng khi không còn ở màn Recruit General, không thấy nút Refresh, hoặc đủ số lần Refresh của tab (setting `refresh_count`, ALL = không giới hạn; mặc định REFRESH_MAX). Dừng khi mua đủ `buy_count` tướng (ALL = không giới hạn; mặc định BUY_LIMIT). True (đã bấm ít nhất một lần hoặc dừng vì màn đổi)."""
     bought = 0   # số tướng đã mua trong lượt chạy này
-    for count in range(REFRESH_MAX):
+    refresh_limit, buy_limit = _limit(settings.get(REFRESH_KEY), REFRESH_MAX), _limit(settings.get(BUY_COUNT_KEY), BUY_LIMIT)
+    for count in (itertools.count() if refresh_limit is None else range(refresh_limit)):
         screen = bot.screenshot()
         if bot.find(HIGH_QUALITY_POPUP, screen=screen, threshold=THRESHOLD) is not None:   # xét trước: tiêu đề / Refresh vẫn khớp dưới popup
             cancel = bot.find(CANCEL, screen=screen, threshold=THRESHOLD)
@@ -251,10 +263,12 @@ def _refresh(bot, settings: dict) -> bool:
             except NotEnoughGold as error:
                 bot.record(f"{NAME}: not enough gold to recruit {error}, stop")
                 return False
+            except GeneralsFull:
+                return False   # đã ghi log ở `_how_to_get_shown`
             if bought_now:
                 bought += bought_now
-                bot.record(f"{NAME}: bought {bought}/{BUY_LIMIT} General(s) so far")
-                if bought >= BUY_LIMIT:
+                bot.record(f"{NAME}: bought {bought}/{buy_limit or 'ALL'} General(s) so far")
+                if buy_limit is not None and bought >= buy_limit:
                     bot.record(f"{NAME}: bought {bought} General(s), stop")
                     return True
                 if not _set_warnings(bot):   # mua xong game có thể bỏ tích hai ô: tích lại Historic
@@ -271,7 +285,7 @@ def _refresh(bot, settings: dict) -> bool:
             return False
         # Thực hiện bấm Refresh cho đến khi ra tướng lịch sử (popup high quality General -> Cancel, dừng ở trên).
         bot.tap(*button, delay=REFRESH_WAIT)  # delay cố định, không cần sửa
-    bot.record(f"{NAME}: {REFRESH_MAX} refreshes done")
+    bot.record(f"{NAME}: {refresh_limit} refreshes done")
     return True
 
 
@@ -327,6 +341,10 @@ def _wanted_general(bot, wanted: list) -> str | None:
         return name
     bot.log(f"{NAME}: General not in the wanted list, keep refreshing")
     return None
+
+
+class GeneralsFull(Exception):
+    """Đã đủ số tướng tối đa (popup "You can only have up to N Generals..." + nút Confirm giữa màn): dừng activity (`_refresh` bắt, trả False)."""
 
 
 class NotEnoughGold(Exception):
@@ -388,10 +406,13 @@ def _buy(bot, name: str, buy_with: str = BUY_RECRUIT, open_gold: bool = False) -
 
 def _how_to_get_shown(bot) -> bool:
     """Sau khi bấm nút mua: wait_for màn "How to get" (thiếu vàng), 1 giây / lần tối đa HOW_TO_GET_WAIT giây, True khi thấy; thấy nút Refresh của
-    Tavern (đã mua xong, về danh sách) thì dừng chờ, False."""
+    Tavern (đã mua xong, về danh sách) thì dừng chờ, False; thấy popup hết chỗ tướng (GENERALS_FULL) thì raise GeneralsFull."""
     for _ in range(HOW_TO_GET_WAIT):
         if bot.wait_for(HOW_TO_GET_TITLE, timeout=1, threshold=THRESHOLD, interval=1) is not None:
             return True
+        if bot.find(GENERALS_FULL, threshold=THRESHOLD) is not None:   # popup hết chỗ tướng (nút Confirm giữa màn): không bấm Confirm, dừng
+            bot.record(f"{NAME}: the General limit is reached (popup with the Confirm button), stop")
+            raise GeneralsFull()
         if bot.find(REFRESH, threshold=THRESHOLD) is not None:
             return False
     return False

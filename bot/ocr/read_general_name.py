@@ -25,6 +25,7 @@ TEXT_MIN_VALUE = 100    # V above this inside the bar is text
 BAR_MARGIN = 3          # px: shrink the bar outline so its border is not read as text
 SPACE_GAP = 4           # px of empty columns between two words
 MIN_SCORE = 0.75        # below this a piece reads as "?"
+SPAN_SLACK = 2          # similarity: the matched letters must lie within a stretch of the name at most len(text) + this long
 MIN_MATCHED = 3         # similarity: fewer matched letters than this (or than the whole name if shorter) is no match
 DOT_RATIO = 0.6         # a piece shorter than this x the tallest one is punctuation (. , ' -), dropped
 
@@ -66,8 +67,11 @@ def similarity(text: str | None, name: str) -> float:
     if not a or not b:
         return 0.0
     matcher = SequenceMatcher(None, a, b, autojunk=False)
-    matched = sum(block.size for block in matcher.get_matching_blocks())
+    blocks = [block for block in matcher.get_matching_blocks() if block.size]
+    matched = sum(block.size for block in blocks)
     if matched < min(MIN_MATCHED, len(b)):
+        return 0.0
+    if blocks[-1].b + blocks[-1].size - blocks[0].b > len(a) + SPAN_SLACK:   # chữ khớp rải khắp tên dài: không phải một đoạn của tên
         return 0.0
     return matched / len(a) + matcher.ratio() / 1000
 
