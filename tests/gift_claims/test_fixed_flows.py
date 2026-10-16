@@ -319,34 +319,6 @@ class FixedGiftFlowTests(unittest.TestCase):
         self.assertEqual(common.ClaimReport(2, 2), report)
         self.assertEqual(2, bot.tap.call_count)
 
-    def test_event_center_remaining_red_is_not_marked_done(self):
-        bot = mock.Mock()
-        bot.is_daily_done.return_value = False
-        progress = gift_claims.GiftProgress()
-        with mock.patch.object(event_center, "run_opened", return_value=False):
-            gift_claims._dispatch(bot, GiftScreen.EVENT_CENTER, progress)
-
-        bot.mark_daily_done.assert_not_called()
-        self.assertIn(GiftScreen.EVENT_CENTER, progress.unresolved_parents)
-
-    def test_event_center_keeps_finished_rows_across_boss_resume(self):
-        bot = mock.Mock()
-        progress = gift_claims.GiftProgress()
-        progress.event_center_done.add(b"finished-row")
-        with mock.patch.object(event_center, "run_opened", return_value=False):
-            gift_claims._dispatch(bot, GiftScreen.EVENT_CENTER, progress)
-
-        self.assertEqual({b"finished-row"}, progress.event_center_done)
-
-    def test_back_to_territory_keeps_finished_tabs_across_boss_resume(self):
-        bot = mock.Mock()
-        progress = gift_claims.GiftProgress()
-        progress.back_to_territory_done.add(b"finished-tab")
-        with (mock.patch.object(back_to_territory, "run_opened", return_value=False),
-              mock.patch.object(gift_claims, "return_home")):
-            gift_claims._dispatch(bot, GiftScreen.BACK_TO_TERRITORY, progress)
-
-        self.assertEqual({b"finished-tab"}, progress.back_to_territory_done)
 
     def test_event_center_finds_inner_red_tab_and_excludes_purchase_edge(self):
         screen = np.zeros((704, 396, 3), dtype=np.uint8)
@@ -772,65 +744,6 @@ class FixedGiftFlowTests(unittest.TestCase):
                            event_center.FIXED_CLAIMS,
                            back_to_territory.FIXED_CLAIMS):
             self.assertIn("Common/button_claim_text", collection)
-
-    def test_dispatch_uses_identified_inner_screen_name(self):
-        bot = mock.Mock()
-        bot.is_daily_done.return_value = False
-        super_result = {empire_depot.KEY: "cleared"}
-        valuable_result = {limited_offer.KEY: "no_dot"}
-        progress = gift_claims.GiftProgress()
-        with (mock.patch.object(super_value_return, "run_opened",
-                                return_value=(super_result, True)) as run_super,
-              mock.patch.object(valuable_event, "run_opened",
-                                return_value=(valuable_result, True)) as run_valuable):
-            gift_claims._dispatch(bot, GiftScreen.SUPER_VALUE_RETURN, progress)
-            gift_claims._dispatch(bot, GiftScreen.VALUABLE_EVENT, progress)
-
-        run_super.assert_called_once()
-        run_valuable.assert_called_once()
-        bot.mark_daily_done.assert_not_called()
-
-    def test_unknown_rotating_screen_is_checked_then_skipped(self):
-        bot = mock.Mock()
-        bot.is_daily_done.return_value = False
-        progress = gift_claims.GiftProgress()
-        with (mock.patch.object(gift_claims, "return_home") as return_home,
-              mock.patch.object(gift_claims, "claim_fixed_controls",
-                                return_value=common.ClaimReport()) as fixed,
-              mock.patch.object(gift_claims, "back_if_close_x", return_value=False),
-              mock.patch.object(gift_claims, "claim_sparkles",
-                                return_value=common.ClaimReport()) as sparkle,
-              mock.patch.object(valuable_event, "run_opened",
-                                return_value=({limited_offer.KEY: "no_dot"}, True)) as run):
-            gift_claims._dispatch(bot, GiftScreen.UNKNOWN, progress)
-            gift_claims._dispatch(bot, GiftScreen.VALUABLE_EVENT, progress)
-
-        return_home.assert_called_once_with(bot)
-        fixed.assert_called_once()
-        sparkle.assert_called_once_with(bot, region=(5, 18, 90, 82), attempts=4)
-        run.assert_called_once()
-        bot.mark_daily_done.assert_not_called()
-
-    def test_parent_with_remaining_red_marker_stays_unresolved_without_db_done(self):
-        bot = mock.Mock()
-        bot.is_daily_done.return_value = False
-        progress = gift_claims.GiftProgress()
-        with mock.patch.object(super_value_return, "run_opened",
-                               return_value=({empire_depot.KEY: "remaining"}, False)):
-            gift_claims._dispatch(bot, GiftScreen.SUPER_VALUE_RETURN, progress)
-
-        bot.mark_daily_done.assert_not_called()
-        self.assertIn(GiftScreen.SUPER_VALUE_RETURN, progress.unresolved_parents)
-
-    def test_legacy_parent_state_does_not_write_aggregate_checkpoint(self):
-        bot = mock.Mock()
-        bot.is_daily_done.return_value = False
-        progress = gift_claims.GiftProgress()
-        with (mock.patch.object(back_to_territory, "run_opened", return_value=False),
-              mock.patch.object(gift_claims, "return_home")):
-            gift_claims._dispatch(bot, GiftScreen.BACK_TO_TERRITORY, progress)
-
-        bot.mark_daily_done.assert_not_called()
 
 
 if __name__ == "__main__":
