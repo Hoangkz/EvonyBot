@@ -2,7 +2,6 @@
 import cv2
 import numpy as np
 
-from ...context.errors import YieldToBoss
 from .common import REFERENCE_WIDTH, find, find_all, return_home
 from .screens import GiftScreen, identify
 
@@ -56,7 +55,7 @@ def _switch_parent_carousel(bot, expected) -> bool:
                            if find(bot, name, screen, threshold=0.70,
                                    region=(0, 7, 100, 20)) is not None), None)
             if target is not None:
-                bot.tap(*target, delay=2)
+                bot.tap(*target, delay=1)
                 if identify(bot, bot.screenshot()) == expected:
                     return True
             if step < 8:
@@ -197,7 +196,7 @@ def open_next(bot, boundary: str, attempted: list[tuple[int, int]]):
     """Open the next unvisited red-dot icon in one boundary."""
     if not return_home(bot):
         bot.record("Gift Claims: không về được màn chính; chưa được coi là hết vùng")
-        raise YieldToBoss
+        return None
     bot.sleep(0.7)
     screen = bot.screenshot()
     dots = red_dots(screen, boundary)
@@ -259,9 +258,9 @@ def open_named(bot, expected):
     if launcher is not None:
         # Template contains only the caption; the icon body above is the safe
         # clickable launcher and follows the bottom bar when slots move.
-        bot.tap(launcher[0], max(0, launcher[1] - 20), delay=2)
+        bot.tap(launcher[0], max(0, launcher[1] - 20), delay=1)
     else:
-        bot.tap_percent(*target, delay=2)
+        bot.tap_percent(*target, delay=1)
     for attempt in range(OPEN_WAIT_ATTEMPTS):
         screen = bot.screenshot()
         if identify(bot, screen) == expected:

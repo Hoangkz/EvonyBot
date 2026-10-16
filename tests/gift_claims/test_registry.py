@@ -11,7 +11,6 @@ from bot.activities import gift_claims
 from bot.activities.gift_claims import common, lobby, valuable_event
 from bot.activities.gift_claims import registry
 from bot.activities.gift_claims.screens import GiftScreen
-from bot.context.errors import YieldToBoss
 from bot.daily_reset import done_today
 from database import Database
 
@@ -220,6 +219,24 @@ class GiftClaimRegistryTests(unittest.TestCase):
         self.assertIn("gift_region_2_test", done)
         self.assertNotIn("gift_region_1_test", done)
 
+    def test_gift_region_disables_join_boss_interrupt_during_its_run(self):
+        bot = mock.Mock()
+        bot._boss_interrupt_enabled = True
+        bot._deadline = 123.0
+        observed = []
+
+        def pending(_bot, _zone=None):
+            observed.append((_bot._boss_interrupt_enabled, _bot._deadline))
+            return ()
+
+        with mock.patch.object(registry, "pending", side_effect=pending):
+            self.assertTrue(gift_claims.run_region(bot, registry.REGION_2))
+
+        self.assertTrue(observed)
+        self.assertTrue(all(state == (False, None) for state in observed))
+        self.assertIs(bot._boss_interrupt_enabled, True)
+        self.assertEqual(123.0, bot._deadline)
+
     def test_region_1_clean_parents_mark_all_children_done_without_reopening(self):
         done = set()
         bot = mock.Mock()
@@ -262,7 +279,7 @@ class GiftClaimRegistryTests(unittest.TestCase):
               mock.patch.object(lobby, "open_next") as open_next):
             self.assertTrue(lobby.open_named(bot, GiftScreen.VALUABLE_EVENT))
 
-        bot.tap.assert_called_once_with(259, 571, delay=2)
+        bot.tap.assert_called_once_with(259, 571, delay=1)
         bot.tap_percent.assert_not_called()
         open_next.assert_not_called()
 
@@ -279,7 +296,7 @@ class GiftClaimRegistryTests(unittest.TestCase):
             count = common.tap_claims(bot, ("Example/button",), max_taps=6)
 
         self.assertEqual(count, 1)
-        bot.tap.assert_called_once_with(100, 200, delay=2)
+        bot.tap.assert_called_once_with(100, 200, delay=1)
 
     def test_claimable_aliases_at_same_control_are_tapped_once(self):
         bot = mock.Mock()
@@ -291,7 +308,7 @@ class GiftClaimRegistryTests(unittest.TestCase):
             )
 
         self.assertEqual(1, count)
-        bot.tap.assert_called_once_with(100, 200, delay=2)
+        bot.tap.assert_called_once_with(100, 200, delay=1)
 
     def test_sparkle_fallback_only_uses_lower_non_purchase_area(self):
         before = np.zeros((704, 396, 3), dtype=np.uint8)
@@ -335,7 +352,7 @@ class GiftClaimRegistryTests(unittest.TestCase):
 
         self.assertEqual(count, 1)
         self.assertEqual(bot.sleep.call_count, 2)
-        bot.tap.assert_called_once_with(100, 200, delay=2)
+        bot.tap.assert_called_once_with(100, 200, delay=1)
 
     def test_fixed_claim_does_not_count_an_unverified_tap(self):
         bot = mock.Mock()
@@ -437,11 +454,11 @@ class GiftClaimRegistryTests(unittest.TestCase):
         self.assertIs(opened, screen)
         bot.tap.assert_called_once_with(360, 290, delay=1)
 
-    def test_lobby_navigation_failure_yields_instead_of_finishing_boundary(self):
+    def test_lobby_navigation_failure_stays_pending_without_yielding_to_boss(self):
         bot = mock.Mock()
         with mock.patch.object(gift_claims.lobby, "return_home", return_value=False):
-            with self.assertRaises(YieldToBoss):
-                gift_claims.lobby.open_next(bot, gift_claims.lobby.BOTTOM, [])
+            self.assertIsNone(
+                gift_claims.lobby.open_next(bot, gift_claims.lobby.BOTTOM, []))
 
 
 if __name__ == "__main__":

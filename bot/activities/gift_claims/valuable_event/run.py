@@ -154,7 +154,7 @@ def run_opened(bot, due_keys: set[str], *, handled: set[str] | None = None
                     continue
 
                 bot.record(f"Gift Claims: Valuable Event mở {spec.task.label} (có dấu đỏ)")
-                bot.tap(*tab, delay=2)
+                bot.tap(*tab, delay=1)
                 if key == strategic_stockpile.KEY:
                     verified = strategic_stockpile.claim_opened(bot)
                     report = ClaimReport(verified, verified)

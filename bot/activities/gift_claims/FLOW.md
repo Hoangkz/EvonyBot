@@ -2,8 +2,9 @@
 
 ## Phạm vi
 
-Task `gift_claims` chỉ chạy sau Daily Activities và có ưu tiên thấp nhất. Mỗi
-điểm nhận có một key DB riêng (ví dụ `gift_limited_offer`), còn `gift_claims`
+Task `gift_claims` hiện là luồng độc lập, chưa được đăng ký tự động vào
+scheduler và không còn chạy sau Daily Activities. Điểm chạy sẽ được thiết lập
+sau. Mỗi điểm nhận có một key DB riêng (ví dụ `gift_limited_offer`), còn `gift_claims`
 chỉ là key tổng để scheduler biết cả hai khu đã xong. Registry tại
 `gift_claims/registry.py` là danh sách bắt buộc phải kiểm tra; chấm đỏ không
 được dùng để kết luận một task đã xong.
@@ -30,12 +31,9 @@ gift_claims/
     └── <từng event>/run.py
 ```
 
-Mỗi event có entry `run(bot)` trong thư mục của chính nó. Chưa có event con nào
-được worker đăng ký thành job/priority riêng. Hiện worker chỉ gọi
-`daily_activities.common._run_gifts()`; sau khi Daily Activities và phần
-Activity Rewards hoàn thành, hàm này gọi một lần `gift_claims.run(ctx)`. Entry
-chung đó quét cả hai khu. Cách chọn/gọi riêng từng `run(bot)` sẽ được thêm sau
-khi có quy tắc điều phối.
+Mỗi event có entry `run(bot)` trong thư mục của chính nó. Chưa có event con hay
+entry tổng nào được worker đăng ký thành job/priority. `gift_claims.run(ctx)`
+vẫn là entry chung quét cả hai khu để dùng khi điểm chạy riêng được thiết lập.
 
 ## Trình tự chung
 
@@ -76,8 +74,9 @@ khi có quy tắc điều phối.
    cạnh không được dùng để kết luận tab vừa xử lý vẫn còn đỏ.
    Mục đã được mở, kiểm tra nút cố định và sparkle đủ 4 lần được coi là đã xét;
    badge trang trí hoặc badge không tự tắt không được làm luồng lặp vô hạn.
-10. Hết 120 giây thì dừng tại điểm kiểm tra gần nhất, nhường Boss và tiếp tục
-    các mục chưa xét ở lát sau.
+10. Gift Claims tạm tắt cờ ngắt bởi Join Boss và deadline của lượt boss trong
+    suốt một lần chạy. Nút Stop và mốc reset server vẫn được kiểm tra. Lỗi điều
+    hướng giữ mục ở trạng thái PENDING để lần chạy Gift Claims sau thử lại.
 11. Nếu DB nói chưa làm, Vùng 1 mở màn cha và quét carousel đủ hai chiều. Khi
     màn cha không còn tab đỏ, toàn bộ key còn lại của riêng màn cha đó được ghi
     DONE, không mở lại từng tab. Vùng 2 vẫn phải vào đúng event con theo quy
@@ -103,8 +102,8 @@ khi có quy tắc điều phối.
 - Back to Territory: với mỗi tab đỏ trên carousel, duyệt tiếp toàn bộ badge đỏ
   ở hàng Day và Daily Login/Stamina/Daily Activity bên dưới; quét dọc danh sách
   để nhận tất cả nút Claim trùng nhau. Chỉ sau đó mới dò sparkle; một sparkle
-  không sinh Congratulations thì dừng tab đó. Nếu lát 120 giây ngắt giữa tab,
-  tab đó chưa được ghi nhớ và phải được mở lại ở lát sau.
+  không sinh Congratulations thì dừng tab đó. Nếu người dùng bấm Stop giữa
+  tab, tab đó chưa được ghi nhớ và phải được mở lại ở lần chạy sau.
 - Event Center: ưu tiên quét đủ ba nhóm theo thứ tự Limited, Activities rồi
   Competition. Precious Blazon Exchange và Hypnos' Dream chỉ mở Rewards khi
   thấy đúng phần chữ Rewards; Dwarf's Treasure tương tự với chữ Daily Free.
@@ -126,7 +125,7 @@ khi có quy tắc điều phối.
   dùng crop gồm cả rương `Daily Free` để tâm ảnh nằm trong vùng bấm thật.
 - Limited chủ động tìm dòng Grace of Star Trail một lần ngay cả khi dòng ngoài
   không có badge đỏ. Việc cuộn danh sách dừng sớm khi ảnh ổn định ở biên; các
-  nhóm đã DONE được checkpoint để lát 120 giây sau không quét lại.
+  nhóm đã DONE được checkpoint để lần chạy sau không quét lại.
 - Màn xoay vòng chưa có tiêu đề cố định: vẫn tìm toàn bộ nút chữ nhận trong
   vùng nội dung, sau đó kiểm tra sparkle đủ bốn lần. Nếu không có kết quả nhận
   thì coi là badge mua hàng và bỏ qua, không để chặn task chung.

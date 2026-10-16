@@ -15,7 +15,6 @@ import cv2
 
 from ...common import click_images, delay, exit_images, find_first, go_home
 from ...context.templates import TEMPLATE_DIR
-from .. import gift_claims
 from ..result import NOT_DONE, TaskResult, clear, done, save_errors, take
 from .constants import (
     GENERAL,
@@ -868,13 +867,6 @@ def _run_rewards(ctx, settings):
     ctx.mark_daily_done(REWARDS)
 
 
-@save_errors("daily_gift_claims")
-def _run_gifts(ctx, settings):
-    """Nhận quà cuối ngày: chỉ khi mọi việc Daily đã tích và thưởng Activity đã xong (chưa thì worker xếp xuống cuối)."""
-    if daily_selected_done(ctx, settings) and ctx.is_daily_done(REWARDS):
-        gift_claims.run(ctx)
-
-
 def _any_selected(settings: dict) -> bool:
     return bool(selected_labels(settings))
 
@@ -887,12 +879,4 @@ def _rewards_done_or_not_ready(ctx, settings) -> bool:
     return not any(ctx.is_daily_done(_KEY_BY_LABEL.get(label, label)) for label in selected_labels(settings))
 
 
-def _gifts_done_or_not_ready(ctx, settings) -> bool:
-    """Xong hôm nay, hoặc chưa tới lúc nhận (Daily đã tích chưa xong hết / thưởng Activity chưa nhận): worker bỏ qua, không
-    gọi run chạy không để đếm lần thử. Mỗi vòng worker đọc lại, hết điều kiện chặn là tự quay lại."""
-    return (ctx.is_daily_done(gift_claims.KEY)
-            or not (daily_selected_done(ctx, settings) and ctx.is_daily_done(REWARDS)))
-
-
 REWARDS_JOB = {"run": _run_rewards, "enabled": _any_selected, "done": _rewards_done_or_not_ready}
-GIFTS_JOB = {"run": _run_gifts, "enabled": _any_selected, "done": _gifts_done_or_not_ready}

@@ -4,9 +4,9 @@ Every named reward location has a durable child key.  ``KEY`` is written only
 after all locations in both outer zones have a current server-day checkpoint.
 """
 from dataclasses import dataclass, field
+from functools import wraps
 from importlib import import_module
 
-from ...context.errors import YieldToBoss
 from . import event_center, lobby, registry, valuable_event
 # Compatibility aliases for callers that previously imported a specific
 # non-Event-Center claim flow from ``gift_claims``.  Implementations live in
@@ -21,7 +21,28 @@ from .common import (TEXT_CLAIM_CONTROLS, back_if_close_x,
 from .screens import GiftScreen
 
 KEY = "gift_claims"
-LABEL = "Nhận toàn bộ quà sau Daily Activities"
+LABEL = "Nhận toàn bộ quà"
+
+
+def _without_join_boss_interrupt(func):
+    """Keep one gift run intact while preserving Stop/reset safety checks."""
+    @wraps(func)
+    def wrapped(bot, *args, **kwargs):
+        missing = object()
+        saved_boss = getattr(bot, "_boss_interrupt_enabled", missing)
+        saved_deadline = getattr(bot, "_deadline", missing)
+        if saved_boss is not missing:
+            bot._boss_interrupt_enabled = False
+        if saved_deadline is not missing:
+            bot._deadline = None
+        try:
+            return func(bot, *args, **kwargs)
+        finally:
+            if saved_boss is not missing:
+                bot._boss_interrupt_enabled = saved_boss
+            if saved_deadline is not missing:
+                bot._deadline = saved_deadline
+    return wrapped
 
 
 @dataclass
@@ -145,6 +166,7 @@ def _dispatch(bot, screen_name: GiftScreen, progress: GiftProgress):
     return_home(bot)
 
 
+@_without_join_boss_interrupt
 def run_region(bot, region: str) -> bool:
     """Run every DB-pending gift location in exactly one user-defined region."""
     if region not in (registry.REGION_1, registry.REGION_2):
@@ -221,6 +243,7 @@ def _run_region_1(bot, label: str) -> bool:
     return True
 
 
+@_without_join_boss_interrupt
 def run(bot) -> bool:
     """Run region 1 then region 2 with durable child checkpoints.
 

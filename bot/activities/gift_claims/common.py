@@ -174,7 +174,7 @@ def open_launcher(bot, launcher: str | tuple[str, ...]):
         return None
     # Launcher templates deliberately contain only their stable text labels;
     # tap the icon body just above the label, where the game accepts input.
-    bot.tap(pos[0], max(0, pos[1] - round(20 * screen.shape[1] / REFERENCE_WIDTH)), delay=2)
+    bot.tap(pos[0], max(0, pos[1] - round(20 * screen.shape[1] / REFERENCE_WIDTH)), delay=1)
     return bot.screenshot()
 
 
@@ -226,7 +226,7 @@ def select_carousel_tab(bot, page_title: str, tab: str, screen=None) -> bool:
             screen = bot.screenshot()
             pos = find(bot, tab, screen, threshold=0.74, region=(0, 7, 100, 20))
             if pos is not None:
-                bot.tap(*pos, delay=2)
+                bot.tap(*pos, delay=1)
                 return True
             if direction < 0:
                 bot.swipe_percent(85, 14, 20, 14, duration=0.5, delay=1)
@@ -246,7 +246,7 @@ def open_event_center_event(bot, row: str, page_title: str) -> bool:
         bot.log(f"Gift Claims: không thấy hàng cố định {row}")
         return_home(bot)
         return False
-    bot.tap_percent(52, row_pos[1] * 100 / screen.shape[0], delay=2)
+    bot.tap_percent(52, row_pos[1] * 100 / screen.shape[0], delay=1)
     opened = bot.screenshot()
     if find(bot, page_title, opened, threshold=0.72, region=(0, 0, 100, 13)) is not None:
         return True
@@ -296,7 +296,7 @@ def tap_claims(bot, templates: tuple[str, ...], *, max_taps: int = 6,
         attempted.add(name)
         attempted_positions.append(pos)
         bot.record(f"Gift Claims: tap {name}")
-        bot.tap(*pos, delay=2)
+        bot.tap(*pos, delay=1)
         count += 1
         after = bot.screenshot()
         change = float(cv2.absdiff(screen, after).mean())
@@ -427,7 +427,7 @@ def tap_sparkle(bot, *, region=(0, 20, 100, 88)) -> bool:
     if point is None:
         return False
     bot.record(f"Gift Claims: không thấy nút cố định, tap sparkle {point}")
-    bot.tap(*point, delay=1.5)
+    bot.tap(*point, delay=1)
     return True
 
 

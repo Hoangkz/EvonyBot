@@ -380,7 +380,7 @@ def _process_opened_event(bot):
                 dot, signature = candidate
                 bot.record(f"Gift Claims: Event Center mở tab đỏ bên trong {dot}")
                 bot.tap(max(0, dot[0] - 25), min(screen.shape[0] - 1, dot[1] + 15),
-                        delay=1.2)
+                        delay=1)
                 report, closed = _process_current_event_content(bot)
                 total = ClaimReport(total.attempted + report.attempted,
                                     total.verified + report.verified)
@@ -473,7 +473,7 @@ def _activities_facebook_red(bot, screen) -> bool:
 
 def _select_category(bot, name: str, x_percent: int) -> bool:
     bot.record(f"Gift Claims: Event Center chọn nhóm {name}")
-    bot.tap_percent(x_percent, 11, delay=1.2)
+    bot.tap_percent(x_percent, 11, delay=1)
     for _ in range(4):
         screen = bot.screenshot()
         if find(bot, PAGE, screen, threshold=0.72,
@@ -579,7 +579,7 @@ def _scan_category(bot, category: str, visited: set[bytes]) -> bool:
             if candidate is None:
                 break
             y, key, expected_screen, event_label = candidate
-            bot.tap_percent(52, y * 100 / screen.shape[0], delay=2)
+            bot.tap_percent(52, y * 100 / screen.shape[0], delay=1)
             if expected_screen is not None:
                 actual_screen = identify(bot)
                 if actual_screen != expected_screen:

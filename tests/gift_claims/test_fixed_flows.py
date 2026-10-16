@@ -9,7 +9,6 @@ import numpy as np
 from bot.activities import gift_claims
 from bot.activities.gift_claims import common, lobby
 from bot.activities.gift_claims.screens import GiftScreen, TITLE_TEMPLATES, identify
-from bot.context.errors import YieldToBoss
 
 event_center = import_module("bot.activities.gift_claims.event_center.run")
 valuable_event = import_module("bot.activities.gift_claims.valuable_event.run")

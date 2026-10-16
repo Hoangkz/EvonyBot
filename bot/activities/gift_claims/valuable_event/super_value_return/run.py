@@ -131,7 +131,7 @@ def run_opened(bot, due_keys: set[str], *, handled: set[str] | None = None
                 if login_tab is not None:
                     bot.record("Gift Claims: Super Value Return mở Login Gifts "
                                "(kiểm tra quà ngày)")
-                    bot.tap(*login_tab, delay=2)
+                    bot.tap(*login_tab, delay=1)
                     claimed = bool(login_gifts.claim_opened(bot))
                     results[login_gifts.KEY] = "processed" if claimed else "checked"
                     handled.add(login_gifts.KEY)
@@ -164,7 +164,7 @@ def run_opened(bot, due_keys: set[str], *, handled: set[str] | None = None
                 has_dot = True
                 marker = "có dấu đỏ" if has_dot else "kiểm tra quà ngày"
                 bot.record(f"Gift Claims: Super Value Return mở {spec.task.label} ({marker})")
-                bot.tap(*tab, delay=2)
+                bot.tap(*tab, delay=1)
                 if key == login_gifts.KEY:
                     count = login_gifts.claim_opened(bot)
                     report = ClaimReport(count, count)

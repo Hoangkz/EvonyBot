@@ -84,8 +84,7 @@ class RealRegistryTests(unittest.TestCase):
         tasks = self.build(["Daily Activities", "Open Gift Box"], settings)
         ordered = [t.key for t in tasks]   # build_tasks đã xếp theo độ ưu tiên
         self.assertEqual(ordered, ["crazy_eggs", "open_gift_box", "daily_buy_general", "daily_offering",
-                                   "daily_gold_levy", "daily_alliance_donation", "daily_patrol", "daily_rewards",
-                                   "daily_gift_claims"])
+                                   "daily_gold_levy", "daily_alliance_donation", "daily_patrol", "daily_rewards"])
         by_key = {t.key: t for t in tasks}
         self.assertIsNotNone(by_key["crazy_eggs"].due)   # việc theo giờ: tới giờ mới đẩy lên đầu danh sách
         self.assertTrue(by_key["daily_patrol"].must_finish)

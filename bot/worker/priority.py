@@ -53,7 +53,6 @@ from ..activities.daily_activities.alliance_vip import JOB as daily_alliance_vip
 from ..activities.daily_activities.city_vip import JOB as daily_city_vip
 from ..activities.daily_activities.alliance_donation import constants as alliance_donation_constants
 from ..activities.daily_activities.alliance_help import constants as alliance_help_constants
-from ..activities.daily_activities.common import GIFTS_JOB as daily_gift_claims
 from ..activities.daily_activities.common import REWARDS_JOB as daily_rewards
 from ..activities.daily_activities.common import daily_job, hourly_job
 from ..activities.event.run import claim_job, event_job
@@ -63,7 +62,7 @@ from ..activities.open_gift_box.run import run as open_gift_box
 from ..activities import join_monster_war
 
 DATA ={
-    "_doc": "Độ ưu tiên của từng nhiệm vụ cho bộ chọn nhiệm vụ của worker (chưa dùng). Nhóm = activity (nút Select Activity / tab UI). key = key nhiệm vụ trong settings / daily_done. Ưu tiên cao hơn làm trước; cùng ưu tiên thì xoay vòng. Mặc định 1. Bubble và Join Boss cũng là nhiệm vụ nhưng có luật riêng (bot/worker/TODO.md mục 1): bubble luôn cao nhất, Join Boss chạy giữa mỗi 2 nhiệm vụ thường. Các key gift_* (bot/activities/gift_claims) không có dòng ở đây: Daily Activities gọi chúng sau khi mọi nhiệm vụ đã chọn cùng Activity Rewards hoàn tất. Mọi nhiệm vụ của nhóm Daily Activities (có run) đều must_finish: làm tới xong rồi mới tới nhiệm vụ khác, không giới hạn 120 giây, không bị Bubble / Auto Times Out / Join Boss ngắt. Thêm \"must_finish\": true vào nhiệm vụ cần làm tới xong: đã bắt đầu thì không bị Bubble / Join Boss / giới hạn 120 giây ngắt (chỉ Stop), xong rồi mới tới Bubble và Join Boss; khi cả activity còn chạy nguyên khối thì mọi nhiệm vụ của nhóm phải có cờ này.",
+    "_doc": "Độ ưu tiên của từng nhiệm vụ cho bộ chọn nhiệm vụ của worker (chưa dùng). Nhóm = activity (nút Select Activity / tab UI). key = key nhiệm vụ trong settings / daily_done. Ưu tiên cao hơn làm trước; cùng ưu tiên thì xoay vòng. Mặc định 1. Bubble và Join Boss cũng là nhiệm vụ nhưng có luật riêng (bot/worker/TODO.md mục 1): bubble luôn cao nhất, Join Boss chạy giữa mỗi 2 nhiệm vụ thường. Gift Claims hiện được tách khỏi Daily Activities và chưa đăng ký vào scheduler; người dùng sẽ thiết lập điểm chạy sau. Mọi nhiệm vụ của nhóm Daily Activities (có run) đều must_finish: làm tới xong rồi mới tới nhiệm vụ khác, không giới hạn 120 giây, không bị Bubble / Auto Times Out / Join Boss ngắt. Thêm \"must_finish\": true vào nhiệm vụ cần làm tới xong: đã bắt đầu thì không bị Bubble / Join Boss / giới hạn 120 giây ngắt (chỉ Stop), xong rồi mới tới Bubble và Join Boss; khi cả activity còn chạy nguyên khối thì mọi nhiệm vụ của nhóm phải có cờ này.",
     "Bubble": [
         {
             "key": "bubble", 
@@ -347,13 +346,6 @@ DATA ={
             "priority": 300,
             "tail": True,
         },
-        {
-            "key": "daily_gift_claims",
-            "run": daily_gift_claims,
-            "label": "Nhận quà cuối ngày (sau khi Daily và thưởng Activity xong)",
-            "priority": -200,
-            "tail": True,
-        }
     ],
     "Black Market": [
         { 
