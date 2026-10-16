@@ -34,7 +34,6 @@ CLAIM_ALL_THRESHOLD = 0.75   # ngưỡng khớp mẫu (thấp hơn mặc định
 CLAIM_ALL_TAPS = 3           # số lần bấm Claim All tối đa khi vừa mở danh sách
 # Ảnh tiêu đề dòng cắt từ danh sách thật (396x704) trong thư mục ảnh của nhiệm vụ: chỉ phần chữ cố
 # định, bỏ số lượng / "for N time(s)" (khác theo tài khoản, lần). Dòng đúng 1,00; dòng khác <= 0,78.
-# Resource Gathering = dòng "Gather ... resources from resource fields in the City" (thu mỏ trong thành).
 ROW_TITLE = "Title.png"
 # Nút Go / Claim nằm dưới tâm tiêu đề dòng ROW_BUTTON_DY px (Offer 434 -> 475, Tax 526 -> 568,
 # Research 356 -> Claim 399), lệch tối đa ROW_BUTTON_TOLERANCE.
