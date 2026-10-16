@@ -1,12 +1,13 @@
 """
 screen.py — screenshots and template matching.
 """
+import io
 import time
 
 import cv2
 import numpy as np
 from adbutils.errors import AdbError
-from PIL import UnidentifiedImageError
+from PIL import Image, UnidentifiedImageError
 
 from .templates import DEFAULT_THRESHOLD, TEMPLATE_DIR
 
@@ -18,7 +19,30 @@ class ScreenMixin:
         for attempt in range(3):
             self.check()
             try:
-                image = self.device.screenshot().convert("RGB")
+                if getattr(self.device, "_client", None) is not None:
+                    # adbutils.screenshot() uses a 600-second shell timeout
+                    # and, by default, converts malformed PNGs into a black
+                    # frame.  MEmu occasionally exhibits both behaviours.
+                    # Capture through the same command with a bounded timeout
+                    # so the two-minute task can still yield to Join Boss.
+                    # device.shell(timeout=...) applies its timeout only
+                    # *after* open_shell(); open_shell itself inherits the
+                    # library's 600-second transport timeout.  Open the
+                    # transport explicitly so connection, command and read
+                    # are all bounded.
+                    connection = self.device.open_transport(timeout=8)
+                    try:
+                        connection.conn.settimeout(8)
+                        connection.send_command("shell:screencap -p")
+                        connection.check_okay()
+                        png = connection.read_until_close(encoding=None)
+                    finally:
+                        connection.close()
+                    image = Image.open(io.BytesIO(png)).convert("RGB")
+                else:
+                    # Flow tests and lightweight fake devices provide only
+                    # the conventional no-argument screenshot method.
+                    image = self.device.screenshot().convert("RGB")
                 return cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
             except (AdbError, UnidentifiedImageError, OSError) as exc:
                 last_error = exc

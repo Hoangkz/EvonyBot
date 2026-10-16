@@ -1,4 +1,8 @@
-"""Report the best match for each gift template in an ADB screenshot run."""
+"""Report template matches from screenshots explicitly captured with --shots.
+
+Screenshots are diagnostic evidence for tuning image recognition, not normal test
+output. ``real_run --shots`` prints the temporary directory to pass here.
+"""
 import argparse
 from pathlib import Path
 
@@ -7,7 +11,8 @@ import cv2
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("run", type=Path, help="directory produced by real_run --shots")
+    parser.add_argument("run", type=Path,
+                        help="temporary directory printed by real_run --shots")
     args = parser.parse_args()
 
     images = [(path, cv2.imread(str(path))) for path in sorted(args.run.glob("*.png"))]

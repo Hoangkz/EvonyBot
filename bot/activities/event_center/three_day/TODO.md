@@ -21,5 +21,5 @@ Chỗ chờ số giây viết cứng, không có vòng kiểm tra rồi thử l�
 
 - [ ] [run.py:80](run.py#L80) (1.5s): `bot.back(delay=1.5)`
 - [ ] [run.py:182](run.py#L182) (1.5s): `bot.back(delay=1.5)`
-- [ ] [run.py:408](run.py#L408) (2s): `bot.tap(*c.REDEEM_TAB_TAP, delay=2)`
+- [x] [run.py:408](run.py#L408) (2s): `bot.tap(*c.REDEEM_TAB_TAP, delay=2)` — đã đổi: chờ 1s × tối đa 5 lần rồi bấm lại
 - [ ] [run.py:532](run.py#L532) (1s): `bot.tap(*c.QTY_MAX_TAP, delay=1)`

@@ -5,6 +5,7 @@ from ..policy import EventPolicy, run_opened_event
 
 POLICY = EventPolicy(
     "Hypnos' Dream",
+    key="gift_hypnos_dream",
     screen=GiftScreen.HYPNOS_DREAM,
     navigation=("Rewards", "HypnosDream/button_rewards"),
 )

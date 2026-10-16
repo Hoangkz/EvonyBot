@@ -2,7 +2,7 @@
 from ..policy import EventPolicy, run_opened_event
 
 
-POLICY = EventPolicy("Blessing of Pallas")
+POLICY = EventPolicy("Blessing of Pallas", key="gift_blessing_of_pallas")
 
 
 def run(bot):

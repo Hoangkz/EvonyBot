@@ -8,4 +8,4 @@ Chỗ chờ số giây viết cứng, không có vòng kiểm tra rồi thử l�
 
 - [ ] [run.py:119](run.py#L119) (1s): `bot.back(delay=1)`
 - [ ] [run.py:126](run.py#L126) (1s): `bot.back(delay=1)`
-- [ ] [run.py:129](run.py#L129) (2s): `bot.tap(*pos, delay=2)`
+- [x] [run.py:129](run.py#L129) (2s): `bot.tap(*pos, delay=2)` — đã đổi: tap_tab (1s, tối đa 10 lần chờ thêm)

@@ -148,16 +148,9 @@ class DailyTaskTests(unittest.TestCase):
         self.assertIn(catalog.REWARDS, bot.done)
         self.assertTrue(DEFS["daily_rewards"].done(bot, {"Offering": True}))
 
-    def test_gifts_wait_for_daily_and_rewards(self):
-        """Quà cuối ngày chỉ nhận khi mọi việc Daily đã tích và thưởng Activity đã xong (đọc DB)."""
-        run = DEFS["daily_gift_claims"].run
-        with mock.patch.object(catalog.gift_claims, "run") as gifts:
-            run(FakeBot({"daily_offering": "x"}), {"Offering": True})
-            gifts.assert_not_called()                                       # thưởng Activity chưa xong
-            run(FakeBot({}), {"Offering": True})
-            gifts.assert_not_called()                                       # Offering chưa xong
-            run(FakeBot({"daily_offering": "x", catalog.REWARDS: "x"}), {"Offering": True})
-            gifts.assert_called_once()
+    def test_gift_claims_is_not_chained_after_daily_activities(self):
+        """Gift Claims chờ điểm chạy riêng, không còn là đuôi của Daily."""
+        self.assertNotIn("daily_gift_claims", DEFS)
 
 
 if __name__ == "__main__":

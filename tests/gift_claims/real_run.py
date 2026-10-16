@@ -2,10 +2,16 @@ r"""Run one or all gift-claim modules on a real ADB device.
 
 Examples:
     venv\Scripts\python.exe -m tests.gift_claims.real_run --serial 127.0.0.1:21513
-    venv\Scripts\python.exe -m tests.gift_claims.real_run --task gift_limited_offer --shots
+    # Mô phỏng đúng một lát worker 120 giây:
+    venv\Scripts\python.exe -m tests.gift_claims.real_run --serial 127.0.0.1:21513 --task gift_event_center_limited --slice-seconds 120
+    # Bỏ --slice-seconds chỉ khi cần chẩn đoán Event Center tới hết luồng:
+    venv\Scripts\python.exe -m tests.gift_claims.real_run --serial 127.0.0.1:21513 --task gift_event_center_limited
+    # Chỉ bật --shots khi cần phân tích nhận diện ảnh; ảnh được lưu trong thư mục tạm.
+    venv\Scripts\python.exe -m tests.gift_claims.real_run --serial 127.0.0.1:21513 --task gift_event_center_limited --shots
 """
 import argparse
 import sys
+import tempfile
 import threading
 import time
 from datetime import datetime
@@ -26,13 +32,20 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--serial", required=True)
     parser.add_argument("--task", action="append", help="gift_* key; repeat to run several")
+    parser.add_argument("--region", choices=("1", "2"),
+                        help="chạy riêng Vùng 1 (ngoài Event Center) hoặc Vùng 2")
     parser.add_argument("--slice-seconds", type=float,
-                        help="simulate the worker time slice and resume after timeout")
+                        help="chỉ dùng khi cần mô phỏng worker yield; bỏ tham số này "
+                             "để test chạy tới khi hoàn tất")
     parser.add_argument("--zone2", action="store_true",
                         help="start the combined flow at the right-rail boundary")
     parser.add_argument("--max-slices", type=int,
                         help="stop a live diagnostic after this many slices")
-    parser.add_argument("--shots", action="store_true")
+    parser.add_argument(
+        "--shots",
+        action="store_true",
+        help="lưu mọi ảnh bot chụp vào thư mục tạm để chẩn đoán nhận diện",
+    )
     args = parser.parse_args()
 
     start = time.monotonic()
@@ -44,7 +57,8 @@ def main():
     bot.mark_daily_done = lambda key: done.__setitem__(key, datetime.now().isoformat(timespec="seconds"))
 
     if args.shots:
-        output = Path("tests/gift_claims/adb_runs") / datetime.now().strftime("%Y%m%d-%H%M%S")
+        output = (Path(tempfile.gettempdir()) / "evonybot_gift_claims" /
+                  datetime.now().strftime("%Y%m%d-%H%M%S"))
         output.mkdir(parents=True, exist_ok=True)
         screenshot, count = bot.screenshot, [0]
 
@@ -57,13 +71,24 @@ def main():
         bot.screenshot = save_screenshot
         log(f"screenshots: {output.resolve()}")
 
+    if args.region:
+        region = (gift_claims.registry.REGION_1 if args.region == "1"
+                  else gift_claims.registry.REGION_2)
+        clean = gift_claims.run_region(bot, region)
+        log(f"Region {args.region} clean: {clean}")
+        log(f"daily_done: {sorted(done)}")
+        return
+
     if args.task:
         if args.task != [event_center.KEY]:
             raise SystemExit(f"live diagnostic only supports {event_center.KEY}")
         bot._deadline = (time.monotonic() + args.slice_seconds
                          if args.slice_seconds else None)
         try:
-            clean = event_center.run_opened(bot)
+            # Standalone diagnostics start from whichever screen the emulator
+            # currently shows. Open Event Center through its fixed launcher
+            # before scanning the event list.
+            clean = event_center.run(bot)
             log(f"Event Center clean: {clean}")
         except BotInterrupted as exc:
             log(f"Event Center yield: {type(exc).__name__}")
