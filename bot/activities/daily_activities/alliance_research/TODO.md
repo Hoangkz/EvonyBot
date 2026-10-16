@@ -14,7 +14,6 @@
 
 ## Chưa làm
 - [ ] Flow test cả luồng từ Go (cần ảnh dòng "Research technologies" ở danh sách Activity và ảnh thành lúc Học viện ở giữa).
-- [ ] Giao diện Activity bản cũ: chưa có `Card.png` của nhiệm vụ nên bản cũ bỏ qua (TASK_UNKNOWN).
 - [ ] Ảnh dòng nhiệm vụ `Title.png` đang chép từ `ActivitiesSourceCollecting.png`; cắt lại từ danh sách thật nếu khớp kém.
 - [ ] Màn Technology báo lỗi riêng khi thiếu tài nguyên hoặc hàng chờ nghiên cứu đầy: hiện chỉ nhận qua việc nút Research
   xám hoặc không đổi sau khi bấm.

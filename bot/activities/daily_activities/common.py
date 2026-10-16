@@ -38,6 +38,8 @@ from .constants import (
     OLD_CARD,
     OLD_CARD_THRESHOLD,
     OLD_CONGRATS,
+    OLD_COMPLETED_MASK,
+    OLD_COMPLETED_THRESHOLD,
     OLD_DONE_BADGE,
     OLD_DONE_CARD,
     OLD_DONE_CARD_THRESHOLD,
@@ -97,6 +99,21 @@ def task_done_cards(task: Task) -> list[str]:
     nếu chưa có."""
     path = f"{ROOT}/{task.folder}/{OLD_DONE_CARD}"
     return [path] if (TEMPLATE_DIR / path).exists() else []
+
+
+def _green_mask(image):
+    """Ảnh nhị phân các điểm chữ xanh lá "Completed" (G > 180, R và B < 110)."""
+    b, g, r = (image[..., i].astype(int) for i in range(3))
+    return (((g > 180) & (r < 110) & (b < 110)) * 255).astype("uint8")
+
+
+def _completed_seen(screen) -> bool:
+    """Trên màn có thẻ "Completed" của nhiệm vụ nào đó (khớp chữ xanh chung, không cần Done.png riêng)."""
+    template = cv2.imread(str(TEMPLATE_DIR / OLD_COMPLETED_MASK), cv2.IMREAD_GRAYSCALE)
+    if template is None or screen is None:
+        return False
+    result = cv2.matchTemplate(_green_mask(screen), template, cv2.TM_CCOEFF_NORMED)
+    return float(result.max()) >= OLD_COMPLETED_THRESHOLD
 
 
 def _all_done_cards() -> list[str]:
@@ -354,8 +371,9 @@ def _search_grid(bot, cards, max_scrolls: int, done_cards=(), tap_go: bool = Tru
         card = next((pos for path in cards
                      if (pos := bot.find(path, threshold=OLD_CARD_THRESHOLD, screen=screen))
                      is not None), None)
-        if card is None and any(bot.find(path, threshold=OLD_DONE_CARD_THRESHOLD, screen=screen) is not None
-                                for path in _all_done_cards()):
+        if card is None and (_completed_seen(screen)
+                             or any(bot.find(path, threshold=OLD_DONE_CARD_THRESHOLD, screen=screen) is not None
+                                    for path in _all_done_cards())):
             # Chưa thấy thẻ mà đã thấy thẻ Completed của nhiệm vụ khác: thẻ đã nhận nằm cuối lưới, nên thẻ này đã
             # xong (hoặc cuộn trượt qua) -> như dấu tích V, open_task kiểm tra lại (TICK_TRIES).
             bot.log("Daily Activities: Completed card seen before the task card")

@@ -86,6 +86,10 @@ OLD_CONGRATS = f"{ROOT}/CollectionActivities/CongratulationsCurrent.png"
 # che một chút còn 0,89); cùng thẻ chưa nhận <= 0,77; Done của nhiệm vụ khác <= 0,53 -> ngưỡng 0,85.
 OLD_DONE_CARD = "Done.png"
 OLD_DONE_CARD_THRESHOLD = 0.85
+# Chữ "Completed" xanh lá chung cho mọi thẻ đã nhận (DailyActivites/OldCompleted.png: ảnh nhị phân, chỉ điểm chữ xanh).
+# Khớp trên ảnh nhị phân cùng cách lọc màu (G > 180, R và B < 110): thẻ Completed 0,64-1,00, lưới chưa xong <= 0,29.
+OLD_COMPLETED_MASK = f"{ROOT}/OldCompleted.png"
+OLD_COMPLETED_THRESHOLD = 0.55
 # Kết quả open_task.
 TASK_OPENED, TASK_DONE, TASK_NOT_FOUND, TASK_NO_LIST = "opened", "done", "not_found", "no_list"
 # Thấy tiêu đề dòng mà không nhận ra nút nào (không Go / Claim / tích V): không đoán là xong.

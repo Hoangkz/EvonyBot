@@ -42,7 +42,7 @@ Logic đã xong; còn thiếu **ảnh** (thêm ảnh là dùng được, không 
    `tests/daily_activities/screens/16..19_old_grid_*.png`; thẻ khớp 1,00, thẻ khác <= 0,51). Kiểm tra trên tài khoản
    khác (13_old_activity_grid): Gathering 0,97, Troop Healing 0,97, General Enhancing 0,97, Material Composing 0,96,
    Trap Building 0,88 (việc còn lại: [trap_building/TODO.md](trap_building/TODO.md)). Đã bấm thẻ xác nhận: găng tay = Resource
-   Collecting ("Collect resources from inside the City"), bình hoá chất = Research (không phải nhiệm vụ của bot).
+   Collecting ("Collect resources from inside the City"), bình hoá chất = Research (Card.png của alliance_research).
 4. **Thẻ đã 100% (bản cũ)**: icon thành hộp quà, bot nhận ra bằng chữ "100%" (`OLD_DONE_BADGE`) → bấm nhận, **chỉ
    khi chưa cuộn** (thẻ chưa nhận nằm đầu lưới; đã cuộn mà thấy "100%" là đã nhận). ~~Ảnh lưới sau khi nhận~~: đã
    có — thẻ xuống cuối lưới, icon cũ + tích xanh "Completed"; mỗi nhiệm vụ `<thư mục ảnh>/Done.png` → `TASK_DONE`.
