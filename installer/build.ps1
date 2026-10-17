@@ -4,7 +4,7 @@ build.ps1 — build the EvonyBot installer (replaces the PyInstaller build).
 Stages everything the installer ships into build\app:
   app\                     Python embeddable runtime + Lib\site-packages;
                            pythonw.exe is renamed EvonyBot.exe (the app's process name)
-  main.cp312-win_amd64.pyd all app code (main, database, version, updater,
+  main.pyd                 all app code (main, database, version, updater,
                            bot\, ui\) compiled by Nuitka into this one file
   EvonyBot.pyw             launcher stub (from main import main)
   ui\assets\, Images\
@@ -136,7 +136,7 @@ try {
 } finally {
     Pop-Location
 }
-Copy-Item (Join-Path $NuitkaOut "main*.pyd") $App
+Copy-Item (Join-Path $NuitkaOut "main*.pyd") (Join-Path $App "main.pyd")
 
 # ---- data files ------------------------------------------------------
 # Dữ liệu trước đây ship riêng dạng .json (boss, event, priority, black_market items /
