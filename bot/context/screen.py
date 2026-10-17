@@ -9,7 +9,7 @@ import numpy as np
 from adbutils.errors import AdbError
 from PIL import Image, UnidentifiedImageError
 
-from .templates import DEFAULT_THRESHOLD, TEMPLATE_DIR
+from .templates import DEFAULT_THRESHOLD, TEMPLATE_DIR, read_image
 
 
 class ScreenMixin:
@@ -70,7 +70,7 @@ class ScreenMixin:
             return name
         if name not in self._templates:
             path = TEMPLATE_DIR / name
-            image = cv2.imread(str(path))
+            image = read_image(path)
             if image is None:
                 raise FileNotFoundError(f"Template not found: {path}")
             self._templates[name] = image

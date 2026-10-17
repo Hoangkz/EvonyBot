@@ -10,7 +10,7 @@ from dataclasses import dataclass
 import cv2
 
 from ...common import click_images, delay, exit_images, find_first, go_home
-from ...context.templates import TEMPLATE_DIR
+from ...context.templates import TEMPLATE_DIR, read_image
 from ..result import NOT_DONE, TaskResult, clear, done, save_errors, take
 from .constants import (
     GENERAL,
@@ -108,7 +108,7 @@ def _green_mask(image):
 
 def _completed_seen(screen) -> bool:
     """Trên màn có thẻ "Completed" của nhiệm vụ nào đó (khớp chữ xanh chung, không cần Done.png riêng)."""
-    template = cv2.imread(str(TEMPLATE_DIR / OLD_COMPLETED_MASK), cv2.IMREAD_GRAYSCALE)
+    template = read_image(TEMPLATE_DIR / OLD_COMPLETED_MASK, cv2.IMREAD_GRAYSCALE)
     if template is None or screen is None:
         return False
     result = cv2.matchTemplate(_green_mask(screen), template, cv2.TM_CCOEFF_NORMED)

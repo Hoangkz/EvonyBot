@@ -143,7 +143,12 @@ Copy-Item (Join-Path $NuitkaOut "main*.pyd") $App
 # city_tour, ...) giờ là .py, được Nuitka compile cùng code -> không copy gì thêm.
 New-Item -ItemType Directory -Force (Join-Path $App "ui") | Out-Null
 Copy-Item (Join-Path $Root "ui\assets") (Join-Path $App "ui\assets") -Recurse
-Copy-Item (Join-Path $Root "Images") (Join-Path $App "Images") -Recurse
+# Images\ is not shipped as loose files: it is packed (scrambled) into images.dat, read into memory
+# at run time. Only the icon stays loose (the window icon and the shortcuts use it).
+& $HostPy (Join-Path $PSScriptRoot "pack_images.py") (Join-Path $Root "Images") (Join-Path $App "images.dat")
+if ($LASTEXITCODE -ne 0) { throw "packing images failed" }
+New-Item -ItemType Directory -Force (Join-Path $App "Images") | Out-Null
+Copy-Item (Join-Path $Root "Images\icon.ico") (Join-Path $App "Images\icon.ico")
 
 # A .pyd can't be run as a script, so the shortcut starts this stub.
 Set-Content (Join-Path $App "EvonyBot.pyw") -Encoding ascii -Value @(

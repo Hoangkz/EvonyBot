@@ -37,7 +37,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from ...context.templates import TEMPLATE_DIR
+from ...context.templates import TEMPLATE_DIR, read_image
 
 MARKET = "market"                # Chợ: City Tax, Black Market
 HOSPITAL = "hospital"            # Bệnh viện: Heal
@@ -143,7 +143,7 @@ def _civ_samples(civ: int, building: str) -> list[Path]:
 
 
 def _load(path: Path):
-    return cv2.imdecode(np.fromfile(str(path), np.uint8), cv2.IMREAD_COLOR)
+    return read_image(path)
 
 
 def _candidates(bot, buildings, others: bool = False) -> list[tuple[int | None, np.ndarray]]:

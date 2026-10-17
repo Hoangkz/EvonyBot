@@ -39,7 +39,7 @@ import cv2
 import numpy as np
 
 from ...common import click_images, delay, exit_images, find_first, go_home, images_in
-from ...context.templates import TEMPLATE_DIR
+from ...context.templates import TEMPLATE_DIR, read_image
 from ...ocr import read_progress
 from ...ocr.read_progress import run_two_lines as read_progress_two_lines
 from ..result import TaskResult, report
@@ -468,7 +468,7 @@ def add_title(bot, screen, titles: list[str], folder, box) -> bool:
         return False
     for template in titles:
         path = TEMPLATE_DIR / template
-        old = cv2.imdecode(np.fromfile(str(path), np.uint8), cv2.IMREAD_COLOR) if path.exists() else None
+        old = read_image(path)
         if old is not None and old.shape == crop.shape \
                 and float(cv2.matchTemplate(crop, old, cv2.TM_CCOEFF_NORMED).max()) >= TITLE_SAME:
             return False

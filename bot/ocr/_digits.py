@@ -9,7 +9,7 @@ make reads more reliable; add them with add_sample.py.
 import cv2
 import numpy as np
 
-from ..context.templates import TEMPLATE_DIR
+from ..context.templates import TEMPLATE_DIR, read_image
 
 OCR_DIR = TEMPLATE_DIR / "OCR"
 MIN_SCORE = 0.6          # below this a character is treated as unreadable
@@ -88,7 +88,7 @@ def _samples(font: str) -> tuple[list[str], np.ndarray]:
     if font not in _fonts:
         digits, rows = [], []
         for path in sorted((OCR_DIR / font).glob("*.png")):
-            image = cv2.imread(str(path), cv2.IMREAD_GRAYSCALE)
+            image = read_image(path, cv2.IMREAD_GRAYSCALE)
             if image is not None:
                 digits.append(path.stem.split("_")[0])
                 rows.append(_normalize(image))
