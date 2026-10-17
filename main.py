@@ -26,9 +26,10 @@ from bot.common import GAME_PACKAGE
 
 from bot.worker import BotManager
 
-from database import Database, is_event_key
+from database import DEFAULT_PROFILE, Database, is_event_key
 from ui import DeviceView, HomeView, Sidebar
 from ui import theme
+from ui.tabs.constants import PROFILE_MAX
 from ui.tabs.logs_tab import SHOW_SECONDS
 
 
@@ -158,6 +159,9 @@ class MainWindow(QMainWindow):
         view.reset_progress_requested.connect(self._on_reset_progress)
         view.reset_info_requested.connect(self._on_reset_info)
         view.tab_settings_changed.connect(self.db.save_settings)
+        view.profile_selected.connect(self._on_profile_selected)
+        view.profile_added.connect(self._on_profile_added)
+        view.profile_deleted.connect(self._on_profile_deleted)
         view.tabs.currentChanged.connect(self._on_tab_changed)
 
         # New device -> store its default config; known device -> restore it.
@@ -168,6 +172,7 @@ class MainWindow(QMainWindow):
             # Ghi lại tab Event theo event.py hiện tại (thêm nhiệm vụ mới,
             # cập nhật level / day khi file được sửa).
             self.db.save_settings(device_id, {"Event": view.event_tab.get_settings()})
+        self._refresh_profiles(device_id, view)
         self.home_view.update_device(
             device_id, server=view.initialization_tab.get_settings()["server"]
         )
@@ -209,6 +214,50 @@ class MainWindow(QMainWindow):
         self.db.save_many_settings(
             {device_id: view.get_settings() for device_id, view in self.device_views.items()}
         )
+
+    def _refresh_profiles(self, device_id: str, view: DeviceView):
+        """Hàng nút hồ sơ của thiết bị: các hồ sơ đã tạo (không gồm default) + hồ sơ đang dùng."""
+        view.set_profiles(self.db.list_profiles(device_id), self.db.active_profile(device_id))
+
+    def _switch_profile(self, device_id: str, view: DeviceView, target: str):
+        """Chụp cấu hình đang dùng vào hồ sơ hiện tại, rồi nạp hồ sơ `target` lên máy (giữ nguyên device id, server...)
+        và lưu thành cấu hình đang dùng."""
+        self.db.save_profile(device_id, self.db.active_profile(device_id), view.shareable_settings())
+        settings = self.db.load_profile(device_id, target)
+        if settings:
+            view.set_settings(settings)
+            self.db.save_settings(device_id, view.get_settings())
+        self.db.set_active_profile(device_id, target)
+
+    def _on_profile_selected(self, device_id: str, name: str):
+        """Bấm nút hồ sơ: chuyển sang nó. Bấm lại hồ sơ đang chọn thì giữ nguyên (nút vẽ lại để vẫn tích)."""
+        view = self.device_views.get(device_id)
+        if view is None:
+            return
+        if name != self.db.active_profile(device_id):
+            self._switch_profile(device_id, view, name)
+        self._refresh_profiles(device_id, view)
+
+    def _on_profile_added(self, device_id: str, name: str):
+        """Nút "+": hồ sơ mới = bản sao cấu hình hiện tại, và máy chuyển sang dùng nó."""
+        view = self.device_views.get(device_id)
+        if view is None or len(self.db.list_profiles(device_id)) >= PROFILE_MAX:
+            return
+        self.db.save_profile(device_id, self.db.active_profile(device_id), view.shareable_settings())
+        self.db.save_profile(device_id, name, view.shareable_settings())
+        self.db.set_active_profile(device_id, name)
+        self._refresh_profiles(device_id, view)
+
+    def _on_profile_deleted(self, device_id: str, name: str):
+        view = self.device_views.get(device_id)
+        if view is None:
+            return
+        if self.db.active_profile(device_id) == name:
+            # Xoá hồ sơ đang dùng: chuyển sang hồ sơ đầu tiên còn lại (không còn hồ sơ nào thì về default).
+            remaining = [n for n in self.db.list_profiles(device_id) if n != name]
+            self._switch_profile(device_id, view, remaining[0] if remaining else DEFAULT_PROFILE)
+        self.db.delete_profile(device_id, name)
+        self._refresh_profiles(device_id, view)
 
     def closeEvent(self, event):
         self._register_timer.stop()

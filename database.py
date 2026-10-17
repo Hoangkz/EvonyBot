@@ -39,6 +39,7 @@ DATA_DIR = Path(os.environ.get("LOCALAPPDATA", Path.home())) / "EvonyBot"
 DB_PATH = DATA_DIR / "evonybot.db"
 
 DAILY_TAB = "Daily Activities"
+DEFAULT_PROFILE = "default"  # hồ sơ mặc định của mỗi thiết bị, không hiện ở UI
 INIT_TAB = "Initialization"  # device id is not stored; server goes to devices.server
 # Key trong bảng `settings`: giờ reset server "HH:MM" (chọn ở màn Home), dùng chung mọi thiết bị.
 SERVER_TIME = "server_time"
@@ -65,6 +66,9 @@ def is_event_key(key: str) -> bool:
     return key.startswith(EVENT_KEY_PREFIXES)
 
 
+# Khoá của tab Initialization riêng từng máy: không sao chép qua Apply ALL / hồ sơ.
+_DEVICE_ONLY_KEYS = ("device_id", "server", "server_time", "bubble_until", "civilization", "city_map")
+
 _JSON_COLUMNS = [*TAB_COLUMNS.values(), "daily_done"]
 
 _SCHEMA = """
@@ -90,6 +94,14 @@ CREATE TABLE IF NOT EXISTS logs (
     message     TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS logs_serial ON logs (serial, id);
+CREATE TABLE IF NOT EXISTS profiles (
+    serial      TEXT NOT NULL,
+    name        TEXT NOT NULL,
+    settings    TEXT NOT NULL,
+    created_at  TEXT NOT NULL,
+    updated_at  TEXT NOT NULL,
+    PRIMARY KEY (serial, name)
+);
 """.format(json_columns=",\n    ".join(f"{c} TEXT NOT NULL DEFAULT '{{}}'" for c in _JSON_COLUMNS))
 
 
@@ -181,6 +193,15 @@ def _add_missing_columns(conn: sqlite3.Connection):
         conn.execute("ALTER TABLE devices ADD COLUMN civilization INTEGER")
     if "city_map" not in columns:
         conn.execute("ALTER TABLE devices ADD COLUMN city_map TEXT")
+    if "profile" not in columns:
+        conn.execute("ALTER TABLE devices ADD COLUMN profile TEXT")
+
+
+def _drop_global_profiles(conn: sqlite3.Connection):
+    """Bảng profiles bản đầu dùng chung mọi máy (không có cột serial): bỏ để tạo lại theo từng máy."""
+    columns = {row["name"] for row in conn.execute("PRAGMA table_info(profiles)")}
+    if columns and "serial" not in columns:
+        conn.execute("DROP TABLE profiles")
 
 
 class Database:
@@ -189,6 +210,7 @@ class Database:
         self.conn = _connect(path)
         _add_json_columns(self.conn)
         _reset_old_layout(self.conn)
+        _drop_global_profiles(self.conn)
         self.conn.executescript(_SCHEMA)
         _add_missing_columns(self.conn)
         _move_server_time(self.conn)
@@ -344,6 +366,53 @@ class Database:
         result[INIT_TAB]["city_map"] = json.loads(row["city_map"]) if row["city_map"] else {}
         return result
 
+    # ---- profiles (hồ sơ cấu hình đặt tên) -----------------------------
+    # Mỗi thiết bị luôn có hồ sơ DEFAULT_PROFILE (không hiện ở UI). Cấu hình đang dùng nằm ở các cột tab của
+    # `devices` và thuộc hồ sơ đang chọn (devices.profile, rỗng = default); bảng `profiles` giữ bản chụp của
+    # các hồ sơ lúc rời đi (kể cả default), nên đổi hồ sơ = chụp hồ sơ cũ rồi nạp hồ sơ mới.
+    def save_profile(self, serial: str, name: str, settings: dict):
+        """Lưu (hoặc ghi đè) hồ sơ `name` của thiết bị = cấu hình mọi tab ({tab title: settings}).
+        Không lưu phần riêng từng máy (device_id, server, bubble_until, civilization, city_map)."""
+        now = _now()
+        settings = {tab: ({k: v for k, v in data.items() if k not in _DEVICE_ONLY_KEYS} if tab == INIT_TAB else data)
+                    for tab, data in settings.items() if tab in TAB_COLUMNS}
+        payload = json.dumps(settings, ensure_ascii=False)
+        self._write(lambda conn: conn.execute(
+            "INSERT INTO profiles (serial, name, settings, created_at, updated_at) VALUES (?, ?, ?, ?, ?) "
+            "ON CONFLICT(serial, name) DO UPDATE SET settings = excluded.settings, updated_at = excluded.updated_at",
+            (serial, name, payload, now, now),
+        ))
+
+    def load_profile(self, serial: str, name: str) -> dict:
+        """Cấu hình đã lưu của hồ sơ `name` (cùng dạng DeviceView.set_settings()); {} nếu chưa có."""
+        self._flush()
+        row = self.conn.execute("SELECT settings FROM profiles WHERE serial = ? AND name = ?",
+                                (serial, name)).fetchone()
+        return json.loads(row["settings"]) if row is not None else {}
+
+    def list_profiles(self, serial: str) -> list[str]:
+        """Tên các hồ sơ của thiết bị (trừ default), theo thứ tự tạo."""
+        self._flush()
+        return [row["name"] for row in self.conn.execute(
+            "SELECT name FROM profiles WHERE serial = ? AND name != ? ORDER BY created_at, rowid",
+            (serial, DEFAULT_PROFILE))]
+
+    def active_profile(self, serial: str) -> str:
+        """Hồ sơ thiết bị đang dùng (DEFAULT_PROFILE nếu chưa chọn)."""
+        row = self._row(serial)
+        return (row["profile"] if row is not None else None) or DEFAULT_PROFILE
+
+    def set_active_profile(self, serial: str, name: str):
+        now = _now()
+        self._write(lambda conn: conn.execute(
+            "UPDATE devices SET profile = ?, updated_at = ? WHERE serial = ?",
+            (None if name == DEFAULT_PROFILE else name, now, serial),
+        ))
+
+    def delete_profile(self, serial: str, name: str):
+        self._write(lambda conn: conn.execute(
+            "DELETE FROM profiles WHERE serial = ? AND name = ?", (serial, name)))
+
     # ---- daily task progress -----------------------------------------
     def get_daily_tasks(self, serial: str) -> list[dict]:
         row = self._row(serial)
@@ -433,8 +502,7 @@ def _save_settings(conn: sqlite3.Connection, serial: str, settings: dict, now: s
                 conn.execute("UPDATE devices SET server = ? WHERE serial = ?",
                              (data["server"] or None, serial))
             # bubble_until / civilization / city_map chỉ được ghi qua set_*, không sao chép qua Apply ALL.
-            data = {k: v for k, v in data.items()
-                    if k not in ("device_id", "server", "server_time", "bubble_until", "civilization", "city_map")}
+            data = {k: v for k, v in data.items() if k not in _DEVICE_ONLY_KEYS}
         conn.execute(
             f"UPDATE devices SET {column} = ? WHERE serial = ?",
             (json.dumps(data, ensure_ascii=False), serial),

@@ -12,8 +12,8 @@ DESIGNER_DATA = {
     "buttonEvent": {"loc": [740, 53], "size": [230, 40], "text": "Event", "type": "Button"},
     # button9 (Start All) nằm cạnh buttonStopAll (Stop All) dưới GroupBox; 2 nút
     # 125x40 (nhỏ lại so với 140x50 gốc) căn phải theo mép phải GroupBox (x=1075).
-    "button9": {"loc": [815, 377], "size": [125, 40], "text": "Start All", "type": "Button"},
-    "buttonStopAll": {"loc": [950, 377], "size": [125, 40], "text": "Stop All", "type": "Button"},
+    "button9": {"loc": [815, 421], "size": [125, 40], "text": "Start All", "type": "Button"},
+    "buttonStopAll": {"loc": [950, 421], "size": [125, 40], "text": "Stop All", "type": "Button"},
     "buttonAllianceCapacity": {"loc": [409, 117], "size": [230, 40], "text": "Alliance Capacity", "type": "Button"},
     "buttonBlackMarket": {"loc": [740, 117], "size": [230, 40], "text": "Black Market", "type": "Button"},
     "buttonRecruitGeneral": {"loc": [85, 181], "size": [230, 40], "text": "Recruit General", "type": "Button"},
@@ -23,7 +23,7 @@ DESIGNER_DATA = {
     "groupBox2": {
         "children": ["ButtonJoinMonsterWar", "buttonDailyActivities", "buttonEvent", "ButtonOpenGiftBox",
                       "buttonAllianceCapacity", "buttonBlackMarket", "buttonRecruitGeneral"],
-        "loc": [13, 106], "size": [1062, 253], "text": "Select Activity", "type": "GroupBox",
+        "loc": [13, 150], "size": [1062, 253], "text": "Select Activity", "type": "GroupBox",
     },
     "checkBoxBubble": {"loc": [13, 62], "size": [75, 28], "text": "Bubble", "type": "CheckBox"},
     "comboBoxBubbleType": {"loc": [90, 62], "size": [60, 28], "type": "ComboBox"},
@@ -51,6 +51,13 @@ CIVILIZATION_UNKNOWN = "(auto)"
 COMBO_ITEMS = {"comboBoxBubbleType": BUBBLE_TYPES,
                "comboBoxCivilization": [CIVILIZATION_UNKNOWN, *CIVILIZATIONS]}
 PAGE_SIZE = (1088, 609)
+# Hàng hồ sơ (dưới Bubble, trên Select Activity): nhãn + các nút hồ sơ sát nhau + nút "+".
+PROFILE_ROW_POS = (13, 104)
+PROFILE_BUTTON_HEIGHT = 34
+PROFILE_BUTTON_MIN_WIDTH = 70
+PROFILE_BUTTON_GAP = 8   # khoảng cách giữa các nút hồ sơ và nút "+"
+PROFILE_MAX = 5  # số hồ sơ tối đa mỗi thiết bị (không tính default ẩn)
+PROFILE_NAME_MAX = 20   # số ký tự tối đa của tên hồ sơ; nút luôn hiện đủ tên
 
 # ---- Tab Initialization: nút Select Activity ----
 
