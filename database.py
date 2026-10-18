@@ -32,10 +32,10 @@ from pathlib import Path
 
 from bot.daily_reset import done_today, reset_clock
 
-# %LOCALAPPDATA%\EvonyBot\evonybot.db — same place whether run from source or
-# installed (the installer also puts the app in %LOCALAPPDATA%\EvonyBot and
-# never ships/overwrites the database, so it survives upgrades and uninstall).
-DATA_DIR = Path(os.environ.get("LOCALAPPDATA", Path.home())) / "EvonyBot"
+# %LOCALAPPDATA%\EvonyBot\app\evonybot.db — same place whether run from source or installed. The installer puts the
+# Python runtime in that same app folder but only deletes the runtime's own files on upgrade / uninstall
+# (installer/EvonyBot.iss), never the database or the license files, so they survive both.
+DATA_DIR = Path(os.environ.get("LOCALAPPDATA", Path.home())) / "EvonyBot" / "app"
 DB_PATH = DATA_DIR / "evonybot.db"
 
 DAILY_TAB = "Daily Activities"

@@ -68,7 +68,7 @@ activity: bot.record(msg)                    # ctx.record = BotWorker.record (g�
 
 ## Đọc log trong DB
 
-DB: `%LOCALAPPDATA%\EvonyBot\evonybot.db`, bảng `logs(id, serial, created_at, message)`, index `(serial, id)`.
+DB: `%LOCALAPPDATA%\EvonyBot\app\evonybot.db`, bảng `logs(id, serial, created_at, message)`, index `(serial, id)`.
 
 ```powershell
 .\venv\Scripts\python.exe -c "from database import Database; db=Database(); [print(t, m) for t, m in db.load_logs('SERIAL', 100)]; db.close()"
@@ -76,7 +76,7 @@ DB: `%LOCALAPPDATA%\EvonyBot\evonybot.db`, bảng `logs(id, serial, created_at, 
 
 Hoặc truy vấn thẳng (VD tìm lỗi):
 ```powershell
-.\venv\Scripts\python.exe -c "import sqlite3, os; c=sqlite3.connect(os.path.expandvars(r'%LOCALAPPDATA%\EvonyBot\evonybot.db')); [print(*r) for r in c.execute(\"SELECT serial, created_at, message FROM logs WHERE message LIKE 'Lỗi%' ORDER BY id DESC LIMIT 50\")]"
+.\venv\Scripts\python.exe -c "import sqlite3, os; c=sqlite3.connect(os.path.expandvars(r'%LOCALAPPDATA%\EvonyBot\app\evonybot.db')); [print(*r) for r in c.execute(\"SELECT serial, created_at, message FROM logs WHERE message LIKE 'Lỗi%' ORDER BY id DESC LIMIT 50\")]"
 ```
 
 ## File liên quan

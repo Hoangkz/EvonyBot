@@ -1,8 +1,9 @@
 ; EvonyBot.iss — Inno Setup script. Build with installer\build.ps1, which
 ; stages build\app first and passes /DAppVersion.
 ;
-; Per-user install (no admin) into %LOCALAPPDATA%\EvonyBot. The database
-; (evonybot.db) is created there at runtime and kept on uninstall.
+; Per-user install (no admin) into %LOCALAPPDATA%\EvonyBot. The database (evonybot.db) and the license files are
+; created at runtime in {app}\app (next to the Python runtime) and kept on upgrade and uninstall: only the runtime's
+; own files are deleted there, never the whole folder.
 
 #ifndef AppVersion
   #define AppVersion "1.0.0"
@@ -35,7 +36,14 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 
 [InstallDelete]
 ; Upgrade: drop the previous runtime/code so no stale files are left behind.
-Type: filesandordirs; Name: "{app}\app"
+Type: filesandordirs; Name: "{app}\app\Lib"
+Type: files; Name: "{app}\app\*.exe"
+Type: files; Name: "{app}\app\*.dll"
+Type: files; Name: "{app}\app\*.pyd"
+Type: files; Name: "{app}\app\*.zip"
+Type: files; Name: "{app}\app\*._pth"
+Type: files; Name: "{app}\app\*.cat"
+Type: files; Name: "{app}\app\LICENSE.txt"
 ; Folder names used by older versions.
 Type: filesandordirs; Name: "{app}\runtime"
 Type: filesandordirs; Name: "{app}\python"
@@ -60,8 +68,16 @@ Filename: "{#AppExe}"; Parameters: """{app}\EvonyBot.pyw"""; WorkingDir: "{app}"
 Filename: "{#AppExe}"; Parameters: """{app}\EvonyBot.pyw"""; WorkingDir: "{app}"; Flags: nowait skipifnotsilent; Check: ShouldRelaunch
 
 [UninstallDelete]
-; __pycache__ folders are written at runtime, so the uninstaller doesn't know them.
-Type: filesandordirs; Name: "{app}\app"
+; __pycache__ folders are written at runtime, so the uninstaller doesn't know them. {app}\app keeps the database and
+; license files (only the runtime's files are removed there).
+Type: filesandordirs; Name: "{app}\app\Lib"
+Type: files; Name: "{app}\app\*.exe"
+Type: files; Name: "{app}\app\*.dll"
+Type: files; Name: "{app}\app\*.pyd"
+Type: files; Name: "{app}\app\*.zip"
+Type: files; Name: "{app}\app\*._pth"
+Type: files; Name: "{app}\app\*.cat"
+Type: files; Name: "{app}\app\LICENSE.txt"
 Type: filesandordirs; Name: "{app}\runtime"
 Type: filesandordirs; Name: "{app}\python"
 Type: filesandordirs; Name: "{app}\bot"

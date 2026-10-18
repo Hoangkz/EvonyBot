@@ -128,13 +128,22 @@ $NuitkaOut = Join-Path $Build "nuitka"
 if (Test-Path $NuitkaOut) { Remove-Item $NuitkaOut -Recurse -Force }
 Push-Location $Root
 try {
-    & $HostPy -m nuitka --module main.py `
-        --include-module=database --include-module=updater --include-module=version `
+    # config_key.py (git-ignored, made by installer/license_config.py) decrypts the license server address read from the gist.
+    # Nuitka finds it through PYTHONPATH (the file lives in installer\, not next to main.py).
+    $keyModule = @()
+    if (Test-Path (Join-Path $PSScriptRoot "config_key.py")) {
+        $keyModule = @("--include-module=config_key")
+        $env:PYTHONPATH = $PSScriptRoot
+    }
+    else { Write-Warning "installer\config_key.py not found: the app will use the built-in license server address only." }
+    & $HostPy -m nuitka --module main.py @keyModule `
+        --include-module=database --include-module=updater --include-module=version --include-module=licensing `
         --include-package=bot --include-package=ui `
         --output-dir=$NuitkaOut --remove-output --no-pyi-file --assume-yes-for-downloads
     if ($LASTEXITCODE -ne 0) { throw "Nuitka compile failed" }
 } finally {
     Pop-Location
+    Remove-Item Env:PYTHONPATH -ErrorAction SilentlyContinue
 }
 Copy-Item (Join-Path $NuitkaOut "main*.pyd") (Join-Path $App "main.pyd")
 
