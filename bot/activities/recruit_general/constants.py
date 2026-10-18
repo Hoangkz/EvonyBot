@@ -32,7 +32,6 @@ REFRESH = f"{FOLDER}/Refresh.png"
 REFRESH_WAIT = 1   # giây chờ sau mỗi lần bấm Refresh: bấm Refresh cho đến khi ra tướng lịch sử (delay cố định, không cần sửa)
 REFRESH_MAX = 1000   # số lần bấm tối đa mỗi lượt chạy khi settings không có "refresh_count"
 REFRESH_KEY = "refresh_count"   # key trong settings của tab: "ALL" (không giới hạn) | 100..1000 (ui/tabs/constants.py RECRUIT_REFRESH_KEY)
-BUY_COUNT_KEY = "buy_count"     # key trong settings của tab: "ALL" (không giới hạn) | 10..100 (ui/tabs/constants.py RECRUIT_BUY_COUNT_KEY)
 HIGH_QUALITY_POPUP = f"{FOLDER}/HighQualityPopup.png"   # dòng chữ của popup (1,00; màn Recruit General thường 0,30)
 CANCEL = f"{FOLDER}/Cancel.png"                         # nút Cancel đỏ của popup (1,00; màn thường 0,45)
 CANCEL_WAIT = 1   # giây chờ sau khi bấm Cancel (delay cố định, không cần sửa)
@@ -42,6 +41,7 @@ CONFIRM_WAIT = 3  # giây tối đa chờ popup hiện lại sau khi Refresh (t�
 # ---- Kiểm tra tướng để mua (sau khi Cancel popup tướng xịn) ----
 # Tên tướng hiện trong dải ngay dưới tướng, đọc bằng OCR (bot/ocr/read_general_name.py). Tướng CẦN MUA: các tên đã tích ở UI (settings["generals"]).
 # Thấy tên nằm trong danh sách -> luồng mua; không thì Refresh tiếp. Thư mục rỗng = không mua tướng nào.
+GENERAL_COUNTS_KEY = "general_counts"   # {"general_counts": {tên tướng: 1|2|3|10|15|20|"ALL"}} (ui/tabs/constants.py RECRUIT_GENERAL_COUNTS_KEY); thiếu = 1
 GENERALS_KEY = "generals"   # key trong settings của tab: {"generals": [tên tướng đã tích, ...]} (ui/tabs/constants.py RECRUIT_GENERALS_KEY)
 NAME_MATCH = 0.5               # tên OCR giống tên tướng cần mua từ mức này (0..1) là khớp
 NAME_STRIP = (99, 478, 198, 34)   # px (x, y, rộng, cao) trên màn 396x704: cả thanh tên tướng, để OCR tách nền thanh
@@ -135,8 +135,7 @@ LIST_WAIT = 10   # giây tối đa chờ về màn danh sách tướng sau khi b
 LIST_RELOAD_WAIT = 2   # giây chờ thêm sau khi về màn danh sách tướng: chờ 2s để đợi game load lại dữ liệu, rồi mới làm tiếp (delay cố định, không cần sửa)
 
 # ---- Giới hạn số tướng mua mỗi lượt chạy ----
-# Mua xong vẫn Refresh tiếp (săn tướng xịn kế tiếp); mua đủ BUY_LIMIT tướng trong lượt chạy này thì ghi log rồi dừng activity.
-BUY_LIMIT = 3   # số tướng mua tối đa khi settings không có "buy_count"
+# Mua xong vẫn Refresh tiếp (săn tướng xịn kế tiếp); mua đủ số lượng của mọi tướng đã tích thì ghi log rồi dừng activity.
 
 # ---- Thiếu vàng: bấm nút mua ra màn "How to get" (danh sách rương vàng) -> mở hết rương nếu tab tích "Open Gold" ----
 # Ảnh cắt từ ảnh chụp 396x704: tiêu đề "How to get" (1,00; màn chi tiết tướng 0,30), chữ "Use" của nút Use trong danh sách (1,00 .. 0,93; chữ "Use it to
