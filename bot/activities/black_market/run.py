@@ -60,7 +60,7 @@ from .constants import (
 )
 
 HOME_BACKS = 5     # số lần Back tối đa để về màn chính trước khi tìm Chợ
-CONFIRM_WAIT = 5   # giây chờ hộp xác nhận sau khi bấm một ô
+CONFIRM_WAIT = 8   # giây chờ hộp xác nhận sau khi bấm một ô
 MARKET_WAIT = 10   # giây chờ thấy Chợ sau khi bấm Go nhiệm vụ mua Black Market / Tax
 
 

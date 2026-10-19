@@ -49,6 +49,11 @@ The Offer Gems cost font ("OfferCost", read_offer_cost.py) is split the same way
 popup's Cost box ("," not saved). Example for "1,475":
 
     python -m bot.ocr.add_sample OfferCost cost.png "1|,|4|7|5"
+
+The General name font ("GeneralName", read_general_name.py) is split like the boss name; the image is the
+name strip of the Recruit General screen. Example for "Rustam":
+
+    python -m bot.ocr.add_sample GeneralName strip.png "r|u|s|t|a|m"
 """
 import sys
 from pathlib import Path
@@ -61,6 +66,8 @@ from .read_boss_name import FONT as NAME_FONT
 from .read_bubble_time import FONT as TIMER_FONT
 from .read_bubble_time import split as split_timer
 from .read_boss_name import split as split_name
+from .read_general_name import FONT as GENERAL_NAME_FONT
+from .read_general_name import split as split_general_name
 from .read_heal_count import FONT as HEAL_COUNT_FONT
 from .read_heal_count import split as split_heal_count
 from .read_milestone import FONT as MILESTONE_FONT
@@ -75,7 +82,11 @@ from .read_progress import split as split_progress
 # Fonts split into pieces by their own splitter (see _pieces.py / read_progress.py).
 PIECE_FONTS = {NAME_FONT: split_name, POWER_FONT: split_power, PROGRESS_FONT: split_progress,
                TIMER_FONT: split_timer, MILESTONE_FONT: split_milestone,
-               HEAL_COUNT_FONT: split_heal_count, OFFER_COST_FONT: split_offer_cost}
+               HEAL_COUNT_FONT: split_heal_count, OFFER_COST_FONT: split_offer_cost,
+               GENERAL_NAME_FONT: split_general_name}
+
+
+NO_COLON_FONTS = {"Camera"}      # chữ số hẹp (5, 7) không được nhầm với ":" (xem split)
 
 
 def add_sample(font: str, image_path: str, text: str) -> list[Path]:
@@ -85,7 +96,7 @@ def add_sample(font: str, image_path: str, text: str) -> list[Path]:
         raise FileNotFoundError(image_path)
     if font in PIECE_FONTS:
         return add_piece_sample(font, image, text.split("|"))
-    chars = split(image)
+    chars = split(image, colon=font not in NO_COLON_FONTS)
     if len(chars) != len(text):
         raise ValueError(f"image splits into {len(chars)} pieces, text has {len(text)}")
 

@@ -9,7 +9,6 @@ from .tab_placeholder import BaseTab
 
 TROOP_RADIOS = [f"troop_{i}" for i in range(1, 9)]
 STAMINA_OPTIONS = ["ALL", "100", "200", "300", "400", "500", "No"]
-HAMMER_OPTIONS = ["No", "10", "9", "8", "7", "6","5","4","3","2","1"]
 
 
 class JoinMonsterWarTab(BaseTab):
@@ -50,28 +49,26 @@ class JoinMonsterWarTab(BaseTab):
         self._stamina_group = stamina
         # Chọn tướng khi hành quân; tướng phụ chỉ đi cùng khi có chọn tướng.
         general = QCheckBox("Select General", stamina)
-        general.setGeometry(290, 39, 250, 28)
+        general.setGeometry(29, 39, 250, 28)
         assistant = QCheckBox("With Assistant General", stamina)
-        assistant.setGeometry(290, 75, 250, 28)
+        assistant.setGeometry(29, 75, 250, 28)
         assistant.setEnabled(False)
         general.toggled.connect(assistant.setEnabled)
         # Khi chọn tướng: bấm tab Development, chỉ chọn tướng phát triển.
         development = QCheckBox("Development General", stamina)
-        development.setGeometry(290, 111, 250, 28)
+        development.setGeometry(29, 111, 250, 28)
         development.setEnabled(False)
         general.toggled.connect(development.setEnabled)
         self.controls["checkBoxSelectGeneral"] = general
         self.controls["checkBoxAssistantGeneral"] = assistant
         self.controls["checkBoxDevelopmentGeneral"] = development
-        for y, (name, text, items, current) in zip((36, 72, 108), (
+        for y, (name, text, items, current) in zip((36,), (
             ("comboBoxUseStamina", "Use Stamina: ", STAMINA_OPTIONS, "100"),
-            ("comboBoxBuyStamina", "Buy Stamina: ", ["10", "16", "20"], "10"),
-            ("comboBoxBuyHammer", "Buy Hammer: ", HAMMER_OPTIONS, "No"),
         )):
             label = QLabel(text, stamina)
-            label.setGeometry(29, y + 3, 124, 24)
+            label.setGeometry(290, y + 3, 90, 24)
             combo = QComboBox(stamina)
-            combo.setGeometry(168, y, 84, 30)
+            combo.setGeometry(384, y, 84, 30)
             combo.addItems(items)
             combo.setCurrentText(current)
             self.controls[name] = combo
@@ -207,8 +204,6 @@ class JoinMonsterWarTab(BaseTab):
         return {
             "troop": [c[n].text() for n in TROOP_RADIOS if c[n].isChecked()],
             "use_stamina": c["comboBoxUseStamina"].currentText(),
-            "buy_stamina": c["comboBoxBuyStamina"].currentText(),
-            "buy_hammer": c["comboBoxBuyHammer"].currentText(),
             "select_general": c["checkBoxSelectGeneral"].isChecked(),
             "select_assistant_general": c["checkBoxAssistantGeneral"].isChecked(),
             "development_general": c["checkBoxDevelopmentGeneral"].isChecked(),
@@ -223,16 +218,12 @@ class JoinMonsterWarTab(BaseTab):
 
     def set_settings(self, data: dict):
         c = self.controls
-        if "buy_stamina" in data:
-            c["comboBoxBuyStamina"].setCurrentText(str(data["buy_stamina"]))
         if "troop" in data:
             troops = data["troop"] if isinstance(data["troop"], list) else [data["troop"]]
             for n in TROOP_RADIOS:
                 c[n].setChecked(c[n].text() in troops)
         if "use_stamina" in data:
             c["comboBoxUseStamina"].setCurrentText(str(data["use_stamina"]))
-        if "buy_hammer" in data:
-            c["comboBoxBuyHammer"].setCurrentText(str(data["buy_hammer"]))
         c["checkBoxSelectGeneral"].setChecked(bool(data.get("select_general", False)))
         c["checkBoxAssistantGeneral"].setChecked(bool(data.get("select_assistant_general", False)))
         c["checkBoxDevelopmentGeneral"].setChecked(bool(data.get("development_general", False)))

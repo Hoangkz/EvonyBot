@@ -398,6 +398,17 @@ def _progress(bot, screen, go) -> int | None:
 
 
 # ---- 2. Nhận quà + đổi quà ----------------------------------------------------------------
+def _tap_redeem_tab(bot):
+    """Bấm tab Redeem rồi chờ 1s xem đã sang chưa, chưa thì chờ thêm 1s (tối đa REDEEM_TAB_TRIES lần). Hết lượt mà chưa
+    sang thì thôi, vòng ngoài nhận diện lại màn và bấm lại."""
+    bot.tap(*c.REDEEM_TAB_TAP)
+    for _ in range(c.REDEEM_TAB_TRIES):
+        bot.sleep(1)
+        if _redeem_selected(bot, bot.screenshot()):
+            return
+    bot.log(f"{NAME}: Redeem tab not shown after {c.REDEEM_TAB_TRIES} checks, tap again")
+
+
 def _claim_and_redeem(bot, order):
     """Cả 2 nhiệm vụ đã xong (quà đã nhận ngay lúc quét nhiệm vụ): sang tab Redeem và đổi quà luôn, không cuộn
     lại danh sách nhiệm vụ để kiểm tra."""
@@ -405,7 +416,7 @@ def _claim_and_redeem(bot, order):
         if action != c.ON_EVENT:
             return None
         if not _redeem_selected(bot, screen):
-            bot.tap(*c.REDEEM_TAB_TAP, delay=2)
+            _tap_redeem_tab(bot)
             return HANDLED
         _redeem(bot, order)
         return c.STOP

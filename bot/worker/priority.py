@@ -26,6 +26,8 @@ from ..activities.daily_activities.alliance_research import TASK as daily_allian
 from ..activities.daily_activities.alliance_research.run import after_go as alliance_research_after_go
 from ..activities.daily_activities.greet_champion import TASK as daily_greet_champion
 from ..activities.daily_activities.greet_champion.run import after_go as greet_champion_after_go
+from ..activities.daily_activities.ranger_knight import TASK as daily_ranger_knight
+from ..activities.daily_activities.ranger_knight.run import after_go as ranger_knight_after_go
 from ..activities.daily_activities.trade_carriage import TASK as daily_trade_carriage
 from ..activities.daily_activities.trade_carriage.run import after_go as trade_carriage_after_go
 from ..activities.event.gather_troops.cultivate_generals.run import run as gather_troops_cultivate_generals
@@ -44,7 +46,6 @@ from ..activities.event.kings_path.refine.run import run as kings_path_refine
 from ..activities.event.kings_path.black_market.run import run as kings_path_black_market
 from ..activities.alliance_capacity.run import run as alliance_capacity
 from ..activities.black_market.run import run as black_market_market
-from ..activities.battlefield_shop.run import run as battlefield_shop
 from ..activities.daily_activities.alliance_donation import TASK as alliance_donation_task
 from ..activities.daily_activities.alliance_donation.run import donate_free
 from ..activities.daily_activities.alliance_help import TASK as alliance_help_task
@@ -63,7 +64,7 @@ from ..activities.open_gift_box.run import run as open_gift_box
 from ..activities import gift_claims, join_monster_war
 
 DATA ={
-    "_doc": "Độ ưu tiên của từng nhiệm vụ cho bộ chọn nhiệm vụ của worker. Gift Claims chạy cuối Daily Activities, sau Activity Rewards; khi có Join Boss nó chịu giới hạn 120 giây và tiếp tục bằng các checkpoint DB ở lượt sau.",
+    "_doc": "Độ ưu tiên của từng nhiệm vụ cho bộ chọn nhiệm vụ của worker.",
     "Bubble": [
         {
             "key": "bubble", 
@@ -333,6 +334,13 @@ DATA ={
             "note": "Về thành: bấm trái tim trên Keep (hoặc Keep -> Champion), chào 2 lần",
         },
         {
+            "key": "daily_ranger_knight",
+            "run": daily_job(daily_ranger_knight, after_go=ranger_knight_after_go),
+            "label": "Ranger Knight",
+            "priority": 384,
+            "must_finish": True,
+        },
+        {
             "key": "daily_trade_carriage",
             "run": daily_job(daily_trade_carriage, after_go=trade_carriage_after_go),
             "must_finish": True,
@@ -347,32 +355,33 @@ DATA ={
             "priority": 300,
             "tail": True,
         },
-        {
-            "key": gift_claims.KEY,
-            "run": gift_claims.run_job,
-            "saves": True,
-            "label": gift_claims.LABEL,
-            "priority": 299,
-            "tail": True,
-            "note": "Chạy sau Daily Activities; có Join Boss thì nhường sau 120 giây và tiếp tục các key DB chưa DONE.",
-        },
     ],
     "Black Market": [
         { 
             "key": "black_market_market",
             "run": black_market_market,
             "label": "Black Market: mua ở Market",
-            "priority": 0,
+            "priority": 10,
             "once": True,
             "needs_city_map": True,   # nhiệm vụ cần route: chỉ vào danh sách khi máy đã có bản đồ thành (worker quét lúc Join Boss rảnh)
         }
     ],
-    "Battlefield Shop": [
-        { 
-            "key": "battlefield_shop",
-            "run": battlefield_shop,
-            "label": "Battlefield Shop",
-            "priority": -1,
-        }
-    ]
+    # Nhận quà event: làm SAU CÙNG mỗi ngày, sau mọi nhiệm vụ của mọi activity (priority 0 và đứng cuối bảng nên xếp sau cả
+    # Black Market, cùng priority 0). Thuộc nhóm Daily Activities: ô tích "Claim Event Gifts" ở tab đó (settings["General"]["gift_claims"]).
+    "Gift Claims": [
+        {
+            "key": gift_claims.valuable_event.KEY,
+            "group": "Daily Activities",
+            "run": gift_claims.job(gift_claims.valuable_event),
+            "label": "Gift Claims: Valuable Event",
+            "priority": 2,
+        },
+        {
+            "key": gift_claims.event_center.KEY,
+            "group": "Daily Activities",
+            "run": gift_claims.job(gift_claims.event_center),
+            "label": "Gift Claims: Event Center",
+            "priority": 1,
+        },
+    ],
 }

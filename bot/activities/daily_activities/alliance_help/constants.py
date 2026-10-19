@@ -29,6 +29,6 @@ HELP_ROW = f"{FOLDER_PATH}/HelpRow.png"
 HELP_TITLE = f"{FOLDER_PATH}/HelpTitle.png"
 HELP_ALL = f"{FOLDER_PATH}/HelpAll.png"
 NO_RECORDS = f"{FOLDER_PATH}/NoRecords.png"
-HELP_WAIT = 3          # giây chờ sau khi bấm Help All
+HELP_WAIT = 8          # giây chờ sau khi bấm Help All
 LIST_WAIT = 5          # giây chờ danh sách yêu cầu (Help All) hoặc "No records" hiện
 NAV_MAX_STEPS = 30

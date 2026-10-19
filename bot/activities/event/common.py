@@ -39,7 +39,7 @@ import cv2
 import numpy as np
 
 from ...common import click_images, delay, exit_images, find_first, go_home, images_in
-from ...context.templates import TEMPLATE_DIR
+from ...context.templates import TEMPLATE_DIR, read_image
 from ...ocr import read_progress
 from ...ocr.read_progress import run_two_lines as read_progress_two_lines
 from ..result import TaskResult, report
@@ -67,6 +67,11 @@ from .constants import (
     CHEST_TAP,
     CHEST_WAIT,
     LOGIN_REWARD_KEY,
+    DAYS_REGION,
+    DAYS_TEXT,
+    DAYS_THRESHOLD,
+    EVENT_OPEN_SETTLE,
+    EVENT_OPEN_WAITS,
     VOYAGE_BACKS,
     VOYAGE_FREE,
     VOYAGE_FREE_REGION,
@@ -207,6 +212,24 @@ def run_task(bot, state: EventState, name: str, event_icon: str, handle=None, *,
             return
 
 
+TAB_CHANGE_TRIES = 10   # tap_tab: số lần chờ thêm 1s (sau lần kiểm tra đầu) khi tab chưa đổi
+
+
+def tap_tab(bot, x, y, action, targets, regions=None, thresholds=None) -> bool:
+    """Bấm tab Day / tab phụ của event (`action` là action vừa nhận ra ở chỗ bấm), chờ 1s rồi kiểm tra đã đổi chưa (nhận
+    diện lại bằng `targets` thấy action khác), chưa thì chờ thêm 1s rồi kiểm tra lại, tối đa TAB_CHANGE_TRIES lần chờ thêm.
+    Hết lượt mà chưa đổi thì thôi (False), vòng run_task nhận diện lại màn rồi bấm lại."""
+    bot.tap(x, y, delay=1)
+    for attempt in range(TAB_CHANGE_TRIES + 1):
+        if attempt:
+            bot.sleep(1)
+        now, _ = find_first(bot, bot.screenshot(), list(targets), regions=regions, thresholds=thresholds)
+        if now != action:
+            return True
+    bot.log(f"Event: tab still {action} after {TAB_CHANGE_TRIES} extra waits, tap again")
+    return False
+
+
 def claim_all(bot, state: EventState, pos):
     """Bấm Claim All. Lỗi game (nút không mất): bấm liên tiếp quá CLAIM_ALL_MAX_TAPS lần thì
     Back và đếm lại từ 0."""
@@ -243,6 +266,12 @@ def common_targets(state: EventState) -> list[tuple[str, str]]:
     return targets
 
 
+def _event_list_shown(bot, screen) -> bool:
+    """Đã ở danh sách event: thấy chữ "day(s)" dưới hàng rương quà hàng ngày (cố định, không đổi theo đợt lễ hội như
+    tiêu đề)."""
+    return bot.find(DAYS_TEXT, threshold=DAYS_THRESHOLD, screen=screen, region=DAYS_REGION) is not None
+
+
 def handle_common(bot, state: EventState, action, pos, screen):
     """Xử lý các action của common_targets(). Trả EVENT_OPENED khi vừa bấm nút event,
     còn lại None."""
@@ -265,8 +294,15 @@ def handle_common(bot, state: EventState, action, pos, screen):
             swipe_around(bot)
             return None
         bot.log(f"Event: tap event button {button}")
-        bot.tap(*button, delay=5)
-        return EVENT_OPENED
+        bot.tap(*button, delay=1)
+        for attempt in range(EVENT_OPEN_WAITS + 1):
+            if attempt:
+                bot.sleep(1)
+            if _event_list_shown(bot, bot.screenshot()):
+                bot.sleep(EVENT_OPEN_SETTLE)
+                return EVENT_OPENED
+        bot.log(f"Event: event list not shown after {EVENT_OPEN_WAITS} extra waits, tap again")
+        return None
     elif action == BACK:
         bot.back(delay=1)
     elif action == TAP:
@@ -432,7 +468,7 @@ def add_title(bot, screen, titles: list[str], folder, box) -> bool:
         return False
     for template in titles:
         path = TEMPLATE_DIR / template
-        old = cv2.imdecode(np.fromfile(str(path), np.uint8), cv2.IMREAD_COLOR) if path.exists() else None
+        old = read_image(path)
         if old is not None and old.shape == crop.shape \
                 and float(cv2.matchTemplate(crop, old, cv2.TM_CCOEFF_NORMED).max()) >= TITLE_SAME:
             return False

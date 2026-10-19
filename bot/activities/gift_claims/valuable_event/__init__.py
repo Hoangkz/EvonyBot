@@ -1,6 +1,7 @@
 """Gift claims for the city-side Valuable Event area (outside Event Center)."""
 from . import run as _run
 from .run import KEYS, SPECS, run_opened
+from .zone import KEY, run
 
 
 def __getattr__(name):
@@ -8,4 +9,4 @@ def __getattr__(name):
     return getattr(_run, name)
 
 
-__all__ = ["KEYS", "SPECS", "run_opened"]
+__all__ = ["KEY", "KEYS", "SPECS", "run", "run_opened"]

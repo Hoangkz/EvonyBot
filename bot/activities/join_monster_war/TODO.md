@@ -44,3 +44,11 @@ bắt được. Xong mục nào thì xoá mục đó. Ảnh còn thiếu để t
 
 - [ ] `FLOW.md` mục "Chọn tướng: `_select_general()`" mô tả hàm cũ không còn trong `run.py` (đã thay bằng
   `_choose_general`) → xoá mục đó.
+
+## Chờ cố định cần xem (có nên đổi sang wait_for không?)
+
+Chỗ chờ số giây viết cứng, không có vòng kiểm tra rồi thử lại. Xác nhận từng chỗ: cần `wait_for` thì sửa, không thì gạch.
+
+### [run.py](run.py)
+
+- [ ] [run.py:356](run.py#L356) (1s): `bot.back(delay=1)`

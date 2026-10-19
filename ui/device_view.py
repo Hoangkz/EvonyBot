@@ -7,8 +7,11 @@ original Form3 (Initialization, Join Monster War, Alliance Capacity,
 Daily Activities, Open Gift Box, Black Market, Event),
 plus a Logs tab showing this device's bot log (not a settings tab).
 """
-from PyQt5.QtCore import pyqtSignal
-from PyQt5.QtWidgets import QTabWidget, QVBoxLayout, QWidget
+from PyQt5.QtCore import QTimer, pyqtSignal
+from PyQt5.QtWidgets import (
+    QAbstractButton, QAbstractSpinBox, QCheckBox, QComboBox, QLineEdit, QRadioButton, QTabWidget, QVBoxLayout,
+    QWidget,
+)
 
 from .tabs import (
     AllianceCapacityTab,
@@ -19,6 +22,7 @@ from .tabs import (
     JoinMonsterWarTab,
     LogsTab,
     OpenGiftBoxTab,
+    RecruitGeneralTab,
 )
 
 
@@ -35,6 +39,9 @@ class DeviceView(QWidget):
     civilization_changed = pyqtSignal(str, int)   # (device_id, nền văn minh 1..7, 0 = tự nhận)
     # (device_id, {tab title: settings}) — một tab có `settings_changed` vừa được người dùng sửa.
     tab_settings_changed = pyqtSignal(str, dict)
+    profile_selected = pyqtSignal(str, str)   # (device_id, tên hồ sơ) bấm nút hồ sơ
+    profile_added = pyqtSignal(str, str)      # (device_id, tên hồ sơ mới) nút "+"
+    profile_deleted = pyqtSignal(str, str)    # (device_id, tên hồ sơ)
 
     def __init__(self, device_id: str, parent=None):
         super().__init__(parent)
@@ -62,6 +69,9 @@ class DeviceView(QWidget):
         self._add_tab(self.open_gift_box_tab, "Open Gift Box")
         self._add_tab(self.alliance_capacity_tab, "Alliance Capacity")
         self._add_tab(self.black_market_tab, "Black Market")
+        # Recruit General: đứng ngay trên tab Logs.
+        self.recruit_general_tab = RecruitGeneralTab()
+        self._add_tab(self.recruit_general_tab, "Recruit General")
         # Logs không có cấu hình: thêm thẳng, không nối Apply ALL / settings.
         self.logs_tab = LogsTab()
         self.tabs.addTab(self.logs_tab, "Logs")
@@ -71,6 +81,12 @@ class DeviceView(QWidget):
         )
         self.initialization_tab.start_all_clicked.connect(self.start_all_requested.emit)
         self.initialization_tab.stop_all_clicked.connect(self.stop_all_requested.emit)
+        self.initialization_tab.profile_clicked.connect(
+            lambda name: self.profile_selected.emit(self.device_id, name))
+        self.initialization_tab.profile_added.connect(
+            lambda name: self.profile_added.emit(self.device_id, name))
+        self.initialization_tab.profile_deleted.connect(
+            lambda name: self.profile_deleted.emit(self.device_id, name))
         self.initialization_tab.server_changed.connect(
             lambda server: self.server_changed.emit(self.device_id, server)
         )
@@ -94,15 +110,43 @@ class DeviceView(QWidget):
                 lambda: self.tab_settings_changed.emit(self.device_id,
                                                        {title: widget.get_settings()})
             )
+        self._autosave_on_edit(widget, title)
+
+    def _autosave_on_edit(self, widget: QWidget, title: str):
+        """Nhiều tab (Join Monster War, Alliance Capacity, Black Market...) không tự phát `settings_changed`:
+        nối mọi ô tích / combo / số / ô chữ người dùng sửa tới một lần lưu (gộp 300 ms). Chỉ dùng tín hiệu do
+        người dùng gây ra nên set_settings() bằng code không kích hoạt lưu."""
+        timer = QTimer(widget)
+        timer.setSingleShot(True)
+        timer.setInterval(300)
+        timer.timeout.connect(
+            lambda: self.tab_settings_changed.emit(self.device_id, {title: widget.get_settings()}))
+        for box in widget.findChildren(QAbstractButton):
+            if isinstance(box, (QCheckBox, QRadioButton)):
+                box.clicked.connect(timer.start)
+        for combo in widget.findChildren(QComboBox):
+            combo.activated.connect(timer.start)
+        for spin in widget.findChildren(QAbstractSpinBox):
+            spin.editingFinished.connect(timer.start)
+        for edit in widget.findChildren(QLineEdit):
+            edit.editingFinished.connect(timer.start)
 
     def _on_apply_all(self):
         # Every tab's Apply ALL copies this device's whole config (all
         # tabs) onto every other device. The device id and server are never copied.
+        self.apply_all_requested.emit(self.device_id, self.shareable_settings())
+
+    def shareable_settings(self) -> dict:
+        """Cấu hình mọi tab trừ phần riêng từng máy (device id, server): dùng cho Apply ALL và hồ sơ."""
         settings = self.get_settings()
         settings["Initialization"] = {
             k: v for k, v in settings["Initialization"].items() if k not in ("device_id", "server")
         }
-        self.apply_all_requested.emit(self.device_id, settings)
+        return settings
+
+    def set_profiles(self, names: list, active: str = ""):
+        """Hàng nút hồ sơ trong tab Initialization (không gồm default; `active` được tích)."""
+        self.initialization_tab.set_profiles(names, active)
 
     def append_log(self, message: str):
         self.logs_tab.append(message)

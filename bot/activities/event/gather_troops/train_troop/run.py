@@ -59,6 +59,7 @@ from ...common import (
     nearest_go,
     read_go_progress,
     run_task,
+    tap_tab,
 )
 from ...constants import GATHER_TROOPS_ICON, THRESHOLDS as EVENT_THRESHOLDS
 from ..troop_tier import choose_tier
@@ -175,7 +176,7 @@ def run(bot, task: dict, state: EventState, troop: TroopTask):
             bot.back(delay=1)
             return HANDLED
         if action in (OPEN_DAY, OPEN_TAB):
-            bot.tap(*pos, delay=2)
+            tap_tab(bot, *pos, action, _targets(troop), _regions(troop), _thresholds(troop))
         elif action == ON_TAB:
             go = nearest_go(bot, screen, pos)
             if go is None:

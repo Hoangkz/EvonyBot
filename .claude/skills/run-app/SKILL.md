@@ -17,7 +17,7 @@ Task được định nghĩa trong [pyproject.toml](../../../pyproject.toml) (po
 `poe dev` mở cửa sổ GUI và chặn cho tới khi đóng → chạy nền (`run_in_background`) và đọc output.
 
 ## Dữ liệu & log
-- Database: `%LOCALAPPDATA%\EvonyBot\evonybot.db` (SQLite, bảng `devices`, mỗi tab một cột JSON). Dùng chung giữa bản source và bản cài — **cẩn thận** khi sửa/xoá, đó là cấu hình thật của người dùng.
+- Database: `%LOCALAPPDATA%\EvonyBot\app\evonybot.db` (SQLite, bảng `devices`, mỗi tab một cột JSON). Dùng chung giữa bản source và bản cài — **cẩn thận** khi sửa/xoá, đó là cấu hình thật của người dùng.
 - Log: `print` ra stdout, dạng `[<serial>] <message>` (từ `BotWorker.log` / `ctx.log`). Lỗi cuối lượt chạy: `[<serial>] Error: ...`.
 - Không có file log; muốn giữ log thì chạy app qua terminal và lưu output.
 

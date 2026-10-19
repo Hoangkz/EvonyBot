@@ -20,16 +20,51 @@ os.environ.setdefault("ADB_MDNS", "0")
 
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QIcon
-from PyQt5.QtWidgets import QApplication, QMainWindow, QStackedWidget, QWidget, QHBoxLayout
+from PyQt5.QtWidgets import (
+    QApplication, QDialog, QHBoxLayout, QLabel, QMainWindow, QMessageBox, QStackedWidget, QVBoxLayout, QWidget,
+)
 
 from bot.common import GAME_PACKAGE
 
 from bot.worker import BotManager
 
-from database import Database, is_event_key
+import licensing
+from database import DEFAULT_PROFILE, Database, is_event_key
 from ui import DeviceView, HomeView, Sidebar
 from ui import theme
+from ui.activation_dialog import ActivationDialog
+from ui.workers import LicenseWorker
+from ui.tabs.constants import PROFILE_MAX
 from ui.tabs.logs_tab import SHOW_SECONDS
+
+
+CONTACT_HINT = f"Contact: {licensing.ADMIN_CONTACT}" if licensing.ADMIN_CONTACT else ""
+LICENSE_CHECK_MS = 60 * 60 * 1000   # re-check the activation code with the server every hour
+
+
+def ensure_license() -> tuple[bool, str | None]:
+    """(may start, notice). A machine that already has a license starts when the server answers; the notice
+    (revoked, expired...) is shown as a popup and the license file is never deleted. When the server cannot be
+    reached the app offers Retry or Quit. The code dialog only appears when there is no license yet: one
+    machine uses one code, so there is no way to enter another one from the app."""
+    if licensing.stored_code():
+        while True:
+            try:
+                licensing.verify()
+                return True, None
+            except licensing.LicenseError as e:
+                return True, str(e)
+            except licensing.OfflineError:
+                box = QMessageBox(
+                    QMessageBox.Critical, "Connection error",
+                    "Unable to load information from the server.\nPlease check your internet connection and try again.")
+                retry = box.addButton("Retry", QMessageBox.AcceptRole)
+                box.addButton("Quit", QMessageBox.RejectRole)   # also what the window's X / Esc does
+                box.setDefaultButton(retry)
+                box.exec()
+                if box.clickedButton() is not retry:
+                    return False, None
+    return ActivationDialog().exec() == QDialog.Accepted, None
 
 
 class MainWindow(QMainWindow):
@@ -40,9 +75,20 @@ class MainWindow(QMainWindow):
         self.resize(1329, 708)
         self._center_on_screen()
 
-        central = QWidget()
-        self.setCentralWidget(central)
-        root = QHBoxLayout(central)
+        # A banner on top (shown while the license is not valid) above the whole UI, which is disabled then.
+        outer = QWidget()
+        self.setCentralWidget(outer)
+        outer_layout = QVBoxLayout(outer)
+        outer_layout.setContentsMargins(0, 0, 0, 0)
+        outer_layout.setSpacing(0)
+        self.license_banner = QLabel()
+        self.license_banner.setWordWrap(True)
+        self.license_banner.setStyleSheet("background: #d32f2f; color: white; font-weight: bold; padding: 8px 12px;")
+        self.license_banner.hide()
+        outer_layout.addWidget(self.license_banner)
+        self.content = QWidget()
+        outer_layout.addWidget(self.content, 1)
+        root = QHBoxLayout(self.content)
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(0)
 
@@ -69,6 +115,14 @@ class MainWindow(QMainWindow):
         self._event_timer.setInterval(60_000)
         self._event_timer.timeout.connect(self._refresh_event_times)
         self._event_timer.start()
+
+        # Activation code: re-checked with the server hourly; revoked / expired -> stop the bots and quit.
+        self._license_worker: LicenseWorker | None = None
+        self._license_notice: str | None = None
+        self._license_timer = QTimer(self)
+        self._license_timer.setInterval(LICENSE_CHECK_MS)
+        self._license_timer.timeout.connect(self._check_license)
+        self._license_timer.start()
 
         self.bots = BotManager(self)
         self.bots.activity_changed.connect(
@@ -108,6 +162,31 @@ class MainWindow(QMainWindow):
         self.home_view.start_all_requested.connect(self._on_start_all_requested)
         self.home_view.stop_all_requested.connect(self._on_stop_all_requested)
         self.home_view.exit_all_requested.connect(self._on_exit_all_requested)
+
+    def _check_license(self):
+        if self._license_worker is not None and self._license_worker.isRunning():
+            return
+        self._license_worker = LicenseWorker("verify", parent=self)
+        self._license_worker.done.connect(lambda: self.notify_license(None))
+        self._license_worker.refused.connect(self.notify_license)
+        # Offline is fine while the last signed answer is inside the grace period.
+        self._license_worker.offline.connect(lambda _m: self.notify_license(licensing.check_local()))
+        self._license_worker.start()
+
+    def notify_license(self, notice: str | None):
+        """License problem (revoked, expired...): stop the bots, lock the whole UI behind a red banner and show a popup
+        (once per notice). The window stays open and the license file untouched; a valid answer unlocks it again."""
+        locked = bool(notice)
+        self.content.setEnabled(not locked)
+        self.license_banner.setVisible(locked)
+        if not locked:
+            self._license_notice = None
+            return
+        self.license_banner.setText(f"{notice} {CONTACT_HINT}".strip())
+        self.bots.stop_all()
+        if notice != self._license_notice:
+            self._license_notice = notice
+            QMessageBox.warning(self, "Activation", f"{notice}\n{CONTACT_HINT}".strip())
 
     def _center_on_screen(self):
         frame = self.frameGeometry()
@@ -158,6 +237,9 @@ class MainWindow(QMainWindow):
         view.reset_progress_requested.connect(self._on_reset_progress)
         view.reset_info_requested.connect(self._on_reset_info)
         view.tab_settings_changed.connect(self.db.save_settings)
+        view.profile_selected.connect(self._on_profile_selected)
+        view.profile_added.connect(self._on_profile_added)
+        view.profile_deleted.connect(self._on_profile_deleted)
         view.tabs.currentChanged.connect(self._on_tab_changed)
 
         # New device -> store its default config; known device -> restore it.
@@ -168,6 +250,7 @@ class MainWindow(QMainWindow):
             # Ghi lại tab Event theo event.py hiện tại (thêm nhiệm vụ mới,
             # cập nhật level / day khi file được sửa).
             self.db.save_settings(device_id, {"Event": view.event_tab.get_settings()})
+        self._refresh_profiles(device_id, view)
         self.home_view.update_device(
             device_id, server=view.initialization_tab.get_settings()["server"]
         )
@@ -210,8 +293,55 @@ class MainWindow(QMainWindow):
             {device_id: view.get_settings() for device_id, view in self.device_views.items()}
         )
 
+    def _refresh_profiles(self, device_id: str, view: DeviceView):
+        """Hàng nút hồ sơ của thiết bị: các hồ sơ đã tạo (không gồm default) + hồ sơ đang dùng."""
+        view.set_profiles(self.db.list_profiles(device_id), self.db.active_profile(device_id))
+
+    def _switch_profile(self, device_id: str, view: DeviceView, target: str):
+        """Chụp cấu hình đang dùng vào hồ sơ hiện tại, rồi nạp hồ sơ `target` lên máy (giữ nguyên device id, server...)
+        và lưu thành cấu hình đang dùng."""
+        self.db.save_profile(device_id, self.db.active_profile(device_id), view.shareable_settings())
+        settings = self.db.load_profile(device_id, target)
+        if settings:
+            view.set_settings(settings)
+            self.db.save_settings(device_id, view.get_settings())
+        self.db.set_active_profile(device_id, target)
+
+    def _on_profile_selected(self, device_id: str, name: str):
+        """Bấm nút hồ sơ: chuyển sang nó. Bấm lại hồ sơ đang chọn thì giữ nguyên (nút vẽ lại để vẫn tích)."""
+        view = self.device_views.get(device_id)
+        if view is None:
+            return
+        if name != self.db.active_profile(device_id):
+            self._switch_profile(device_id, view, name)
+        self._refresh_profiles(device_id, view)
+
+    def _on_profile_added(self, device_id: str, name: str):
+        """Nút "+": hồ sơ mới = bản sao cấu hình hiện tại, và máy chuyển sang dùng nó."""
+        view = self.device_views.get(device_id)
+        if view is None or len(self.db.list_profiles(device_id)) >= PROFILE_MAX:
+            return
+        self.db.save_profile(device_id, self.db.active_profile(device_id), view.shareable_settings())
+        self.db.save_profile(device_id, name, view.shareable_settings())
+        self.db.set_active_profile(device_id, name)
+        self._refresh_profiles(device_id, view)
+
+    def _on_profile_deleted(self, device_id: str, name: str):
+        view = self.device_views.get(device_id)
+        if view is None:
+            return
+        if self.db.active_profile(device_id) == name:
+            # Xoá hồ sơ đang dùng: chuyển sang hồ sơ đầu tiên còn lại (không còn hồ sơ nào thì về default).
+            remaining = [n for n in self.db.list_profiles(device_id) if n != name]
+            self._switch_profile(device_id, view, remaining[0] if remaining else DEFAULT_PROFILE)
+        self.db.delete_profile(device_id, name)
+        self._refresh_profiles(device_id, view)
+
     def closeEvent(self, event):
         self._register_timer.stop()
+        self._license_timer.stop()
+        if self._license_worker is not None:
+            self._license_worker.wait()
         self.bots.stop_all(wait=True)
         self.db.close()
         super().closeEvent(event)
@@ -382,8 +512,13 @@ def main():
     app = QApplication(sys.argv)
     app.setWindowIcon(QIcon(str(Path(__file__).resolve().parent / "Images" / "icon.ico")))
     theme.apply(app)
+    may_start, notice = ensure_license()
+    if not may_start:
+        sys.exit(0)
     window = MainWindow()
     window.show()
+    if notice:   # the app opens normally; the popup comes right after the window shows
+        QTimer.singleShot(0, lambda: window.notify_license(notice))
     sys.exit(app.exec())
 
 

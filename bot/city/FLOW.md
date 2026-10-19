@@ -30,7 +30,7 @@ mốc), `ANCHOR_SHIFT` (độ lệch tâm "chính giữa"), `DATA` (13 ô quét)
 
 **1. Chuẩn bị**
 - Máy civ N đang ở màn thành (không phải thế giới; ở thế giới bấm nút toà thành góc dưới phải). `bot.civilization` hoặc ảnh mẫu
-  phải nhận ra civ: kiểm tra ảnh `Images/Event/Building/civ<N>/<công trình>/` có đủ Keep, Walls, Research Factory, Tavern, Archer
+  phải nhận ra civ: kiểm tra ảnh `Images/Building/civ<N>/<công trình>/` có đủ Keep, Walls, Research Factory, Tavern, Archer
   Tower, Watchtower, Art Hall, Pasture, Rally Spot, Trap Factory, Prison... và **đúng công trình** (từng có ảnh Prison cắt nhầm Trap
   Factory). Kiểm tra điểm khớp: `.\venv\Scripts\python.exe .claude\skills\template-images\scripts\probe.py match <ảnh> -s <serial>`
   (>= 0,9 khi công trình ở giữa màn).

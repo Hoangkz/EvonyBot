@@ -52,11 +52,13 @@ from ..activities.event.city_building import (
     WATCHTOWER,
     WONDER,
     WORKSHOP,
+    _assign,
+    _best_match,
     _candidates,
 )
 
 from .tours import FIXED_NAMES, TOURS
-# Công trình nhận ra khi quét / đi (có ảnh mẫu trong Images/Event/Building/civ<N>/ hoặc ảnh tự học).
+# Công trình nhận ra khi quét / đi (có ảnh mẫu trong Images/Building/civ<N>/ hoặc ảnh tự học).
 BUILDINGS = (KEEP, MARKET, HOSPITAL, FORGE, BARRACKS, STABLES, ARCHER_CAMP, WORKSHOP, TRAP_FACTORY, ACADEMY, SHRINE,
              ART_HALL, BATTLEFIELD, PASTURE, WALLS, EMBASSY, PRISON, TAVERN, RESEARCH_FACTORY, HOLY_PALACE, ICE_LAND,
              RALLY_SPOT, VICTORY_COLUMN, TRIUMPHAL_ARCH, WATCHTOWER, ARCHER_TOWER, DRAGON_CLIFF, SUBORDINATE_CITY,
@@ -306,6 +308,26 @@ def civ_of(bot, screen) -> int | None:
     return best_civ
 
 
+def update_civ(bot, name: str, screen) -> int | None:
+    """Nhận nền văn minh của thành đang hiện từ Thành chính / công trình cố định, so ảnh mẫu của MỌI nền văn minh (không chỉ
+    civ đã lưu). Khác civ đang lưu (hoặc chưa lưu) thì cập nhật DB (city_building._assign: bot.set_civilization). Trả civ vừa
+    cập nhật, None nếu không đổi / không nhận ra."""
+    names = (KEEP, *FIXED_NAMES)
+    if _best_match(bot, _candidates(bot, names), screen) is not None and getattr(bot, "civilization", None):
+        return None      # thấy ảnh của civ đã lưu: đúng rồi, không đổi
+    best = _best_match(bot, _candidates(bot, names, others=True), screen)   # không thấy civ đã lưu: thử ảnh các civ còn lại
+    if best is None:
+        best = _best_match(bot, _candidates(bot, names), screen)           # chưa lưu civ: ảnh của mọi civ
+    old = getattr(bot, "civilization", None)
+    if best is None or best[1] is None or best[1] == old:
+        return None
+    bot.record(f"{name}: civilization changed {old} -> {best[1]}")
+    _assign(bot, name, best[1])
+    if old:
+        bot.set_city_map({})    # bản đồ thành cũ thuộc civ cũ, không còn đúng
+    return best[1]
+
+
 def tour_of(bot, screen):
     """Dữ liệu route (module civ<N>/city_tour.py) của thành đang hiện: theo civ_of; chưa biết civ thì dùng civ1; civ chưa đo đủ -> None."""
     civ = civ_of(bot, screen)
@@ -315,6 +337,7 @@ def tour_of(bot, screen):
 def find_keep(bot, name: str):
     """Đưa Thành chính vào giữa màn (bước đầu của quét route: các ô sau đều đi từ Thành chính). Mọi nhiệm vụ đã xong nên không
     còn nút Go để nhờ game kéo Thành chính vào giữa, phải tự tìm:
+    0. Mỗi màn: nhận nền văn minh (update_civ), khác civ trong DB thì cập nhật.
     1. Thấy Thành chính -> kéo bù vào giữa.
     2. Thấy một công trình cố định (FIXED: Tường thành / Research Factory / Tavern) -> kéo nó vào giữa màn rồi vuốt đúng
        đường cố định về Thành chính (ROUTES, đo sẵn) -> kéo bù Thành chính vào giữa.
@@ -325,6 +348,7 @@ def find_keep(bot, name: str):
         if move is not None:
             swipe(bot, move)
         screen = city_screen(bot)
+        update_civ(bot, name, screen)   # civ khác civ trong DB -> cập nhật (trước khi tìm, vì ảnh mẫu tìm theo civ đã lưu)
         found = visible(bot, screen, [KEEP, *FIXED_NAMES])
         if not found:
             continue

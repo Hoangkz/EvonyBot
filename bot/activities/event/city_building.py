@@ -8,7 +8,7 @@ tự học ảnh công trình và tự xếp thiết bị vào nền văn minh 1
 devices.civilization; bot.civilization / bot.set_civilization). Ảnh học dùng chung cho mọi máy
 cùng nền văn minh: %LOCALAPPDATA%\\EvonyBot\\buildings\\civ<N>\\<công trình>\\<n>.png.
 Ảnh có sẵn (cắt tay: trung vị 30 khung trong 30 s, ảnh gốc ở tests/event/city_building/screens)
-nằm trong Images/Event/Building/civ<N>/<công trình>/ — dùng cùng ảnh học, bot không ghi vào đây.
+nằm trong Images/Building/civ<N>/<công trình>/ — dùng cùng ảnh học, bot không ghi vào đây.
 
 Flow (tap_building rồi remember_building):
 1. Tìm ảnh học của công trình ở vùng giữa (tối đa BUILDING_TIMEOUT giây): máy đã biết nền văn
@@ -37,7 +37,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from ...context.templates import TEMPLATE_DIR
+from ...context.templates import TEMPLATE_DIR, read_image
 
 MARKET = "market"                # Chợ: City Tax, Black Market
 HOSPITAL = "hospital"            # Bệnh viện: Heal
@@ -79,7 +79,7 @@ TROOP_BUILDINGS = (BARRACKS, ARCHER_CAMP, STABLES, WORKSHOP)
 # Thư mục ảnh học (cạnh evonybot.db, xem database.DATA_DIR). Test đổi biến này sang thư mục tạm.
 LEARNED_DIR = Path(os.environ.get("LOCALAPPDATA", Path.home())) / "EvonyBot" / "buildings"
 # Ảnh có sẵn trong repo (đọc thêm, không ghi).
-BUNDLED_DIR = TEMPLATE_DIR / "Event" / "Building"
+BUNDLED_DIR = TEMPLATE_DIR / "Building"
 PENDING = "pending"
 MAX_CIVS = 7
 MAX_SAMPLES = 3
@@ -143,7 +143,7 @@ def _civ_samples(civ: int, building: str) -> list[Path]:
 
 
 def _load(path: Path):
-    return cv2.imdecode(np.fromfile(str(path), np.uint8), cv2.IMREAD_COLOR)
+    return read_image(path)
 
 
 def _candidates(bot, buildings, others: bool = False) -> list[tuple[int | None, np.ndarray]]:

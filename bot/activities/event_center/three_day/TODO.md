@@ -12,3 +12,14 @@ KHÔNG làm (không có ô chọn, bot không bấm Go ở các dòng đó).
 - [ ] Chạy thử trên máy thật.
 - [ ] Đổi quà nhớ vị trí hàng (event.py giữ đúng thứ tự hàng của game; ROW_PITCH / DRAG_* trong constants.py): chưa đo thật xem vuốt 1 px màn = bao nhiêu px danh sách; bot tự dò thêm quanh hàng nếu lệch, nhưng cần đo để dò ít nhất. Không dùng OCR số vé.
 - [ ] Donate hết kim cương (mua lại lượt): hiện chỉ đánh dấu xong hôm nay khi không đạt mục tiêu; người dùng sẽ sửa case hết kim cương chung sau.
+
+## Chờ cố định cần xem (có nên đổi sang wait_for không?)
+
+Chỗ chờ số giây viết cứng, không có vòng kiểm tra rồi thử lại. Xác nhận từng chỗ: cần `wait_for` thì sửa, không thì gạch.
+
+### [run.py](run.py)
+
+- [ ] [run.py:80](run.py#L80) (1.5s): `bot.back(delay=1.5)`
+- [ ] [run.py:182](run.py#L182) (1.5s): `bot.back(delay=1.5)`
+- [x] [run.py:408](run.py#L408) (2s): `bot.tap(*c.REDEEM_TAB_TAP, delay=2)` — đã đổi: chờ 1s × tối đa 5 lần rồi bấm lại
+- [ ] [run.py:532](run.py#L532) (1s): `bot.tap(*c.QTY_MAX_TAP, delay=1)`

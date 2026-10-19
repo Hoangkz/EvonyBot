@@ -70,7 +70,7 @@ Mỗi task là một flow riêng. Tối thiểu cần các test sau.
 Assert `"Resource Tax"` và `"Activity Rewards"` có trong dict daily*done sau khi chạy. 3. **Gold Levy** (`tests/daily_activities/gold_levy/test_flow.py`, luồng mới `after_go`): 01..04 (chung) → cuộn thêm
 (`04b_activity_levy_row`) → Go → `05_after_go` `tap_at(222, 345)` (Thành chính khớp ảnh mẫu civ) → `06_keep_menu`
 `tap(Levy.png)` → `07_levy_popup` `tap(FreeLevyAll.png)` → `08_levy_done` `back()` → `05_after_go` `end(result=True)`.
-Nhánh nút đã xám: bỏ 07, `08_levy_done` `back()` luôn. 4. Mỗi task còn lại (Monster Killing, Offering, Troop Training, ...) cần một method `test*<task>`. Toạ độ tap cứng của từng handler nằm trong `run.py`, nên dùng `tap_at` với đúng các toạ độ đó.
+Nhánh nút đã xám: bỏ 07, `08_levy_done` `back()` luôn. 4. Mỗi task còn lại (Offering, Troop Training, ...) cần một method `test*<task>`. Toạ độ tap cứng của từng handler nằm trong `run.py`, nên dùng `tap_at` với đúng các toạ độ đó.
 
 ## Black Market — `tests/black_market/`
 
@@ -87,21 +87,6 @@ Nhánh nút đã xám: bỏ 07, `08_levy_done` `back()` luôn. 4. Mỗi task cò
 | 05  | hết ô để mua                                                           | `tap(INSTANT_REFRESH)` hoặc dừng: `back()`, `end()` |
 
 Nhánh phụ: Resource giá kim cương bị bỏ (`bm_screen_3`), giới hạn Refresh / Quantity Buy, kim cương < 50, CheckGold.
-
-## Battlefield Shop — `tests/battlefield_shop/`
-
-Settings: `{"quantity_to_refresh": "0"}`, `open_box` / `black_market` để False. Code đang có `TODO: cần làm lại`, nên nếu viết test ngay thì phải xác nhận lại flow với người dùng.
-
-| #   | Màn hình                                                             | Action                                                                              |
-| --- | -------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| 01  | Màn hình chính                                                       | `tap("Black Market/chucnang.png")`                                                  |
-| 02  | Menu                                                                 | `tap("Black Market/activites.png")`                                                 |
-| 03  | Danh sách Daily Activities                                           | `swipe(50, 50, 50, 32)` cho tới khi thấy `BattlefieldShop/rss.png` / `openshop.png` |
-| 04  | Dòng Battlefield Shop                                                | `tap("BattlefieldShop/openshop.png")` (hoặc `rss.png`, `goto.png`)                  |
-| 05  | `vaoshop.png`                                                        | `tap(...)`                                                                          |
-| 06  | Shop (`Black Market/Refresh.png`) có món trong `BattlefieldShop/buy` | `tap_at(<ô sau _cell>)`                                                             |
-| 07  | `xacnhan.png`                                                        | `tap(...)`                                                                          |
-| 08  | Shop không còn món cần mua                                           | `end()` (giới hạn refresh là 0)                                                     |
 
 ## Join Monster War — `tests/join_monster_war/`
 
@@ -300,3 +285,16 @@ Cập nhật event 3 ngày (đã đổi logic): vào event là ở đầu danh s
 Heal (King's Path / Daily Activities): nút Heal phải sáng (cam, `heal_screen.png`) mới `tap(HEAL_BUTTON)`; xám (`heal_screen_reset.png`) thì làm lại từ màn Hospital (`test_heal_button_not_lit_redo_from_hospital`); thấy hộp "Healing ... Speed Up" ngay sau khi nhập số thì đi tiếp tới Speed Up (`test_heal_already_started_goes_to_speed_up`).
 
 Donate (Alliance Science): bấm Donate tới khi ra nút kim cương (`donate_gems.png`) kể cả khi đã đủ số cần, rồi mới xong.
+
+## Recruit General — `tests/recruit_general/`
+
+Settings: `{}`; ctx có `city_map` (đã có route trong DB).
+
+| #   | Màn hình                                         | Action                                            |
+| --- | ------------------------------------------------ | ------------------------------------------------- |
+| 01  | Menu tròn Tavern (nút "•••" còn hiện)             | `tap_at` Tavern, rồi `tap("RecruitGeneral/MenuRecruit.png")` |
+| 02  | Màn Recruit General, hai ô chưa tích              | `tap_pct(56.6, 83)` (tích Historic)               |
+| 02b | Historic tích, Epic chưa tích (tổng hợp)          | `tap("RecruitGeneral/Refresh.png")` liên tục      |
+| 03  | Hai ô đã tích                                    | `tap_pct(10.6, 83)` (bỏ tích Epic)                |
+| 04  | Popup "Your Tavern has a high quality General"    | `tap("RecruitGeneral/Cancel.png")`, dừng          |
+

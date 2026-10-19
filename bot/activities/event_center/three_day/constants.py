@@ -110,13 +110,14 @@ REDEEM_BUTTON_DY = 3
 REDEEM_COLOR_BOX = (-29, -6, 10, 12)   # (dx, dy, w, h) so với tâm nút
 REDEEM_GREEN_DIFF = 10
 REDEEM_WAIT = 2
+REDEEM_TAB_TRIES = 5   # bấm tab Redeem rồi chờ 1s xem đã sang chưa, chưa thì chờ thêm 1s, tối đa ngần này lần; hết lượt mà chưa sang thì để vòng ngoài bấm lại
 MAX_REDEEMS_PER_ITEM = 30
 GREY_STOP = 5   # quà xám (chưa đổi được lần nào) liên tiếp thì dừng đổi quà
 # Bấm Redeem -> popup chọn số lượng (tên quà, thanh trượt "1 / 2", nút xanh ghi giá): bấm cạnh dấu
 # "+" (đầu phải thanh trượt) để chọn đổi TẤT CẢ, rồi bấm nút xanh. Nhận popup bằng nút "+" (30x30,
 # đúng 1,00; cũng có ở màn speed up nên chỉ chờ ngay sau khi bấm Redeem).
 QTY_PLUS = f"{FOLDER}/qtyPlus.png"
-QTY_WAIT = 3                    # giây chờ popup
+QTY_WAIT = 8                    # giây chờ popup
 QTY_MAX_TAP = (276, 354)        # cạnh dấu "+" (đầu phải thanh trượt)
 QTY_CONFIRM_TAP = (198, 452)    # nút xanh giữa popup
 # Vị trí hàng quà: hàng k có tâm icon ở y = ROW_FIRST_Y + ROW_PITCH * k khi chưa cuộn (đo: 347,

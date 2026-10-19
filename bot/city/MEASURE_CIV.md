@@ -6,7 +6,7 @@ Ví dụ PowerShell: `$env:EVONY_SERIAL="127.0.0.1:21943"; $env:EVONY_CIV="3"`. 
 
 ## Chuẩn bị
 1. Tạo `bot/city/civ<N>/__init__.py` + `city_tour.py` (copy khung của civ2: `COMPLETE = False`, `FIXED / ANCHOR_SHIFT / ROUTES = {}`, `DATA = []`) và thêm civ vào `ALL` trong [tours.py](tours.py).
-2. Máy ở màn thành, có ảnh mẫu `Images/Event/Building/civ<N>/<công trình>/1.png` (kiểm bằng `look.py`). **Ảnh mẫu cắt ở GIỮA công trình, nhỏ (~60-100 px), không lấy nước / nền đất** (tài khoản khác nước, ô đất xung quanh khác).
+2. Máy ở màn thành, có ảnh mẫu `Images/Building/civ<N>/<công trình>/1.png` (kiểm bằng `look.py`). **Ảnh mẫu cắt ở GIỮA công trình, nhỏ (~60-100 px), không lấy nước / nền đất** (tài khoản khác nước, ô đất xung quanh khác).
    Ảnh cũ cắt xấu khớp chỉ 0,3 - 0,55; ảnh cắt đúng khớp 0,9 - 1,0. Cắt lại: `probe.py shot` rồi `probe.py crop <ảnh> x y w h -o <đường dẫn> --force`, xem ảnh cắt, kiểm `probe.py match`.
 3. Về Thành chính ở giữa màn mà không cần vuốt: `go_keep.py` (mở Activity -> Gold Levy -> Go). Dùng mỗi khi lạc đường, vì sai số cộng dồn nhanh.
 

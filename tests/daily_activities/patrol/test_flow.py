@@ -23,7 +23,7 @@ from bot.activities.event.kings_path.patrol.run import round_key
 from tests.flow import Step, back, end, run_flow, tap, tap_at
 
 SCREENS = Path(__file__).parent / "screens"
-WALLS_POS = (246, 345)   # Tường thành trên patrol_city khớp ảnh mẫu civ (Images/Event/Building/civ*/walls)
+WALLS_POS = (246, 345)   # Tường thành trên patrol_city khớp ảnh mẫu civ (Images/Building/civ*/walls)
 TO_PATROL = [
     Step("patrol_city.png", tap_at(*WALLS_POS)),
     Step("patrol_menu.png", tap(MENU_PATROL)),

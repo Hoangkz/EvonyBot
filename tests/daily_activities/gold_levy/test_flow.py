@@ -19,7 +19,7 @@ from tests.flow import Step, back, end, run_flow, tap, tap_at
 
 SCREENS = Path(__file__).parent / "screens"
 LEVY_GO_Y = 461   # Go dưới tiêu đề "Levy Gold 5 time(s)" (y 418) trên 04b_activity_levy_row
-KEEP_POS = (222, 345)   # Thành chính khớp ảnh mẫu có sẵn (Images/Event/Building/civ*/keep) trên 05_after_go
+KEEP_POS = (222, 345)   # Thành chính khớp ảnh mẫu có sẵn (Images/Building/civ*/keep) trên 05_after_go
 TO_GO = [
     *TO_ACTIVITY, *CLAIM_ALL_ONCE,
     Step("03_activity_top.png", SCROLL),

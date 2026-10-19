@@ -7,6 +7,5 @@
 
 ## Chưa làm
 - [ ] Flow test từ Go (cần ảnh danh sách Activity + các màn Trade Carriage ở `screens/`).
-- [ ] Giao diện Activity bản cũ: chưa có `Card.png` nên bản cũ bỏ qua (TASK_UNKNOWN).
 
 - [ ] Popup nhận quà (`GIFT_POPUP`) đang dùng ảnh "Congratulations!" dùng chung, chưa kiểm tra trên màn Trade Carriage thật: cần ảnh chụp popup đó (nếu khác thì cắt ảnh riêng).

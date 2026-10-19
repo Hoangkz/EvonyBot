@@ -4,7 +4,7 @@ build.ps1 — build the EvonyBot installer (replaces the PyInstaller build).
 Stages everything the installer ships into build\app:
   app\                     Python embeddable runtime + Lib\site-packages;
                            pythonw.exe is renamed EvonyBot.exe (the app's process name)
-  main.cp312-win_amd64.pyd all app code (main, database, version, updater,
+  main.pyd                 all app code (main, database, version, updater,
                            bot\, ui\) compiled by Nuitka into this one file
   EvonyBot.pyw             launcher stub (from main import main)
   ui\assets\, Images\
@@ -128,22 +128,36 @@ $NuitkaOut = Join-Path $Build "nuitka"
 if (Test-Path $NuitkaOut) { Remove-Item $NuitkaOut -Recurse -Force }
 Push-Location $Root
 try {
-    & $HostPy -m nuitka --module main.py `
-        --include-module=database --include-module=updater --include-module=version `
+    # config_key.py (git-ignored, made by installer/license_config.py) decrypts the license server address read from the gist.
+    # Nuitka finds it through PYTHONPATH (the file lives in installer\, not next to main.py).
+    $keyModule = @()
+    if (Test-Path (Join-Path $PSScriptRoot "config_key.py")) {
+        $keyModule = @("--include-module=config_key")
+        $env:PYTHONPATH = $PSScriptRoot
+    }
+    else { Write-Warning "installer\config_key.py not found: the app will use the built-in license server address only." }
+    & $HostPy -m nuitka --module main.py @keyModule `
+        --include-module=database --include-module=updater --include-module=version --include-module=licensing `
         --include-package=bot --include-package=ui `
         --output-dir=$NuitkaOut --remove-output --no-pyi-file --assume-yes-for-downloads
     if ($LASTEXITCODE -ne 0) { throw "Nuitka compile failed" }
 } finally {
     Pop-Location
+    Remove-Item Env:PYTHONPATH -ErrorAction SilentlyContinue
 }
-Copy-Item (Join-Path $NuitkaOut "main*.pyd") $App
+Copy-Item (Join-Path $NuitkaOut "main*.pyd") (Join-Path $App "main.pyd")
 
 # ---- data files ------------------------------------------------------
 # Dữ liệu trước đây ship riêng dạng .json (boss, event, priority, black_market items /
 # city_tour, ...) giờ là .py, được Nuitka compile cùng code -> không copy gì thêm.
 New-Item -ItemType Directory -Force (Join-Path $App "ui") | Out-Null
 Copy-Item (Join-Path $Root "ui\assets") (Join-Path $App "ui\assets") -Recurse
-Copy-Item (Join-Path $Root "Images") (Join-Path $App "Images") -Recurse
+# Images\ is not shipped as loose files: it is packed (scrambled) into images.dat, read into memory
+# at run time. Only the icon stays loose (the window icon and the shortcuts use it).
+& $HostPy (Join-Path $PSScriptRoot "pack_images.py") (Join-Path $Root "Images") (Join-Path $App "images.dat")
+if ($LASTEXITCODE -ne 0) { throw "packing images failed" }
+New-Item -ItemType Directory -Force (Join-Path $App "Images") | Out-Null
+Copy-Item (Join-Path $Root "Images\icon.ico") (Join-Path $App "Images\icon.ico")
 
 # A .pyd can't be run as a script, so the shortcut starts this stub.
 Set-Content (Join-Path $App "EvonyBot.pyw") -Encoding ascii -Value @(

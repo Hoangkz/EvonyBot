@@ -5,10 +5,12 @@ Xulyanh.RunOcr + Xulyanh.ImageToNumber, which used Tesseract). One module
 per reader, each exposing `run(image)`:
 
 - read_number: digits -> int
+- read_camera: thanh toạ độ "X:0628 Y:0128" của bản đồ thế giới (ảnh cả màn hình) -> (628, 128)
 - read_coords: "X:Y" map coordinate -> (x, y)
 - read_server: "S. 1257" (sau "Empire Name:") -> "1257"
 - read_boss_count: số boss chờ ở huy hiệu đỏ của icon listboss (màn thành) -> 3
 - read_boss_name: "(Boss) Peryton" trên thẻ rally -> "(boss) peryton"
+- read_general_name: tên tướng dưới ảnh tướng ở màn Recruit General -> "rustam" ("?" = glyph chưa có mẫu); similarity() so khớp mờ với tên cần mua
 - read_power: lực boss "6.5M" trên thẻ rally -> 6500000
 - read_progress: tiến độ nhiệm vụ event "300 / 500" -> 300 (số đã làm)
 - read_milestone: tiến độ rương mốc "Progress:12 / 70" (Gather Troops) -> 12
@@ -23,7 +25,9 @@ from .read_balance import run as read_balance
 from .read_boss_count import run as read_boss_count
 from .read_boss_name import run as read_boss_name
 from .read_bubble_time import run as read_bubble_time
+from .read_camera import run as read_camera
 from .read_coords import run as read_coords
+from .read_general_name import run as read_general_name
 from .read_heal_count import run as read_heal_count
 from .read_milestone import run as read_milestone
 from .read_number import run as read_number
@@ -34,5 +38,5 @@ from .read_server import run as read_server
 from .read_tax_count import run as read_tax_count
 from .read_train_count import run as read_train_count
 
-__all__ = ["read_balance", "read_boss_count", "read_boss_name", "read_bubble_time", "read_coords", "read_heal_count", "read_milestone", "read_number", "read_offer_cost", "read_power", "read_progress",
+__all__ = ["read_balance", "read_boss_count", "read_boss_name", "read_bubble_time", "read_camera", "read_coords", "read_general_name", "read_heal_count", "read_milestone", "read_number", "read_offer_cost", "read_power", "read_progress",
            "read_server", "read_tax_count", "read_train_count"]

@@ -2,93 +2,62 @@
 
 ## Phạm vi
 
-Task `gift_claims` được đăng ký ở cuối nhóm Daily Activities, sau
-`daily_rewards`, với priority 299. Khi có Join Boss, mỗi lượt chạy tối đa 120
-giây; hết thời gian hoặc có boss mới thì nhường Join Boss rồi gọi lại từ các
-key DB còn PENDING. Mỗi điểm nhận có một key DB riêng (ví dụ `gift_limited_offer`), còn `gift_claims`
-chỉ là key tổng để scheduler biết cả hai khu đã xong. Registry tại
-`gift_claims/registry.py` là danh sách bắt buộc phải kiểm tra; chấm đỏ không
-được dùng để kết luận một task đã xong.
+Gift Claims gồm **hai hoạt động độc lập**, mỗi hoạt động có hàm `run(bot)` riêng. Worker chạy cả hai **sau cùng mỗi ngày, sau mọi nhiệm vụ của mọi activity**
+(`bot/worker/priority.py`, nhóm "Gift Claims", priority 0, thuộc activity Daily Activities) khi ô **Claim Event Gifts** ở tab Daily
+Activities được tích (`settings["General"]["gift_claims"]`, mặc định bật):
 
-Mỗi key được DB lưu timestamp ISO, ví dụ `gift_limited_offer:
-2026-10-14T21:05:00`. `BotWorker.is_daily_done()` so timestamp với lần reset
-server gần nhất (mặc định 14:00, lấy từ DB settings). Vì vậy lúc 15:00 ngày
-15/10, bản ghi 21:05 ngày 14/10 là **chưa làm**; lúc 13:59 thì vẫn **đã làm**.
-DB không xoá key khi sang ngày mới.
+- `gift_claims.valuable_event.run`: Valuable Event + Super Value Return (khu ngoài Event Center). Key tổng
+  `gift_valuable_event`.
+- `gift_claims.event_center.run`: Back to Territory (icon ngoài) + các event con trong danh sách Limited của Event
+  Center. Key tổng `gift_event_center`.
 
-## Cấu trúc và điểm chạy hiện tại
+Mỗi nhiệm vụ con có key `daily_done` riêng (ví dụ `gift_limited_offer`). DB lưu timestamp ISO;
+`BotWorker.is_daily_done()` so với lần reset server gần nhất (mặc định 14:00, lấy từ DB settings): 15:00 ngày 15/10 thì
+bản ghi 21:05 ngày 14/10 là **chưa làm**, 13:59 thì vẫn **đã làm**. Key hết hạn tự động, DB không xoá khi sang ngày.
+
+## Cấu trúc
 
 ```
 gift_claims/
-├── valuable_event/              # Khu ngoài thành, không đi qua Event Center
-│   ├── run.py                   # quét carousel Valuable Event
+├── scan.py                      # vòng kiểm tra 3 lần dùng chung cho cả hai hoạt động
+├── valuable_event/
+│   ├── zone.py                  # run(bot) của hoạt động Valuable Event
+│   ├── run.py                   # quét carousel (dấu đỏ) dùng bởi từng tab
 │   ├── super_value_return/run.py
-│   ├── login_gifts/run.py
-│   └── <từng event>/run.py
-├── back_to_territory/           # Thanh phải ngoài thành, ngang cấp Event Center
+│   └── <từng event>/run.py      # TASK = GiftTask(key, nhãn, run)
+├── back_to_territory/           # Thanh phải ngoài thành, tính vào hoạt động Event Center
 │   └── run.py
-└── event_center/                # Chỉ các event mở sau khi vào Event Center
-    ├── run.py                   # chỉ quét danh sách Limited
-    ├── grace_of_star_trail/run.py
-    ├── dwarfs_treasure/run.py
+└── event_center/
+    ├── zone.py                  # run(bot) của hoạt động Event Center
+    ├── run.py                   # quét danh sách Limited
     └── <từng event>/run.py
 ```
 
-Mỗi event có entry `run(bot)` trong thư mục của chính nó. Entry tổng
-`gift_claims.run_job(ctx, settings)` là job scheduler; key tổng trong DB là
-điều kiện để worker bỏ qua toàn bộ hoạt động trong phần còn lại của ngày server.
+## Trình tự (`scan.run_zone`)
 
-## Trình tự chung
+1. Hoạt động đã có key tổng hôm nay: bỏ qua. Nhiệm vụ con đã xong hôm nay: bỏ qua, chỉ làm các nhiệm vụ còn lại.
+2. Một **lượt** = tìm từng event còn lại (mở trang cha bằng vị trí/launcher cố định, không dựa vào chấm đỏ):
+   - Thấy: nhận quà theo quy tắc nhóm bên dưới, ghi key xong của event đó, đưa số lần "không thấy" về 0.
+   - Không thấy: back về màn chính, ghi thêm một lần "không thấy" (key `<key>_miss_1..3`).
+3. Chạy tối đa 3 lượt liên tiếp. Event không thấy cả 3 lần = hôm nay không có, ghi key xong. Thấy ở bất kỳ lượt nào thì
+   đã xong và đếm về 0.
+4. Không mở được trang cha (launcher/Event Center không hiện) **không** tính là "không thấy": lượt đó dừng, chờ lần chạy sau.
+5. Mọi nhiệm vụ con xong thì ghi key tổng của hoạt động.
+6. Số lần "không thấy" lưu trong DB nên nhường Join Boss hay khởi động lại vẫn đếm tiếp. Hết giới hạn 120 giây hoặc có
+   boss mới thì không ghi DONE cho bước đang dở.
 
-1. Đọc registry và bỏ qua duy nhất những key đã DONE trong ngày server hiện
-   tại. Key chưa DONE luôn phải đi tới đúng màn và kiểm tra, kể cả khi không
-   còn chấm đỏ.
-2. Về màn thành phố; kiểm tra Vùng 1 trước, sau đó Vùng 2:
-   - Vùng 1 là toàn bộ điểm nhận quà không nằm trong Event Center, gồm
-     Valuable Event và Super Value Return (Empire Depot, Lucky Raffle,
-     City Growth Plan, Login Gifts).
-   - Vùng 2 là thanh icon bên phải: Back to Territory là màn ngang cấp;
-     Event Center là launcher riêng chứa các event Limited bên trong.
-3. Mở Valuable Event bằng vị trí launcher cố định ở thanh dưới và Event Center
-   bằng template launcher cố định ở thanh phải; không chạm vào chấm đỏ.
-   Facebook/Follow Us luôn bị loại.
-   Các mảng đỏ sát nhau trên cùng một icon phải được gộp thành một badge thật;
-   không được mở lại artwork của cùng icon như một mục Unknown.
-4. Dò label cố định từ đầu tới cuối. Label nào còn PENDING trong DB thì mở và
-   chạy flow của event đó, kể cả không có dấu đỏ. Dấu đỏ chỉ là tín hiệu phụ
-   cho event chưa có label cố định.
-5. Nếu là màn cha có carousel hoặc danh sách, duyệt toàn bộ dấu đỏ trong màn cha.
-6. Trong mỗi màn con, xử lý theo thứ tự:
-   - bấm nút điều hướng/phần thưởng cố định như Rewards, Star Trail Gift,
-     Sprint Package, Stockpile hoặc Scores;
-   - tìm các nút nhận thật: Claim, Free, Claim Free, Claimable, Daily Free,
-     Claim All;
-   - nếu thấy nút X của popup/mục không nhận được thì dùng Back để thoát, không
-     bấm trực tiếp vào X;
-   - dò điểm lấp lánh trong vùng nội dung an toàn; Valuable Event cần 3 vòng
-     liên tiếp không nhận thêm quà, Event Center lấy 3 mẫu cho mỗi lượt kiểm;
-   - không bấm vùng mua hàng, thanh tài nguyên hoặc phần thưởng trả phí.
-7. Xác minh từng lần nhận bằng một trong các điều kiện:
-   - xuất hiện Congratulations;
-   - nút nhận vừa bấm biến mất;
-   - trạng thái Claimed xuất hiện tại đúng phần thưởng.
-8. Việc chỉ bấm nút điều hướng không được tính là đã nhận quà.
-9. Quay lại header hoặc danh sách và xác minh flow của đúng event đã hoàn tất.
-   Chỉ lúc đó key riêng của event mới được ghi timestamp. Màn cha/aggregate
-   chỉ DONE khi tất cả key trong registry của cả hai khu đều current.
-   Trên carousel, mỗi dấu đỏ chỉ thuộc tab có tâm gần nó nhất; dấu của tab bên
-   cạnh không được dùng để kết luận tab vừa xử lý vẫn còn đỏ.
-   Mục đã được mở, vét nút cố định và đủ số vòng kiểm tra sparkle được coi là đã xét;
-   badge trang trí hoặc badge không tự tắt không được làm luồng lặp vô hạn.
-10. Gift Claims giữ nguyên deadline và cờ ngắt Join Boss của worker. Hết 120
-    giây hoặc có boss mới thì không ghi DONE cho bước đang dở; sau Join Boss,
-    hàm chạy lại và chỉ lấy các key chưa DONE trong DB.
-11. Sau một lượt dò đầy đủ cả hai vùng mà vẫn còn label không xuất hiện, lưu
-    lần lượt `gift_claims_scan_1`, `gift_claims_scan_2`,
-    `gift_claims_scan_3`. Chỉ khi đủ ba lượt trong cùng ngày server mới ghi
-    DONE cho các event còn thiếu và ghi key tổng `gift_claims`. Không thấy
-    launcher/màn cha sau một lần tìm đầy đủ được tính là lượt rỗng; bị ngắt
-    giữa lượt bởi 120 giây/Join Boss thì không tăng số lượt quét.
+Facebook/Follow Us luôn bị loại. Các mảng đỏ sát nhau trên cùng một icon phải được gộp thành một badge thật.
+
+## Trong từng trang con
+
+1. Bấm nút điều hướng/phần thưởng cố định như Rewards, Star Trail Gift, Sprint Package, Stockpile hoặc Scores.
+2. Tìm các nút nhận thật: Claim, Free, Claim Free, Claimable, Daily Free, Claim All.
+3. Thấy nút X của popup/mục không nhận được thì dùng Back để thoát, không bấm trực tiếp vào X.
+4. Dò điểm lấp lánh trong vùng nội dung an toàn (Valuable Event cần 3 vòng liên tiếp không nhận thêm quà, Event Center lấy
+   3 mẫu mỗi lượt); không bấm vùng mua hàng, thanh tài nguyên hoặc phần thưởng trả phí.
+5. Xác minh mỗi lần nhận bằng Congratulations, nút vừa bấm biến mất, hoặc trạng thái Claimed ở đúng phần thưởng. Chỉ bấm
+   nút điều hướng không được tính là đã nhận quà.
+6. Trên carousel, mỗi dấu đỏ chỉ thuộc tab có tâm gần nó nhất.
 
 ## Quy tắc từng nhóm
 

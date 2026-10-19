@@ -5,67 +5,62 @@ Form3_Designer.cs: same controls, same nesting, same X/Y/W/H.
 import time
 from datetime import datetime
 
-from PyQt5.QtCore import QTimer, pyqtSignal
-from PyQt5.QtWidgets import QPushButton
+from PyQt5.QtCore import QPoint, QSize, Qt, QTimer, pyqtSignal
+from PyQt5.QtGui import QColor, QFont, QFontMetrics, QIcon, QPainter, QPen, QPixmap, QPolygon
+from PyQt5.QtWidgets import QHBoxLayout, QInputDialog, QLineEdit, QMenu, QMessageBox, QPushButton, QWidget
 
+from .constants import (
+    ACTIVITY_BUTTONS,
+    ACTIVITY_BUTTON_STYLE,
+    ACTIVITY_BUTTON_TARGETS,
+    BUBBLE_TYPES,
+    CIVILIZATIONS,
+    CIVILIZATION_UNKNOWN,
+    COMBO_ITEMS,
+    DEFAULT_BUBBLE_TYPE,
+    DESIGNER_DATA,
+    PAGE_SIZE,
+    PROFILE_BUTTON_GAP,
+    PROFILE_BUTTON_HEIGHT,
+    PROFILE_BUTTON_MIN_WIDTH,
+    PROFILE_MAX,
+    PROFILE_NAME_MAX,
+    PROFILE_ROW_POS,
+)
 from ..theme import COLORS
 from .tab_placeholder import DesignerTab, confirm_reset
 
-DESIGNER_DATA = {
-    "ButtonJoinMonsterWar": {"loc": [85, 53], "size": [230, 40], "text": "Join Monster War", "type": "Button"},
-    "ButtonOpenGiftBox": {"loc": [85, 117], "size": [230, 40], "text": "Open Gift Box", "type": "Button"},
-    "button10": {"loc": [740, 53], "size": [230, 40], "text": "Event", "type": "Button"},
-    # button9 (Start All) nằm cạnh buttonStopAll (Stop All) dưới GroupBox; 2 nút
-    # 125x40 (nhỏ lại so với 140x50 gốc) căn phải theo mép phải GroupBox (x=1075).
-    "button9": {"loc": [815, 377], "size": [125, 40], "text": "Start All", "type": "Button"},
-    "buttonStopAll": {"loc": [950, 377], "size": [125, 40], "text": "Stop All", "type": "Button"},
-    "buttonAllianceCapacity": {"loc": [409, 117], "size": [230, 40], "text": "Alliance Capacity", "type": "Button"},
-    "buttonBlackMarket": {"loc": [740, 117], "size": [230, 40], "text": "Black Market", "type": "Button"},
-    "buttonDailyActivities": {"loc": [409, 53], "size": [230, 40], "text": "Daily Activities", "type": "Button"},
-    "buttonInitializationApplyAll": {"loc": [935, 16], "size": [132, 43], "text": "Apply ALL", "type": "Button"},
-    "buttonStart": {"loc": [449, 447], "size": [217, 51], "text": "Start", "type": "Button"},
-    "groupBox2": {
-        "children": ["ButtonJoinMonsterWar", "buttonDailyActivities", "button10", "ButtonOpenGiftBox",
-                      "buttonAllianceCapacity", "buttonBlackMarket"],
-        "loc": [13, 106], "size": [1062, 253], "text": "Select Activity", "type": "GroupBox",
-    },
-    "checkBoxBubble": {"loc": [13, 62], "size": [75, 28], "text": "Bubble", "type": "CheckBox"},
-    "comboBoxBubbleType": {"loc": [90, 62], "size": [60, 28], "type": "ComboBox"},
-    "labelBubbleTime": {"loc": [158, 62], "size": [100, 28], "type": "Label"},
-    "labelCivilization": {"loc": [180, 22], "size": [72, 28], "text": "Civilization:", "type": "Label"},
-    "comboBoxCivilization": {"loc": [254, 22], "size": [100, 28], "type": "ComboBox"},
-    "labelID": {"loc": [506, 18], "size": [200, 32], "text": "labelID", "type": "Label"},
-    "labelServer": {"loc": [13, 22], "size": [48, 28], "text": "Server:", "type": "Label"},
-    "textBoxServer": {"loc": [63, 22], "size": [100, 28], "type": "TextBox"},
-    "tabPage1": {
-        "children": ["button9", "buttonStopAll", "buttonInitializationApplyAll", "buttonStart",
-                     "labelID",
-                     "labelServer", "textBoxServer", "checkBoxBubble", "labelBubbleTime",
-                     "comboBoxBubbleType", "labelCivilization", "comboBoxCivilization",
-                     "groupBox2"],
-        "loc": [4, 31], "size": [1088, 609], "text": "Initialization", "type": "TabPage",
-    },
-}
-# Loại bubble (khiên) có thể dùng.
-BUBBLE_TYPES = ["8h", "24h", "3d", "7d"]
-DEFAULT_BUBBLE_TYPE = "24h"
-# Nền văn minh: số 1..7 (devices.civilization) = vị trí trong danh sách; mục đầu = chưa biết (bot tự nhận).
-CIVILIZATIONS = ["Europe", "China", "Japan", "Korea", "America", "Russia", "Arabia"]
-CIVILIZATION_UNKNOWN = "(auto)"
-COMBO_ITEMS = {"comboBoxBubbleType": BUBBLE_TYPES,
-               "comboBoxCivilization": [CIVILIZATION_UNKNOWN, *CIVILIZATIONS]}
-PAGE_SIZE = (1088, 609)
 
-# Original button.Tag values in the C# form matched the activity's
-# display text, which in turn matches this app's tab titles.
-ACTIVITY_BUTTON_TARGETS = {
-    "ButtonJoinMonsterWar": "Join Monster War",
-    "buttonAllianceCapacity": "Alliance Capacity",
-    "buttonDailyActivities": "Daily Activities",
-    "ButtonOpenGiftBox": "Open Gift Box",
-    "buttonBlackMarket": "Black Market",
-    "button10": "Event",
-}
+def _new_icon_canvas() -> tuple[QPixmap, QPainter]:
+    pixmap = QPixmap(64, 64)
+    pixmap.fill(Qt.transparent)
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.Antialiasing)
+    return pixmap, painter
+
+
+def _symbol_icon() -> QIcon:
+    """Dấu + xanh lá (màu success của theme), nền trong suốt, nằm chính giữa ảnh."""
+    pixmap, painter = _new_icon_canvas()
+    painter.setPen(QPen(QColor(COLORS["success"]), 8, Qt.SolidLine, Qt.FlatCap))
+    painter.drawLine(32, 4, 32, 60)
+    painter.drawLine(4, 32, 60, 32)
+    painter.end()
+    return QIcon(pixmap)
+
+
+def _trash_icon() -> QIcon:
+    """Thùng rác đỏ: nắp + quai, thân hơi thon xuống, hai vạch dọc."""
+    pixmap, painter = _new_icon_canvas()
+    painter.setPen(QPen(QColor("#d9534f"), 5, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
+    painter.drawLine(8, 16, 56, 16)                               # nắp
+    painter.drawPolyline(QPolygon([QPoint(24, 16), QPoint(24, 7), QPoint(40, 7), QPoint(40, 16)]))   # quai
+    painter.drawPolyline(QPolygon([QPoint(14, 16), QPoint(18, 58), QPoint(46, 58), QPoint(50, 16)]))   # thân
+    painter.drawLine(26, 28, 26, 46)
+    painter.drawLine(38, 28, 38, 46)
+    painter.end()
+    return QIcon(pixmap)
+
 
 def seconds_until(iso: str) -> float | None:
     """Số giây từ bây giờ tới thời điểm ISO (giờ máy); None nếu rỗng / sai định dạng."""
@@ -85,22 +80,6 @@ def format_remaining(seconds: float) -> str:
     return f"{days}d {clock}" if days else clock
 
 
-# Set on each button directly: the designer page's own "background: white"
-# stylesheet would otherwise win over the app-level theme.
-ACTIVITY_BUTTON_STYLE = f"""
-QPushButton:checked {{
-    background: {COLORS['success']};
-    border-color: {COLORS['success']};
-    color: white;
-    font-weight: 600;
-}}
-QPushButton:checked:hover {{
-    background: #28985f;
-    color: white;
-}}
-"""
-
-
 class InitializationTab(DesignerTab):
     start_clicked = pyqtSignal()
     start_all_clicked = pyqtSignal()
@@ -109,6 +88,9 @@ class InitializationTab(DesignerTab):
     settings_changed = pyqtSignal()    # bật/tắt bubble hoặc đổi loại bubble
     civilization_changed = pyqtSignal(int)   # người dùng chọn nền văn minh (1..7, 0 = tự nhận)
     reset_info_clicked = pyqtSignal()        # nút Reset info: xoá bubble, server, nền văn minh, route của máy
+    profile_clicked = pyqtSignal(str)        # bấm nút hồ sơ: chọn nó (bấm lại hồ sơ đang chọn = về default)
+    profile_added = pyqtSignal(str)          # nút "+": tên hồ sơ mới
+    profile_deleted = pyqtSignal(str)        # chuột phải một nút hồ sơ -> Delete
 
     def __init__(self, device_id="", parent=None):
         super().__init__("tabPage1", DESIGNER_DATA, COMBO_ITEMS, PAGE_SIZE, parent=parent)
@@ -151,6 +133,39 @@ class InitializationTab(DesignerTab):
         self._bubble_timer.timeout.connect(self._refresh_bubble_time)
         self._refresh_bubble_time()
 
+        # Hàng hồ sơ dưới Bubble. Hồ sơ default của máy luôn có nhưng không hiện nút.
+        self._profile_names: list[str] = []
+        self._profile_row = QWidget(self.page)
+        self._profile_row.move(*PROFILE_ROW_POS)
+        row = QHBoxLayout(self._profile_row)
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(PROFILE_BUTTON_GAP)       # các nút hồ sơ đứng kế nhau, cách một chút
+        self._profile_buttons = QHBoxLayout()
+        self._profile_buttons.setContentsMargins(0, 0, 0, 0)
+        self._profile_buttons.setSpacing(PROFILE_BUTTON_GAP)
+        row.addLayout(self._profile_buttons)
+        add = QPushButton()
+        add.setFixedSize(PROFILE_BUTTON_HEIGHT + 12, PROFILE_BUTTON_HEIGHT)
+        add.setStyleSheet("padding: 0px;")      # theme có padding lớn
+        add.setIcon(_symbol_icon())            # dấu + vẽ tay để nằm chính giữa nút (chữ "+" lệch theo đường cơ sở)
+        add.setIconSize(QSize(14, 14))
+        add.setToolTip("New profile (copies this device's current settings)")
+        add.clicked.connect(self._add_profile)
+        row.addWidget(add)
+        self._add_button = add
+        # Nút × xoá hồ sơ đang chọn; ẩn khi đang dùng default (default không xoá được).
+        self._active_profile = ""
+        self._delete_button = QPushButton()
+        self._delete_button.setFixedSize(PROFILE_BUTTON_HEIGHT + 12, PROFILE_BUTTON_HEIGHT)
+        self._delete_button.setStyleSheet("padding: 0px;")
+        self._delete_button.setIcon(_trash_icon())
+        self._delete_button.setIconSize(QSize(14, 14))
+        self._delete_button.setToolTip("Delete the selected profile")
+        self._delete_button.clicked.connect(lambda: self._confirm_delete_profile(self._active_profile))
+        self._delete_button.hide()
+        row.addWidget(self._delete_button)
+        self._resize_profile_row()
+
         c["buttonStart"].setStyleSheet("font-size: 13.8pt;")
         c["buttonStart"].clicked.connect(self.start_clicked.emit)
         # 2 nút riêng biệt (không còn toggle Start All <-> Stop All trên cùng 1 nút).
@@ -169,7 +184,83 @@ class InitializationTab(DesignerTab):
         for name in ACTIVITY_BUTTON_TARGETS:
             c[name].setCheckable(True)
             c[name].setStyleSheet(ACTIVITY_BUTTON_STYLE)
-            c[name].toggled.connect(self.settings_changed.emit)
+            c[name].toggled.connect(lambda checked, name=name: self._on_activity_toggled(name, checked))
+
+    def _on_activity_toggled(self, name: str, checked: bool):
+        """Nút exclusive chạy một mình: nó được tích -> bỏ tích mọi nút khác; nút thường được tích -> bỏ tích các nút
+        exclusive. Bỏ tích bằng code không phát lại tín hiệu."""
+        if checked:
+            exclusive = ACTIVITY_BUTTONS[name]["exclusive"]
+            for other, info in ACTIVITY_BUTTONS.items():
+                if other != name and (exclusive or info["exclusive"]):
+                    button = self.controls[other]
+                    button.blockSignals(True)
+                    button.setChecked(False)
+                    button.blockSignals(False)
+        self.settings_changed.emit()
+
+    def set_profiles(self, names: list, active: str = ""):
+        """Dựng lại hàng nút hồ sơ (không gồm default); nút `active` được tích xanh, không nút nào tích = default."""
+        self._profile_names = list(names)
+        self._active_profile = active if active in names else ""
+        self._delete_button.setVisible(bool(self._active_profile))
+        self._add_button.setVisible(len(names) < PROFILE_MAX)   # đủ số hồ sơ thì ẩn nút +
+        while self._profile_buttons.count():
+            item = self._profile_buttons.takeAt(0)
+            if item.widget() is not None:
+                item.widget().deleteLater()
+        for name in names:
+            button = QPushButton(name)
+            button.setCheckable(True)
+            button.setChecked(name == active)
+            # padding dọc 0 (theme để lớn nên chữ bị cắt ở nút cao 28 px); chữ đậm cả khi chưa chọn để nút không đổi cỡ.
+            button.setStyleSheet("QPushButton { padding: 0px 12px; }" + ACTIVITY_BUTTON_STYLE)
+            button.setFixedHeight(PROFILE_BUTTON_HEIGHT)
+            # Chữ thường khi chưa chọn, đậm khi chọn (ACTIVITY_BUTTON_STYLE): chừa sẵn chỗ cho chữ đậm để nút không đổi cỡ.
+            bold = QFont(button.font())
+            bold.setWeight(QFont.DemiBold)
+            button.setMinimumWidth(max(PROFILE_BUTTON_MIN_WIDTH, QFontMetrics(bold).horizontalAdvance(name) + 28))
+            button.setContextMenuPolicy(Qt.CustomContextMenu)
+            button.clicked.connect(lambda _=False, name=name: self.profile_clicked.emit(name))
+            button.customContextMenuRequested.connect(
+                lambda _pos, name=name, button=button: self._profile_menu(name, button))
+            self._profile_buttons.addWidget(button)
+            button.show()       # tạo sau khi trang đã hiện: phải show() tay, không thì nút trống tới khi bấm
+        self._resize_profile_row()
+
+    def _resize_profile_row(self):
+        """Đo lại hàng theo các nút hiện có (layout chưa tự đo vì cha là trang cố định kích cỡ)."""
+        self._profile_row.layout().activate()
+        self._profile_row.resize(self._profile_row.sizeHint())
+
+    def _profile_menu(self, name: str, button: QPushButton):
+        menu = QMenu(self)
+        delete = menu.addAction(f"Delete '{name}'")
+        if menu.exec_(button.mapToGlobal(button.rect().bottomLeft())) is delete:
+            self._confirm_delete_profile(name)
+
+    def _confirm_delete_profile(self, name: str):
+        if name and confirm_reset(self, "Delete profile", f"Delete profile '{name}'?"):
+            self.profile_deleted.emit(name)
+
+    def _add_profile(self):
+        if len(self._profile_names) >= PROFILE_MAX:
+            QMessageBox.warning(self, "New profile", f"Each device can have at most {PROFILE_MAX} profiles.")
+            return
+        dialog = QInputDialog(self)
+        dialog.setInputMode(QInputDialog.TextInput)     # ô nhập chỉ được tạo sau khi chọn chế độ
+        dialog.setWindowTitle("New profile")
+        dialog.setLabelText("Profile name:")
+        dialog.findChild(QLineEdit).setMaxLength(PROFILE_NAME_MAX)
+        if not dialog.exec_():
+            return
+        name = dialog.textValue().strip()
+        if not name:
+            return
+        if name.lower() == "default" or name.lower() in (n.lower() for n in self._profile_names):
+            QMessageBox.warning(self, "New profile", f"A profile named '{name}' already exists.")
+            return
+        self.profile_added.emit(name)
 
     def _confirm_reset_info(self):
         if confirm_reset(self, "Reset info",
