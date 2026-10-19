@@ -18,12 +18,13 @@ _SIZE = (12, 20)         # (w, h) characters are scaled to before comparing
 _fonts: dict[str, tuple[list[str], np.ndarray]] = {}
 
 
-def split(image: np.ndarray, max_ratio: float | None = None) -> list:
+def split(image: np.ndarray, max_ratio: float | None = None, colon: bool = True) -> list:
     """Characters of `image` (BGR or gray) left to right: "," for a short
     mark (comma / dot), ":" for a colon, else the character's black & white
     crop. Split at native size — scaled up, digits 1px apart run together.
     With `max_ratio`, a piece wider than `max_ratio` x its height (two digits
-    touching, e.g. "44") is cut at its thinnest column."""
+    touching, e.g. "44") is cut at its thinnest column. `colon=False`: a narrow
+    piece with a gap is a digit, not ":" (fonts whose "5" / "7" are that narrow)."""
     if image.size == 0:
         return []
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if image.ndim == 3 else image
@@ -45,7 +46,7 @@ def split(image: np.ndarray, max_ratio: float | None = None) -> list:
         h, w = c.shape
         if h < height * 0.5:
             chars.append(",")
-        elif w <= h * 0.5 and not c.any(axis=1).all():   # two dots stacked
+        elif colon and w <= h * 0.5 and not c.any(axis=1).all():   # two dots stacked
             chars.append(":")
         else:
             chars.append(c)
@@ -98,10 +99,10 @@ def _samples(font: str) -> tuple[list[str], np.ndarray]:
     return _fonts[font]
 
 
-def read(image: np.ndarray, font: str, max_ratio: float | None = None) -> str | None:
+def read(image: np.ndarray, font: str, max_ratio: float | None = None, colon: bool = True) -> str | None:
     """Digits, "," and ":" in `image`, or None if there are no digits or
-    one doesn't match any sample of `font` well enough. `max_ratio` as in split()."""
-    return read_chars(split(image, max_ratio), font)
+    one doesn't match any sample of `font` well enough. `max_ratio`, `colon` as in split()."""
+    return read_chars(split(image, max_ratio, colon), font)
 
 
 def read_chars(chars: list, font: str) -> str | None:

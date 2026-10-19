@@ -86,6 +86,9 @@ PIECE_FONTS = {NAME_FONT: split_name, POWER_FONT: split_power, PROGRESS_FONT: sp
                GENERAL_NAME_FONT: split_general_name}
 
 
+NO_COLON_FONTS = {"Camera"}      # chữ số hẹp (5, 7) không được nhầm với ":" (xem split)
+
+
 def add_sample(font: str, image_path: str, text: str) -> list[Path]:
     """Save each digit of the image as Images/OCR/<font>/<digit>_<n>.png."""
     image = cv2.imread(image_path)
@@ -93,7 +96,7 @@ def add_sample(font: str, image_path: str, text: str) -> list[Path]:
         raise FileNotFoundError(image_path)
     if font in PIECE_FONTS:
         return add_piece_sample(font, image, text.split("|"))
-    chars = split(image)
+    chars = split(image, colon=font not in NO_COLON_FONTS)
     if len(chars) != len(text):
         raise ValueError(f"image splits into {len(chars)} pieces, text has {len(text)}")
 

@@ -59,6 +59,12 @@ def target(bot):
         return test_recruit_tap(bot)
     if os.environ.get("EVONY_TEST") == "recruit_buy":
         return test_recruit_buy(bot)
+    if os.environ.get("EVONY_TEST") == "arc":
+        # Đang ở bản đồ thế giới: quét hình quạt EVONY_DEG="bắt đầu,kết thúc" (mặc định -15,15); EVONY_R = bán kính km (mặc định 300).
+        from bot.common.arc_sweep import arc_sweep
+        radius = float(os.environ.get("EVONY_R", 300))
+        start, end = (float(d) for d in os.environ.get("EVONY_DEG", "-15,15").split(","))
+        return arc_sweep(bot, start, end, radius, on_step=lambda u, v: bot.log(f"arc: tới ({u:.0f}, {v:.0f})") or False)
     return test_trade_carriage(bot)
 
 
