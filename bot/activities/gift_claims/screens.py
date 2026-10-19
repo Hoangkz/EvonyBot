@@ -20,6 +20,8 @@ class GiftScreen(str, Enum):
     DWARFS_TREASURE = "DwarfsTreasure"
     REVELATION_OF_HORUS = "RevelationOfHorus"
     SEALED_IMPERIAL_TREASURY = "SealedImperialTreasury"
+    GIANTS_WISDOM_TEMPLE = "GiantsWisdomTemple"
+    WISHFUL_WINDMILL_FESTIVAL = "WishfulWindmillFestival"
 
 
 TITLE_TEMPLATES = {
@@ -37,6 +39,17 @@ TITLE_TEMPLATES = {
     GiftScreen.DWARFS_TREASURE: "DwarfsTreasure/title",
     GiftScreen.REVELATION_OF_HORUS: "RevelationOfHorus/title",
     GiftScreen.SEALED_IMPERIAL_TREASURY: "SealedImperialTreasury/title",
+    GiftScreen.WISHFUL_WINDMILL_FESTIVAL: "WishfulWindmillFestival/title",
+}
+
+PAGE_MARKERS = {
+    # Giant's page title is animated/scaled differently from its stable list
+    # label.  The exact Skip animation controls supplied by the user are a
+    # safer page identity and cannot occur on the Event Center list.
+    GiftScreen.GIANTS_WISDOM_TEMPLE: (
+        "GiantsWisdomTemple/checkbox_skip_animation_unchecked",
+        "GiantsWisdomTemple/checkbox_skip_animation_checked",
+    ),
 }
 
 
@@ -45,6 +58,11 @@ def identify(bot, screen=None) -> GiftScreen | None:
     screen = bot.screenshot() if screen is None else screen
     for name, template in TITLE_TEMPLATES.items():
         if find(bot, template, screen, threshold=0.72, region=(0, 0, 100, 13)) is not None:
+            return name
+    for name, templates in PAGE_MARKERS.items():
+        if any(find(bot, template, screen, threshold=0.72,
+                    region=(35, 35, 100, 65)) is not None
+               for template in templates):
             return name
     return None
 

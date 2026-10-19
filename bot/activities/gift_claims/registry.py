@@ -17,9 +17,10 @@ from .valuable_event import (
     super_value_weekly_card,
 )
 from .event_center import (
-    blessing_of_pallas, dragon_battle, dwarfs_treasure, grace_of_star_trail,
+    blessing_of_pallas, dragon_battle, dwarfs_treasure, giants_wisdom_temple,
+    grace_of_star_trail,
     hypnos_dream, poseidons_day, precious_blazon_exchange,
-    revelation_of_horus, sealed_imperial_treasury,
+    revelation_of_horus, sealed_imperial_treasury, wishful_windmill_festival,
 )
 from .common import GiftTask
 
@@ -90,6 +91,8 @@ LOCATIONS = (
     ClaimLocation(REGION_2, grace_of_star_trail.TASK),
     ClaimLocation(REGION_2, _policy_task(sealed_imperial_treasury)),
     ClaimLocation(REGION_2, _policy_task(dwarfs_treasure)),
+    ClaimLocation(REGION_2, _policy_task(giants_wisdom_temple)),
+    ClaimLocation(REGION_2, _policy_task(wishful_windmill_festival)),
     ClaimLocation(REGION_2, _policy_task(revelation_of_horus)),
 )
 

@@ -2,7 +2,8 @@
 
 1. Back to Territory nằm ở vùng thanh phải cùng khu với launcher Event Center,
    nhưng không nằm bên trong Event Center.
-2. Mở Back to Territory từ màn thành phố.
+2. Tìm launcher bằng ảnh/tên từ màn thành phố; tuyệt đối không bấm tọa độ cố định.
+   Nếu không tìm thấy launcher thì DONE ngay trong ngày.
 3. Quét từng tab đỏ ở carousel trên cùng.
 4. Trong tab, quét tiếp badge đỏ ở Day/Daily Login/Stamina và cuộn danh sách phần thưởng.
 5. Bấm Claim/Claimable/Free trong vùng quà; mỗi lần phải có Congratulations hoặc nút biến mất.

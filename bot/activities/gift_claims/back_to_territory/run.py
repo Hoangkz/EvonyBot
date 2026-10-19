@@ -190,7 +190,8 @@ def run(bot):
     from ..screens import GiftScreen
 
     if not open_named(bot, GiftScreen.BACK_TO_TERRITORY):
-        return False
+        bot.record("Gift Claims: không tìm thấy Back to Territory bằng ảnh/tên; DONE hôm nay")
+        return True
     clean = run_opened(bot, set())
     return_home(bot)
     return clean

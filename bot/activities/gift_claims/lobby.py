@@ -24,16 +24,14 @@ EVENT_CENTER_LAUNCHERS = ("EventCenter/launcher_side", "EventCenter/launcher")
 FIXED_PARENT_TARGETS = {
     GiftScreen.VALUABLE_EVENT: (77, 83),
     GiftScreen.SUPER_VALUE_RETURN: (9, 83),
-    # Back to Territory is a city-side launcher in the same right rail as
-    # Event Center, not a child inside Event Center. Its title is verified
-    # after this fallback tap before any reward logic can run.
-    GiftScreen.BACK_TO_TERRITORY: (91, 20),
 }
 FIXED_PARENT_LAUNCHERS = {
     GiftScreen.VALUABLE_EVENT: (
         "ValuableEvent/launcher", (45, 70, 85, 95)),
     GiftScreen.SUPER_VALUE_RETURN: (
         "EmpireDepot/launcher", (0, 70, 25, 95)),
+    GiftScreen.BACK_TO_TERRITORY: (
+        "BackToTerritory/title", REGIONS[RIGHT]),
 }
 PARENT_ANCHOR_TABS = {
     GiftScreen.VALUABLE_EVENT: (
@@ -256,7 +254,7 @@ def open_named(bot, expected):
                 if launcher_spec is not None else None)
     target = FIXED_PARENT_TARGETS.get(expected)
     if launcher is None and target is None:
-        bot.log(f"Gift Claims: {expected.value} chưa có launcher cố định")
+        bot.log(f"Gift Claims: không tìm thấy launcher {expected.value} bằng ảnh/tên")
         return False
     bot.record(f"Gift Claims: mở {expected.value} từ vị trí cố định")
     if launcher is not None:

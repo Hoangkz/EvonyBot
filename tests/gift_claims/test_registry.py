@@ -32,6 +32,7 @@ class GiftClaimRegistryTests(unittest.TestCase):
     def test_each_event_center_package_exposes_a_run_entry_point(self):
         names = (
             "blessing_of_pallas", "dragon_battle", "dwarfs_treasure",
+            "giants_wisdom_temple", "wishful_windmill_festival",
             "grace_of_star_trail", "hypnos_dream", "poseidons_day",
             "precious_blazon_exchange", "revelation_of_horus",
             "sealed_imperial_treasury",
@@ -92,14 +93,37 @@ class GiftClaimRegistryTests(unittest.TestCase):
             "EventCenter/title.png",
             "EventCenter/facebook_activity.png",
             "PreciousBlazonExchange/title.png",
-            "PreciousBlazonExchange/button_rewards.png",
+            "PreciousBlazonExchange/list_row.png",
+            "PreciousBlazonExchange/button_rewards_text.png",
+            "PreciousBlazonExchange/popup_congratulations.png",
+            "PreciousBlazonExchange/status_rewards_claimed.png",
+            "BlessingOfPallas/status_claimed.png",
+            "BlessingOfPallas/button_claim.png", "BlessingOfPallas/list_row.png",
             "DwarfsTreasure/title.png", "DwarfsTreasure/list_row.png",
-            "DwarfsTreasure/button_daily_free.png",
+            "DwarfsTreasure/button_daily_free_chest.png",
+            "DwarfsTreasure/checkbox_skip_animation_unchecked.png",
+            "DwarfsTreasure/checkbox_skip_animation_checked.png",
             "HypnosDream/title.png",
-            "HypnosDream/button_rewards.png",
+            "HypnosDream/button_rewards_text.png",
             "PoseidonsDay/title.png",
             "PoseidonsDay/tab_ocean_offering.png",
-            "PoseidonsDay/button_daily_free.png",
+            "PoseidonsDay/tab_packages_red_dot.png",
+            "PoseidonsDay/status_daily_free_claimed.png",
+            "PoseidonsDay/button_daily_free_text.png",
+            "GiantsWisdomTemple/list_row.png",
+            "GiantsWisdomTemple/checkbox_skip_animation_unchecked.png",
+            "GiantsWisdomTemple/checkbox_skip_animation_checked.png",
+            "GiantsWisdomTemple/button_free_wisdom_tile.png",
+            "GiantsWisdomTemple/message_not_enough_items.png",
+            "WishfulWindmillFestival/list_row.png",
+            "WishfulWindmillFestival/title.png",
+            "WishfulWindmillFestival/tab_wind_power_storage.png",
+            "WishfulWindmillFestival/button_challenge_quest.png",
+            "WishfulWindmillFestival/button_claim.png",
+            "WishfulWindmillFestival/button_wind_blessings.png",
+            "WishfulWindmillFestival/title_wind_blessings.png",
+            "WishfulWindmillFestival/button_claim_all.png",
+            "WishfulWindmillFestival/status_no_records.png",
             "RevelationOfHorus/title.png",
             "SealedImperialTreasury/title.png",
         }
@@ -192,6 +216,8 @@ class GiftClaimRegistryTests(unittest.TestCase):
                          "gift_city_growth_plan", "gift_login_gifts"} <= region_1)
         self.assertIn("gift_resource_consumption_sprint", region_1)
         self.assertIn("gift_grace_of_star_trail", region_2)
+        self.assertIn("gift_giants_wisdom_temple", region_2)
+        self.assertIn("gift_wishful_windmill_festival", region_2)
         self.assertIn("gift_back_to_territory", region_2)
         self.assertNotIn("gift_back_to_territory", region_1)
         self.assertTrue(region_1.isdisjoint(region_2))
@@ -530,29 +556,40 @@ class GiftClaimRegistryTests(unittest.TestCase):
                          weekly.navigation)
         self.assertEqual((), weekly.claims)
 
-    def test_event_center_uses_fixed_launcher_and_inner_title(self):
+    def test_event_center_uses_project_finder_and_inner_title(self):
         bot = mock.Mock()
         screen = np.zeros((704, 396, 3), dtype=np.uint8)
         bot.screenshot.return_value = screen
         def find_named(_bot, name, *_args, **_kwargs):
-            if name == "EventCenter/launcher_side":
-                return (360, 310)
             if name == "EventCenter/title":
                 return (200, 25)
             return None
 
         with (mock.patch.object(common, "return_home", return_value=True),
+              mock.patch.object(common, "find_project_event_center",
+                                return_value=(360, 310)),
               mock.patch.object(common, "find", side_effect=find_named)):
             opened = common.open_event_center(bot)
 
         self.assertIs(opened, screen)
-        bot.tap.assert_called_once_with(360, 290, delay=1)
+        bot.tap.assert_called_once_with(360, 285, delay=1)
 
     def test_lobby_navigation_failure_stays_pending_without_yielding_to_boss(self):
         bot = mock.Mock()
         with mock.patch.object(gift_claims.lobby, "return_home", return_value=False):
             self.assertIsNone(
                 gift_claims.lobby.open_next(bot, gift_claims.lobby.BOTTOM, []))
+
+    def test_missing_back_to_territory_is_done_without_coordinate_tap(self):
+        module = import_module(
+            "bot.activities.gift_claims.back_to_territory.run")
+        bot = mock.Mock()
+        bot.is_daily_done.return_value = False
+        with mock.patch.object(lobby, "open_named", return_value=False):
+            self.assertTrue(module.TASK.run(bot))
+
+        bot.tap_percent.assert_not_called()
+        bot.mark_daily_done.assert_called_once_with("gift_back_to_territory")
 
 
 if __name__ == "__main__":

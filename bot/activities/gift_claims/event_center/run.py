@@ -2,9 +2,10 @@
 import cv2
 import numpy as np
 
-from . import (blessing_of_pallas, dragon_battle, dwarfs_treasure, grace_of_star_trail,
-               hypnos_dream, poseidons_day, precious_blazon_exchange,
-               revelation_of_horus, sealed_imperial_treasury)
+from . import (blessing_of_pallas, dragon_battle, dwarfs_treasure,
+               giants_wisdom_temple, grace_of_star_trail, hypnos_dream,
+               poseidons_day, precious_blazon_exchange, revelation_of_horus,
+               sealed_imperial_treasury, wishful_windmill_festival)
 from ..common import (ClaimReport, GiftTask, TEXT_CLAIM_CONTROLS, back_if_close_x,
                      claim_fixed_controls, claim_sparkles,
                      close_congratulations, find, find_all,
@@ -34,6 +35,7 @@ CATEGORIES = (
 )
 CATEGORY_DONE_PREFIX = b"__category_done__\0"
 FORCED_EVENT_PREFIX = b"__forced_event__\0"
+POLICY_SEEN_PREFIX = b"__policy_seen__\0"
 EVENT_POLICIES = (
     blessing_of_pallas.POLICY,
     dragon_battle.POLICY,
@@ -43,6 +45,8 @@ EVENT_POLICIES = (
     grace_of_star_trail.POLICY,
     sealed_imperial_treasury.POLICY,
     dwarfs_treasure.POLICY,
+    giants_wisdom_temple.POLICY,
+    wishful_windmill_festival.POLICY,
     revelation_of_horus.POLICY,
 )
 POLICY_BY_SCREEN = {policy.screen: policy for policy in EVENT_POLICIES
@@ -54,15 +58,29 @@ SKIPPED_SCREENS = {policy.screen: policy for policy in EVENT_POLICIES
 FIXED_CLAIMS = TEXT_CLAIM_CONTROLS
 REWARD_NAVIGATION = grace_of_star_trail.POLICY.reward_navigation
 FORCED_LIMITED_ROWS = (
+    ("BlessingOfPallas/list_row", FORCED_EVENT_PREFIX + b"blessing_of_pallas",
+     None, "Blessing of Pallas", blessing_of_pallas.POLICY.key),
     ("DragonBattle/list_row", FORCED_EVENT_PREFIX + b"dragon_battle",
-     GiftScreen.DRAGON_BATTLE, "Dragon Battle"),
+     GiftScreen.DRAGON_BATTLE, "Dragon Battle", dragon_battle.POLICY.key),
+    ("PreciousBlazonExchange/list_row",
+     FORCED_EVENT_PREFIX + b"precious_blazon_exchange",
+     GiftScreen.PRECIOUS_BLAZON_EXCHANGE, "Precious Blazon Exchange",
+     precious_blazon_exchange.POLICY.key),
     ("GraceOfStarTrail/list_row", FORCED_EVENT_PREFIX + b"grace_of_star_trail",
-     GiftScreen.GRACE_OF_STAR_TRAIL, "Grace of Star Trail"),
+     GiftScreen.GRACE_OF_STAR_TRAIL, "Grace of Star Trail",
+     grace_of_star_trail.POLICY.key),
     # Dwarf's Treasure may lose its outer Event Center badge while the
     # Daily Free chest inside is still claimable.  Check the named row once
     # per daily run instead of using the outer badge as its source of truth.
     ("DwarfsTreasure/list_row", FORCED_EVENT_PREFIX + b"dwarfs_treasure",
-     GiftScreen.DWARFS_TREASURE, "Dwarf's Treasure"),
+     GiftScreen.DWARFS_TREASURE, "Dwarf's Treasure", dwarfs_treasure.POLICY.key),
+    ("GiantsWisdomTemple/list_row", FORCED_EVENT_PREFIX + b"giants_wisdom_temple",
+     GiftScreen.GIANTS_WISDOM_TEMPLE, "Giant's Wisdom Temple",
+     giants_wisdom_temple.POLICY.key),
+    ("WishfulWindmillFestival/list_row",
+     FORCED_EVENT_PREFIX + b"wishful_windmill_festival",
+     GiftScreen.WISHFUL_WINDMILL_FESTIVAL, "Wishful Windmill Festival",
+     wishful_windmill_festival.POLICY.key),
 )
 
 
@@ -98,6 +116,249 @@ def _close_congratulations(bot):
         bot.back(delay=0.8)
         return True
     return False
+
+
+def _close_exact_congratulations(bot) -> bool:
+    """Close either supplied Event Center congratulations marker."""
+    if close_congratulations(bot, attempts=1):
+        return True
+    screen = bot.screenshot()
+    if find(bot, "PreciousBlazonExchange/popup_congratulations", screen,
+            threshold=0.72, region=(0, 35, 100, 65)) is None:
+        return False
+    bot.back(delay=0.8)
+    return True
+
+
+def _wait_for(bot, template: str, *, attempts=4, threshold=0.68,
+              region=(0, 0, 100, 100)):
+    for attempt in range(attempts):
+        screen = bot.screenshot()
+        pos = find(bot, template, screen, threshold=threshold, region=region)
+        if pos is not None:
+            return pos
+        if attempt + 1 < attempts:
+            bot.sleep(0.5)
+    return None
+
+
+def _ensure_skip_animation(bot, folder: str) -> bool:
+    """Enable Skip animation and require the supplied green checked state."""
+    region = (35, 35, 100, 92)
+    checked = f"{folder}/checkbox_skip_animation_checked"
+    unchecked = f"{folder}/checkbox_skip_animation_unchecked"
+    if _wait_for(bot, checked, attempts=2, region=region) is not None:
+        return True
+    # Background art differs between events, so the full supplied crop can
+    # score poorly even though the green check itself is unchanged. Detect
+    # that check by colour/shape inside the named Skip-animation strip.
+    screen = bot.screenshot()
+    height, width = screen.shape[:2]
+    area = screen[int(height * .35):int(height * .92),
+                  int(width * .35):width]
+    hsv = cv2.cvtColor(area, cv2.COLOR_BGR2HSV)
+    green = cv2.inRange(hsv, np.array((35, 100, 80)),
+                        np.array((95, 255, 255)))
+    _, _, stats, _ = cv2.connectedComponentsWithStats(green)
+    scale = width / 396
+    if any(6 * scale <= w <= 28 * scale and 6 * scale <= h <= 28 * scale
+           and pixels >= 18 * scale * scale
+           for _, _, w, h, pixels in stats[1:]):
+        bot.record(f"Gift Claims: {folder} đã có dấu tích xanh Skip animation")
+        return True
+    pos = _wait_for(bot, unchecked, attempts=3, region=region)
+    if pos is None:
+        bot.log(f"Gift Claims: {folder} không nhận diện được Skip animation")
+        return False
+    bot.record(f"Gift Claims: {folder} bật Skip animation")
+    bot.tap(*pos, delay=0.8)
+    return _wait_for(bot, checked, attempts=3, region=region) is not None
+
+
+def _handle_precious(bot):
+    attempted = 0
+    for attempt in range(4):
+        screen = bot.screenshot()
+        if find(bot, "PreciousBlazonExchange/status_rewards_claimed", screen,
+                threshold=0.68, region=(0, 12, 40, 48)) is not None:
+            return ClaimReport(attempted, 1), True
+        rewards = find(bot, "PreciousBlazonExchange/button_rewards_text", screen,
+                       threshold=0.62, region=(0, 12, 45, 48))
+        if rewards is not None:
+            attempted += 1
+            bot.record("Gift Claims: Precious Blazon Exchange tap exact Rewards")
+            bot.tap(*rewards, delay=0.8)
+            if _close_exact_congratulations(bot):
+                return ClaimReport(attempted, 1), True
+        if attempt + 1 < 4:
+            bot.sleep(0.5)
+    done = _wait_for(bot, "PreciousBlazonExchange/status_rewards_claimed", attempts=2,
+                     threshold=0.68, region=(0, 12, 40, 48)) is not None
+    return ClaimReport(attempted, int(done)), done
+
+
+def _handle_hypnos(bot):
+    attempted = 0
+    # The page is already identified by its fixed title.  Four misses in the
+    # exact upper-right reward area means its chest/Rewards control is gone.
+    for attempt in range(4):
+        screen = bot.screenshot()
+        rewards = find(bot, "HypnosDream/button_rewards_text", screen,
+                       threshold=0.62, region=(65, 12, 100, 38))
+        if rewards is None:
+            if attempt + 1 < 4:
+                bot.sleep(0.4)
+                continue
+            bot.record("Gift Claims: Hypnos' Dream không còn Rewards ở góc phải")
+            return ClaimReport(attempted, 1), True
+        attempted += 1
+        bot.record("Gift Claims: Hypnos' Dream tap exact Rewards")
+        bot.tap(*rewards, delay=0.8)
+        if _close_exact_congratulations(bot):
+            return ClaimReport(attempted, 1), True
+    return ClaimReport(attempted, 0), False
+
+
+def _handle_poseidon(bot):
+    attempted = 0
+    for attempt in range(5):
+        screen = bot.screenshot()
+        if find(bot, "PoseidonsDay/status_daily_free_claimed", screen, threshold=0.68,
+                region=(65, 12, 100, 38)) is not None:
+            return ClaimReport(attempted, 1), True
+        daily = find(bot, "PoseidonsDay/button_daily_free_text", screen,
+                     threshold=0.62, region=(65, 12, 100, 38))
+        if daily is not None:
+            attempted += 1
+            bot.record("Gift Claims: Poseidon's Day tap exact Daily Free")
+            bot.tap(*daily, delay=0.8)
+            if _close_exact_congratulations(bot):
+                return ClaimReport(attempted, 1), True
+        elif attempt == 0:
+            package = find(bot, "PoseidonsDay/tab_packages_red_dot", screen,
+                           threshold=0.68, region=(45, 5, 90, 18))
+            if package is not None:
+                attempted += 1
+                bot.record("Gift Claims: Poseidon's Day mở tab Packages có chấm đỏ")
+                bot.tap(*package, delay=0.8)
+        if attempt + 1 < 5:
+            bot.sleep(0.5)
+    done = _wait_for(bot, "PoseidonsDay/status_daily_free_claimed", attempts=2, threshold=0.68,
+                     region=(65, 12, 100, 38)) is not None
+    return ClaimReport(attempted, int(done)), done
+
+
+def _handle_grace(bot):
+    report = _tap_reward_navigation(bot)
+    return report, report.verified > 0
+
+
+def _handle_giant(bot):
+    if not _ensure_skip_animation(bot, "GiantsWisdomTemple"):
+        return ClaimReport(), False
+    target = _wait_for(bot, "GiantsWisdomTemple/button_free_wisdom_tile", attempts=4,
+                       threshold=0.70, region=(0, 30, 100, 92))
+    if target is None:
+        return ClaimReport(), False
+    bot.record("Gift Claims: Giant's Wisdom Temple tap exact free tile")
+    bot.tap(*target, delay=0.8)
+    if _close_exact_congratulations(bot):
+        return ClaimReport(1, 1), True
+    done = _wait_for(bot, "GiantsWisdomTemple/message_not_enough_items", attempts=4,
+                     threshold=0.70, region=(0, 15, 100, 45)) is not None
+    return ClaimReport(1, int(done)), done
+
+
+def _handle_dwarf(bot):
+    if not _ensure_skip_animation(bot, "DwarfsTreasure"):
+        return ClaimReport(), False
+    daily = _wait_for(bot, "DwarfsTreasure/button_daily_free_chest", attempts=4,
+                      threshold=0.66, region=(65, 12, 100, 38))
+    if daily is None:
+        bot.log("Gift Claims: Dwarf's Treasure không thấy Daily Free chính xác")
+        return ClaimReport(), False
+    bot.record("Gift Claims: Dwarf's Treasure tap exact Daily Free")
+    bot.tap(*daily, delay=0.8)
+    if _close_exact_congratulations(bot):
+        return ClaimReport(1, 1), True
+    gone = _wait_for(bot, "DwarfsTreasure/button_daily_free_chest", attempts=3,
+                     threshold=0.66, region=(65, 12, 100, 38)) is None
+    return ClaimReport(1, int(gone)), gone
+
+
+def _wishful_open_blessings(bot) -> bool:
+    if _wait_for(bot, "WishfulWindmillFestival/title_wind_blessings",
+                 attempts=1, threshold=0.68) is not None:
+        return True
+    entry = _wait_for(bot, "WishfulWindmillFestival/button_wind_blessings",
+                      attempts=4, threshold=0.68, region=(65, 15, 100, 60))
+    if entry is None:
+        return False
+    bot.tap(*entry, delay=0.8)
+    return _wait_for(bot, "WishfulWindmillFestival/title_wind_blessings",
+                     attempts=4, threshold=0.68) is not None
+
+
+def _handle_wishful(bot):
+    attempted = 0
+    if not _wishful_open_blessings(bot):
+        return ClaimReport(), False
+    no_records = _wait_for(bot, "WishfulWindmillFestival/status_no_records",
+                           attempts=2, threshold=0.68, region=(0, 18, 100, 92))
+    if no_records is None:
+        claim_all = _wait_for(bot, "WishfulWindmillFestival/button_claim_all",
+                              attempts=4, threshold=0.68, region=(35, 15, 100, 95))
+        if claim_all is None:
+            return ClaimReport(), False
+        attempted += 1
+        bot.record("Gift Claims: Wishful Windmill tap Claim All")
+        bot.tap(*claim_all, delay=0.8)
+        _close_exact_congratulations(bot)
+        # Claim All returns to the main event; if it did not, one Back is safe
+        # because the Wind Blessings title proves the child panel.
+        if _wait_for(bot, "WishfulWindmillFestival/button_wind_blessings",
+                     attempts=2, threshold=0.68, region=(65, 15, 100, 60)) is None:
+            bot.back(delay=0.8)
+        if not _wishful_open_blessings(bot):
+            return ClaimReport(attempted, 0), False
+        no_records = _wait_for(bot, "WishfulWindmillFestival/status_no_records",
+                               attempts=4, threshold=0.68, region=(0, 18, 100, 92))
+    if no_records is None:
+        return ClaimReport(attempted, 0), False
+
+    bot.record("Gift Claims: Wishful Windmill phần Wind Blessings = No Records")
+    bot.back(delay=0.8)
+    storage = _wait_for(bot, "WishfulWindmillFestival/tab_wind_power_storage",
+                        attempts=4, threshold=0.68, region=(20, 5, 80, 20))
+    if storage is None:
+        return ClaimReport(attempted, 1), False
+    bot.tap(*storage, delay=0.8)
+    challenge = _wait_for(bot, "WishfulWindmillFestival/button_challenge_quest",
+                          attempts=4, threshold=0.68, region=(0, 10, 100, 95))
+    if challenge is None:
+        return ClaimReport(attempted, 1), False
+    bot.tap(*challenge, delay=0.6)
+    for _ in range(12):
+        claim = _wait_for(bot, "WishfulWindmillFestival/button_claim",
+                          attempts=2, threshold=0.68, region=(35, 15, 100, 95))
+        if claim is None:
+            bot.record("Gift Claims: Wishful Windmill phần Challenge Quest hết Claim")
+            return ClaimReport(attempted, 2), True
+        attempted += 1
+        bot.tap(*claim, delay=0.7)
+        _close_exact_congratulations(bot)
+    return ClaimReport(attempted, 1), False
+
+
+EXACT_HANDLERS = {
+    GiftScreen.PRECIOUS_BLAZON_EXCHANGE: _handle_precious,
+    GiftScreen.POSEIDONS_DAY: _handle_poseidon,
+    GiftScreen.HYPNOS_DREAM: _handle_hypnos,
+    GiftScreen.GRACE_OF_STAR_TRAIL: _handle_grace,
+    GiftScreen.GIANTS_WISDOM_TEMPLE: _handle_giant,
+    GiftScreen.DWARFS_TREASURE: _handle_dwarf,
+    GiftScreen.WISHFUL_WINDMILL_FESTIVAL: _handle_wishful,
+}
 
 
 def _inner_red_dots(screen):
@@ -252,8 +513,10 @@ def _tap_reward_navigation(bot) -> ClaimReport:
                     return ClaimReport(attempted, 1)
             if attempt < 3:
                 bot.sleep(0.5)
-        bot.log("Gift Claims: đã mở Star Trail Gift nhưng chưa thấy/nhận được coin Claim")
-        return ClaimReport(attempted, 0)
+        # The user-defined terminal state is the opened Star Trail Gift page
+        # with no remaining coin Claim control.
+        bot.record("Gift Claims: Star Trail Gift đã mở và không còn coin Claim; DONE")
+        return ClaimReport(attempted, 1)
     return ClaimReport()
 
 
@@ -300,6 +563,14 @@ def _finish_event(bot, policy, report: ClaimReport) -> ClaimReport:
 
 def _process_known_event(bot, policy) -> ClaimReport:
     """Check a named event twice when no reward success can be verified."""
+    exact = EXACT_HANDLERS.get(policy.screen)
+    if exact is not None:
+        report, completed = exact(bot)
+        if completed:
+            return _finish_event(bot, policy, report)
+        bot.record(f"Gift Claims: {policy.label} chưa đạt điều kiện DONE riêng; giữ PENDING")
+        return report
+
     total = ClaimReport()
     for pass_number in range(1, MAX_EVENT_VERIFY_PASSES + 1):
         bot.check()
@@ -326,7 +597,15 @@ def _process_opened_event(bot):
     opened = bot.screenshot()
     name = identify(bot, opened)
     policy = POLICY_BY_SCREEN.get(name)
+    if (policy is not None and policy.key is not None
+            and bot.is_daily_done(policy.key) is True):
+        bot.record(f"Gift Claims: {policy.label} đã DONE trong DB hôm nay; bỏ qua")
+        return ClaimReport()
     skipped = SKIPPED_SCREENS.get(name)
+    if name == GiftScreen.EVENT_CENTER:
+        bot.log("Gift Claims: cú bấm vẫn ở danh sách Event Center; không xử lý "
+                "chấm đỏ của thanh nhóm như tab quà")
+        return ClaimReport()
     if skipped is not None:
         bot.record(f"Gift Claims: {skipped.label} - {skipped.skip_reason}")
         return _finish_event(bot, skipped, ClaimReport())
@@ -341,9 +620,19 @@ def _process_opened_event(bot):
     # slice.  Inspect the page body exactly once; its fixed Claim/Free controls
     # are still handled, but decorative red pixels can no longer drive taps.
     if name is None:
+        if find(bot, "BlessingOfPallas/status_claimed", opened, threshold=0.68,
+                region=LOWER) is not None:
+            bot.record("Gift Claims: Blessing of Pallas đã hiện Claimed")
+            mark_task_done(bot, blessing_of_pallas.POLICY.key)
+            return ClaimReport(0, 1)
         bot.record("Gift Claims: Event Center page chưa có title template; "
                    "kiểm tra nội dung một lần, không quét dot trong artwork")
         report, _ = _process_current_event_content(bot)
+        after = bot.screenshot()
+        if find(bot, "BlessingOfPallas/status_claimed", after, threshold=0.68,
+                region=LOWER) is not None:
+            bot.record("Gift Claims: Blessing of Pallas xác minh Claim -> Claimed")
+            mark_task_done(bot, blessing_of_pallas.POLICY.key)
         return report
 
     # Grace may keep its claim badge only on the nested Star Trail Gift icon,
@@ -514,6 +803,27 @@ def _same_list_position(before: bytes, after: bytes, max_distance=18) -> bool:
         np.unpackbits(np.bitwise_xor(old, new)).sum()) <= max_distance
 
 
+def _mark_missing_event_policies_done(bot, seen_policy_keys: set[str]) -> None:
+    """Close DB keys for rotating events absent from a complete Limited scan.
+
+    Event Center entries rotate or expire from day to day.  Absence is a
+    terminal daily result, but a page that was found and failed its own exact
+    completion contract must remain pending.
+    """
+    for policy in EVENT_POLICIES:
+        if policy.key is None or policy.key in seen_policy_keys:
+            continue
+        if bot.is_daily_done(policy.key):
+            continue
+        bot.record(f"Gift Claims: không tìm thấy {policy.label} trong lượt quét "
+                   "Limited từ đầu tới cuối; DONE hôm nay")
+        mark_task_done(bot, policy.key)
+
+
+def _policy_seen_checkpoint(policy_key: str) -> bytes:
+    return POLICY_SEEN_PREFIX + policy_key.encode("utf-8")
+
+
 def _verify_clean(bot, category: str, ignored=()) -> bool:
     # Return to the top, then scan the complete vertical list once more.
     for _ in range(MAX_SCROLLS):
@@ -544,6 +854,11 @@ def _scan_category(bot, category: str, visited: set[bytes]) -> bool:
     opened_count = 0
     failed_forced = set()
     recentered_forced = set()
+    recentered_rows = set()
+    seen_policy_keys: set[str] = {
+        item[len(POLICY_SEEN_PREFIX):].decode("utf-8")
+        for item in visited if item.startswith(POLICY_SEEN_PREFIX)
+    }
     for scroll in range(MAX_SCROLLS + 1):
         bot.check()
         while True:
@@ -555,10 +870,11 @@ def _scan_category(bot, category: str, visited: set[bytes]) -> bool:
                 return True
             candidate = None
             if category == "limited":
-                for template, key, expected_screen, event_label in FORCED_LIMITED_ROWS:
+                for (template, key, expected_screen, event_label,
+                     policy_key) in FORCED_LIMITED_ROWS:
                     if key in visited or key in failed_forced:
                         continue
-                    row = find(bot, template, screen, threshold=0.76,
+                    row = find(bot, template, screen, threshold=0.90,
                                region=(10, 15, 75, 98))
                     if isinstance(row, tuple) and len(row) == 2:
                         if (row[1] > int(screen.shape[0] * 0.80)
@@ -577,7 +893,8 @@ def _scan_category(bot, category: str, visited: set[bytes]) -> bool:
                         # below it so a small residual scroll cannot select
                         # the preceding event (observed with Dwarf -> Sealed).
                         tap_y = min(screen.shape[0] - 1, row[1] + 18)
-                        candidate = tap_y, key, expected_screen, event_label
+                        candidate = (tap_y, key, expected_screen, event_label,
+                                     policy_key)
                         bot.record(f"Gift Claims: Event Center mở {event_label} "
                                    "để kiểm tra quà bên trong dù dòng ngoài không đỏ "
                                    f"(y={tap_y})")
@@ -590,14 +907,47 @@ def _scan_category(bot, category: str, visited: set[bytes]) -> bool:
                 signature = _row_signature(screen, y)
                 key = _category_signature(category, signature)
                 if not _category_seen(category, signature, visited):
-                    candidate = y, key, None, None
+                    if (y > int(screen.shape[0] * 0.80)
+                            and key not in recentered_rows):
+                        recentered_rows.add(key)
+                        bot.record("Gift Claims: kéo hàng đỏ sát đáy lên giữa trước khi bấm")
+                        bot.swipe_percent(50, 82, 50, 52,
+                                          duration=0.4, delay=0.8)
+                        candidate = "recenter"
+                        break
+                    candidate = y, key, None, None, None
                     break
+            if candidate == "recenter":
+                continue
             if candidate is None:
                 break
-            y, key, expected_screen, event_label = candidate
+            y, key, expected_screen, event_label, forced_policy_key = candidate
             bot.tap_percent(52, y * 100 / screen.shape[0], delay=1)
-            if expected_screen is not None:
+            actual_screen = identify(bot)
+            for _ in range(4):
+                if actual_screen != GiftScreen.EVENT_CENTER:
+                    break
+                bot.sleep(0.5)
                 actual_screen = identify(bot)
+            if actual_screen == GiftScreen.EVENT_CENTER:
+                bot.log("Gift Claims: bấm hàng nhưng vẫn ở Event Center; bỏ vị trí "
+                        "này trong lượt quét và không kết luận event vắng mặt")
+                failed_forced.add(key)
+                if forced_policy_key is not None:
+                    seen_policy_keys.add(forced_policy_key)
+                    visited.add(_policy_seen_checkpoint(forced_policy_key))
+                visited.add(key)
+                continue
+            actual_policy = POLICY_BY_SCREEN.get(actual_screen)
+            if actual_policy is not None and actual_policy.key is not None:
+                seen_policy_keys.add(actual_policy.key)
+                visited.add(_policy_seen_checkpoint(actual_policy.key))
+            elif forced_policy_key is not None:
+                # Pallas currently has no stable page-title crop; the exact
+                # list label is its identity.
+                seen_policy_keys.add(forced_policy_key)
+                visited.add(_policy_seen_checkpoint(forced_policy_key))
+            if expected_screen is not None:
                 if actual_screen != expected_screen:
                     bot.log(f"Gift Claims: bấm hàng {event_label} nhưng mở "
                             f"{getattr(actual_screen, 'value', actual_screen)}; "
@@ -633,6 +983,8 @@ def _scan_category(bot, category: str, visited: set[bytes]) -> bool:
         bot.record(f"Gift Claims: Event Center/{category} còn badge đỏ dai dẳng "
                    "sau khi đã quét; đánh dấu skip/done")
         clean = True
+    if clean and category == "limited":
+        _mark_missing_event_policies_done(bot, seen_policy_keys)
     bot.record(f"Gift Claims: Event Center/{category} đã mở {opened_count} dòng đỏ; "
                + ("DONE, danh sách hết đỏ" if clean
                   else "chưa DONE, danh sách vẫn còn đỏ"))

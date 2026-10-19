@@ -7,8 +7,8 @@ POLICY = EventPolicy(
     "Poseidon's Day",
     key="gift_poseidons_day",
     screen=GiftScreen.POSEIDONS_DAY,
-    navigation=("Daily Free", "PoseidonsDay/button_daily_free"),
-    navigation_entry=("PoseidonsDay/tab_ocean_offering",),
+    navigation=("Daily Free", "PoseidonsDay/button_daily_free_text"),
+    navigation_entry=("PoseidonsDay/tab_packages_red_dot",),
 )
 
 

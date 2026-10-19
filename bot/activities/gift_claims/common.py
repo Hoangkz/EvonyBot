@@ -11,6 +11,8 @@ import cv2
 import numpy as np
 
 from ...common import go_home
+from ..event.common import find_event_center as find_project_event_center, swipe_around
+from ..event_center.constants import EVENT_CENTER_TAP_OFFSET
 
 ROOT = "GiftClaims"
 REFERENCE_WIDTH = 396
@@ -18,7 +20,6 @@ MAIN_MARKER = "Server/listActivity.png"
 MAX_HOME_STEPS = 7
 MAX_TAB_SWIPES = 7
 EVENT_CENTER_WAIT_ATTEMPTS = 6
-EVENT_CENTER_LAUNCHERS = ("EventCenter/launcher_side", "EventCenter/launcher")
 FIXED_CONTROL_THRESHOLDS = {
     "Common/button_daily_free_text": 0.62,
     "Common/button_claim_text": 0.65,
@@ -167,21 +168,19 @@ def open_launcher(bot, launcher: str | tuple[str, ...]):
 
 
 def open_event_center(bot):
-    """Open the explicitly named Event Center icon wherever the lobby moved it."""
+    """Open Event Center through the project's authoritative image finder."""
     for launch_attempt in range(3):
         if not return_home(bot):
             return None
         lobby = bot.screenshot()
-        launcher = None
-        for name in EVENT_CENTER_LAUNCHERS:
-            launcher = find(bot, name, lobby, threshold=0.70,
-                            region=(60, 5, 100, 72))
-            if launcher is not None:
-                break
+        launcher = find_project_event_center(bot, lobby)
         if launcher is None:
-            bot.log("Gift Claims: named Event Center launcher not found")
-            return None
-        bot.tap(launcher[0], max(0, launcher[1] - 20), delay=1)
+            bot.log("Gift Claims: project find_event_center chưa thấy Event Center; kéo để tìm lại")
+            if launch_attempt < 2:
+                swipe_around(bot)
+            continue
+        dx, dy = EVENT_CENTER_TAP_OFFSET
+        bot.tap(launcher[0] + dx, launcher[1] + dy, delay=1)
         for attempt in range(EVENT_CENTER_WAIT_ATTEMPTS):
             screen = bot.screenshot()
             if find(bot, "EventCenter/title", screen, threshold=0.72,
