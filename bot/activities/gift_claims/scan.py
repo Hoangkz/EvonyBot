@@ -42,7 +42,8 @@ def reset_misses(bot, key: str):
 
 
 def run_zone(bot, zone_key: str, tasks: Iterable[tuple[str, str]],
-             sweep: Callable[[object, list[str]], set[str]]) -> bool:
+             sweep: Callable[[object, list[str]], set[str]], *,
+             max_sweeps: int = MAX_MISSES) -> bool:
     """Chạy tối đa 3 lượt kiểm tra cho các nhiệm vụ chưa xong; True khi cả hoạt động xong hôm nay.
 
     ``tasks``: (key, nhãn). ``sweep(bot, pending_keys)`` làm MỘT lượt: tìm từng event trong ``pending_keys``, thấy thì nhận
@@ -51,7 +52,7 @@ def run_zone(bot, zone_key: str, tasks: Iterable[tuple[str, str]],
     tasks = list(tasks)
     if bot.is_daily_done(zone_key):
         return True
-    for _ in range(MAX_MISSES):
+    for _ in range(max_sweeps):
         pending = [(key, label) for key, label in tasks if not bot.is_daily_done(key)]
         if not pending:
             break
@@ -60,9 +61,13 @@ def run_zone(bot, zone_key: str, tasks: Iterable[tuple[str, str]],
         for key, label in pending:
             if bot.is_daily_done(key):
                 reset_misses(bot, key)
+                bot.record(f"Gift Claims: {label} đã DONE trong lượt kiểm tra này")
                 continue
             if key not in inspected:
                 continue
+            attempt = min(misses(bot, key) + 1, MAX_MISSES)
+            bot.record(f"Gift Claims: kiểm tra {label} không xuất hiện "
+                       f"(lượt {attempt}/{MAX_MISSES})")
             count = add_miss(bot, key)
             bot.record(f"Gift Claims: không thấy {label} (lần {count}/{MAX_MISSES})")
             if count >= MAX_MISSES:

@@ -9,5 +9,6 @@ venv/
 build/
 dist/
 *.spec
+tempCodeRunnerFile.py
 .DS_Store
 images.dat

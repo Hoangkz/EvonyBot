@@ -18,10 +18,29 @@ import adbutils
 import cv2
 
 from bot.activities import gift_claims
+from bot.activities.gift_claims.event_center import zone as event_center_zone
+from bot.activities.gift_claims.valuable_event import zone as valuable_event_zone
+from bot.activities.gift_claims.valuable_event.super_value_return import zone as super_value_return_zone
 from bot.context import BotContext
 from bot.context import BotInterrupted
 
-ZONES = {"valuable_event": gift_claims.valuable_event, "event_center": gift_claims.event_center}
+ZONES = {
+    "valuable_event": gift_claims.valuable_event,
+    "super_value_return": gift_claims.super_value_return,
+    "event_center": gift_claims.event_center,
+}
+ZONE_TASKS = {
+    "event_center": event_center_zone.TASKS,
+    "valuable_event": [(task.key, task.label) for task in valuable_event_zone.TASKS],
+    "super_value_return": [
+        (task.key, task.label) for task in super_value_return_zone.TASKS
+    ],
+}
+TASKS_BY_ZONE = {
+    zone: {key.removeprefix("gift_"): key for key, _label in tasks}
+    for zone, tasks in ZONE_TASKS.items()
+}
+ALL_TASKS = sorted(set().union(*(tasks for tasks in TASKS_BY_ZONE.values())))
 
 
 def main():
@@ -30,18 +49,30 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--serial", required=True)
     parser.add_argument("--zone", required=True, choices=sorted(ZONES), help="hoạt động cần chạy")
+    parser.add_argument(
+        "--task", choices=ALL_TASKS,
+        help="chỉ chạy một task trong zone đã chọn; task khác được giả lập DONE trong bộ nhớ",
+    )
     parser.add_argument("--slice-seconds", type=float,
                         help="mô phỏng worker nhường Join Boss sau số giây này rồi chạy tiếp; bỏ đi để chạy tới khi xong")
     parser.add_argument("--max-slices", type=int, help="dừng sau số lát này")
     parser.add_argument("--shots", action="store_true",
                         help="lưu mọi ảnh bot chụp vào thư mục tạm để chẩn đoán nhận diện")
     args = parser.parse_args()
+    if args.task and args.task not in TASKS_BY_ZONE[args.zone]:
+        parser.error(f"--task {args.task} không thuộc --zone {args.zone}")
 
     start = time.monotonic()
     log = lambda message: print(f"[{time.monotonic() - start:7.1f}s] {message}", flush=True)
     bot = BotContext(adbutils.adb.device(serial=args.serial), threading.Event(), None, log)
     bot.record = log
     done = {}
+    if args.task:
+        target_key = TASKS_BY_ZONE[args.zone][args.task]
+        timestamp = datetime.now().isoformat(timespec="seconds")
+        zone_tasks = ZONE_TASKS[args.zone]
+        done.update({key: timestamp for key, _label in zone_tasks if key != target_key})
+        log(f"chỉ test task: {args.task} ({target_key})")
     bot.is_daily_done = done.__contains__
     bot.mark_daily_done = lambda key: done.__setitem__(key, datetime.now().isoformat(timespec="seconds"))
     bot.done_at = done.get

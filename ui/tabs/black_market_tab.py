@@ -2,9 +2,10 @@
 black_market_tab.py — tab "Black Market", dựng từ danh mục vật phẩm bot/activities/black_market/items.py.
 
 - Group "Setting": CheckGold (vàng < 2.000.000 thì dừng), Refresh (số lần Instant Refresh), Quantity Buy (số lần mua).
-- Group "Resource": một ô tích "Resource" (mặc định tích) — mua mọi gói tài nguyên của 4 loại (lương thực / gỗ / đá /
-  quặng), mọi mức số lượng trong `resource_packs` của items.py (10k .. 5M).
-- Các group còn lại (`groups` trong items.py, trừ "resource"): một ô tích mỗi món; món có
+- Group "General": gộp ô "Resource" (mặc định tích), Chips 100, Stamina 50 và Tribute.
+  Resource mua mọi gói tài nguyên của 4 loại (lương thực / gỗ / đá / quặng), mọi mức số lượng trong
+  `resource_packs` của items.py (10k .. 5M).
+- Các group còn lại (`groups` trong items.py, trừ "general"): một ô tích mỗi món; món có
   `"default": true` (Chips 100) mặc định tích.
 Vị trí control tính tự động (ô tích xếp _COLS cột mỗi hàng).
 
@@ -17,7 +18,7 @@ from bot.activities.black_market.items import DATA as CATALOG
 
 from .tab_placeholder import DesignerTab
 
-RESOURCE_GROUP = "resource"
+GENERAL_GROUP = "general"
 RESOURCES_BOX = "checkBoxMarketResources"
 
 LIMITS = ["ALL", "10", "20", "50", "100"]
@@ -62,12 +63,22 @@ def _build(catalog):
     add_group("setting", "Setting", ["checkBoxCheckGoldMarket", "labelRefreshMarket", "comboBoxRefreshMarket",
                                      "labelBuyMarket", "comboBoxBuyMarket"], 10 + _ROW_H)
 
-    group(RESOURCE_GROUP, catalog["groups"][RESOURCE_GROUP], [(RESOURCES_BOX, "Resource")])
-    data[RESOURCES_BOX]["checked"] = True   # mặc định mua tài nguyên
-
     items = {}
+    general_boxes = [(RESOURCES_BOX, "Resource")]
+    for it in catalog["items"]:
+        if it["group"] != GENERAL_GROUP:
+            continue
+        name = f"checkBoxMarketItem_{it['id']}"
+        items[it["id"]] = (name, it)
+        general_boxes.append((name, it["name"]))
+    group(GENERAL_GROUP, catalog["groups"][GENERAL_GROUP], general_boxes)
+    data[RESOURCES_BOX]["checked"] = True   # mặc định mua tài nguyên
+    for name, _ in general_boxes[1:]:
+        data[name]["checked"] = bool(
+            items[name.removeprefix("checkBoxMarketItem_")][1].get("default"))
+
     for key, title in catalog["groups"].items():
-        if key == RESOURCE_GROUP:
+        if key == GENERAL_GROUP:
             continue
         members = [it for it in catalog["items"] if it["group"] == key]
         boxes = []

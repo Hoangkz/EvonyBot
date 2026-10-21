@@ -18,10 +18,12 @@ class GiftScreen(str, Enum):
     POSEIDONS_DAY = "PoseidonsDay"
     HYPNOS_DREAM = "HypnosDream"
     DWARFS_TREASURE = "DwarfsTreasure"
+    DWARFS_LUCKY_APPLE = "DwarfsLuckyApple"
     REVELATION_OF_HORUS = "RevelationOfHorus"
     SEALED_IMPERIAL_TREASURY = "SealedImperialTreasury"
     GIANTS_WISDOM_TEMPLE = "GiantsWisdomTemple"
     WISHFUL_WINDMILL_FESTIVAL = "WishfulWindmillFestival"
+    EAGLE_OF_FREEDOM = "EagleOfFreedom"
 
 
 TITLE_TEMPLATES = {
@@ -29,6 +31,9 @@ TITLE_TEMPLATES = {
     GiftScreen.VALUABLE_EVENT: "ValuableEvent/title",
     GiftScreen.EVENT_CENTER: "EventCenter/title",
     GiftScreen.DRAGON_BATTLE: "DragonBattle/title",
+    # Check Eagle before Grace: their wide red title bars score about 0.727
+    # against each other, while Eagle's supplied title is an exact 1.0 match.
+    GiftScreen.EAGLE_OF_FREEDOM: "EagleOfFreedom/title",
     GiftScreen.GRACE_OF_STAR_TRAIL: "GraceOfStarTrail/title",
     GiftScreen.BACCHUS_TAVERN: "BacchusTavern/title",
     GiftScreen.BACK_TO_TERRITORY: "BackToTerritory/title",
@@ -37,6 +42,7 @@ TITLE_TEMPLATES = {
     GiftScreen.POSEIDONS_DAY: "PoseidonsDay/title",
     GiftScreen.HYPNOS_DREAM: "HypnosDream/title",
     GiftScreen.DWARFS_TREASURE: "DwarfsTreasure/title",
+    GiftScreen.DWARFS_LUCKY_APPLE: "DwarfsLuckyApple/title",
     GiftScreen.REVELATION_OF_HORUS: "RevelationOfHorus/title",
     GiftScreen.SEALED_IMPERIAL_TREASURY: "SealedImperialTreasury/title",
     GiftScreen.WISHFUL_WINDMILL_FESTIVAL: "WishfulWindmillFestival/title",

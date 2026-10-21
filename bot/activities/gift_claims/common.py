@@ -36,6 +36,17 @@ TEXT_CLAIM_CONTROLS = (
     "Common/button_free_text",
 )
 
+# The launcher caption has two stable visual states: a dim caption after the
+# daily rewards are complete and a glowing caption while rewards remain.  Keep
+# both templates text-only so matching does not depend on the animated chest or
+# the city scene behind it.
+VALUABLE_EVENT_LABELS = (
+    "ValuableEvent/launcher_text_done",
+    "ValuableEvent/launcher_text_pending",
+)
+VALUABLE_EVENT_REGION = (40, 68, 88, 96)
+VALUABLE_EVENT_THRESHOLDS = (0.85, 0.80, 0.75, 0.70, 0.65)
+
 
 @dataclass(frozen=True)
 class GiftTask:
@@ -99,6 +110,26 @@ def find(bot, name: str, screen=None, threshold: float = 0.82, region=None):
     screen = bot.screenshot() if screen is None else screen
     return bot.find(_scaled_template(bot, name, screen), threshold=threshold,
                     screen=screen, region=region)
+
+
+def find_valuable_event(bot, screen):
+    """Find only the ``Valuable Event`` caption on an existing screenshot.
+
+    This deliberately mirrors the project's ``find_event_center`` threshold
+    ladder.  Both the completed/dim and pending/glowing captions are accepted;
+    the icon artwork and notification badge are not part of either template.
+    """
+    for threshold in VALUABLE_EVENT_THRESHOLDS:
+        for label in VALUABLE_EVENT_LABELS:
+            pos = find(bot, label, screen=screen, threshold=threshold,
+                       region=VALUABLE_EVENT_REGION)
+            if pos is not None:
+                state = label.rsplit("_", 1)[-1]
+                bot.log(
+                    f"Gift Claims: Valuable Event ({state}) at threshold "
+                    f"{threshold}")
+                return pos
+    return None
 
 
 def find_all(bot, name: str, screen=None, threshold: float = 0.82,

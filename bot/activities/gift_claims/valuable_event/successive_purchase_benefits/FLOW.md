@@ -1,8 +1,9 @@
 # Flow: Successive Purchase Benefits
 
 1. Mở Valuable Event, chọn tab có badge đỏ.
-2. Ưu tiên Daily Free, sau đó Claim/Free/Claimable trong vùng nội dung.
-3. Chỉ coi là nhận khi có Congratulations hoặc control biến mất.
-4. Quay về màn thành.
+2. Tìm Daily Free trong vùng nội dung và bấm để nhận.
+3. Chỉ DONE khi thấy đúng ảnh rương đã mở `chest_open`.
+4. Không thấy Daily Free nhưng rương chưa mở thì giữ PENDING.
+5. Quay về màn thành.
 
 Không bấm các ô yêu cầu mua/nạp để mở reward.

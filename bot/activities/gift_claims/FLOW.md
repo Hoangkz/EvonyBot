@@ -2,12 +2,15 @@
 
 ## Phạm vi
 
-Gift Claims gồm **hai hoạt động độc lập**, mỗi hoạt động có hàm `run(bot)` riêng. Worker chạy cả hai **sau cùng mỗi ngày, sau mọi nhiệm vụ của mọi activity**
-(`bot/worker/priority.py`, nhóm "Gift Claims", priority 0, thuộc activity Daily Activities) khi ô **Claim Event Gifts** ở tab Daily
+Gift Claims gồm **ba hoạt động độc lập**, mỗi hoạt động có hàm `run(bot)` riêng.
+Worker chạy nhóm quà sau khi hoàn thành các Daily Activities và ưu tiên theo
+thứ tự **Event Center -> Valuable Event -> Super Value Return** khi ô **Claim Event Gifts** ở tab Daily
 Activities được tích (`settings["General"]["gift_claims"]`, mặc định bật):
 
-- `gift_claims.valuable_event.run`: Valuable Event + Super Value Return (khu ngoài Event Center). Key tổng
-  `gift_valuable_event`.
+- `gift_claims.valuable_event.run`: chỉ Valuable Event. Key tổng `gift_valuable_event`.
+- `gift_claims.super_value_return.run`: Login Gifts, Empire Depot, Lucky Raffle,
+  City Growth Plan Stage 1 và Refining Weekly Card. Key tổng
+  `gift_super_value_return`.
 - `gift_claims.event_center.run`: Back to Territory (icon ngoài) + các event con trong danh sách Limited của Event
   Center. Key tổng `gift_event_center`.
 
@@ -23,13 +26,15 @@ gift_claims/
 ├── valuable_event/
 │   ├── zone.py                  # run(bot) của hoạt động Valuable Event
 │   ├── run.py                   # quét carousel (dấu đỏ) dùng bởi từng tab
-│   ├── super_value_return/run.py
 │   └── <từng event>/run.py      # TASK = GiftTask(key, nhãn, run)
+├── super_value_return/
+│   ├── zone.py
+│   └── run.py
 ├── back_to_territory/           # Thanh phải ngoài thành, tính vào hoạt động Event Center
 │   └── run.py
 └── event_center/
     ├── zone.py                  # run(bot) của hoạt động Event Center
-    ├── run.py                   # quét danh sách Limited
+    ├── run.py                   # quét Limited trước, rồi Activities
     └── <từng event>/run.py
 ```
 
@@ -47,6 +52,17 @@ gift_claims/
    boss mới thì không ghi DONE cho bước đang dở.
 
 Facebook/Follow Us luôn bị loại. Các mảng đỏ sát nhau trên cùng một icon phải được gộp thành một badge thật.
+
+Trong Valuable Event và Super Value Return, ba lượt quét của cùng một lần chạy
+giữ nguyên màn cha đang mở. Task nhìn thấy nhưng chưa đạt điều kiện DONE được
+giữ PENDING; bot tiếp tục làm task kế tiếp. Chỉ task không xuất hiện trong cả
+một lượt quét mới được cộng `miss`, và chỉ thoát màn cha sau khi toàn khu kết
+thúc hoặc lượt chạy bị ngắt.
+
+Mỗi vị trí carousel chỉ xử lý một tab từ một ảnh chụp: hoàn tất toàn bộ flow
+vùng dưới, chốt DONE/PENDING, nghỉ 1 giây, chụp lại rồi mới lướt vùng trên.
+Không tái sử dụng tọa độ của các tab còn lại từ ảnh cũ. Carousel lướt trong 1
+giây và chờ 1 giây để các máy chạy đồng thời có thời gian ổn định giao diện.
 
 ## Trong từng trang con
 
@@ -73,11 +89,18 @@ Facebook/Follow Us luôn bị loại. Các mảng đỏ sát nhau trên cùng m�
   nội dung trả phí/trang trí. Sau đó bot quét lại toàn bộ carousel phía trên;
   nếu badge vẫn còn thì chạy lại mục ở vòng tổng thứ hai. Badge vẫn tồn tại
   sau vòng tổng thứ hai được coi là trả phí/trang trí và key được DONE hôm nay.
+- Ảnh tab nhiệm vụ trên carousel dùng ngưỡng cao `0.82`. Không thấy một tab
+  sau một lượt quét đầy đủ chỉ ghi `miss 1/3`; đủ ba lượt quét đầy đủ không
+  thấy mới ghi task đó DONE. Không còn chấm đỏ trong một lượt cũng không được
+  bỏ qua quy tắc ba lượt này.
 - Super Value Return: luôn kiểm tra Login Gifts một lần; Empire Depot và Lucky
   Raffle dùng Claimable; City Growth Plan ưu tiên Claim All rồi chỉ nhận cột
   miễn phí bên trái.
-- Login Gifts: chỉ bấm rương vàng/phát sáng được nhận diện trong cột miễn phí;
-  không dò mù các hàng. Chỉ tính khi có Congratulations.
+- Login Gifts: tìm đúng ảnh `button_reward_chest`; nếu không thấy thì bấm điểm
+  dự phòng `(45, 190)`. Không dùng chấm đỏ hay quét rương theo từng hàng. Sau
+  khi bấm phải chụp màn hình mới: thấy Congratulations **hoặc** trang Login
+  Gifts vẫn mở nhưng không còn nút rương thì DONE; rương vẫn còn mà không có
+  Congratulations thì giữ PENDING.
 - Back to Territory nằm ở thanh phải cùng vùng ngoài thành với Event Center,
   nhưng là màn ngang cấp và không phải event con của Event Center. Với mỗi tab
   đỏ trên carousel, duyệt tiếp toàn bộ badge đỏ
@@ -85,7 +108,18 @@ Facebook/Follow Us luôn bị loại. Các mảng đỏ sát nhau trên cùng m�
   để nhận tất cả nút Claim trùng nhau. Chỉ sau đó mới dò sparkle; một sparkle
   không sinh Congratulations thì dừng tab đó. Nếu người dùng bấm Stop giữa
   tab, tab đó chưa được ghi nhớ và phải được mở lại ở lần chạy sau.
-- Event Center: chỉ quét nhóm Limited; không vào Activities hoặc Competition.
+- Event Center: quét xong toàn bộ nhóm Limited trước, chỉ khi các key Limited
+  đều DONE hôm nay mới chuyển sang Activities; không vào Competition. Mỗi nhóm
+  chỉ duyệt tối đa bốn vị trí danh sách (vị trí đầu và ba lần lướt chậm). Ở
+  từng vị trí bot log rõ danh sách tên nhiệm vụ còn pending trước khi dò và
+  bấm. Event không xuất hiện trong một lượt quét đầy đủ được log `lần 1/3`,
+  `2/3`, `3/3`; sau ba lượt mới coi là hôm nay không có và ghi DONE.
+  Eagle of Freedom mở đúng trang theo title, quét dọc tới khi danh sách không
+  di chuyển hai lần liên tiếp, nhận từng nút Claim và chỉ DONE sau khi đã lướt
+  hết mà không còn Claim. Ảnh `Claimed` được loại trừ trước khi tìm `Claim`,
+  vì template của từ ngắn có thể khớp nhầm vào đầu từ dài.
+  Một tọa độ Claim chỉ được bấm một lần trong cùng một vùng để tránh lặp vô hạn
+  khi giao diện lag hoặc nút chưa kịp biến mất.
   Precious Blazon Exchange và Hypnos' Dream chỉ mở Rewards khi
   thấy đúng phần chữ Rewards; Dwarf's Treasure tương tự với chữ Daily Free.
   Poseidon's Day phải nhận diện đúng tiêu đề, bấm tab Ocean Offering có dấu đỏ,

@@ -2,7 +2,8 @@
 import cv2
 import numpy as np
 
-from .common import REFERENCE_WIDTH, find, find_all, return_home
+from .common import (REFERENCE_WIDTH, find, find_all, find_valuable_event,
+                     return_home)
 from .screens import GiftScreen, identify
 
 BOTTOM = "bottom"
@@ -17,26 +18,20 @@ MAX_OPENS_PER_BOUNDARY = 16
 OPEN_WAIT_ATTEMPTS = 6
 IGNORED_RIGHT_LAUNCHERS = ("FollowUs/facebook_icon",)
 EVENT_CENTER_LAUNCHERS = ("EventCenter/launcher_side", "EventCenter/launcher")
-# The city-side gift carousel is the fixed Valuable Event launcher on the
-# bottom rail.  Its artwork changes with the promotion, but the launcher slot
-# does not.  Entering by this slot lets the DB-first runner inspect a pending
-# event even after the game has removed its notification badge.
-FIXED_PARENT_TARGETS = {
-    GiftScreen.VALUABLE_EVENT: (77, 83),
-    GiftScreen.SUPER_VALUE_RETURN: (9, 83),
-}
 FIXED_PARENT_LAUNCHERS = {
-    GiftScreen.VALUABLE_EVENT: (
-        "ValuableEvent/launcher", (45, 70, 85, 95)),
     GiftScreen.SUPER_VALUE_RETURN: (
-        "EmpireDepot/launcher", (0, 70, 25, 95)),
+        ("EmpireDepot/launcher", "EmpireDepot/launcher_frame_1",
+         "EmpireDepot/launcher_frame_2", "EmpireDepot/launcher_frame_3",
+         "SuperValueReturn/launcher_lucky_raffle",
+         "SuperValueReturn/launcher_login_gifts"),
+        (0, 68, 30, 96)),
     GiftScreen.BACK_TO_TERRITORY: (
-        "BackToTerritory/title", REGIONS[RIGHT]),
+        ("BackToTerritory/title",), REGIONS[RIGHT]),
 }
 PARENT_ANCHOR_TABS = {
     GiftScreen.VALUABLE_EVENT: (
         "ResourceConsumptionSprint/tab", "LimitedOffer/tab"),
-    GiftScreen.SUPER_VALUE_RETURN: ("EmpireDepot/tab",),
+    GiftScreen.SUPER_VALUE_RETURN: ("EmpireDepot/tab_current", "EmpireDepot/tab"),
 }
 
 
@@ -242,27 +237,38 @@ def open_next(bot, boundary: str, attempted: list[tuple[int, int]]):
 
 
 def open_named(bot, expected):
-    """Open a named parent through its fixed launcher, never a red badge."""
+    """Open a named parent through image recognition, never a fixed position."""
     if not return_home(bot):
         return False
     screen = bot.screenshot()
     if identify(bot, screen) == expected:
         return True
-    launcher_spec = FIXED_PARENT_LAUNCHERS.get(expected)
-    launcher = (find(bot, launcher_spec[0], screen, threshold=0.68,
-                     region=launcher_spec[1])
-                if launcher_spec is not None else None)
-    target = FIXED_PARENT_TARGETS.get(expected)
-    if launcher is None and target is None:
+    launcher = None
+    if expected == GiftScreen.VALUABLE_EVENT:
+        launcher = find_valuable_event(bot, screen)
+    else:
+        launcher_spec = FIXED_PARENT_LAUNCHERS.get(expected)
+        if launcher_spec is not None:
+            templates, region = launcher_spec
+            for template in templates:
+                launcher = find(bot, template, screen, threshold=0.66,
+                                region=region)
+                if launcher is not None:
+                    break
+    fixed_fallback = False
+    if launcher is None and expected == GiftScreen.SUPER_VALUE_RETURN:
+        scale = screen.shape[1] / REFERENCE_WIDTH
+        bot.record("Gift Claims: không thấy Empire Depot; dùng fallback x=30 y=560")
+        bot.tap(round(30 * scale), round(560 * scale), delay=1)
+        fixed_fallback = True
+    elif launcher is None:
         bot.log(f"Gift Claims: không tìm thấy launcher {expected.value} bằng ảnh/tên")
         return False
-    bot.record(f"Gift Claims: mở {expected.value} từ vị trí cố định")
-    if launcher is not None:
-        # Template contains only the caption; the icon body above is the safe
-        # clickable launcher and follows the bottom bar when slots move.
+    if not fixed_fallback:
+        bot.record(f"Gift Claims: mở {expected.value} bằng ảnh launcher")
+        # Template contains the caption; the icon body above is the click target
+        # and follows the carousel if its slot moves.
         bot.tap(launcher[0], max(0, launcher[1] - 20), delay=1)
-    else:
-        bot.tap_percent(*target, delay=1)
     for attempt in range(OPEN_WAIT_ATTEMPTS):
         screen = bot.screenshot()
         if identify(bot, screen) == expected:
@@ -271,6 +277,6 @@ def open_named(bot, expected):
             bot.sleep(1)
     if _switch_parent_carousel(bot, expected):
         return True
-    bot.log(f"Gift Claims: launcher cố định không mở {expected.value}")
+    bot.log(f"Gift Claims: launcher ảnh không mở {expected.value}")
     return_home(bot)
     return False
