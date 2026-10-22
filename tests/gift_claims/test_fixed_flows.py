@@ -1214,8 +1214,10 @@ class FixedGiftFlowTests(unittest.TestCase):
         screen = np.zeros((704, 396, 3), dtype=np.uint8)
         bot.best_match.side_effect = ((0.94, (300, 620)),
                                       (0.92, (300, 620)))
-        with mock.patch.object(event_center, "_scaled_template",
-                               side_effect=lambda _bot, name, _screen: name):
+        with (mock.patch.object(event_center, "_scaled_template",
+                                side_effect=lambda _bot, name, _screen: name),
+              mock.patch.object(event_center, "_apple_button_color_band",
+                                return_value=(190.0, 0.75))):
             state, position = event_center._apple_button_state(
                 bot, screen,
                 "DwarfsLuckyApple/button_red_wish_x10",
@@ -1231,6 +1233,8 @@ class FixedGiftFlowTests(unittest.TestCase):
                                       (0.95, (300, 620)))
         with (mock.patch.object(event_center, "_scaled_template",
                                 side_effect=lambda _bot, name, _screen: name),
+              mock.patch.object(event_center, "_apple_button_color_band",
+                                return_value=(25.0, 0.06)),
               mock.patch.object(event_center, "_apple_done_ornament_matches",
                                 return_value=(True, (0.95, 0.96)))):
             state, _ = event_center._apple_button_state(
@@ -1247,6 +1251,8 @@ class FixedGiftFlowTests(unittest.TestCase):
                                       (0.95, (300, 620)))
         with (mock.patch.object(event_center, "_scaled_template",
                                 side_effect=lambda _bot, name, _screen: name),
+              mock.patch.object(event_center, "_apple_button_color_band",
+                                return_value=(25.0, 0.06)),
               mock.patch.object(event_center, "_apple_done_ornament_matches",
                                 return_value=(False, (0.92, 0.31)))):
             state, position = event_center._apple_button_state(
@@ -1264,6 +1270,8 @@ class FixedGiftFlowTests(unittest.TestCase):
                                       (0.994, (300, 620)))
         with (mock.patch.object(event_center, "_scaled_template",
                                 side_effect=lambda _bot, name, _screen: name),
+              mock.patch.object(event_center, "_apple_button_color_band",
+                                return_value=(195.0, 0.78)),
               mock.patch.object(event_center, "_apple_done_ornament_matches",
                                 return_value=(False, (0.256, 0.132)))):
             state, position = event_center._apple_button_state(
@@ -1273,6 +1281,50 @@ class FixedGiftFlowTests(unittest.TestCase):
 
         self.assertEqual("active", state)
         self.assertEqual((300, 620), position)
+
+    def test_lucky_apple_real_templates_have_separate_gray_yellow_bands(self):
+        folder = IMAGES / "GiftClaims" / "DwarfsLuckyApple"
+        active = cv2.imread(str(folder / "button_red_wish_x10.png"))
+        done = cv2.imread(str(folder / "status_red_wish_x10_done.png"))
+
+        def centered(template):
+            screen = np.zeros((704, 396, 3), dtype=np.uint8)
+            top, left = 500, 140
+            height, width = template.shape[:2]
+            screen[top:top + height, left:left + width] = template
+            return screen, (left + width // 2, top + height // 2)
+
+        active_band = event_center._apple_button_color_band(*centered(active))
+        done_band = event_center._apple_button_color_band(*centered(done))
+
+        self.assertGreaterEqual(active_band[0],
+                                event_center.APPLE_ACTIVE_SATURATION_MIN)
+        self.assertGreaterEqual(active_band[1],
+                                event_center.APPLE_ACTIVE_COLOR_RATIO_MIN)
+        self.assertLessEqual(done_band[0],
+                             event_center.APPLE_DONE_SATURATION_MAX)
+        self.assertLessEqual(done_band[1],
+                             event_center.APPLE_DONE_COLOR_RATIO_MAX)
+
+    def test_lucky_apple_yellow_band_overrides_high_gray_template_score(self):
+        bot = mock.Mock()
+        screen = np.zeros((704, 396, 3), dtype=np.uint8)
+        bot.best_match.side_effect = ((0.68, (300, 620)),
+                                      (0.99, (300, 620)))
+        with (mock.patch.object(event_center, "_scaled_template",
+                                side_effect=lambda _bot, name, _screen: name),
+              mock.patch.object(event_center, "_apple_button_color_band",
+                                return_value=(190.0, 0.75)),
+              mock.patch.object(event_center, "_apple_done_ornament_matches")
+              as ornament):
+            state, position = event_center._apple_button_state(
+                bot, screen,
+                "DwarfsLuckyApple/button_red_wish_x10",
+                "DwarfsLuckyApple/status_red_wish_x10_done")
+
+        self.assertEqual("active", state)
+        self.assertEqual((300, 620), position)
+        ornament.assert_not_called()
 
     def test_lucky_apple_ornament_check_uses_both_template_edges(self):
         template = cv2.imread(str(IMAGES / "GiftClaims" /

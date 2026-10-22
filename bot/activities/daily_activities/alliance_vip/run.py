@@ -19,6 +19,8 @@ from .constants import (
     BUY_BUTTON_BOX,
     BUY_MIN_SATURATION,
     BUY_WAIT,
+    BOTTOM_CONFIRMATIONS,
+    BOTTOM_SIGNATURE_DISTANCE,
     CONFIRM_BUTTON,
     CONFIRM_CHECKS,
     DAILY_HEADER,
@@ -114,6 +116,28 @@ def _shop_to_top(bot) -> None:
     for _ in range(TOP_SWIPES):
         bot.swipe_percent(*TOP_SWIPE, duration=TOP_SWIPE_DURATION, delay=0)
     bot.sleep(TOP_SETTLE)
+
+
+def _shop_scroll_signature(screen) -> np.ndarray:
+    """Stable edge dHash for the scrolling shop body.
+
+    Price glows and item artwork animate even at the real bottom, so raw pixel
+    difference can report movement forever.  Blurred structural edges in the
+    left/centre list body preserve row movement while suppressing that glow.
+    """
+    height, width = screen.shape[:2]
+    patch = screen[int(height * .10):int(height * .95),
+                   int(width * .03):int(width * .76)]
+    gray = cv2.cvtColor(patch, cv2.COLOR_BGR2GRAY)
+    edges = cv2.Canny(cv2.GaussianBlur(gray, (5, 5), 0), 45, 120)
+    tiny = cv2.resize(edges, (33, 24), interpolation=cv2.INTER_AREA)
+    return np.packbits(tiny[:, 1:] > tiny[:, :-1])
+
+
+def _shop_scroll_distance(before, after) -> int:
+    old = _shop_scroll_signature(before)
+    new = _shop_scroll_signature(after)
+    return int(np.unpackbits(np.bitwise_xor(old, new)).sum())
 
 
 def _buy_button_active(bot, screen, center) -> bool:
@@ -398,15 +422,28 @@ def _run_shop_session(ctx, settings: dict,
         if priority_filter is not None and all(ctx.is_daily_done(key) for key in priority_filter):
             break
         if step >= SCROLLS:
+            ctx.record(f"{LABEL}: đã đủ {SCROLLS} lượt lướt nhưng chưa có "
+                       "3 xác nhận đáy liên tiếp; dừng theo trần an toàn")
             break
         ctx.record(f"{LABEL}: đã xử lý hết khung {step + 1}/{SCROLLS + 1}; vuốt chậm 1s rồi dừng 1s để quét")
-        before_scroll = cv2.resize(screen[70:670], (40, 60))
+        before_scroll = screen
         ctx.swipe_percent(*SWIPE, duration=SWIPE_DURATION, delay=SCAN_SETTLE)
-        after_scroll = cv2.resize(ctx.screenshot()[70:670], (40, 60))
-        movement = float(cv2.absdiff(before_scroll, after_scroll).mean())
-        stagnant_swipes = stagnant_swipes + 1 if movement < 2.0 else 0
-        if stagnant_swipes >= 2:
-            ctx.record(f"{LABEL}: danh sách đã chạm đáy (2 lần không dịch chuyển); dừng cuộn")
+        after_scroll = ctx.screenshot()
+        distance = _shop_scroll_distance(before_scroll, after_scroll)
+        stable = distance <= BOTTOM_SIGNATURE_DISTANCE
+        if stable and weekly_reached:
+            stagnant_swipes += 1
+        else:
+            stagnant_swipes = 0
+        ctx.record(f"{LABEL}: kiểm tra đáy bằng dải cấu trúc: khoảng cách "
+                   f"{distance}, Weekly={'đã thấy' if weekly_reached else 'chưa thấy'}, "
+                   f"ổn định={stagnant_swipes}/{BOTTOM_CONFIRMATIONS}")
+        if stable and not weekly_reached:
+            ctx.record(f"{LABEL}: khung chưa dịch chuyển nhưng chưa thấy mốc "
+                       "Weekly Sale; tiếp tục lướt, chưa được kết luận đáy")
+        if stagnant_swipes >= BOTTOM_CONFIRMATIONS:
+            ctx.record(f"{LABEL}: đã thấy Weekly Sale và vùng danh sách không "
+                       f"dịch chuyển {BOTTOM_CONFIRMATIONS} lần; xác nhận đã tới cuối")
             break
 
     for key in ("tribute", "vip_points"):

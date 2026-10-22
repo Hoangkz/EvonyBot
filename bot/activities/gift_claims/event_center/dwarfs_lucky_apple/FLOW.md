@@ -20,7 +20,13 @@
    bot vẫn phải tap an toàn `(195, 20)` một lần trước khi xét trạng thái mới.
 6. Mọi ảnh trạng thái DONE phải xác minh thêm cả hoa văn viền trái và viền phải
    của template. Nếu thiếu một trong hai viền thì không được kết luận DONE.
-7. Nếu ảnh nút đang chuyển sáng làm nhận dạng mơ hồ, bot ở nguyên trong nhiệm
+7. ACTIVE/DONE còn được phân biệt bằng dải màu HSV 70x24 ở tâm nút. Nút vàng
+   ACTIVE phải có độ bão hòa trung bình ít nhất `110` và tối thiểu `35%` pixel
+   có saturation từ `100`; nút xám DONE phải có trung bình không quá `65` và
+   tỷ lệ pixel màu không quá `20%`. Điểm template chỉ dùng để định vị; nếu ảnh
+   DONE khớp cao nhưng dải vẫn vàng thì phải tiếp tục bấm, không được chuyển
+   pha. DONE chỉ hợp lệ khi đồng thời đủ dải xám và hai viền hoa văn.
+8. Nếu ảnh nút đang chuyển sáng làm nhận dạng mơ hồ, bot ở nguyên trong nhiệm
    vụ và chụp lại mỗi 1 giây; ba lần không đọc được không được chuyển PENDING
    hoặc Back ra danh sách. Chỉ bộ đếm 120 giây của worker mới được ngắt để quay
    lại Join Boss, rồi lần chạy sau tiếp tục nhiệm vụ chưa DONE.

@@ -152,6 +152,40 @@ class SingleSessionTests(unittest.TestCase):
                          run.MONTH_KEY, run.DAY_KEY,
                          run._item_done_key("chip_100")}.issubset(ctx.done))
 
+    def test_shop_requires_weekly_marker_and_three_stable_swipes_for_bottom(self):
+        ctx = self.Ctx()
+        settings = {SETTINGS_KEY: {"chip_100": True}}
+        ranges = {"monthly": None, "daily": None}
+        with (mock.patch.object(run, "_open_shop", return_value=True),
+              mock.patch.object(run, "_shop_to_top"),
+              mock.patch.object(run, "_visible_section_ranges",
+                                return_value=(ranges, True, True)),
+              mock.patch.object(run, "_find_item",
+                                return_value=(None, 0.0, False)),
+              mock.patch.object(run, "SCROLLS", 10)):
+            run._run_shop_session(ctx, settings)
+
+        self.assertEqual(3, ctx.swipes)
+        self.assertTrue(any("xác nhận đã tới cuối" in line
+                            for line in ctx.logs))
+
+    def test_shop_does_not_call_stable_frame_bottom_before_weekly_marker(self):
+        ctx = self.Ctx()
+        settings = {SETTINGS_KEY: {"chip_100": True}}
+        ranges = {"monthly": None, "daily": None}
+        with (mock.patch.object(run, "_open_shop", return_value=True),
+              mock.patch.object(run, "_shop_to_top"),
+              mock.patch.object(run, "_visible_section_ranges",
+                                return_value=(ranges, False, False)),
+              mock.patch.object(run, "_find_item",
+                                return_value=(None, 0.0, False)),
+              mock.patch.object(run, "SCROLLS", 4)):
+            run._run_shop_session(ctx, settings)
+
+        self.assertEqual(4, ctx.swipes)
+        self.assertFalse(any("xác nhận đã tới cuối" in line
+                             for line in ctx.logs))
+
 
 if __name__ == "__main__":
     unittest.main()

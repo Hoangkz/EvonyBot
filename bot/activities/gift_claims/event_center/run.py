@@ -50,13 +50,14 @@ INNER_TOP = (0, 7, 100, 15)
 MAX_INNER_SWIPES = 4
 MAX_EVENT_VERIFY_PASSES = 2
 APPLE_STATE_THRESHOLD = 0.80
-# Active orange buttons can score lower against the template while their glow
-# is animating. DONE remains strict (including both ornaments), but an active
-# control is safe to tap at this still-conservative score.
-APPLE_ACTIVE_THRESHOLD = 0.75
-APPLE_DONE_MARGIN = 0.05
 APPLE_ORNAMENT_THRESHOLD = 0.70
 APPLE_ORNAMENT_WIDTH_RATIO = 0.18
+APPLE_COLOR_LOCATE_THRESHOLD = 0.72
+APPLE_ACTIVE_SATURATION_MIN = 110.0
+APPLE_ACTIVE_COLOR_RATIO_MIN = 0.35
+APPLE_DONE_SATURATION_MAX = 65.0
+APPLE_DONE_COLOR_RATIO_MAX = 0.20
+APPLE_COLOR_SATURATION_CUTOFF = 100
 MAX_APPLE_TAPS_PER_PHASE = 100
 APPLE_STATE_MISS_RETRIES = 3
 # MEmu can become noticeably slower when the worker controls many devices at
@@ -700,6 +701,30 @@ def _apple_done_ornament_matches(screen, template, center) -> tuple[bool, tuple[
     return min(scores) >= APPLE_ORNAMENT_THRESHOLD, scores
 
 
+def _apple_button_color_band(screen, center) -> tuple[float, float]:
+    """Return (mean HSV saturation, saturated-pixel ratio) near button centre.
+
+    The supplied active buttons have a yellow/orange band around S=199..210
+    with over 75% strongly saturated pixels.  The disabled ornamental buttons
+    are grey around S=24..27 with under 8%.  Sampling the common 70x24 centre
+    strip is therefore much more stable than comparing their shared wording.
+    """
+    scale_x = screen.shape[1] / 396
+    scale_y = screen.shape[0] / 704
+    half_width = max(8, round(35 * scale_x))
+    half_height = max(4, round(12 * scale_y))
+    left = max(0, center[0] - half_width)
+    right = min(screen.shape[1], center[0] + half_width)
+    top = max(0, center[1] - half_height)
+    bottom = min(screen.shape[0], center[1] + half_height)
+    patch = screen[top:bottom, left:right]
+    if patch.size == 0:
+        return 0.0, 0.0
+    saturation = cv2.cvtColor(patch, cv2.COLOR_BGR2HSV)[..., 1]
+    return (float(saturation.mean()),
+            float(np.mean(saturation >= APPLE_COLOR_SATURATION_CUTOFF)))
+
+
 def _apple_button_state(bot, screen, active: str, finished: str,
                         region=(0, 15, 100, 98)):
     """Distinguish the orange active button from the grey disabled button.
@@ -716,10 +741,19 @@ def _apple_button_state(bot, screen, active: str, finished: str,
         active_template, screen=screen, region=region)
     done_score, done_pos = bot.best_match(
         done_template, screen=screen, region=region)
-    bot.record(f"Gift Claims: Dwarf's Lucky Apple so màu nút "
-               f"active={active_score:.3f}, done={done_score:.3f}")
+    active_color = (_apple_button_color_band(screen, active_pos)
+                    if active_pos is not None else (0.0, 0.0))
+    done_color = (_apple_button_color_band(screen, done_pos)
+                  if done_pos is not None else (0.0, 0.0))
+    bot.record(f"Gift Claims: Dwarf's Lucky Apple dải màu "
+               f"ACTIVE score={active_score:.3f}, S={active_color[0]:.1f}, "
+               f"tỷ lệ vàng={active_color[1]:.2f}; DONE score={done_score:.3f}, "
+               f"S={done_color[0]:.1f}, tỷ lệ vàng={done_color[1]:.2f}")
+
+    done_is_gray = (done_color[0] <= APPLE_DONE_SATURATION_MAX and
+                    done_color[1] <= APPLE_DONE_COLOR_RATIO_MAX)
     if (done_pos is not None and done_score >= APPLE_STATE_THRESHOLD
-            and done_score >= active_score + APPLE_DONE_MARGIN):
+            and done_is_gray):
         ornament_ok, ornament_scores = _apple_done_ornament_matches(
             screen, done_template, done_pos)
         bot.record("Gift Claims: Dwarf's Lucky Apple kiểm tra hoa văn DONE "
@@ -730,12 +764,27 @@ def _apple_button_state(bot, screen, active: str, finished: str,
             return "done", done_pos
         bot.record("Gift Claims: ảnh giống DONE nhưng thiếu viền hoa văn; "
                    "không được kết luận DONE")
-    if active_pos is not None and active_score >= APPLE_ACTIVE_THRESHOLD:
-        if active_score < APPLE_STATE_THRESHOLD:
-            bot.record("Gift Claims: Dwarf's Lucky Apple ảnh ACTIVE đang đổi "
-                       f"sáng nhưng đạt ngưỡng riêng {active_score:.3f} >= "
-                       f"{APPLE_ACTIVE_THRESHOLD:.2f}; tiếp tục bấm")
-        return "active", active_pos
+
+    # Both templates share the same text and coin icon.  Use whichever one
+    # locates that control most strongly, then let its yellow colour band
+    # decide ACTIVE. This handles animation frames where the active-template
+    # score falls while the visually wrong grey template scores near 1.0.
+    candidates = [(active_score, active_pos, active_color),
+                  (done_score, done_pos, done_color)]
+    locate_score, locate_pos, locate_color = max(
+        candidates, key=lambda candidate: candidate[0])
+    active_is_yellow = (
+        locate_color[0] >= APPLE_ACTIVE_SATURATION_MIN and
+        locate_color[1] >= APPLE_ACTIVE_COLOR_RATIO_MIN)
+    if (locate_pos is not None and
+            locate_score >= APPLE_COLOR_LOCATE_THRESHOLD and
+            active_is_yellow):
+        bot.record("Gift Claims: Dwarf's Lucky Apple dải vàng đạt chuẩn; "
+                   "xác nhận nút ACTIVE và tiếp tục bấm")
+        return "active", locate_pos
+    if done_pos is not None and done_score >= APPLE_STATE_THRESHOLD:
+        bot.record("Gift Claims: Dwarf's Lucky Apple ảnh gần DONE nhưng dải "
+                   "màu chưa đủ xám hoặc hoa văn chưa đạt; chờ frame ổn định")
     return None, None
 
 

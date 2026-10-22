@@ -32,8 +32,14 @@ flowchart TD
   luôn. Bấm **nút giá** mới hiện popup mua (bấm vào sách thì không).
 - **Popup mua**: bấm giá xong chờ 1 giây, chưa có popup (tìm nút "+") thì chờ thêm tối đa 5 lần (1 giây / lần); sau 5 lần vẫn không có
   popup thì vẫn lưu xong. Có popup: bấm "+" 5 lần rồi bấm nút mua (dưới thanh số lượng) -> hiện hộp xác nhận -> bấm **Confirm** mới là mua thật, SAU ĐÓ mới lưu DB. Chờ Confirm tối đa 5 giây; không có Confirm mà popup mua còn mở, hoặc sau Confirm hộp vẫn còn thì Back, không lưu.
-- **Cuộn**: vừa vào shop KHÔNG cuộn lên (đầu trang sẵn). Monthly xong thì kéo thật nhanh xuống cuối (6 lần vuốt 0,15 giây, không chờ giữa
-  các lần), chờ 1,5 giây cho shop hết trôi rồi tìm. Không bao giờ cuộn lên: ở cuối mà chưa thấy tiêu đề Weekly Sale thì chỉ chụp lại (tối đa 6 lần, 1 giây / lần), vẫn không thấy thì dừng, không lưu.
+- **Cuộn**: vừa vào shop đưa danh sách về đầu để ưu tiên Tribute và 100 VIP
+  Points. Sau đó quét/mua mọi món đang thấy rồi mới vuốt chậm 1 giây và chờ
+  thêm 1 giây. Trần an toàn tăng lên 32 lượt. Mỗi lượt ghi log khoảng cách
+  chữ ký cấu trúc của vùng danh sách; chỉ xác nhận đã tới cuối khi đã thấy mốc
+  `Weekly Sale` và chữ ký không dịch chuyển 3 lượt liên tiếp. Khung đứng yên
+  trước khi thấy Weekly không được coi là đáy. Nếu đủ 32 lượt mà chưa có ba
+  xác nhận, dừng theo trần an toàn và giữ các món chưa thấy ở trạng thái
+  PENDING.
 - **Lỗi / không tới được shop**: không lưu dấu, lần sau làm lại; lỗi lưu `daily_alliance_vip_error` vào DB.
 
 ## Số đo (máy 21913, 396x704)

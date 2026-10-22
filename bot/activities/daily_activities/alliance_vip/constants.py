@@ -49,10 +49,12 @@ BUY_MIN_SATURATION = 100     # nút xanh/vàng hoạt động; nút xám không 
 CONFIRM_CHECKS = 5            # bấm mua xong chờ hộp xác nhận (Confirm) tối đa chừng này giây; bấm Confirm mới là mua thật
 BUY_WAIT = 3                  # giây chờ sau khi bấm mua
 POPUP_CHECKS = 5              # bấm giá xong chờ 1 giây, chưa có popup thì chờ thêm tối đa chừng này lần (1 giây / lần); vẫn không có = coi như xong
-SCROLLS = 16                  # số lần cuộn xuống tối đa để tìm sách Daily
+SCROLLS = 32                  # trần an toàn lớn; dừng sớm chỉ khi xác nhận đáy thật
 SWIPE = (50, 68, 50, 46)      # % màn hình: cuộn Alliance Shop xuống (~155 px mỗi lần; vuốt dài / nhanh thì shop trôi quá, lỡ sách)
 SWIPE_DURATION = 1.0          # vuốt 1s + dừng quét 1s = tối đa 2s mỗi bước
 SCAN_SETTLE = 1.0
+BOTTOM_CONFIRMATIONS = 3      # phải đứng yên 3 lần liên tiếp sau khi đã thấy Weekly Sale
+BOTTOM_SIGNATURE_DISTANCE = 10  # dHash vùng nội dung <= ngưỡng này coi như không dịch chuyển
 TOP_SWIPE = (50, 25, 50, 85)  # đưa carousel dọc về đầu trước mỗi lượt tìm ưu tiên
 TOP_SWIPES = 6
 TOP_SWIPE_DURATION = 0.35
