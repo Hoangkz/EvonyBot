@@ -35,6 +35,7 @@ class HomeView(QWidget):
     exit_all_requested = pyqtSignal()       # đóng game trên mọi thiết bị
     reset_time_changed = pyqtSignal(str)   # giờ reset server "HH:MM" người dùng vừa chọn
     auto_timeout_changed = pyqtSignal(str)  # số phút "Auto Times Out" người dùng vừa chọn
+    active_toggled = pyqtSignal(str, bool)  # (serial, muốn kích hoạt?) người dùng bấm nút Active/Inactive
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -115,8 +116,8 @@ class HomeView(QWidget):
         layout.addLayout(toolbar)
 
         # ---- Device table ----
-        self.table = QTableWidget(0, 4)
-        self.table.setHorizontalHeaderLabels(["DevicesName", "Server", "Activity", "Status"])
+        self.table = QTableWidget(0, 5)
+        self.table.setHorizontalHeaderLabels(["DevicesName", "Server", "Activity", "Status", "Active"])
         self.table.verticalHeader().setVisible(False)
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
@@ -127,6 +128,7 @@ class HomeView(QWidget):
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
         header.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)
         self.table.setStyleSheet(
             """
             QTableWidget { background: transparent; border: none; }
@@ -235,10 +237,11 @@ class HomeView(QWidget):
         self.update_button.setEnabled(True)
         self.update_button.setText(f"Version {__version__}")
 
-    def set_devices(self, serials: list):
+    def set_devices(self, serials: list, active: dict | None = None):
+        """`active` = {serial: đang kích hoạt?}; thiếu thì coi là kích hoạt."""
         self.table.setRowCount(0)
         for serial in serials:
-            self.add_device_row(serial)
+            self.add_device_row(serial, active=(active or {}).get(serial, True))
         self.set_run_counts(0, len(serials))
 
     def set_run_counts(self, running: int, total: int):
@@ -256,13 +259,31 @@ class HomeView(QWidget):
         self.stop_all_button.setEnabled(running > 0)
 
     def add_device_row(self, serial: str, activity: str = "None", status: str = "InActive",
-                       server: str = ""):
+                       server: str = "", active: bool = True):
         row = self.table.rowCount()
         self.table.insertRow(row)
         for col, text in enumerate((serial, server, activity, status)):
             item = QTableWidgetItem(text)
             item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             self.table.setItem(row, col, item)
+        button = QPushButton()
+        button.setStyleSheet("padding: 2px 6px; margin: 2px;")
+        button.clicked.connect(lambda _=False, s=serial, b=button: self.active_toggled.emit(s, not b.property("active")))
+        self.table.setCellWidget(row, 4, button)
+        self.table.setRowHeight(row, 44)
+        self._show_active(button, active)
+
+    @staticmethod
+    def _show_active(button: QPushButton, active: bool):
+        button.setProperty("active", active)
+        button.setText("Active" if active else "Inactive")
+
+    def set_active(self, serial: str, active: bool):
+        """Hiện trạng thái kích hoạt của thiết bị (không phát active_toggled)."""
+        for row in range(self.table.rowCount()):
+            if self.table.item(row, 0).text() == serial:
+                self._show_active(self.table.cellWidget(row, 4), active)
+                return
 
     def update_device(self, serial: str, activity: str | None = None, status: str | None = None,
                       server: str | None = None):

@@ -90,6 +90,7 @@ class InitializationTab(DesignerTab):
     reset_info_clicked = pyqtSignal()        # nút Reset info: xoá bubble, server, nền văn minh, route của máy
     profile_clicked = pyqtSignal(str)        # bấm nút hồ sơ: chọn nó (bấm lại hồ sơ đang chọn = về default)
     profile_added = pyqtSignal(str)          # nút "+": tên hồ sơ mới
+    active_clicked = pyqtSignal(bool)        # nút Active/Inactive: muốn kích hoạt máy này?
     profile_deleted = pyqtSignal(str)        # chuột phải một nút hồ sơ -> Delete
 
     def __init__(self, device_id="", parent=None):
@@ -175,6 +176,13 @@ class InitializationTab(DesignerTab):
         # "Start All(10)" vẫn vừa vẹn, không bị cắt.
         for key in ("button9", "buttonStopAll"):
             c[key].setStyleSheet("padding: 6px 8px;")
+        # Nút Active/Inactive của máy (cạnh Start All).
+        self._active = True
+        self.active_button = QPushButton(self.page)
+        self.active_button.setGeometry(680, 421, 125, 40)
+        self.active_button.setStyleSheet("padding: 6px 8px;")
+        self.active_button.clicked.connect(lambda: self.active_clicked.emit(not self._active))
+        self.set_active(True)
         # Chưa có số liệu -> tắt cả 2; main sẽ set_run_counts() ngay khi đăng ký thiết bị.
         c["button9"].setEnabled(False)
         c["buttonStopAll"].setEnabled(False)
@@ -272,6 +280,11 @@ class InitializationTab(DesignerTab):
         """While the bot runs, Start becomes Stop (same button, same signal)."""
         self.controls["buttonStart"].setText("Stop" if running else "Start")
         self.controls["buttonStart"].setStyleSheet("background-color: #d9534f; color: white;" if running else "")
+
+    def set_active(self, active: bool):
+        self._active = active
+        self.active_button.setText("Active" if active else "Inactive")
+        self.controls["buttonStart"].setEnabled(active)   # máy Inactive không được Start
 
     def set_run_counts(self, running: int, total: int):
         """Cập nhật 2 nút Start All / Stop All theo (số bot đang chạy, tổng số thiết bị).
