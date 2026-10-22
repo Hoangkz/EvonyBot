@@ -10,8 +10,8 @@ Patrol dùng chung với King's Path).
 import unittest
 from pathlib import Path
 
-from bot.activities.daily_activities.patrol.constants import KEY, LABEL
-from bot.activities.daily_activities.patrol.run import after_go
+from bot.activities.daily_activities.patrol.constants import KEY, LABEL, MORE_KEY, MORE_LABEL
+from bot.activities.daily_activities.patrol.run import after_go, more_done, run_more
 from bot.activities.event.kings_path.patrol.constants import (
     MENU_PATROL,
     PATROL_BUTTON,
@@ -40,6 +40,38 @@ def _after_go(bot, _settings):
 
 def _rounds_done(*numbers, key=KEY):
     return {round_key(n, key): "2026-10-04T08:00:00" for n in numbers}
+
+
+def _run_more(bot, settings):
+    return run_more(bot, settings)
+
+
+class PatrolMoreFlow(unittest.TestCase):
+    def test_more_done_rules(self):
+        """Việc nối tiếp bị bỏ qua khi Daily Patrol chưa xong, hoặc đã xong hết (MORE_KEY / đủ 10 lượt)."""
+        class Ctx:
+            def __init__(self, done):
+                self.done = done
+
+            def is_daily_done(self, key):
+                return key in self.done
+        self.assertTrue(more_done(Ctx(set()), {}))
+        self.assertFalse(more_done(Ctx({KEY}), {}))
+        self.assertTrue(more_done(Ctx({KEY, MORE_KEY}), {}))
+        self.assertTrue(more_done(Ctx({KEY, *(round_key(n, KEY) for n in range(1, 11))}), {}))
+
+    def test_more_patrols_remaining_rounds(self):
+        """Daily đã xong (1 lượt): việc nối tiếp tìm thành -> Tường thành -> patrol lượt 2..10 -> Back, lưu MORE_KEY."""
+        flow = [
+            Step("patrol_city.png", tap_at(*WALLS_POS)),
+            Step("patrol_menu.png", tap(MENU_PATROL)),
+            Step("patrol_done.png", back()),
+            Step("patrol_city.png", end(result=None)),
+        ]
+        device = run_flow(self, _run_more, SCREENS, flow, {}, daily_done={KEY: "2026-10-04T08:00:00",
+                                                                           **_rounds_done(*range(1, 10))})
+        self.assertIn(MORE_KEY, device.daily_done)
+        self.assertIn(f"{MORE_LABEL}: 10 rounds today, done for today", device.logs)
 
 
 class PatrolFlow(unittest.TestCase):

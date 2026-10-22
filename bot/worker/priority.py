@@ -19,12 +19,14 @@ from ..activities.daily_activities.general_enhancing.run import after_go as gene
 from ..activities.daily_activities.wheel_of_fortune import TASK as daily_wheel_of_fortune
 from ..activities.daily_activities.wheel_of_fortune.run import after_go as wheel_of_fortune_after_go
 from ..activities.daily_activities.patrol import TASK as daily_patrol
+from ..activities.daily_activities.patrol.run import MORE_JOB as daily_patrol_more_job
 from ..activities.daily_activities.patrol.run import after_go as patrol_after_go
 from ..activities.daily_activities.material_composing import TASK as daily_material_composing
 from ..activities.daily_activities.material_composing import after_go as material_composing_after_go
 from ..activities.daily_activities.alliance_research import TASK as daily_alliance_research
 from ..activities.daily_activities.alliance_research.run import after_go as alliance_research_after_go
 from ..activities.daily_activities.greet_champion import TASK as daily_greet_champion
+from ..activities.daily_activities.greet_champion.run import MORE_JOB as daily_greet_champion_more_job
 from ..activities.daily_activities.greet_champion.run import after_go as greet_champion_after_go
 from ..activities.daily_activities.ranger_knight import TASK as daily_ranger_knight
 from ..activities.daily_activities.ranger_knight.run import after_go as ranger_knight_after_go
@@ -318,7 +320,13 @@ DATA ={
             "run": daily_job(daily_patrol, after_go=patrol_after_go),
             "label": "Patrol",
             "priority": 387, 
-            "must_finish": True,
+        },
+        {
+            "key": "daily_patrol_more",
+            "run": daily_patrol_more_job,
+            "label": "Patrol (more rounds)",
+            "priority": 387,
+            "note": "Sau khi Daily Patrol xong (đủ 1 lượt): tìm thành -> Tường thành -> patrol tiếp tới đủ 10 lượt, không đi qua Go",
         },
         { 
             "key": "daily_material_composing",
@@ -331,8 +339,14 @@ DATA ={
             "run": daily_job(daily_greet_champion, after_go=greet_champion_after_go),
             "label": "Greet Champion",
             "priority": 385, 
-            "must_finish": True,
             "note": "Về thành: bấm trái tim trên Keep (hoặc Keep -> Champion), chào 2 lần",
+        },
+        {
+            "key": "daily_greet_champion_more",
+            "run": daily_greet_champion_more_job,
+            "label": "Greet Champion (more)",
+            "priority": 385,
+            "note": "Sau khi Daily Greet xong (đủ 2 lần): tìm thành -> trái tim / Keep -> Champion, chào tiếp tới 10/10, không đi qua Go",
         },
         {
             "key": "daily_ranger_knight",
