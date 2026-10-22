@@ -32,6 +32,7 @@ from .constants import (
     LIST_MAX_SCROLLS,
     LIST_RETRIES,
     LIST_SWIPE,
+    LIST_SWIPE_DURATION,
     MAIN_MORE,
     OLD_ACTIVITY_TITLE,
     OLD_CARD,
@@ -328,7 +329,7 @@ def _search_list(bot, titles, max_scrolls: int, tap_go: bool = True) -> str:
         if scrolls >= max_scrolls or at_end:
             break
         previous = screen
-        bot.swipe_percent(*LIST_SWIPE, duration=1.0, delay=1)
+        bot.swipe_percent(*LIST_SWIPE, duration=LIST_SWIPE_DURATION, delay=1)
         scrolls += 1
     bot.log(f"Daily Activities: {titles[0] if titles else '?'} not found in Activity list")
     return TASK_NOT_FOUND
@@ -393,7 +394,7 @@ def _search_grid(bot, cards, max_scrolls: int, done_cards=(), tap_go: bool = Tru
         if scrolls >= max_scrolls or (previous is not None and _same_list(previous, screen)):
             break
         previous = screen
-        bot.swipe_percent(*LIST_SWIPE, duration=1.0, delay=1)
+        bot.swipe_percent(*LIST_SWIPE, duration=LIST_SWIPE_DURATION, delay=1)
         scrolls += 1
     bot.log(f"Daily Activities: {cards[0]} not found in Activity grid")
     return TASK_NOT_FOUND

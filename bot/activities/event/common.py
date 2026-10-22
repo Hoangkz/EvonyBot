@@ -31,6 +31,7 @@ Ví dụ một nhiệm vụ mới (xem gather_troops/ground_troop/run.py là b�
 màn sau đặt trước màn trước. `handle` trả None cho action không phải của nhiệm vụ để
 handle_common() lo (quà, Event Center, BACK, go_home...).
 """
+import importlib
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -156,17 +157,28 @@ def mark_complete(bot, key: str):
     report(bot, TaskResult(done=True, complete=True, key=key))
 
 
-def mark_daily_troop(bot, kind: str):
-    """Nhiệm vụ Event vừa thật sự heal / train lính (`kind`: "heal" hoặc "train"): việc Daily Activities cùng loại (Troop Heading / Troop
-    Training) hôm nay cũng coi là xong, khỏi làm lại. Lưu daily_done của việc Daily; đã lưu rồi thì thôi."""
+# Nhiệm vụ Event -> việc Daily Activities làm cùng thao tác trong game: (gói trong daily_activities, ...).
+_DAILY_OF = {
+    "heal": "troop_healing",                  # King's Path Heal / 3-Day Heal  -> Troop Heading
+    "train": "troop_training",                # King's Path Train Troop, Gather Troops 4 loại lính -> Troop Training
+    "trap": "trap_building",                  # Gather Troops Trap Factory -> Trap Building
+    "cultivate": "general_enhancing",         # Gather Troops Cultivate Generals -> General Enhancing
+    "patrol": "patrol",                       # King's Path Patrol -> Patrol
+    "wheel": "wheel_of_fortune",              # King's Path Wheel -> Wheel of Fortune
+    "black_market": "black_market",           # King's Path Black Market -> Black Market
+    "tax": "resource_tax",                    # King's Path City Tax -> Resource Tax
+}
+
+
+def mark_daily_activity(bot, kind: str):
+    """Nhiệm vụ Event vừa thật sự làm xong thao tác `kind` (khoá của _DAILY_OF): việc Daily Activities cùng thao tác hôm nay cũng coi là
+    xong, khỏi làm lại. Lưu daily_done của việc Daily (vào DB); đã lưu rồi thì thôi. Gọi từ phần của nhiệm vụ Event, KHÔNG gọi trong
+    hàm dùng chung với Daily (patrol_rounds, spin_wheel, buy_items...) để Daily không tự đánh dấu mình giữa chừng."""
     # import trong hàm: các gói daily_activities nạp gói event (vòng import nếu import ở mức module).
-    if kind == "heal":
-        from ..daily_activities.troop_healing.constants import KEY, LABEL
-    else:
-        from ..daily_activities.troop_training.constants import KEY, LABEL
-    if not bot.is_daily_done(KEY):
-        bot.record(f"Event: {kind} troops done, also marks Daily Activities {LABEL} done today")
-        bot.mark_daily_done(KEY)
+    constants = importlib.import_module(f"{__package__.rsplit('.', 1)[0]}.daily_activities.{_DAILY_OF[kind]}.constants")
+    if not bot.is_daily_done(constants.KEY):
+        bot.record(f"Event: {kind} done, also marks Daily Activities {constants.LABEL} done today")
+        bot.mark_daily_done(constants.KEY)
 
 
 def mark_target_reached(bot, key: str):

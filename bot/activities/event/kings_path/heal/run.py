@@ -23,7 +23,7 @@ from .....ocr import read_heal_count
 from .....ocr.read_input_bar import run as read_input_bar
 from .....ocr.read_heal_count import CROP as HEAL_COUNT_CROP
 from ...city_building import HOSPITAL
-from ...common import EventState, mark_daily_troop, mark_done
+from ...common import EventState, mark_daily_activity, mark_done
 from ...gather_troops.train_troop.constants import (
     CHECKBOX_OFF,
     CONFIRM,
@@ -113,7 +113,7 @@ def _heal(bot, path, done, target):
         bot.log(f"{NAME}: Heal button not lit, redo from the Hospital screen ({attempt}/{HEAL_ATTEMPTS})")
     if result is not True:
         return None
-    mark_daily_troop(bot, "heal")   # đã bấm Heal thật: việc Daily Troop Heading hôm nay cũng xong
+    mark_daily_activity(bot, "heal")   # đã bấm Heal thật: việc Daily Troop Heading hôm nay cũng xong
     speed_up = bot.wait_for(SPEED_UP, timeout=SCREEN_WAIT)
     if speed_up is None:
         bot.record(f"{NAME}: Speed Up not shown after Heal")

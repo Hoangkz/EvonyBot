@@ -16,7 +16,7 @@ import cv2
 import numpy as np
 
 from ...city_building import WALLS
-from ...common import EventState, mark_done, mark_target_reached
+from ...common import EventState, mark_daily_activity, mark_done, mark_target_reached
 from .. import path_task
 from ..building import open_building
 from .constants import (
@@ -65,6 +65,8 @@ def _patrol(bot, path, done, target):
         return
     patrol_rounds(bot, done or 0, target,
                   lambda message, complete: _finish(bot, path, message, complete=complete))
+    if rounds_today(bot) > 0:   # đã patrol ít nhất một lượt hôm nay: việc Daily Patrol cũng xong
+        mark_daily_activity(bot, "patrol")
 
 
 def patrol_rounds(bot, progress: int, target: int, finish, name: str = NAME, key: str = KEY) -> bool:

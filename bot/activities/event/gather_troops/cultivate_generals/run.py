@@ -28,7 +28,7 @@ import numpy as np
 
 from .....common import delay, find_first, wait_gone
 from .....ocr import read_progress
-from ...common import (HANDLED, STOP, EventState, mark_complete,
+from ...common import (HANDLED, STOP, EventState, mark_complete, mark_daily_activity,
                        mark_target_reached, run_task)
 from ...constants import GATHER_TROOPS_ICON, GO_BUTTON, GO_REGION, PROGRESS_FROM_GO
 from .constants import (
@@ -100,6 +100,7 @@ def run(bot, task: dict, state: EventState):
             bot.tap(*x100)
             done += CULTIVATE_X100_TIMES
             bot.record(f"Cultivate Generals: Cultivate x100 -> {done}/{TOTAL}")
+            mark_daily_activity(bot, "cultivate")   # đã cultivate thật: việc Daily General Enhancing hôm nay cũng xong
             if done >= TOTAL:
                 mark_target_reached(bot, KEY)
                 return STOP

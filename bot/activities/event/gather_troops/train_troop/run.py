@@ -54,7 +54,7 @@ from ...common import (
     EventState,
     day_locked,
     mark_complete,
-    mark_daily_troop,
+    mark_daily_activity,
     mark_locked,
     mark_target_reached,
     nearest_go,
@@ -303,6 +303,9 @@ def _plan_batches(bot, plan: _Plan, count: int, name: str, key: str) -> bool:
     return True
 
 
+TRAP_FACTORY_KEY = "gather_troops_trap_factory"   # key nhiệm vụ Trap Factory (trap_factory/constants.py KEY; import ở đây thì vòng import)
+
+
 def _train_step(bot, plan: _Plan, name: str, key: str):
     """Màn Train: nút "Train" xanh -> bấm (1 mẻ); nút đã đổi thành "Training Speedup" (đang
     train) -> bấm mở màn speedup. Đã bấm đủ số lần và nút Train hiện lại -> xong.
@@ -316,7 +319,8 @@ def _train_step(bot, plan: _Plan, name: str, key: str):
             # màn chưa kịp đổi mà bấm lại thì đếm dư, bấm Train không ăn thì cũng đếm dư -> thiếu mẻ).
             plan.started += 1
             plan.pending = 0
-            mark_daily_troop(bot, "train")   # đã train thật: việc Daily Troop Training hôm nay cũng xong
+            # đã train / build thật: việc Daily cùng thao tác hôm nay cũng xong (Trap Factory -> Trap Building, còn lại -> Troop Training)
+            mark_daily_activity(bot, "trap" if key == TRAP_FACTORY_KEY else "train")
             bot.log(f"{name}: Train batch {plan.started}/{plan.times}")
         bot.tap(*speedup, delay=BUTTON_WAIT)
     elif train is None:
