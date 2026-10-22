@@ -128,6 +128,8 @@ class GeneralPicker(QGroupBox):
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)   # 4 cột vừa chiều ngang, không cuộn ngang
         scroll.setWidget(holder)
+        scroll.setStyleSheet("QScrollArea { background: transparent; border: none; }"
+                             "QScrollArea > QWidget > QWidget { background: transparent; }")   # nền trắng của group, không xám của theme
         scroll.setMinimumHeight(RECRUIT_PICKER_HEIGHT)
         top = QHBoxLayout()
         top.addWidget(self.search, 1)
