@@ -34,13 +34,35 @@ class BotManager(QObject):
         # "Auto Times Out" (phút) chung mọi thiết bị: main gán giá trị đã lưu / chọn ở màn Home; worker
         # đang chạy đọc giá trị mới ngay.
         self.auto_timeout_minutes = 0
+        # Số bot chạy cùng lúc tối đa theo giấy phép; None = không giới hạn.
+        self.max_running: int | None = None
+        # Số bot chạy cùng lúc cao nhất kể từ lần báo giấy phép trước (server dùng để bắt chạy lố rồi hạ).
+        self._peak = 0
 
     def is_running(self, serial: str) -> bool:
         return serial in self._workers
 
+    def peak_devices(self) -> int:
+        return max(self._peak, len(self._workers))
+
+    def reset_peak(self):
+        """Server đã nhận báo cáo: đếm đỉnh mới từ số bot đang chạy hiện giờ."""
+        self._peak = len(self._workers)
+
+    def running_serials(self) -> list[str]:
+        return list(self._workers)
+
+    def at_limit(self) -> bool:
+        return self.max_running is not None and len(self._workers) >= self.max_running
+
     def start(self, serial: str, activities: list[str], settings: dict,
               daily_done: dict | None = None) -> bool:
         if self.is_running(serial):
+            return False
+        if self.at_limit():
+            msg = f"Giấy phép chỉ cho chạy tối đa {self.max_running} giả lập cùng lúc"
+            print(f"[{serial}] {msg}")
+            self.log_message.emit(serial, msg)
             return False
         if not activities:
             print(f"[{serial}] No activity selected")
@@ -64,6 +86,7 @@ class BotManager(QObject):
         worker.history.connect(self.history.emit)
         worker.finished.connect(lambda: self._on_finished(serial))
         self._workers[serial] = worker
+        self._peak = max(self._peak, len(self._workers))
         worker.start()
         self.running_changed.emit(serial, True)
         return True

@@ -9,6 +9,7 @@ the selected device's tabbed control panel.
 import ctypes
 import os
 import platform
+import random
 import sys
 import threading
 from datetime import datetime, timedelta
@@ -41,7 +42,14 @@ from ui.tabs.logs_tab import SHOW_SECONDS
 
 
 CONTACT_HINT = f"Contact: {licensing.ADMIN_CONTACT}" if licensing.ADMIN_CONTACT else ""
-LICENSE_CHECK_MS = 60 * 60 * 1000   # re-check the activation code with the server every hour
+# Re-check the activation code with the server at a random gap in this range (not a fixed period, so nobody can
+# time their cheating around the check).
+LICENSE_CHECK_MIN_MS = 10 * 60 * 1000
+LICENSE_CHECK_MAX_MS = 60 * 60 * 1000
+
+
+def next_license_check_ms() -> int:
+    return random.randint(LICENSE_CHECK_MIN_MS, LICENSE_CHECK_MAX_MS)
 
 
 def ensure_license() -> tuple[bool, str | None]:
@@ -122,11 +130,12 @@ class MainWindow(QMainWindow):
         self._license_worker: LicenseWorker | None = None
         self._license_notice: str | None = None
         self._license_timer = QTimer(self)
-        self._license_timer.setInterval(LICENSE_CHECK_MS)
+        self._license_timer.setSingleShot(True)
         self._license_timer.timeout.connect(self._check_license)
-        self._license_timer.start()
+        self._license_timer.start(next_license_check_ms())
 
         self.bots = BotManager(self)
+        self.bots.max_running = licensing.max_devices()
         self.bots.activity_changed.connect(
             lambda serial, activity: self.home_view.update_device(serial, activity=activity)
         )
@@ -166,11 +175,14 @@ class MainWindow(QMainWindow):
         self.home_view.exit_all_requested.connect(self._on_exit_all_requested)
 
     def _check_license(self):
+        self._license_timer.start(next_license_check_ms())   # next check at a new random gap
         if self._license_worker is not None and self._license_worker.isRunning():
             return
-        self._license_worker = LicenseWorker("verify", parent=self)
-        self._license_worker.done.connect(lambda: self.notify_license(None))
-        self._license_worker.refused.connect(self.notify_license)
+        self._license_worker = LicenseWorker("verify", parent=self, running=self.bots.running_serials(),
+                                             peak=self.bots.peak_devices())
+        # The server received the report (accepted or refused): start counting the next peak. Offline keeps it.
+        self._license_worker.done.connect(lambda: (self.bots.reset_peak(), self.notify_license(None)))
+        self._license_worker.refused.connect(lambda msg: (self.bots.reset_peak(), self.notify_license(msg)))
         # Offline is fine while the last signed answer is inside the grace period.
         self._license_worker.offline.connect(lambda _m: self.notify_license(licensing.check_local()))
         self._license_worker.start()
@@ -179,6 +191,7 @@ class MainWindow(QMainWindow):
         """License problem (revoked, expired...): stop the bots, lock the whole UI behind a red banner and show a popup
         (once per notice). The window stays open and the license file untouched; a valid answer unlocks it again."""
         locked = bool(notice)
+        self.bots.max_running = licensing.max_devices()   # giấy phép vừa làm mới có thể đổi giới hạn
         self.content.setEnabled(not locked)
         self.license_banner.setVisible(locked)
         if not locked:
@@ -372,6 +385,9 @@ class MainWindow(QMainWindow):
         thiết bị đang chạy được giữ nguyên."""
         for device_id in self.device_views:
             if not self.bots.is_running(device_id):
+                if self.bots.at_limit():
+                    self.bots.start(device_id, [], {})   # chỉ để ghi log báo đã đạt giới hạn
+                    break
                 self._start_bot(device_id)
 
     def _on_stop_all_requested(self):
