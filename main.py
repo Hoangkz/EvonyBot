@@ -9,6 +9,7 @@ the selected device's tabbed control panel.
 import ctypes
 import os
 import platform
+import random
 import sys
 import threading
 from datetime import datetime, timedelta
@@ -24,6 +25,8 @@ from PyQt5.QtWidgets import (
     QApplication, QDialog, QHBoxLayout, QLabel, QMainWindow, QMessageBox, QStackedWidget, QVBoxLayout, QWidget,
 )
 
+from bot.activities.find_boss.angles import split_angles
+from bot.activities.find_boss.constants import END_KEY, START_KEY
 from bot.common import GAME_PACKAGE
 
 from bot.worker import BotManager
@@ -39,7 +42,14 @@ from ui.tabs.logs_tab import SHOW_SECONDS
 
 
 CONTACT_HINT = f"Contact: {licensing.ADMIN_CONTACT}" if licensing.ADMIN_CONTACT else ""
-LICENSE_CHECK_MS = 60 * 60 * 1000   # re-check the activation code with the server every hour
+# Re-check the activation code with the server at a random gap in this range (not a fixed period, so nobody can
+# time their cheating around the check).
+LICENSE_CHECK_MIN_MS = 10 * 60 * 1000
+LICENSE_CHECK_MAX_MS = 60 * 60 * 1000
+
+
+def next_license_check_ms() -> int:
+    return random.randint(LICENSE_CHECK_MIN_MS, LICENSE_CHECK_MAX_MS)
 
 
 def ensure_license() -> tuple[bool, str | None]:
@@ -67,6 +77,21 @@ def ensure_license() -> tuple[bool, str | None]:
     return ActivationDialog().exec() == QDialog.Accepted, None
 
 
+PREBUILD_IDLE_SECONDS = 1.0   # chỉ dựng sẵn giao diện máy khi người dùng đã ngừng thao tác chừng này giây
+
+
+def _idle_seconds() -> float:
+    """Số giây từ lần cuối người dùng thao tác chuột / bàn phím (Windows); nơi khác coi là đã rảnh."""
+    if os.name != "nt":
+        return PREBUILD_IDLE_SECONDS
+    class LASTINPUTINFO(ctypes.Structure):
+        _fields_ = [("cbSize", ctypes.c_uint), ("dwTime", ctypes.c_uint)]
+    info = LASTINPUTINFO(ctypes.sizeof(LASTINPUTINFO), 0)
+    if not ctypes.windll.user32.GetLastInputInfo(ctypes.byref(info)):
+        return PREBUILD_IDLE_SECONDS
+    return max(0.0, (ctypes.windll.kernel32.GetTickCount() - info.dwTime) / 1000.0)
+
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -86,6 +111,12 @@ class MainWindow(QMainWindow):
         self.license_banner.setStyleSheet("background: #d32f2f; color: white; font-weight: bold; padding: 8px 12px;")
         self.license_banner.hide()
         outer_layout.addWidget(self.license_banner)
+        # Hiện trong lúc đang hỏi server (xem _check_license): giao diện bị khoá cho tới khi có kết quả.
+        self.license_checking = QLabel("Checking license, please wait...")
+        self.license_checking.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.license_checking.setStyleSheet("background: #3a63f2; color: white; font-weight: bold; padding: 8px 12px;")
+        self.license_checking.hide()
+        outer_layout.addWidget(self.license_checking)
         self.content = QWidget()
         outer_layout.addWidget(self.content, 1)
         root = QHBoxLayout(self.content)
@@ -106,6 +137,13 @@ class MainWindow(QMainWindow):
         # Building a DeviceView is heavy (8 designer tabs), so new devices
         # are registered one per event-loop tick to keep the UI responsive.
         self._pending_devices: list[str] = []
+        self._active: dict[str, bool] = {}        # serial -> đang kích hoạt (nút Active/Inactive ở Home)
+        self._active_flags: dict[str, bool] = {}
+        self._saved_active: dict[str, bool] = {}
+        # Dựng DeviceView rất nặng (~3 s/máy với theme), nên chỉ dựng khi cần (mở máy, Start, Apply ALL...);
+        # danh sách máy đã đăng ký nằm ở _device_ids, device_views chỉ chứa máy đã dựng.
+        self._device_ids: list[str] = []
+        self._new_devices: set[str] = set()   # máy vừa thêm vào DB, chưa có cấu hình lưu
         self._register_timer = QTimer(self)
         self._register_timer.setInterval(0)
         self._register_timer.timeout.connect(self._register_next_device)
@@ -120,11 +158,12 @@ class MainWindow(QMainWindow):
         self._license_worker: LicenseWorker | None = None
         self._license_notice: str | None = None
         self._license_timer = QTimer(self)
-        self._license_timer.setInterval(LICENSE_CHECK_MS)
+        self._license_timer.setSingleShot(True)
         self._license_timer.timeout.connect(self._check_license)
-        self._license_timer.start()
+        self._license_timer.start(next_license_check_ms())
 
         self.bots = BotManager(self)
+        self.bots.max_running = licensing.max_devices()
         self.bots.activity_changed.connect(
             lambda serial, activity: self.home_view.update_device(serial, activity=activity)
         )
@@ -159,24 +198,38 @@ class MainWindow(QMainWindow):
         self.sidebar.home_selected.connect(lambda: self.stack.setCurrentWidget(self.home_view))
         self.sidebar.device_selected.connect(self._show_device)
         self.home_view.devices_loaded.connect(self._on_devices_loaded)
+        self.home_view.active_toggled.connect(self._on_active_toggled)
         self.home_view.start_all_requested.connect(self._on_start_all_requested)
         self.home_view.stop_all_requested.connect(self._on_stop_all_requested)
         self.home_view.exit_all_requested.connect(self._on_exit_all_requested)
 
     def _check_license(self):
+        self._license_timer.start(next_license_check_ms())   # next check at a new random gap
         if self._license_worker is not None and self._license_worker.isRunning():
             return
-        self._license_worker = LicenseWorker("verify", parent=self)
-        self._license_worker.done.connect(lambda: self.notify_license(None))
-        self._license_worker.refused.connect(self.notify_license)
+        self._license_worker = LicenseWorker("verify", parent=self, running=self.bots.running_serials(),
+                                             peak=self.bots.peak_devices())
+        # Đang hỏi server: báo cho người dùng và khoá giao diện tới khi có kết quả.
+        self.license_checking.show()
+        self.content.setEnabled(False)
+        self._license_worker.finished.connect(self._end_license_check)
+        # The server received the report (accepted or refused): start counting the next peak. Offline keeps it.
+        self._license_worker.done.connect(lambda: (self.bots.reset_peak(), self.notify_license(None)))
+        self._license_worker.refused.connect(lambda msg: (self.bots.reset_peak(), self.notify_license(msg)))
         # Offline is fine while the last signed answer is inside the grace period.
         self._license_worker.offline.connect(lambda _m: self.notify_license(licensing.check_local()))
         self._license_worker.start()
+
+    def _end_license_check(self):
+        """Hỏi server xong (kể cả lỗi bất ngờ): bỏ thông báo "đang kiểm tra"; mở khoá trừ khi giấy phép đang bị khoá."""
+        self.license_checking.hide()
+        self.content.setEnabled(not self.license_banner.isVisible())
 
     def notify_license(self, notice: str | None):
         """License problem (revoked, expired...): stop the bots, lock the whole UI behind a red banner and show a popup
         (once per notice). The window stays open and the license file untouched; a valid answer unlocks it again."""
         locked = bool(notice)
+        self.bots.max_running = licensing.max_devices()   # giấy phép vừa làm mới có thể đổi giới hạn
         self.content.setEnabled(not locked)
         self.license_banner.setVisible(locked)
         if not locked:
@@ -197,11 +250,48 @@ class MainWindow(QMainWindow):
         # Start over: drop every old device (stops its bot), then re-add
         # the scanned ones from scratch.
         self._register_timer.stop()
-        for device_id in list(self.device_views):
+        for device_id in list(self._device_ids):
             self._unregister_device(device_id)
         self._pending_devices = list(serials)
+        self._active = self._decide_active(serials)
+        self.home_view.set_devices(serials, self._active)
         if self._pending_devices:
             self._register_timer.start()
+            QTimer.singleShot(300, self._prebuild_next_view)
+        self._refresh_run_counts()
+
+    def _decide_active(self, serials: list) -> dict:
+        """{serial: kích hoạt?}: ưu tiên giá trị đã lưu trong DB (không vượt số tối đa); máy mới chưa có trong DB
+        được kích hoạt khi còn chỗ, hết chỗ thì không."""
+        limit = self.bots.max_running
+        room = lambda: limit is None or sum(self._active_flags.values()) < limit
+        self._active_flags = {}
+        stored = self.db.get_active_map()
+        saved = {serial: stored.get(serial) for serial in serials}
+        self._saved_active = stored
+        for serial in serials:
+            if saved[serial] and room():
+                self._active_flags[serial] = True
+        for serial in serials:
+            if serial not in self._active_flags:
+                self._active_flags[serial] = saved[serial] is None and room()
+        return dict(self._active_flags)
+
+    def _on_active_toggled(self, serial: str, want: bool):
+        """Nút Active/Inactive ở Home: lưu DB; kích hoạt không được vượt số tối đa, tắt thì dừng bot của máy."""
+        if want:
+            limit = self.bots.max_running
+            if limit is not None and sum(self._active.values()) >= limit:
+                QMessageBox.warning(self, "Cannot activate this device", "Cannot activate this device")
+                return
+        self._active[serial] = want
+        self.db.set_active(serial, want)
+        self.home_view.set_active(serial, want)
+        view = self.device_views.get(serial)
+        if view is not None:
+            view.set_active(want)
+        if not want:
+            self.bots.stop(serial)
         self._refresh_run_counts()
 
     def _register_next_device(self):
@@ -214,6 +304,9 @@ class MainWindow(QMainWindow):
             self._register_timer.stop()
 
     def _unregister_device(self, device_id: str):
+        if device_id in self._device_ids:
+            self._device_ids.remove(device_id)
+        self._new_devices.discard(device_id)
         self.sidebar.remove_device(device_id)
         view = self.device_views.pop(device_id, None)
         if view is not None:
@@ -225,14 +318,61 @@ class MainWindow(QMainWindow):
         self.bots.stop(device_id)
 
     def _register_device(self, device_id: str):
-        if device_id in self.device_views:
+        """Đăng ký máy (rẻ): thêm vào DB, sidebar, hàng Home. Giao diện máy dựng sau, ở _ensure_view."""
+        if device_id in self._device_ids:
             return
+        active = self._active.get(device_id, True)
+        if self.db.add_device(device_id, active):
+            self._new_devices.add(device_id)
+        elif self._saved_active.get(device_id) != active:
+            self.db.set_active(device_id, active)
+        self._device_ids.append(device_id)
+        server = self.db.load_settings(device_id).get("Initialization", {}).get("server", "")
+        self.home_view.update_device(device_id, server=server)
+        self.sidebar.add_device(device_id)
+
+    def _ensure_view(self, device_id: str, busy: bool = True) -> "DeviceView | None":
+        """DeviceView của máy, dựng ngay nếu chưa có (chặn giao diện vài giây)."""
+        view = self.device_views.get(device_id)
+        if view is None and device_id in self._device_ids:
+            if busy:
+                QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+            try:
+                view = self._build_view(device_id)
+            finally:
+                if busy:
+                    QApplication.restoreOverrideCursor()
+        return view
+
+    def _prebuild_next_view(self):
+        """Lúc rảnh dựng sẵn từng máy một (mỗi lần một máy, giữa các lần giao diện vẫn nhận thao tác) để bấm sang máy
+        không phải đợi dựng. Máy Active dựng trước."""
+        if self._pending_devices:    # còn đang đăng ký máy: đợi xong đã
+            QTimer.singleShot(100, self._prebuild_next_view)
+            return
+        todo = [d for d in self._device_ids if d not in self.device_views]
+        if not todo:
+            return
+        if _idle_seconds() < PREBUILD_IDLE_SECONDS:   # người dùng đang thao tác: đợi, đừng chặn giao diện
+            QTimer.singleShot(300, self._prebuild_next_view)
+            return
+        todo.sort(key=lambda d: not self._active.get(d, True))
+        self._ensure_view(todo[0], busy=False)
+        QTimer.singleShot(150, self._prebuild_next_view)
+
+    def _ensure_all_views(self):
+        for device_id in list(self._device_ids):
+            self._ensure_view(device_id)
+
+    def _build_view(self, device_id: str) -> DeviceView:
         view = DeviceView(device_id)
         view.start_requested.connect(self._on_start_requested)
         view.start_all_requested.connect(self._on_start_all_requested)
         view.stop_all_requested.connect(self._on_stop_all_requested)
+        view.active_requested.connect(self._on_active_toggled)
         view.apply_all_requested.connect(self._on_apply_all_requested)
         view.server_changed.connect(self._on_server_changed)
+        view.auto_angles_requested.connect(self._on_auto_angles)
         view.civilization_changed.connect(self._on_civilization_changed)
         view.reset_progress_requested.connect(self._on_reset_progress)
         view.reset_info_requested.connect(self._on_reset_info)
@@ -243,17 +383,15 @@ class MainWindow(QMainWindow):
         view.tabs.currentChanged.connect(self._on_tab_changed)
 
         # New device -> store its default config; known device -> restore it.
-        if self.db.add_device(device_id):
-            self.db.save_settings(device_id, view.get_settings())
+        if device_id in self._new_devices:
+            self._new_devices.discard(device_id)
+            # Các tab khác chưa dựng: mỗi tab tự lưu cấu hình mặc định của nó khi được dựng (DeviceView._build_tab).
+            self.db.save_settings(device_id, {"Initialization": view.initialization_tab.get_settings()})
         else:
+            # Tab chưa dựng nhận cấu hình khi được dựng, rồi tự ghi lại theo code hiện tại (nhiệm vụ Event mới, level / day...).
             view.set_settings(self.db.load_settings(device_id))
-            # Ghi lại tab Event theo event.py hiện tại (thêm nhiệm vụ mới,
-            # cập nhật level / day khi file được sửa).
-            self.db.save_settings(device_id, {"Event": view.event_tab.get_settings()})
         self._refresh_profiles(device_id, view)
-        self.home_view.update_device(
-            device_id, server=view.initialization_tab.get_settings()["server"]
-        )
+        view.set_active(self._active.get(device_id, True))
         # Tab Logs chỉ hiện log trong SHOW_SECONDS gần nhất; DB vẫn giữ đủ.
         since = (datetime.now() - timedelta(seconds=SHOW_SECONDS)).isoformat(timespec="seconds")
         for created_at, message in self.db.load_logs(device_id, since):
@@ -263,16 +401,16 @@ class MainWindow(QMainWindow):
         self._refresh_event_times(device_id)
         view.set_run_counts(*self._run_counts())
         self.stack.addWidget(view)
-        self.sidebar.add_device(device_id)
+        return view
 
     def _refresh_event_times(self, serial: str | None = None):
         """Cập nhật tiêu đề group của tab Event (thời gian còn lại của event) cho một thiết bị / mọi thiết bị."""
         for device_id, view in self.device_views.items():
             if serial is None or device_id == serial:
-                view.event_tab.set_event_times(self.db.daily_done(device_id))
+                view.set_event_times(self.db.daily_done(device_id))
 
     def _show_device(self, device_id: str):
-        view = self.device_views.get(device_id)
+        view = self._ensure_view(device_id)
         self._refresh_event_times(device_id)
         if view is not None:
             view.tabs.setCurrentIndex(self._current_tab_index)
@@ -284,6 +422,7 @@ class MainWindow(QMainWindow):
 
     def _on_apply_all_requested(self, source_id: str, settings: dict):
         """Copy the active device's config onto every other device."""
+        self._ensure_all_views()
         for device_id, view in self.device_views.items():
             if device_id != source_id:
                 view.set_settings(settings)
@@ -292,6 +431,18 @@ class MainWindow(QMainWindow):
         self.db.save_many_settings(
             {device_id: view.get_settings() for device_id, view in self.device_views.items()}
         )
+
+    def _on_auto_angles(self, device_id: str):
+        """Nút Auto của tab Find Boss: chia đều 0..360° cho mọi thiết bị cùng server với `device_id` (xếp theo device id), mỗi máy một cung liền nhau,
+        bội của ANGLE_STEP. Chưa biết server thì chỉ máy này (cả vòng)."""
+        self._ensure_all_views()
+        server = self.device_views[device_id].initialization_tab.get_settings()["server"].strip()
+        ids = sorted(d for d, v in self.device_views.items() if server and v.initialization_tab.get_settings()["server"].strip() == server)
+        if device_id not in ids:
+            ids = [device_id]
+        for d, (start, end) in zip(ids, split_angles(len(ids))):
+            self.device_views[d].find_boss_tab.set_settings({START_KEY: start, END_KEY: end})
+            self.db.save_settings(d, {"Find Boss": self.device_views[d].find_boss_tab.get_settings()})
 
     def _refresh_profiles(self, device_id: str, view: DeviceView):
         """Hàng nút hồ sơ của thiết bị: các hồ sơ đã tạo (không gồm default) + hồ sơ đang dùng."""
@@ -350,14 +501,17 @@ class MainWindow(QMainWindow):
         """Start button toggles: starts the device's bot, or stops it if running."""
         if self.bots.is_running(device_id):
             self.bots.stop(device_id)
-        else:
+        elif self._active.get(device_id, True):
             self._start_bot(device_id)
 
     def _on_start_all_requested(self):
         """Start All (màn Home): chạy những thiết bị chưa hoạt động;
         thiết bị đang chạy được giữ nguyên."""
-        for device_id in self.device_views:
-            if not self.bots.is_running(device_id):
+        for device_id in list(self._device_ids):
+            if self._active.get(device_id, True) and not self.bots.is_running(device_id):
+                if self.bots.at_limit():
+                    self.bots.start(device_id, [], {})   # chỉ để ghi log báo đã đạt giới hạn
+                    break
                 self._start_bot(device_id)
 
     def _on_stop_all_requested(self):
@@ -374,8 +528,8 @@ class MainWindow(QMainWindow):
 
     def _run_counts(self) -> tuple[int, int]:
         """(số bot đang chạy, tổng số thiết bị đã đăng ký)."""
-        total = len(self.device_views)
-        running = sum(1 for d in self.device_views if self.bots.is_running(d))
+        total = sum(1 for d in self._device_ids if self._active.get(d, True))
+        running = sum(1 for d in self._device_ids if self.bots.is_running(d))
         return running, total
 
     def _refresh_run_counts(self):
@@ -387,7 +541,7 @@ class MainWindow(QMainWindow):
             view.set_run_counts(*counts)
 
     def _start_bot(self, device_id: str):
-        view = self.device_views.get(device_id)
+        view = self._ensure_view(device_id)
         if view is None:
             return
         settings = view.get_settings()
@@ -488,7 +642,7 @@ class MainWindow(QMainWindow):
                     adbutils.adb.device(serial=serial).shell(f"am force-stop {GAME_PACKAGE}")
                 except Exception as e:
                     print(f"[{serial}] Exit All: không đóng được game: {e}")
-        threading.Thread(target=close_games, args=(list(self.device_views),),
+        threading.Thread(target=close_games, args=(list(self._device_ids),),
                          name="exit-all", daemon=True).start()
 
 

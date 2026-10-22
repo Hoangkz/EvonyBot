@@ -4,6 +4,7 @@ alliance.py — Donate khi người dùng không làm Patrol (ô Patrol = 0): kh
 đủ mục tiêu (như activity Alliance Capacity, dùng lại ảnh của nó). Không đọc được tiến độ ở dòng
 Go nên tự lưu số lần đã donate hôm nay vào daily_done (alliance_key).
 """
+from .....common import no_alliance
 from .....common import click_images, delay, exit_images, find_first, go_home
 from ...common import mark_done
 from .constants import (
@@ -18,7 +19,7 @@ from .constants import (
 from .donating import donate_times
 
 NAME = "Donate"
-_ON_SCIENCE, _TAP, _BACK, _SCROLL, _OUT = "on_science", "tap", "back", "scroll", "out_alliance"
+_ON_SCIENCE, _TAP, _BACK, _SCROLL, _OUT, _OPEN = "on_science", "tap", "back", "scroll", "out_alliance", "open_alliance"
 
 
 def alliance_key(n: int) -> str:
@@ -62,16 +63,22 @@ def _open_science(bot) -> bool:
         (ALLIANCE_SCROLL, _SCROLL),
         *[(path, _BACK) for path in exit_images()],
         *[(path, _TAP) for path in click_images()],
-        (ALLIANCE_BUTTON, _TAP),
+        (ALLIANCE_BUTTON, _OPEN),
     ]
     for _ in range(NAV_MAX_STEPS):
         screen = bot.screenshot()
+        if no_alliance.check(bot, screen):
+            return False
         action, pos = find_first(bot, screen, targets, top_left={_OUT})
         if action == _ON_SCIENCE:
             return True
         if action == _TAP:
             bot.tap(*pos)
             delay(bot, 2)
+        elif action == _OPEN:
+            bot.tap(*pos)
+            if no_alliance.wait_menu(bot):
+                return False
         elif action == _SCROLL:
             for _ in range(2):
                 bot.swipe_percent(50, 87, 50, 54, duration=1.0)

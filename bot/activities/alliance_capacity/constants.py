@@ -11,4 +11,5 @@ DONATE = "donate"           # donate screen open -> long-press Donate
 OUT_ALLIANCE = "out_alliance"
 SCROLL = "scroll"           # war screen -> scroll up
 TAP = "tap"
+OPEN = "open_alliance"      # nút Liên minh ở màn chính: bấm rồi chờ menu Liên minh / màn chưa có liên minh
 BACK = "back"

@@ -54,6 +54,7 @@ from .generals import GENERALS
 from .tab_placeholder import BaseTab, RadioGroup
 
 
+BUILD_CHUNK = 5   # số ô tướng dựng mỗi đợt khi dựng ngầm (mỗi ô ~5 ms khi cửa sổ đã hiện: đợt nhỏ để không khựng)
 GROUP_TIGHT = "QGroupBox#{name} {{ padding: 6px 6px 6px 6px; }}"   # thay padding 14px 10px 10px của theme cho group có tên
 
 
@@ -82,52 +83,33 @@ class GeneralPicker(QGroupBox):
         types = {g.get("type1", "") for g in generals} - {""}
         for type1 in [t for t in RECRUIT_TYPE_ORDER if t in types] + sorted(types - set(RECRUIT_TYPE_ORDER)):
             self.type.addItem(type1, type1)
+        # Ô tích / số lượng của ~400 tướng rất nặng để dựng (>1 s mỗi máy), nên trạng thái giữ ở các dict này và
+        # widget chỉ dựng lần đầu tab hiện ra (_build_cells); trước đó mọi hàm đọc / ghi cấu hình dùng dict.
+        self._generals = list(generals)
+        self._checked = {g["name"]: bool(g.get("default")) for g in generals}
+        self._count_value = {g["name"]: RECRUIT_GENERAL_COUNT_DEFAULT for g in generals}
+        self._civs = {g["name"]: g["civ"] for g in generals}
+        self._types = {g["name"]: g.get("type1", "") for g in generals}
+        self._defaults = dict(self._checked)
         self._boxes = {}
         self._cells = {}    # ô tích + ô số lượng của từng tướng (xếp vào lưới)
         self._counts = {}   # ô chọn số lượng cần mua của từng tướng
-        self._civs = {}
-        self._types = {}
-        self._defaults = {}
+        self._shown = []
+        self._built = False
+        self._placed = 0     # số ô đã xếp thẳng vào lưới lúc dựng ngầm
+        self._pending = []   # tướng chưa dựng ô (dựng dần từng đợt nhỏ để không chặn giao diện)
         holder = QWidget()
         self._grid = QGridLayout(holder)
         self._grid.setAlignment(Qt.AlignTop)
         self._grid.setHorizontalSpacing(6)
         for column in range(columns):
             self._grid.setColumnStretch(column, 1)   # các cột chia đều bề ngang, cột cuối không bị hở bên phải
-        for g in generals:
-            box = QCheckBox()   # tên hiện ở nhãn bên cạnh (xuống dòng khi dài)
-            box.setChecked(bool(g.get("default")))
-            self._defaults[g["name"]] = bool(g.get("default"))
-            box.toggled.connect(lambda _checked: self.changed.emit())
-            count = QComboBox()
-            for option in RECRUIT_GENERAL_COUNT_OPTIONS:
-                count.addItem(str(option), option)
-            count.setCurrentIndex(RECRUIT_GENERAL_COUNT_OPTIONS.index(RECRUIT_GENERAL_COUNT_DEFAULT))
-            count.currentIndexChanged.connect(lambda _index: self.changed.emit())
-            count.setFixedWidth(GENERAL_COUNT_WIDTH)
-            count.setEnabled(box.isChecked())   # chỉ chọn được số lượng khi tướng đã tích
-            box.toggled.connect(count.setEnabled)
-            cell = QWidget()   # một hàng: ô số lượng nhỏ đứng ngay cạnh tên tướng
-            cell_layout = QHBoxLayout(cell)
-            cell_layout.setContentsMargins(0, 0, 0, 0)
-            cell_layout.setSpacing(2)
-            label = QLabel(g["name"])
-            label.setWordWrap(True)
-            label.setMinimumWidth(GENERAL_NAME_WIDTH)   # tối thiểu cố định, dài quá thì xuống dòng; thừa chỗ thì tên giãn ra cho cột lấp kín
-            label.setToolTip(g["name"])
-            label.mousePressEvent = lambda _event, box=box: box.toggle()   # bấm vào tên cũng tích
-            cell_layout.addWidget(box)
-            cell_layout.addWidget(label, 1)
-            cell_layout.addWidget(count)
-            self._boxes[g["name"]] = box
-            self._counts[g["name"]] = count
-            self._cells[g["name"]] = cell
-            self._civs[g["name"]] = g["civ"]
-            self._types[g["name"]] = g.get("type1", "")
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)   # 4 cột vừa chiều ngang, không cuộn ngang
         scroll.setWidget(holder)
+        scroll.setStyleSheet("QScrollArea { background: transparent; border: none; }"
+                             "QScrollArea > QWidget > QWidget { background: transparent; }")   # nền trắng của group, không xám của theme
         scroll.setMinimumHeight(RECRUIT_PICKER_HEIGHT)
         top = QHBoxLayout()
         top.addWidget(self.search, 1)
@@ -147,9 +129,100 @@ class GeneralPicker(QGroupBox):
         self.search.textChanged.connect(self._filter)
         self.civ.currentTextChanged.connect(self._filter)
         self.type.currentTextChanged.connect(self._filter)
-        self._filter()
+
+    def start_background_build(self):
+        """Bắt đầu dựng ngầm các ô tướng (gọi sau khi giao diện máy đã hiện lần đầu: dựng trước khi hiện làm lần hiện đầu chậm ~1 s)."""
+        QTimer.singleShot(0, self._start_build)
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        if not self._built:
+            self._build_all()   # mở tab sớm hơn lúc dựng ngầm xong: dựng nốt ngay
+
+    def _start_build(self):
+        if not self._built and not self._pending:
+            self._pending = list(self._generals)
+            self._build_chunk()
+
+    def _build_chunk(self):
+        if self._built:
+            return
+        for g in self._pending[:BUILD_CHUNK]:
+            self._build_cell(g)
+        del self._pending[:BUILD_CHUNK]
+        if self._pending:
+            QTimer.singleShot(15, self._build_chunk)
+        else:
+            self._finish_build()
+
+    def _build_all(self):
+        for g in self._pending:
+            self._build_cell(g)
+        if not self._pending:
+            for g in self._generals:
+                if g["name"] not in self._cells:
+                    self._build_cell(g)
+        self._pending = []
+        self._finish_build()
+
+    def _unfiltered(self) -> bool:
+        return (not self.search.text().strip() and self.civ.currentData() == RECRUIT_CIV_ALL
+                and self.type.currentData() == RECRUIT_TYPE_ALL)
+
+    def _finish_build(self):
+        self._built = True
+        self._shown = list(self._cells)
+        if not self._unfiltered() or self._placed != len(self._cells):
+            self._filter()
+
+    def _build_cell(self, g):
+        if g["name"] in self._cells:
+            return
+        if True:
+            name = g["name"]
+            box = QCheckBox()   # tên hiện ở nhãn bên cạnh (xuống dòng khi dài)
+            box.setChecked(self._checked[name])
+            box.toggled.connect(lambda checked, name=name: self._on_toggled(name, checked))
+            count = QComboBox()
+            for option in RECRUIT_GENERAL_COUNT_OPTIONS:
+                count.addItem(str(option), option)
+            count.setCurrentIndex(RECRUIT_GENERAL_COUNT_OPTIONS.index(self._count_value[name]))
+            count.currentIndexChanged.connect(lambda _index, name=name, count=count: self._on_count(name, count))
+            count.setFixedWidth(GENERAL_COUNT_WIDTH)
+            count.setEnabled(box.isChecked())   # chỉ chọn được số lượng khi tướng đã tích
+            box.toggled.connect(count.setEnabled)
+            cell = QWidget()   # một hàng: ô số lượng nhỏ đứng ngay cạnh tên tướng
+            cell_layout = QHBoxLayout(cell)
+            cell_layout.setContentsMargins(0, 0, 0, 0)
+            cell_layout.setSpacing(2)
+            label = QLabel(name)
+            label.setWordWrap(True)
+            label.setMinimumWidth(GENERAL_NAME_WIDTH)   # tối thiểu cố định, dài quá thì xuống dòng; thừa chỗ thì tên giãn ra cho cột lấp kín
+            label.setToolTip(name)
+            label.mousePressEvent = lambda _event, box=box: box.toggle()   # bấm vào tên cũng tích
+            cell_layout.addWidget(box)
+            cell_layout.addWidget(label, 1)
+            cell_layout.addWidget(count)
+            self._boxes[name] = box
+            self._counts[name] = count
+            if self._unfiltered():
+                i = self._placed
+                self._placed += 1   # xếp luôn vào lưới theo thứ tự: không phải xếp lại cả 300 ô một lượt ở cuối
+                self._grid.addWidget(cell, i // self._columns, i % self._columns)
+                cell.show()
+            self._cells[name] = cell
+
+    def _on_toggled(self, name, checked):
+        self._checked[name] = checked
+        self.changed.emit()
+
+    def _on_count(self, name, combo):
+        self._count_value[name] = combo.currentData()
+        self.changed.emit()
 
     def _filter(self, *_):
+        if not self._built:
+            return
         text = self.search.text().strip().lower()
         civ = self.civ.currentData()
         type1 = self.type.currentData()
@@ -171,33 +244,42 @@ class GeneralPicker(QGroupBox):
 
     def _reset(self):
         """Về mặc định: chỉ tích các tướng `default` (toàn danh sách, không phụ thuộc bộ lọc đang chọn)."""
-        for name, box in self._boxes.items():
-            box.setChecked(self._defaults[name])
-            self._counts[name].setCurrentIndex(RECRUIT_GENERAL_COUNT_OPTIONS.index(RECRUIT_GENERAL_COUNT_DEFAULT))
+        for name in self._checked:
+            self._checked[name] = self._defaults[name]
+            self._count_value[name] = RECRUIT_GENERAL_COUNT_DEFAULT
+            if self._built:
+                self._boxes[name].setChecked(self._defaults[name])
+                self._counts[name].setCurrentIndex(RECRUIT_GENERAL_COUNT_OPTIONS.index(RECRUIT_GENERAL_COUNT_DEFAULT))
+        self.changed.emit()
 
     def checked(self):
-        return [name for name, box in self._boxes.items() if box.isChecked()]
+        return [name for name, checked in self._checked.items() if checked]
 
     def counts(self) -> dict:
         """Số lượng cần mua của các tướng đang tích: {tên: 1|2|3|10|15|20|"ALL"}."""
-        return {name: self._counts[name].currentData() for name, box in self._boxes.items() if box.isChecked()}
+        return {name: self._count_value[name] for name, checked in self._checked.items() if checked}
 
     def set_counts(self, counts: dict):
         """Đặt số lượng từng tướng; thiếu / không hợp lệ (settings cũ) thì về mặc định."""
-        for name, combo in self._counts.items():
+        for name in self._count_value:
             value = counts.get(name)
-            combo.blockSignals(True)
-            combo.setCurrentIndex(RECRUIT_GENERAL_COUNT_OPTIONS.index(
-                value if value in RECRUIT_GENERAL_COUNT_OPTIONS else RECRUIT_GENERAL_COUNT_DEFAULT))
-            combo.blockSignals(False)
+            self._count_value[name] = value if value in RECRUIT_GENERAL_COUNT_OPTIONS else RECRUIT_GENERAL_COUNT_DEFAULT
+            if self._built:
+                combo = self._counts[name]
+                combo.blockSignals(True)
+                combo.setCurrentIndex(RECRUIT_GENERAL_COUNT_OPTIONS.index(self._count_value[name]))
+                combo.blockSignals(False)
 
     def set_checked(self, names):
         names = set(names)
-        for name, box in self._boxes.items():
-            box.blockSignals(True)
-            box.setChecked(name in names)
-            box.blockSignals(False)
-            self._counts[name].setEnabled(box.isChecked())
+        for name in self._checked:
+            self._checked[name] = name in names
+            if self._built:
+                box = self._boxes[name]
+                box.blockSignals(True)
+                box.setChecked(name in names)
+                box.blockSignals(False)
+                self._counts[name].setEnabled(box.isChecked())
 
 
 class TightGroupBox(QGroupBox):

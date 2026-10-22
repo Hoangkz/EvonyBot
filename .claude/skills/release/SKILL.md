@@ -6,7 +6,7 @@ disable-model-invocation: true
 
 # Release EvonyBot
 
-Chuỗi phát hành: `version.py` → [installer/build.ps1](../../../installer/build.ps1) → `dist/EvonyBot-Setup-<ver>.exe` → GitHub Release trên `Hoangkz/EvonyBot` → [updater.py](../../../updater.py) trên máy người dùng thấy bản mới.
+Chuỗi phát hành: `version.py` → [installer/build.ps1](../../../installer/build.ps1) → `dist/EvonyBot-Setup-<ver>.exe` → GitHub Release trên repo public `Hoangkz/EvonyBotReleasee` (repo source `Hoangkz/EvonyBot` để private) → [updater.py](../../../updater.py) trên máy người dùng thấy bản mới.
 
 ## 1. Kiểm tra trước
 - `git status` sạch (hoặc người dùng xác nhận những gì đang thay đổi sẽ đi vào bản build — build lấy code **trong working tree**, không phải commit).
@@ -37,8 +37,8 @@ git commit -m "Release v<version>"
 git tag v<version>
 git push; git push origin v<version>
 ```
-Tạo release với tag `v<version>` và **đính kèm file .exe** (updater lấy asset đầu tiên có đuôi `.exe`; repo phải public):
-- Có `gh`: `gh release create v<version> dist/EvonyBot-Setup-<version>.exe --title "v<version>" --notes "..."`
-- Không có `gh` (máy hiện chưa cài): hướng dẫn người dùng tạo release trên github.com/Hoangkz/EvonyBot/releases/new và upload file .exe.
+Release nằm ở repo **riêng, public** `Hoangkz/EvonyBotReleasee` (không chứa source). Tạo release với tag `v<version>` và **đính kèm file .exe** (updater lấy asset đầu tiên có đuôi `.exe`):
+- Có `gh`: `gh release create v<version> dist/EvonyBot-Setup-<version>.exe --repo Hoangkz/EvonyBotReleasee --title "v<version>" --notes "..."`
+- Không có `gh` (máy hiện chưa cài): hướng dẫn người dùng tạo release trên github.com/Hoangkz/EvonyBotReleasee/releases/new (tag `v<version>`) và upload file .exe.
 
 Release notes: tóm tắt thay đổi từ `git log <tag trước>..HEAD` (commit message trong repo thường chỉ là "a"/"test", nên đọc diff để viết).

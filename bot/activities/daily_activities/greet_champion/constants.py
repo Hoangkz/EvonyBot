@@ -49,3 +49,15 @@ SCREEN_WAIT = 8          # giây tối đa đợi màn Champion hiện / màn đ
 TASK_MAX_SECONDS = 600   # tổng thời gian tối đa của nhiệm vụ sau Go (10 lần Greet ~ 10 phút)
 GREET_MIDDLE = (50, 50)  # % màn hình: bấm giữa sau mỗi lần Greet (đóng hoạt ảnh / thưởng chào)
 BACKS_AFTER = 4          # xong: Back (tối đa chừng này lần) tới khi về màn thành sạch
+
+# Nhiệm vụ Daily chỉ cần GREET_REQUIRED lần chào: đủ là lưu "xong hôm nay" (KEY) vào DB NGAY rồi chào tiếp trong cùng lần chạy tới khi
+# bị ngắt. Phần còn lại (tới 10/10) do việc nối tiếp MORE_KEY làm: tìm thành -> trái tim / Keep -> Champion -> chào tiếp.
+GREET_REQUIRED = 2
+GREET_MAX = 10           # số lần chào tối đa mỗi ngày
+MORE_KEY = "daily_greet_champion_more"   # xong (10/10 hoặc hết mỹ nữ) = có trong daily_done
+MORE_LABEL = "Greet Champion (more)"
+
+
+def greet_key(n: int) -> str:
+    """Key daily_done: đã bấm Greet lần thứ `n` hôm nay (đếm lần chào của bot, vì màn game chỉ cho biết 10/10)."""
+    return f"{KEY}_greet_{n}"

@@ -2,6 +2,7 @@ from .alliance_capacity_tab import AllianceCapacityTab
 from .black_market_tab import BlackMarketTab
 from .daily_activities_tab import DailyActivitiesTab
 from .event_tab import EventTab
+from .find_boss_tab import FindBossTab
 from .initialization_tab import InitializationTab
 from .join_monster_war_tab import JoinMonsterWarTab
 from .logs_tab import LogsTab
@@ -14,6 +15,7 @@ __all__ = [
     "BlackMarketTab",
     "DailyActivitiesTab",
     "EventTab",
+    "FindBossTab",
     "InitializationTab",
     "JoinMonsterWarTab",
     "LogsTab",

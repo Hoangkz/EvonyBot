@@ -23,6 +23,10 @@ class YieldToBoss(BotInterrupted):
     """Nhiệm vụ tự nhường lượt cho Join Boss tại điểm an toàn (kể cả nhiệm vụ must_finish); chưa xong, làm tiếp lần sau."""
 
 
+class YieldToTask(BotInterrupted):
+    """Việc `idle_only` (Find Boss) đang quét thì có nhiệm vụ khác tới lượt (việc theo giờ tới giờ, City VIP 0h...): nhường, làm lại sau khi rảnh."""
+
+
 class BubbleDue(BotInterrupted):
     """Bubble sắp hết: dừng activity đang chạy (kể cả Join Boss) để gia hạn trước."""
 

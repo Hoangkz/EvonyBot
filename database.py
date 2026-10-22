@@ -56,6 +56,7 @@ TAB_COLUMNS = {
     "Black Market": "black_market",
     "Event": "event",
     "Recruit General": "recruit_general",
+    "Find Boss": "find_boss",
 }
 # Khoá daily_done của tab Event (nhiệm vụ gather_troops / kings_path / three_day, mốc reset event, đăng nhập, Voyage);
 # mọi khoá khác thuộc Daily Activities.
@@ -195,6 +196,8 @@ def _add_missing_columns(conn: sqlite3.Connection):
         conn.execute("ALTER TABLE devices ADD COLUMN city_map TEXT")
     if "profile" not in columns:
         conn.execute("ALTER TABLE devices ADD COLUMN profile TEXT")
+    if "active" not in columns:
+        conn.execute("ALTER TABLE devices ADD COLUMN active INTEGER")
 
 
 def _drop_global_profiles(conn: sqlite3.Connection):
@@ -260,17 +263,30 @@ class Database:
         return self.conn.execute("SELECT * FROM devices WHERE serial = ?", (serial,)).fetchone()
 
     # ---- devices -----------------------------------------------------
-    def add_device(self, serial: str) -> bool:
+    def add_device(self, serial: str, active: bool | None = None) -> bool:
         """Insert the device if it's new. Returns True if it was inserted."""
         if serial in self._known:
             return False
         self._known.add(serial)
         now = _now()
         self._write(lambda conn: conn.execute(
-            "INSERT OR IGNORE INTO devices (serial, created_at, updated_at) VALUES (?, ?, ?)",
-            (serial, now, now),
+            "INSERT OR IGNORE INTO devices (serial, active, created_at, updated_at) VALUES (?, ?, ?, ?)",
+            (serial, None if active is None else int(active), now, now),
         ))
         return True
+
+    def get_active_map(self) -> dict:
+        """{serial: kích hoạt?} của mọi thiết bị đã chọn Active/Inactive (nút ở Home); máy chưa có / chưa chọn thì vắng."""
+        self._flush()
+        return {row["serial"]: bool(row["active"])
+                for row in self.conn.execute("SELECT serial, active FROM devices WHERE active IS NOT NULL")}
+
+    def set_active(self, serial: str, active: bool):
+        now = _now()
+        self._write(lambda conn: conn.execute(
+            "UPDATE devices SET active = ?, updated_at = ? WHERE serial = ?",
+            (int(active), now, serial),
+        ))
 
     def set_server(self, serial: str, server: str):
         """Lưu server của thiết bị (rỗng -> NULL)."""

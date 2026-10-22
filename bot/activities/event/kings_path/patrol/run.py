@@ -69,12 +69,13 @@ def _patrol(bot, path, done, target):
         mark_daily_activity(bot, "patrol")
 
 
-def patrol_rounds(bot, progress: int, target: int, finish, name: str = NAME, key: str = KEY) -> bool:
+def patrol_rounds(bot, progress: int, target: int, finish, name: str = NAME, key: str = KEY, on_round=None) -> bool:
     """Đang ở màn Patrol: patrol từng lượt (Select All -> Patrol -> Refresh) tới khi `progress` (+PER_ROUND mỗi
     lượt) >= `target` -> finish(message, True); đủ ROUNDS_PER_DAY lượt hôm nay / hết Refresh ->
     finish(message, False). True nếu đã gọi finish; False nếu dừng vì lỗi (không nhận ra màn / nút).
     Dùng chung với Daily Activities / Patrol; mỗi nhiệm vụ đếm lượt hôm nay riêng theo `key` (round_key) — hết lượt
-    thật của game thì nút Refresh xám / không ra bộ mới, vòng lặp tự dừng."""
+    thật của game thì nút Refresh xám / không ra bộ mới, vòng lặp tự dừng. `on_round(today)`: gọi sau mỗi lượt vừa lưu
+    (Daily dùng để lưu "xong hôm nay" ngay khi đủ lượt tối thiểu rồi làm tiếp)."""
     refreshed = False   # vừa bấm Refresh, chưa thấy bộ phần thưởng mới
     select_taps = 0     # số lần bấm Select All liên tiếp mà ô vẫn chưa tích
     for _ in range(MAX_STEPS):
@@ -123,6 +124,8 @@ def patrol_rounds(bot, progress: int, target: int, finish, name: str = NAME, key
         progress += PER_ROUND
         bot.record(f"{name}: round {today} today done (progress {progress} / {target})")
         bot.mark_daily_done(round_key(today, key))
+        if on_round is not None:
+            on_round(today)
     bot.record(f"{name}: too many steps, stop")
     return False
 

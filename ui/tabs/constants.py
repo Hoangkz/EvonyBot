@@ -17,12 +17,13 @@ DESIGNER_DATA = {
     "buttonAllianceCapacity": {"loc": [409, 117], "size": [230, 40], "text": "Alliance Capacity", "type": "Button"},
     "buttonBlackMarket": {"loc": [740, 117], "size": [230, 40], "text": "Black Market", "type": "Button"},
     "buttonRecruitGeneral": {"loc": [85, 181], "size": [230, 40], "text": "Recruit General", "type": "Button"},
+    "buttonFindBoss": {"loc": [409, 181], "size": [230, 40], "text": "Find Boss", "type": "Button"},
     "buttonDailyActivities": {"loc": [409, 53], "size": [230, 40], "text": "Daily Activities", "type": "Button"},
     "buttonInitializationApplyAll": {"loc": [935, 16], "size": [132, 43], "text": "Apply ALL", "type": "Button"},
     "buttonStart": {"loc": [449, 447], "size": [217, 51], "text": "Start", "type": "Button"},
     "groupBox2": {
         "children": ["ButtonJoinMonsterWar", "buttonDailyActivities", "buttonEvent", "ButtonOpenGiftBox",
-                      "buttonAllianceCapacity", "buttonBlackMarket", "buttonRecruitGeneral"],
+                      "buttonAllianceCapacity", "buttonBlackMarket", "buttonRecruitGeneral", "buttonFindBoss"],
         "loc": [13, 150], "size": [1062, 253], "text": "Select Activity", "type": "GroupBox",
     },
     "checkBoxBubble": {"loc": [13, 62], "size": [75, 28], "text": "Bubble", "type": "CheckBox"},
@@ -74,6 +75,7 @@ ACTIVITY_BUTTONS = {
     "buttonBlackMarket": {"target": "Black Market", "exclusive": False},
     "buttonEvent": {"target": "Event", "exclusive": False},
     "buttonRecruitGeneral": {"target": "Recruit General", "exclusive": "Recruit General" in EXCLUSIVE_ACTIVITIES},
+    "buttonFindBoss": {"target": "Find Boss", "exclusive": False},
 }
 ACTIVITY_BUTTON_TARGETS = {name: info["target"] for name, info in ACTIVITY_BUTTONS.items()}
 

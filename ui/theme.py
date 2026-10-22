@@ -90,6 +90,23 @@ QTabBar::tab:selected {{
     border-bottom: 2px solid {COLORS['accent']};
 }}
 
+/* ---- Hàng tab của màn thiết bị (tự xuống hàng): nút trông như tab ---- */
+QPushButton#TabButton {{
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    border-radius: 0px;
+    padding: 9px 14px;
+    color: {COLORS['text_secondary']};
+}}
+QPushButton#TabButton:hover {{
+    color: {COLORS['accent']};
+}}
+QPushButton#TabButton:checked {{
+    color: {COLORS['accent']};
+    border-bottom: 2px solid {COLORS['accent']};
+}}
+
 /* ---- GroupBox ---- */
 QGroupBox {{
     background: {COLORS['bg_group']};

@@ -14,6 +14,8 @@ Các bước (nhanh -> chậm, bước sau chỉ chạy khi bước trước có
 `level`: boss trùm đọc từ huy hiệu cấp độ bên trái nhãn (read_map_level), boss sự kiện suy ra từ tầng (boss.py); None nếu không đọc được.
 Nhãn bị cắt ở rìa màn hình / vùng giao diện chỉ đọc được một phần (read_map_label.read_partial, read_fragment): `partial` = True, `candidates` = các tên còn khả dĩ; `confirm` = True cho boss cần bấm vào xem lại.
 """
+import threading
+
 import cv2
 import numpy as np
 
@@ -30,18 +32,43 @@ NAME_ALIASES = {"Knight Bayard": ["Bayar Knight"]}       # tên hiện trên nh�
 # có mồi khớp hơn thì bộ đọc chọn mồi và bỏ nhãn đó.
 DECOYS = ["Renegade", "Bloody Gladiator", "Invader", "Barbarian", "Bandit", "Robber", "Crafty Ranger", "Hypocritical Knight", "Ferocious Knight", "Dark Warrior", "Mysterious Witch",
           "Evil Knight", "Teutonic Berserker", "Scythian Knight", "Inferno Warrior", "Wraith Hunter", "Murderous Warrior", "Golden Skull Cup Warrior", "Monarch", "Skeleton Warrior"]
-_cache: dict = {}
+_caches: dict = {}                                       # {khoá lựa chọn: danh mục đã dựng}
+_local = threading.local()                               # lựa chọn boss của luồng đang chạy (mỗi thiết bị một luồng): {tên boss: {các cấp được chọn}}; None = dùng cờ "active" của boss.py
+
+
+def set_selection(selected: list[dict] | None):
+    """Chọn boss cần tìm: `selected` = [{"name", "levels": [cấp, ...]}, ...] (cùng dạng "selected_bosses" của tab Join Monster War / Find Boss); boss không có cấp thì chỉ cần có tên.
+    None: về lại cờ "active" của boss.py. Ảnh hưởng "active" của find_bosses / read_popup (boss_scan chỉ xử lý boss active)."""
+    _local.selection = None if selected is None else {boss["name"]: set(boss.get("levels") or []) for boss in selected}
+
+
+def _selection() -> dict | None:
+    return getattr(_local, "selection", None)
+
+
+def _state() -> dict:
+    """Danh mục đã dựng cho lựa chọn boss hiện tại của luồng (nhớ lại theo lựa chọn)."""
+    selection = _selection()
+    return _caches.setdefault(None if selection is None else tuple(sorted((n, tuple(sorted(l))) for n, l in selection.items())), {})
 
 
 def _catalog():
     """([(tên, {cấp: (tầng, đang_bật)}, đang_bật, nhóm)], {chữ trên nhãn: (tên, tầng, có (Boss))}, Lexicon của các nhãn) từ ui/tabs/boss.py, nhớ lại."""
+    _cache = _state()
     if "catalog" not in _cache:
         from ui.tabs.boss import DATA
         entries, labels = [], {}
         for category in DATA["boss_categories"]:
             for boss in category["list"]:
-                levels = {lv["level"]: (lv.get("tier"), bool(lv.get("active"))) for lv in (boss.get("levels") or [])}
-                entries.append((boss["name"], levels, bool(boss.get("active")), category["label"]))
+                selection = _selection()
+                if selection is None:
+                    levels = {lv["level"]: (lv.get("tier"), bool(lv.get("active"))) for lv in (boss.get("levels") or [])}
+                    boss_active = bool(boss.get("active"))
+                else:
+                    ticked = selection.get(boss["name"])
+                    levels = {lv["level"]: (lv.get("tier"), ticked is not None and lv["level"] in ticked) for lv in (boss.get("levels") or [])}
+                    boss_active = ticked is not None and not levels
+                entries.append((boss["name"], levels, boss_active, category["label"]))
                 for shown in [boss["name"]] + NAME_ALIASES.get(boss["name"], []):
                     labels[f"(Boss) {shown}"] = (boss["name"], None, True)
                     for tier, _ in levels.values():
@@ -68,6 +95,7 @@ def read_popup(screen: np.ndarray) -> dict | None:
     """Boss trong cửa sổ thông tin (sau khi bấm Attack) trên `screen`: {"name", "tier", "level", "active", "text", "score"} theo danh mục boss.py, hoặc None nếu không đọc ra tên boss
     nào trong danh mục (không phải boss cần tìm). `level` suy ra từ tầng (boss trùm: None); `active`: boss (hoặc tầng đó) đang được bật."""
     entries, _, _ = _catalog()
+    _cache = _state()
     popup, lexicon = _cache["popup"]
     read = read_boss_popup.read_name(screen, lexicon, _cache["popup_halves"])
     if read is None:
@@ -126,7 +154,7 @@ def _partial_entry(part: dict, lexicon, box, region, badge_level: int | None) ->
     found = read_map_label.candidates(lexicon, part)
     if part["side"] is None:                               # đoạn nằm giữa tên: chỉ biết tên, không biết tầng / (Boss)
         canonical = {alias: name for name, aliases in NAME_ALIASES.items() for alias in aliases}
-        options = [(canonical.get(n, n), None, False) for n in found if n in _cache["boss_names"]]
+        options = [(canonical.get(n, n), None, False) for n in found if n in _state()["boss_names"]]
         if not options or len(options) < len(found):        # đoạn nằm trong tên quái thường
             return None
     else:

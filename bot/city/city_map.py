@@ -420,3 +420,27 @@ def scan_city(bot, name: str, watch=None) -> bool:
         return True
     finally:
         bot.swipe_watch = None
+
+
+def reach_building(bot, name: str, building: str) -> bool:
+    """Đưa `building` vào tầm bấm mà không dựa vào nút Go (sau khi đánh boss camera có thể đang ở chỗ khác):
+    1. Về thành (đang ở thế giới thì bấm nút toà thành; popup che thì Back), thấy công trình trên màn -> kéo vào giữa màn.
+    2. Không thấy, máy ĐÃ có route trong DB (`bot.city_map`) -> goto: từ công trình đang thấy vuốt thẳng tới, kéo vào giữa.
+    3. Máy CHƯA có route -> scan_city tìm route và LƯU vào DB (bot.set_city_map), rồi goto.
+    Mọi trường hợp thành công thì công trình đã ở giữa màn. False nếu không tìm được route hoặc không tới được (lượt sau thử lại)."""
+    ensure_city(bot, name)
+    screen = city_screen(bot)
+    score, pos = locate(bot, screen, building)
+    if pos is not None and score >= BUILDING_THRESHOLD:
+        bot.log(f"{name}: {building} already on screen, centre it")
+        centre(bot, building, pos, getattr(tour_of(bot, screen), "ANCHOR_SHIFT", {}))
+        return True
+    if not bot.city_map:
+        bot.record(f"{name}: no city route in DB, finding it")
+        if not scan_city(bot, name):
+            bot.record(f"{name}: route not found, cannot reach {building}")
+            return False
+    if goto(bot, name, building, bot.city_map) is None:
+        bot.record(f"{name}: {building} not reached")
+        return False
+    return True

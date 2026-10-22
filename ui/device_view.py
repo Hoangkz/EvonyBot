@@ -7,17 +7,20 @@ original Form3 (Initialization, Join Monster War, Alliance Capacity,
 Daily Activities, Open Gift Box, Black Market, Event),
 plus a Logs tab showing this device's bot log (not a settings tab).
 """
-from PyQt5.QtCore import QTimer, pyqtSignal
+from PyQt5.QtCore import Qt, QTimer, pyqtSignal
 from PyQt5.QtWidgets import (
-    QAbstractButton, QAbstractSpinBox, QCheckBox, QComboBox, QLineEdit, QRadioButton, QTabWidget, QVBoxLayout,
-    QWidget,
+    QAbstractButton, QAbstractSpinBox, QButtonGroup, QCheckBox, QComboBox, QLineEdit, QPushButton, QRadioButton, QTabWidget,
+    QVBoxLayout, QWidget,
 )
+
+from .flow_layout import FlowLayout
 
 from .tabs import (
     AllianceCapacityTab,
     BlackMarketTab,
     DailyActivitiesTab,
     EventTab,
+    FindBossTab,
     InitializationTab,
     JoinMonsterWarTab,
     LogsTab,
@@ -35,11 +38,13 @@ class DeviceView(QWidget):
     apply_all_requested = pyqtSignal(str, dict)
     server_changed = pyqtSignal(str, str)   # (device_id, server)
     reset_progress_requested = pyqtSignal(str, bool)   # (device_id, True = tab Event, False = Daily Activities)
+    active_requested = pyqtSignal(str, bool)   # device_id, muốn kích hoạt?
     reset_info_requested = pyqtSignal(str)   # device_id: xoá bubble, server, nền văn minh, route
     civilization_changed = pyqtSignal(str, int)   # (device_id, nền văn minh 1..7, 0 = tự nhận)
     # (device_id, {tab title: settings}) — một tab có `settings_changed` vừa được người dùng sửa.
     tab_settings_changed = pyqtSignal(str, dict)
-    profile_selected = pyqtSignal(str, str)   # (device_id, tên hồ sơ) bấm nút hồ sơ
+    auto_angles_requested = pyqtSignal(str)   # device_id: nút Auto của tab Find Boss
+    profile_selected = pyqtSignal(str, str)  # (device_id, tên hồ sơ) bấm nút hồ sơ
     profile_added = pyqtSignal(str, str)      # (device_id, tên hồ sơ mới) nút "+"
     profile_deleted = pyqtSignal(str, str)    # (device_id, tên hồ sơ)
 
@@ -47,34 +52,50 @@ class DeviceView(QWidget):
         super().__init__(parent)
         self.setObjectName("DeviceView")
         self.device_id = device_id
+        self._shown_once = False
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(16, 16, 16, 16)
 
+        # Hàng tab nằm ngay phía trên nội dung như thanh tab thường nhưng tự xuống hàng (tối đa vài hàng) khi không đủ chỗ, nên luôn thấy hết
+        # mà không phải cuộn. QTabWidget vẫn là nơi chứa các trang (view.tabs: settings, main.py), chỉ ẩn thanh tab của nó; hai bên đồng bộ chỉ mục.
+        self.tab_strip = QWidget()
+        self.tab_strip.setObjectName("TabStrip")
+        self.tab_flow = FlowLayout(self.tab_strip, spacing=2)
+        self.tab_buttons = QButtonGroup(self)
+        self.tab_buttons.setExclusive(True)
+        layout.addWidget(self.tab_strip)
         self.tabs = QTabWidget()
+        self.tabs.tabBar().hide()
+        self.tabs.currentChanged.connect(self._sync_tab_buttons)
         layout.addWidget(self.tabs)
 
+        # Dựng cả 10 tab một lượt tốn ~1 s (theme áp lên từng widget). Chỉ Initialization và Logs dựng ngay; tab còn lại là
+        # trang trống, dựng khi mở tab đó hoặc lúc rảnh (_build_next_tab), hoặc khi cần cả bộ (get_settings...).
+        self._pending_settings: dict[str, dict] = {}   # cấu hình set_settings() cho tab chưa dựng
+        self._event_done: dict | None = None            # daily_done cho tab Event chưa dựng
+        self._lazy: dict[str, tuple] = {}               # tiêu đề -> (tên thuộc tính, hàm tạo) của tab chưa dựng
         self.initialization_tab = InitializationTab(device_id=device_id)
-        self.join_monster_war_tab = JoinMonsterWarTab()
-        self.alliance_capacity_tab = AllianceCapacityTab()
-        self.daily_activities_tab = DailyActivitiesTab()
-        self.open_gift_box_tab = OpenGiftBoxTab()
-        self.black_market_tab = BlackMarketTab()
-        self.event_tab = EventTab()
-
         self._add_tab(self.initialization_tab, "Initialization")
-        self._add_tab(self.join_monster_war_tab, "Join Monster War")
-        self._add_tab(self.daily_activities_tab, "Daily Activities")
-        self._add_tab(self.event_tab, "Event")
-        self._add_tab(self.open_gift_box_tab, "Open Gift Box")
-        self._add_tab(self.alliance_capacity_tab, "Alliance Capacity")
-        self._add_tab(self.black_market_tab, "Black Market")
-        # Recruit General: đứng ngay trên tab Logs.
-        self.recruit_general_tab = RecruitGeneralTab()
-        self._add_tab(self.recruit_general_tab, "Recruit General")
+        for title, attr, factory in (
+                ("Join Monster War", "join_monster_war_tab", JoinMonsterWarTab),
+                ("Daily Activities", "daily_activities_tab", DailyActivitiesTab),
+                ("Event", "event_tab", EventTab),
+                ("Open Gift Box", "open_gift_box_tab", OpenGiftBoxTab),
+                ("Alliance Capacity", "alliance_capacity_tab", AllianceCapacityTab),
+                ("Black Market", "black_market_tab", BlackMarketTab),
+                # Recruit General: đứng ngay trên tab Logs.
+                ("Recruit General", "recruit_general_tab", RecruitGeneralTab),
+                ("Find Boss", "find_boss_tab", FindBossTab)):
+            self._lazy[title] = (attr, factory)
+            self._add_tab_button(title, self.tabs.addTab(QWidget(), title))
         # Logs không có cấu hình: thêm thẳng, không nối Apply ALL / settings.
         self.logs_tab = LogsTab()
-        self.tabs.addTab(self.logs_tab, "Logs")
+        self._add_tab_button("Logs", self.tabs.addTab(self.logs_tab, "Logs"))
+        self.tabs.currentChanged.connect(self._build_tab_at)
+        self._background_timer = QTimer(self)
+        self._background_timer.setSingleShot(True)
+        self._background_timer.timeout.connect(self._build_next_tab)
 
         self.initialization_tab.start_clicked.connect(
             lambda: self.start_requested.emit(self.device_id)
@@ -91,18 +112,108 @@ class DeviceView(QWidget):
             lambda server: self.server_changed.emit(self.device_id, server)
         )
 
-        self.daily_activities_tab.reset_progress_clicked.connect(
-            lambda: self.reset_progress_requested.emit(self.device_id, False))
-        self.event_tab.reset_progress_clicked.connect(
-            lambda: self.reset_progress_requested.emit(self.device_id, True))
+        self.initialization_tab.active_clicked.connect(
+            lambda want: self.active_requested.emit(self.device_id, want))
         self.initialization_tab.reset_info_clicked.connect(
             lambda: self.reset_info_requested.emit(self.device_id))
         self.initialization_tab.civilization_changed.connect(
             lambda civilization: self.civilization_changed.emit(self.device_id, civilization)
         )
 
+    def showEvent(self, event):
+        super().showEvent(event)
+        if not self._shown_once:
+            self._shown_once = True
+            self._background_timer.start(50)   # lần hiện đầu xong mới dựng nốt các tab còn lại, từng tab một
+
+    def __getattr__(self, name):
+        """Tab chưa dựng (join_monster_war_tab, event_tab...) được dựng ngay khi có người dùng tới."""
+        lazy = self.__dict__.get("_lazy")
+        if lazy:
+            for title, (attr, _factory) in list(lazy.items()):
+                if attr == name:
+                    self._build_tab(title)
+                    return self.__dict__[name]
+        raise AttributeError(name)
+
+    def _build_tab_at(self, index: int):
+        if index >= 0:
+            self._build_tab(self.tabs.tabText(index))
+
+    def _build_next_tab(self):
+        if self._lazy:
+            self._build_tab(next(iter(self._lazy)))
+        if self._lazy:
+            self._background_timer.start(30)
+
+    def ensure_all_tabs(self):
+        while self._lazy:
+            self._build_tab(next(iter(self._lazy)))
+
+    def _build_tab(self, title: str):
+        """Dựng tab `title` (nếu chưa), thay trang trống, áp cấu hình đang chờ rồi lưu lại cấu hình mới của tab."""
+        entry = self._lazy.pop(title, None)
+        if entry is None:
+            return
+        attr, factory = entry
+        index = next(i for i in range(self.tabs.count()) if self.tabs.tabText(i) == title)
+        widget = factory()
+        setattr(self, attr, widget)
+        current = self.tabs.currentIndex()
+        self.tabs.blockSignals(True)
+        old = self.tabs.widget(index)
+        self.tabs.removeTab(index)
+        self.tabs.insertTab(index, widget, title)
+        self.tabs.setCurrentIndex(current)
+        self.tabs.blockSignals(False)
+        self._sync_tab_buttons(current)
+        old.deleteLater()
+        self._wire_tab(widget, title)
+        if title in self._pending_settings:
+            widget.set_settings(self._pending_settings.pop(title))
+        if title == "Event" and self._event_done is not None:
+            widget.set_event_times(self._event_done)
+        # Ghi lại cấu hình theo code hiện tại (tab / nhiệm vụ mới, level / day đổi trong event.py; máy mới thì mặc định).
+        self.tab_settings_changed.emit(self.device_id, {title: widget.get_settings()})
+
+    def _wire_tab(self, widget: QWidget, title: str):
+        self._connect_tab(widget, title)
+        if title == "Daily Activities":
+            widget.reset_progress_clicked.connect(lambda: self.reset_progress_requested.emit(self.device_id, False))
+        elif title == "Event":
+            widget.reset_progress_clicked.connect(lambda: self.reset_progress_requested.emit(self.device_id, True))
+        elif title == "Find Boss":
+            widget.auto_clicked.connect(lambda: self.auto_angles_requested.emit(self.device_id))
+        elif title == "Recruit General":
+            widget.generals.start_background_build()
+
+    def set_event_times(self, daily_done: dict):
+        """Tiêu đề group của tab Event (thời gian còn lại); tab chưa dựng thì áp khi dựng xong."""
+        self._event_done = daily_done
+        if "Event" not in self._lazy:
+            self.event_tab.set_event_times(daily_done)
+
+    def _add_tab_button(self, title: str, index: int):
+        """Nút trên hàng tab cho tab `index`: bấm thì mở tab đó."""
+        button = QPushButton(title)
+        button.setObjectName("TabButton")
+        button.setCheckable(True)
+        button.setCursor(Qt.PointingHandCursor)
+        self.tab_buttons.addButton(button, index)
+        self.tab_flow.addWidget(button)
+        button.clicked.connect(lambda _checked=False, i=index: self.tabs.setCurrentIndex(i))
+        self._sync_tab_buttons(self.tabs.currentIndex())
+
+    def _sync_tab_buttons(self, index: int):
+        button = self.tab_buttons.button(index)
+        if button is not None:
+            button.setChecked(True)
+
     def _add_tab(self, widget: QWidget, title: str):
-        self.tabs.addTab(widget, title)
+        self._add_tab_button(title, self.tabs.addTab(widget, title))
+        self._connect_tab(widget, title)
+
+    def _connect_tab(self, widget: QWidget, title: str):
         widget.setProperty("tab_title", title)
         widget.apply_all_clicked.connect(self._on_apply_all)
         if hasattr(widget, "settings_changed"):
@@ -157,12 +268,16 @@ class DeviceView(QWidget):
     def set_running(self, running: bool):
         self.initialization_tab.set_running(running)
 
+    def set_active(self, active: bool):
+        self.initialization_tab.set_active(active)
+
     def set_run_counts(self, running: int, total: int):
         """Hai nút Start All / Stop All trong tab Initialization."""
         self.initialization_tab.set_run_counts(running, total)
 
     def get_settings(self) -> dict:
         """Collect settings from every tab into one dict, keyed by tab title."""
+        self.ensure_all_tabs()
         return {self.tabs.tabText(i): self.tabs.widget(i).get_settings()
                 for i in range(self.tabs.count()) if self.tabs.widget(i) is not self.logs_tab}
 
@@ -170,4 +285,7 @@ class DeviceView(QWidget):
         for i in range(self.tabs.count()):
             title = self.tabs.tabText(i)
             if title in data and self.tabs.widget(i) is not self.logs_tab:
-                self.tabs.widget(i).set_settings(data[title])
+                if title in self._lazy:
+                    self._pending_settings[title] = data[title]   # áp khi tab được dựng
+                else:
+                    self.tabs.widget(i).set_settings(data[title])

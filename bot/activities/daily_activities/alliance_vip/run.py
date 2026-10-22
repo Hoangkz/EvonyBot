@@ -12,6 +12,7 @@ Lỗi thì lưu `daily_alliance_vip_error` vào DB (save_errors).
 """
 import cv2
 
+from ....common import no_alliance
 from ....common import click_images, delay, exit_images, find_first, go_home
 from ...result import save_errors
 from .constants import (
@@ -47,7 +48,7 @@ from .constants import (
     VIP_THRESHOLD,
 )
 
-_ON_SHOP, _TAP, _BACK, _SCROLL, _OUT = "on_shop", "tap", "back", "scroll", "out_alliance"
+_ON_SHOP, _TAP, _BACK, _SCROLL, _OUT, _OPEN = "on_shop", "tap", "back", "scroll", "out_alliance", "open_alliance"
 _ALLIANCE_BUTTON, _ALLIANCE_SCROLL, _OUT_ALLIANCE = ALLIANCE_NAV
 
 
@@ -60,16 +61,22 @@ def _open_shop(bot) -> bool:
         (_ALLIANCE_SCROLL, _SCROLL),
         *[(path, _BACK) for path in exit_images()],
         *[(path, _TAP) for path in click_images()],
-        (_ALLIANCE_BUTTON, _TAP),
+        (_ALLIANCE_BUTTON, _OPEN),
     ]
     for _ in range(NAV_MAX_STEPS):
         screen = bot.screenshot()
+        if no_alliance.check(bot, screen):
+            return False
         action, pos = find_first(bot, screen, targets, top_left={_OUT})
         if action == _ON_SHOP:
             return True
         if action == _TAP:
             bot.tap(*pos)
             delay(bot, 2)
+        elif action == _OPEN:
+            bot.tap(*pos)
+            if no_alliance.wait_menu(bot):
+                return False
         elif action == _SCROLL:
             bot.swipe_percent(50, 87, 50, 54, duration=1.0)
             delay(bot)

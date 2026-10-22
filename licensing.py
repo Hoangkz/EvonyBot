@@ -7,9 +7,13 @@ signature (Ed25519, public key below) so the file cannot be edited or copied to 
 
 Server contract (JSON over HTTPS), both endpoints take {"code", "hwid", "app_version"}:
     POST {API_URL}/activate   first activation (binds this hwid to the code)
-    POST {API_URL}/verify     refresh: is the code still valid for this hwid
+    POST {API_URL}/verify     refresh: is the code still valid for this hwid; also carries
+                              "running_devices": [serial, ...] (emulators with a bot running) and "peak_devices": int (most
+                              bots running at once since the last report); the server
+                              answers {"ok": false, "error": "device_limit"} when there are more than max_devices
   ok     -> {"ok": true,  "payload": "<JSON text>", "signature": "<base64 Ed25519 over payload bytes>"}
-            payload JSON = {"code", "hwid", "issued_at", "expires_at"}  (ISO 8601 UTC; expires_at null = no expiry)
+            payload JSON = {"code", "hwid", "issued_at", "expires_at", "max_devices"}  (ISO 8601 UTC; expires_at null = no expiry;
+                                     max_devices = số giả lập chạy cùng lúc, thiếu/null = không giới hạn)
   failed -> {"ok": false, "error": "<invalid_code|revoked|expired|customer_limit|...>"}
 """
 import base64
@@ -58,6 +62,7 @@ _ERRORS = {
     "invalid_info": "Please enter a valid email, full name and phone number.",
     "revoked": "Your account has been locked. Please contact the admin to unlock it.",
     "expired": "Your account has expired. Please contact the admin to renew it.",
+    "device_limit": "More emulators are running than your license allows. Please contact the admin.",
     "customer_limit": "This activation code has reached its maximum number of users. Please contact the admin.",
 }
 
@@ -158,11 +163,15 @@ def api_url() -> str:
     return _api_url_cache
 
 
-def _call(endpoint: str, code: str, customer: dict | None = None) -> dict:
+def _call(endpoint: str, code: str, customer: dict | None = None, running: list[str] | None = None,
+          peak: int | None = None) -> dict:
     """POST to the server; returns the stored form {"code", "payload", "signature"} of a valid answer.
-    `customer` (email, full_name, phone, address) is sent on activation only."""
+    `customer` (email, full_name, phone, address) is sent on activation only; `running` (serials of the
+    emulators with a bot running) and `peak` (most bots running at once since the last report) on verify only."""
     body = json.dumps({"code": code, "hwid": hwid(), "app_version": __version__,
-                       "device_name": device_name(), **(customer or {})}).encode()
+                       "device_name": device_name(), **(customer or {}),
+                       **({"running_devices": running} if running is not None else {}),
+                       **({"peak_devices": peak} if peak is not None else {})}).encode()
     req = urllib.request.Request(f"{api_url()}/{endpoint}", data=body, method="POST", headers={
         "Content-Type": "application/json", "User-Agent": "EvonyBot"})
     try:
@@ -230,18 +239,34 @@ def check_local() -> str | None:
     return None
 
 
+def max_devices() -> int | None:
+    """Số giả lập được chạy cùng lúc theo giấy phép (payload "max_devices"); None = không giới hạn
+    (payload hợp lệ nhưng không có trường này). Không có giấy phép, chữ ký sai hoặc payload hỏng -> 0
+    (không cho chạy giả lập nào)."""
+    license_ = _load()
+    if not license_ or not _signature_ok(license_.get("payload", ""), license_.get("signature", "")):
+        return 0
+    try:
+        value = json.loads(license_["payload"]).get("max_devices")
+        if value is None:
+            return None
+        return int(value) if int(value) > 0 else None
+    except (KeyError, ValueError, TypeError, AttributeError):
+        return 0
+
+
 def activate(code: str, customer: dict):
     """Activate `code` on this machine for `customer` {"email", "full_name", "phone", "address"}.
     Raises LicenseError (refused) or OfflineError (no server)."""
     _save(_call("activate", code.strip(), customer))
 
 
-def verify() -> str | None:
+def verify(running: list[str] | None = None, peak: int | None = None) -> str | None:
     """Refresh the stored license from the server. Returns None when valid.
     Raises LicenseError when the server no longer accepts it (the stored license file is kept as it is) or
     OfflineError when the server cannot be reached (the caller decides with check_local())."""
     code = stored_code()
     if not code:
         raise LicenseError("No activation code.")
-    _save(_call("verify", code))
+    _save(_call("verify", code, running=running, peak=peak))
     return None
