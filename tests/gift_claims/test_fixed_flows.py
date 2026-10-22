@@ -1010,11 +1010,14 @@ class FixedGiftFlowTests(unittest.TestCase):
 
     def test_wishful_searches_wind_blessings_across_content_not_right_only(self):
         bot = mock.Mock()
-        with mock.patch.object(event_center, "_wait_for",
-                               side_effect=(None, (35, 260), (198, 24))) as wait:
+        bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
+        with (mock.patch.object(event_center, "_wishful_panel_open",
+                                side_effect=(False, True)),
+              mock.patch.object(event_center, "find",
+                                return_value=(35, 260)) as find_entry):
             self.assertTrue(event_center._wishful_open_blessings(bot))
 
-        entry_call = wait.call_args_list[1]
+        entry_call = find_entry.call_args_list[0]
         self.assertEqual("WishfulWindmillFestival/button_wind_blessings",
                          entry_call.args[1])
         self.assertEqual((0, 12, 100, 85), entry_call.kwargs["region"])
@@ -1023,30 +1026,94 @@ class FixedGiftFlowTests(unittest.TestCase):
 
     def test_wishful_reward_chest_opens_done_one_panel(self):
         bot = mock.Mock()
-        with mock.patch.object(
-                event_center, "_wait_for",
-                side_effect=(None, None, (62, 248), (198, 24))) as wait:
+        bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
+        with (mock.patch.object(event_center, "_wishful_panel_open",
+                                side_effect=(False, True)),
+              mock.patch.object(event_center, "find",
+                                side_effect=(None, (62, 248))) as find_entry):
             self.assertTrue(event_center._wishful_open_blessings(bot))
 
-        chest_call = wait.call_args_list[2]
-        self.assertEqual("WishfulWindmillFestival/button_reward_chest",
+        chest_call = find_entry.call_args_list[1]
+        self.assertEqual("WishfulWindmillFestival/button_reward_chest_wind",
                          chest_call.args[1])
-        self.assertEqual(0.82, chest_call.kwargs["threshold"])
+        self.assertEqual(0.86, chest_call.kwargs["threshold"])
         self.assertEqual((0, 12, 100, 85), chest_call.kwargs["region"])
         bot.tap.assert_called_once_with(
             62, 248, delay=event_center.WISHFUL_SETTLE_SECONDS)
 
     def test_wishful_retries_only_after_refinding_same_launcher(self):
         bot = mock.Mock()
-        with mock.patch.object(
-                event_center, "_wait_for",
-                side_effect=(None, (35, 260), None, (36, 261), (198, 24))):
+        with (mock.patch.object(event_center, "_wishful_panel_open",
+                                side_effect=(False, False, True)),
+              mock.patch.object(
+                  event_center, "_wishful_find_entry",
+                  return_value=((35, 260),
+                                "WishfulWindmillFestival/button_wind_blessings",
+                                0.68, "Wind Blessings")),
+              mock.patch.object(event_center, "_wait_for",
+                                return_value=(36, 261))):
             self.assertTrue(event_center._wishful_open_blessings(bot))
 
         self.assertEqual(
             [mock.call(35, 260, delay=event_center.WISHFUL_SETTLE_SECONDS),
              mock.call(36, 261, delay=event_center.WISHFUL_SETTLE_SECONDS)],
             bot.tap.call_args_list)
+
+    def test_wishful_new_crops_have_the_exact_supplied_dimensions(self):
+        chest = cv2.imread(str(
+            IMAGES / "GiftClaims" / "WishfulWindmillFestival" /
+            "button_reward_chest_wind.png"))
+        title = cv2.imread(str(
+            IMAGES / "GiftClaims" / "WishfulWindmillFestival" /
+            "title_wind_blessings_text.png"))
+        self.assertEqual((32, 39), chest.shape[:2])
+        self.assertEqual((18, 131), title.shape[:2])
+
+    def test_wishful_panel_claims_without_back_or_reopening(self):
+        bot = mock.Mock()
+        bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
+        calls = {"count": 0}
+
+        def claims(_bot, _screen):
+            calls["count"] += 1
+            return [(330, 245)] if calls["count"] == 1 else []
+
+        with (mock.patch.object(event_center, "_wishful_panel_open",
+                                return_value=True),
+              mock.patch.object(event_center, "_wishful_claims",
+                                side_effect=claims),
+              mock.patch.object(event_center,
+                                "_close_wishful_congratulations",
+                                return_value=True)):
+            report, done = event_center._claim_wishful_panel(bot, "DONE 1")
+
+        self.assertTrue(done)
+        self.assertEqual(common.ClaimReport(1, 1), report)
+        bot.tap.assert_called_once_with(
+            330, 245, delay=event_center.WISHFUL_SETTLE_SECONDS)
+        self.assertEqual(2, bot.swipe_percent.call_count)
+        bot.back.assert_not_called()
+
+    def test_wishful_handle_finishes_each_panel_before_next_phase(self):
+        bot = mock.Mock()
+        first = common.ClaimReport(2, 2)
+        second = common.ClaimReport(3, 3)
+        with (mock.patch.object(event_center, "_wishful_open_blessings",
+                                return_value=True) as open_first,
+              mock.patch.object(event_center, "_claim_wishful_panel",
+                                side_effect=((first, True), (second, True))) as claim,
+              mock.patch.object(event_center, "_wait_for",
+                                side_effect=((190, 80), (198, 620)))):
+            report, done = event_center._handle_wishful(bot)
+
+        self.assertTrue(done)
+        self.assertEqual(common.ClaimReport(5, 5), report)
+        open_first.assert_called_once_with(bot)
+        self.assertEqual([mock.call(bot, "DONE 1"),
+                          mock.call(bot, "Challenge Quest")],
+                         claim.call_args_list)
+        bot.back.assert_called_once_with(
+            delay=event_center.WISHFUL_SETTLE_SECONDS)
 
     def test_event_row_wait_does_not_treat_loading_frame_as_opened(self):
         bot = mock.Mock()
