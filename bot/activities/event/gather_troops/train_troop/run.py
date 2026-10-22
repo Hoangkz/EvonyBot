@@ -54,6 +54,7 @@ from ...common import (
     EventState,
     day_locked,
     mark_complete,
+    mark_daily_troop,
     mark_locked,
     mark_target_reached,
     nearest_go,
@@ -315,6 +316,7 @@ def _train_step(bot, plan: _Plan, name: str, key: str):
             # màn chưa kịp đổi mà bấm lại thì đếm dư, bấm Train không ăn thì cũng đếm dư -> thiếu mẻ).
             plan.started += 1
             plan.pending = 0
+            mark_daily_troop(bot, "train")   # đã train thật: việc Daily Troop Training hôm nay cũng xong
             bot.log(f"{name}: Train batch {plan.started}/{plan.times}")
         bot.tap(*speedup, delay=BUTTON_WAIT)
     elif train is None:

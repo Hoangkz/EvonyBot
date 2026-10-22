@@ -56,7 +56,6 @@ DISMISS_TO_AMOUNT = (-38, -31)
 # Dòng có Dismiss cao hơn MIN_DISMISS_Y: ô số của nó bị thanh "Wounded Troops" che (danh sách cuộn
 # dở) -> bỏ qua. Dòng trên cùng khi chưa cuộn: Dismiss y = 221.
 MIN_DISMISS_Y = 200
-INPUT_DELETES = 7   # xoá số cũ trong ô (tối đa 7 chữ số) trước khi gõ số mới
 # Nút "Heal" góc dưới phải (319, 666): 1,00 khi chưa chọn lính (xám) / 0,86 khi đã chọn.
 HEAL_BUTTON = f"{KP}/Heal/healButton.png"
 HEAL_BUTTON_THRESHOLD = 0.8
@@ -74,6 +73,16 @@ HEAL_WAIT = 3   # sau khi bấm Heal
 INPUT_OK = f"{KP}/Heal/inputOk.png"
 INPUT_WAIT = 10
 INPUT_TRIES = 2   # không thấy thanh nhập thì bấm lại ô số (lần bấm đầu có thể bị nuốt)
+# Thanh nhập TỰ ĐÓNG sau ~10 giây kể từ lúc mở (INPUT_BAR_LIFETIME): mọi thao tác trong đó phải nhanh.
+# Gõ xong KHÔNG bấm OK: bấm vị trí này (x%, y%: giữa mép trên màn hình) là thanh nhập đóng và số được nhận (đã đo trên 21913: ô số hiện
+# "30,000 / 103,319", nút Heal sáng). Trước khi đóng, đọc lại số trong ô trắng của thanh nhập (chữ đen trên nền trắng, bot/ocr/read_input_bar.py) phải
+# đúng số vừa gõ; sai (gõ trượt / xoá chưa hết) thì xoá gõ lại, tối đa INPUT_TYPE_TRIES lần.
+INPUT_CLOSE_TAP = (50, 2)
+INPUT_BAR_BOX = (0, 648, 300, 40)   # (x, y, rộng, cao) ô trắng có số đã gõ, đáy màn hình 396x704
+INPUT_TYPE_TRIES = 3
+INPUT_DELETES = 12   # số lần xoá lùi trước khi gõ (thừa không sao: xoá khi ô đã trống không làm gì)
+INPUT_SETTLE = 0.5   # chờ sau khi gõ trước khi chụp đọc lại
+INPUT_BAR_LIFETIME = 10   # giây: thanh nhập tự đóng sau chừng này kể từ lúc mở (đo 10,6 s trên 21913)
 
 # ---- Sau khi bấm Heal: màn Hospital đang chữa (heal_healing.png) -------------------------
 # Nút "Speed Up" góc dưới phải (319, 674): 1,00; màn khác <= 0,71.

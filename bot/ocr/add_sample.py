@@ -50,6 +50,11 @@ popup's Cost box ("," not saved). Example for "1,475":
 
     python -m bot.ocr.add_sample OfferCost cost.png "1|,|4|7|5"
 
+The map label level font ("MapLevel", read_map_level.py) is the orange number in the round badge left of a monster /
+boss label on the world map; the image is the badge, the text its digits. Example for level 22:
+
+    python -m bot.ocr.add_sample MapLevel badge.png "2|2"
+
 The General name font ("GeneralName", read_general_name.py) is split like the boss name; the image is the
 name strip of the Recruit General screen. Example for "Rustam":
 
@@ -70,6 +75,8 @@ from .read_general_name import FONT as GENERAL_NAME_FONT
 from .read_general_name import split as split_general_name
 from .read_heal_count import FONT as HEAL_COUNT_FONT
 from .read_heal_count import split as split_heal_count
+from .read_map_level import FONT as MAP_LEVEL_FONT
+from .read_map_level import split as split_map_level
 from .read_milestone import FONT as MILESTONE_FONT
 from .read_milestone import split as split_milestone
 from .read_offer_cost import FONT as OFFER_COST_FONT
@@ -83,7 +90,7 @@ from .read_progress import split as split_progress
 PIECE_FONTS = {NAME_FONT: split_name, POWER_FONT: split_power, PROGRESS_FONT: split_progress,
                TIMER_FONT: split_timer, MILESTONE_FONT: split_milestone,
                HEAL_COUNT_FONT: split_heal_count, OFFER_COST_FONT: split_offer_cost,
-               GENERAL_NAME_FONT: split_general_name}
+               GENERAL_NAME_FONT: split_general_name, MAP_LEVEL_FONT: split_map_level}
 
 
 NO_COLON_FONTS = {"Camera"}      # chữ số hẹp (5, 7) không được nhầm với ":" (xem split)

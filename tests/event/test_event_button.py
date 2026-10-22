@@ -1,8 +1,8 @@
 """
 Chọn nút event trên màn chính (bot/activities/event/common.py find_event_button): trên chính ảnh
 vừa thấy nút "•••", tìm đuôi ruy băng (Images/Event/ribbonTail.png) trong 2 vùng cố định — vùng
-nào trả về toạ độ thì vùng đó đúng, ra MỘT nút duy nhất; không vùng nào thấy thì bấm ngay dưới
-chữ "Event Center" như trước. Nút trên cùng bên phải (đuôi (331, 105)) không phải nút event.
+nào trả về toạ độ thì vùng đó đúng, ra MỘT nút duy nhất; không vùng nào thấy thì trả None
+(event đã hết). Nút trên cùng bên phải (đuôi (331, 105)) không phải nút event.
 
 Ảnh screens/ribbon/ (mỗi máy 10 khung khác nhau nhất trong 60 khung chụp liên tục 1 phút):
   01-10  máy 21913: Event Center ở cột 2 (281, 106), nút event ngay dưới: đuôi (253, 173)
@@ -69,11 +69,11 @@ class EventButtonTests(unittest.TestCase):
         self.assertLess(score, 0.86)
         self.assertNear(find_event_button(self.ctx, screen), (283, 145))
 
-    def test_no_ribbon_uses_event_center(self):
-        # Không thấy ruy băng ở cả 2 vùng: bấm Event Center (359, 309) + (10, 40) như trước.
+    def test_no_ribbon_means_event_ended(self):
+        # Không thấy ruy băng ở cả 2 vùng: None (Event Center vẫn thấy -> event đã hết).
         screen = self._screen("screens/ribbon/11.png")
         screen[100:111, 248:259] = 0
-        self.assertNear(find_event_button(self.ctx, screen), (369, 349))
+        self.assertIsNone(find_event_button(self.ctx, screen))
 
 
 if __name__ == "__main__":

@@ -32,13 +32,14 @@ màn sau đặt trước màn trước. `handle` trả None cho action không ph
 handle_common() lo (quà, Event Center, BACK, go_home...).
 """
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import cv2
 import numpy as np
 
-from ...common import click_images, delay, exit_images, find_first, go_home, images_in
+from ...common.go_home import EXIT_CANCEL, EXIT_DIALOG, EXIT_THRESHOLD
+from ...common import click_images, delay, exit_images, find_first, go_home, images_in, to_city
 from ...context.templates import TEMPLATE_DIR, read_image
 from ...ocr import read_progress
 from ...ocr.read_progress import run_two_lines as read_progress_two_lines
@@ -54,7 +55,10 @@ from .constants import (
     DAY_LOCK_THRESHOLD,
     DAY_TABS,
     DAY_TABS_REGION,
-    EVENT_BUTTON_OFFSET,
+    EVENT_ENDED_CHECKS,
+    EVENT_ENDED_LAG_WAIT,
+    EVENT_ENDED_MAX_BACKS,
+    EVENT_ENDED_SAME_DIFF,
     EVENT_CENTER,
     EVENT_CENTER_REGION,
     EVENT_CENTER_THRESHOLDS,
@@ -122,6 +126,7 @@ from .constants import (
 # Kết quả của handle_common() để vòng lặp nhiệm vụ biết vừa xảy ra gì; run_task() cũng
 # gọi handle(EVENT_OPENED, None, None) ngay sau khi mở được icon event.
 EVENT_OPENED = "event_opened"   # vừa bấm nút event
+EVENT_ENDED = "event_ended"     # màn chính có Event Center nhưng không có nút event (không ruy băng): event 7 ngày đã hết
 # Giá trị `handle` của nhiệm vụ trả cho run_task().
 HANDLED = "handled"             # action riêng đã xử lý xong -> quét lại
 STOP = "stop"                   # nhiệm vụ kết thúc -> run_task() return
@@ -132,6 +137,7 @@ class EventState:
     """Trạng thái dùng chung giữa các nhiệm vụ trong một lượt chạy Event."""
     login_done: bool = False   # mỗi lượt chỉ nhận quà 1 lần, kể cả khi bấm trượt
     claim_all_taps: int = 0    # số lần bấm Claim All liên tiếp (xem CLAIM_ALL_MAX_TAPS)
+    absent: set = field(default_factory=set)   # key event không còn trong game hôm nay (hết ruy băng / không thấy icon): perform_task lưu vào DB
 
 
 # ---- Báo kết quả nhiệm vụ cho worker ------------------------------------------------------
@@ -148,6 +154,19 @@ def mark_done(bot, key: str):
 
 def mark_complete(bot, key: str):
     report(bot, TaskResult(done=True, complete=True, key=key))
+
+
+def mark_daily_troop(bot, kind: str):
+    """Nhiệm vụ Event vừa thật sự heal / train lính (`kind`: "heal" hoặc "train"): việc Daily Activities cùng loại (Troop Heading / Troop
+    Training) hôm nay cũng coi là xong, khỏi làm lại. Lưu daily_done của việc Daily; đã lưu rồi thì thôi."""
+    # import trong hàm: các gói daily_activities nạp gói event (vòng import nếu import ở mức module).
+    if kind == "heal":
+        from ..daily_activities.troop_healing.constants import KEY, LABEL
+    else:
+        from ..daily_activities.troop_training.constants import KEY, LABEL
+    if not bot.is_daily_done(KEY):
+        bot.record(f"Event: {kind} troops done, also marks Daily Activities {LABEL} done today")
+        bot.mark_daily_done(KEY)
 
 
 def mark_target_reached(bot, key: str):
@@ -191,12 +210,19 @@ def run_task(bot, state: EventState, name: str, event_icon: str, handle=None, *,
             return
         if result is not None:
             continue
-        if handle_common(bot, state, action, pos, screen) != EVENT_OPENED:
+        opened = handle_common(bot, state, action, pos, screen)
+        if opened == EVENT_ENDED:
+            bot.record(f"{name}: no event ribbon next to Event Center, event has ended, skip to next task")
+            state.absent.update(cycle.EVENT_OF_ICON.values())   # cả 2 event 7 ngày đều nằm sau nút ruy băng này
+            return
+        if opened != EVENT_OPENED:
             continue
         # Màn danh sách event: tìm (cuộn tối đa 4 lần) rồi bấm icon event.
         result = open_event(bot, event_icon)
         if result == NOT_FOUND:
             bot.record(f"{name}: event not found in event list, skip to next task")
+            if event_icon in cycle.EVENT_OF_ICON:
+                state.absent.add(cycle.EVENT_OF_ICON[event_icon])
             return
         if result == NOT_IN_LIST:
             failures += 1
@@ -288,11 +314,19 @@ def handle_common(bot, state: EventState, action, pos, screen):
         bot.log("Event: already on event list")
         return EVENT_OPENED
     elif action == ON_MAIN_SCREEN:
+        if to_city(bot):   # màn thế giới cũng có "•••" và Event Center: về thành rồi nhận diện lại
+            return None
         button = find_event_button(bot, screen)
         if button is None:
-            bot.log("Event: event button not found, swiping")
-            swipe_around(bot)
-            return None
+            if find_event_center(bot, screen) is None:
+                bot.log("Event: event button not found, swiping")
+                swipe_around(bot)
+                return None
+            # Thấy Event Center mà không có ruy băng: lần đầu đã tính, kiểm thêm tới đủ EVENT_ENDED_CHECKS lần, mỗi lần sau một cú Back
+            # xác nhận game đang phản hồi (xem _recheck_ribbon). Chưa kiểm đủ (game lag) thì không kết luận, quét lại màn.
+            button, confirmed = _recheck_ribbon(bot)
+            if button is None:
+                return EVENT_ENDED if confirmed else None
         bot.log(f"Event: tap event button {button}")
         bot.tap(*button, delay=1)
         for attempt in range(EVENT_OPEN_WAITS + 1):
@@ -519,8 +553,7 @@ def find_event_button(bot, screen):
     Event Center, có khi lên hàng trên cùng). Tìm đuôi ruy băng trong cả 2 vùng RIBBON_SEARCH:
     vùng nào trả về toạ độ thì vùng đó đúng. Ngưỡng thứ nhất trước, không vùng nào đạt thì lần
     lượt thử các ngưỡng thấp hơn; cả 2 vùng cùng đạt thì lấy chỗ khớp cao hơn. Ngưỡng thấp nhất
-    cũng không đạt: bấm ngay dưới chữ "Event Center" như trước (không thấy cả Event Center ->
-    None)."""
+    cũng không đạt: None (không có ruy băng = không có event đang diễn ra; người gọi tự kiểm Event Center)."""
     matches = [(*bot.best_match(RIBBON_TAIL, screen=screen, region=region), thresholds)
                for region, thresholds in RIBBON_SEARCH]
     dx, dy = RIBBON_BUTTON_OFFSET
@@ -531,12 +564,34 @@ def find_event_button(bot, screen):
             score, (x, y) = max(passed)
             bot.log(f"Event: ribbon at {(x, y)} score {score:.3f} (level {level})")
             return x + dx, y + dy
-    event_center = find_event_center(bot, screen)
-    if event_center is None:
-        return None
-    bot.log("Event: no ribbon, using button below Event Center")
-    ox, oy = EVENT_BUTTON_OFFSET
-    return event_center[0] + ox, event_center[1] + oy
+    return None
+
+
+def _recheck_ribbon(bot):
+    """Kiểm lại ruy băng cho đủ EVENT_ENDED_CHECKS lần (lần đầu đã làm ở người gọi). Mỗi lần: Back, rồi xác nhận game phản hồi:
+    hiện hộp thoát game thì bấm Cancel; không có hộp mà màn đã đổi (popup đóng) cũng được; màn không đổi = game lag / đang load ->
+    chờ rồi Back lại, KHÔNG tính lần kiểm đó (tối đa EVENT_ENDED_MAX_BACKS lần Back). Trả (nút event hoặc None, đã kiểm đủ chưa)."""
+    checks = 1
+    for _ in range(EVENT_ENDED_MAX_BACKS):
+        if checks >= EVENT_ENDED_CHECKS:
+            return None, True
+        before = bot.screenshot()
+        bot.back(delay=1.5)
+        after = bot.screenshot()
+        cancel = (bot.find(EXIT_CANCEL, threshold=EXIT_THRESHOLD, screen=after)
+                  if bot.find(EXIT_DIALOG, threshold=EXIT_THRESHOLD, screen=after) is not None else None)
+        if cancel is not None:
+            bot.tap(*cancel, delay=1)
+        elif before.shape != after.shape or float(np.abs(before.astype(np.int16) - after.astype(np.int16)).mean()) < EVENT_ENDED_SAME_DIFF:
+            bot.log("Event: Back changed nothing, game may be lagging / loading, wait and Back again")
+            bot.sleep(EVENT_ENDED_LAG_WAIT)
+            continue
+        checks += 1
+        bot.log(f"Event: no ribbon, check {checks}/{EVENT_ENDED_CHECKS}")
+        button = find_event_button(bot, bot.screenshot())
+        if button is not None:
+            return button, False
+    return None, checks >= EVENT_ENDED_CHECKS
 
 
 def find_event_center(bot, screen):

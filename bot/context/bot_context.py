@@ -27,6 +27,8 @@ class BotContext(FlowMixin, InputMixin, ScreenMixin):
         # (None = không theo dõi). Khác Bubble / Auto Times Out, không bị hoãn bởi must_finish.
         self._reset_due_at: float | None = None
         self.report_boss = lambda coords: None
+        # Server của tài khoản (số trong "S. 1257", chuỗi rỗng = chưa biết): worker gán khi đọc được; boss_scan dùng làm khoá danh sách boss đã chia sẻ.
+        self.server = ""
         # Daily Activities: task đã xong từ lần reset gần nhất chưa / đánh dấu xong.
         self.is_daily_done = lambda task: False
         self.mark_daily_done = lambda task: None

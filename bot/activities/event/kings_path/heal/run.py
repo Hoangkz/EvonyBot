@@ -9,7 +9,7 @@ Sau Go: bấm giữa màn hình (Bệnh viện) -> menu:
 2. Có "Heal" (rảnh): bấm -> màn Hospital: Reset (bỏ chọn hết, nút đổi thành Select All) -> cuộn
    danh sách xuống cuối (chưa thấy ảnh cuối danh sách LIST_END thì cuộn tiếp, thấy thì thôi, tối đa LIST_SCROLLS lần) (lính cấp thấp nhất ở dưới cùng) -> chọn nhiều dòng một
    lần, từ dòng dưới cùng lên: OCR số lính bị thương mỗi dòng ("0 / 8,147", ocr/read_heal_count.py),
-   bấm ô số -> thanh nhập: gõ min(còn thiếu, số lính) -> OK; đủ số cần heal (mục tiêu - số đã heal,
+   bấm ô số -> thanh nhập: gõ min(còn thiếu, số lính), xác nhận đã gõ đúng, bấm giữa mép trên màn hình (không bấm OK); đủ số cần heal (mục tiêu - số đã heal,
    OCR ở dòng Go) hoặc hết dòng đang thấy thì thôi -> Heal (phải sáng mới bấm; chưa sáng thì làm lại từ màn Hospital, tối đa HEAL_ATTEMPTS lần) -> Speed Up -> Finish All -> trả AGAIN
    (thiếu thì lượt sau heal tiếp).
 AGAIN: không bấm giữa lại, đi lại từ màn chính -> Event Center -> King's Path -> Day 3 -> Healing
@@ -20,9 +20,10 @@ Up, không có Heal mà có Upgrade (chỉ Citizen / Detail / Upgrade — heal_m
 Hospital "Wounded Troops 0/0" không có dòng lính nào (heal_empty.png).
 """
 from .....ocr import read_heal_count
+from .....ocr.read_input_bar import run as read_input_bar
 from .....ocr.read_heal_count import CROP as HEAL_COUNT_CROP
 from ...city_building import HOSPITAL
-from ...common import EventState, mark_done
+from ...common import EventState, mark_daily_troop, mark_done
 from ...gather_troops.train_troop.constants import (
     CHECKBOX_OFF,
     CONFIRM,
@@ -48,9 +49,13 @@ from .constants import (
     HEAL_LIT_DIFF,
     HEAL_WAIT,
     HOSPITAL_TITLE,
+    INPUT_BAR_BOX,
+    INPUT_CLOSE_TAP,
     INPUT_DELETES,
+    INPUT_SETTLE,
     INPUT_OK,
     INPUT_TRIES,
+    INPUT_TYPE_TRIES,
     INPUT_WAIT,
     KEY,
     LIST_END,
@@ -108,6 +113,7 @@ def _heal(bot, path, done, target):
         bot.log(f"{NAME}: Heal button not lit, redo from the Hospital screen ({attempt}/{HEAL_ATTEMPTS})")
     if result is not True:
         return None
+    mark_daily_troop(bot, "heal")   # đã bấm Heal thật: việc Daily Troop Heading hôm nay cũng xong
     speed_up = bot.wait_for(SPEED_UP, timeout=SCREEN_WAIT)
     if speed_up is None:
         bot.record(f"{NAME}: Speed Up not shown after Heal")
@@ -198,23 +204,49 @@ def _heal_button_lit(bot, screen, pos) -> bool:
 
 
 def _enter_amount(bot, x: int, y: int, amount: int) -> bool:
-    """Dòng có nút Dismiss tại (x, y): bấm ô số -> thanh nhập: xoá số cũ, gõ `amount` -> OK."""
+    """Dòng có nút Dismiss tại (x, y): bấm ô số -> thanh nhập: xoá số cũ, gõ `amount` (MỘT lệnh adb), đọc lại số trong thanh nhập xác
+    nhận đúng `amount`, rồi bấm INPUT_CLOSE_TAP để đóng thanh nhập (không bấm OK). Thanh nhập TỰ ĐÓNG sau ~INPUT_BAR_LIFETIME giây kể
+    từ lúc mở (đo trên 21913), nên xoá + gõ phải gộp một lệnh và không chờ thừa; thanh nhập bị đóng / số sai / không đọc được thì
+    mở lại gõ lại, tối đa INPUT_TYPE_TRIES lần. False nếu không mở được thanh nhập hoặc gõ không đúng."""
     ax, ay = x + DISMISS_TO_AMOUNT[0], y + DISMISS_TO_AMOUNT[1]
-    ok = None
+    keys = " ".join(["KEYCODE_DEL"] * INPUT_DELETES)
+    typed = None
+    for attempt in range(1, INPUT_TYPE_TRIES + 1):
+        if not _open_input(bot, ax, ay):
+            bot.record(f"{NAME}: amount input not shown (tapped {ax}, {ay} x{INPUT_TRIES})")
+            return False
+        # Con trỏ về cuối số, xoá lùi thừa (xoá khi ô đã trống không sao), gõ số: một lệnh để khỏi quá INPUT_BAR_LIFETIME.
+        bot.shell(f"input keyevent KEYCODE_MOVE_END; input keyevent {keys}; input text {amount}")
+        bot.sleep(INPUT_SETTLE)
+        typed = _read_typed(bot)
+        if typed == amount:
+            break
+        bot.log(f"{NAME}: input shows {typed}, wanted {amount}, type again ({attempt}/{INPUT_TYPE_TRIES})")
+    wrong = typed != amount
+    if wrong:
+        bot.record(f"{NAME}: amount input shows {typed}, wanted {amount}")
+    for _ in range(2):   # bấm đóng; thanh nhập còn đó (bấm trượt) thì bấm thêm một lần
+        bot.tap_percent(*INPUT_CLOSE_TAP, delay=1 + EXTRA_WAIT)
+        if bot.find(INPUT_OK) is None:
+            break
+    return not wrong
+
+
+def _open_input(bot, ax: int, ay: int) -> bool:
+    """Thanh nhập đang mở thì thôi (bấm ô số lúc đó là đóng nó); chưa thì bấm ô số (tối đa INPUT_TRIES lần) rồi chờ nút OK."""
+    if bot.find(INPUT_OK) is not None:
+        return True
     for _ in range(INPUT_TRIES):
         bot.tap(ax, ay, delay=EXTRA_WAIT)
-        ok = bot.wait_for(INPUT_OK, timeout=INPUT_WAIT)
-        if ok is not None:
-            break
-    if ok is None:
-        bot.record(f"{NAME}: amount input not shown (tapped {ax}, {ay} x{INPUT_TRIES})")
-        return False
-    for _ in range(INPUT_DELETES):
-        bot.shell("input keyevent KEYCODE_DEL")
-    bot.shell(f"input text {amount}")
-    bot.sleep(EXTRA_WAIT)
-    bot.tap(*ok, delay=1 + EXTRA_WAIT)
-    return True
+        if bot.wait_for(INPUT_OK, timeout=INPUT_WAIT) is not None:
+            return True
+    return False
+
+
+def _read_typed(bot) -> int | None:
+    """Số đang gõ trong ô trắng của thanh nhập (bot/ocr/read_input_bar.py), None nếu trống / không đọc được."""
+    x, y, w, h = INPUT_BAR_BOX
+    return read_input_bar(bot.crop(bot.screenshot(), x, y, w, h))
 
 
 def _finish_all(bot) -> bool:

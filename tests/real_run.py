@@ -11,18 +11,22 @@ Ctrl+C để dừng.
 """
 import argparse
 import os
+import sys
 import tempfile
 import threading
 import time
 from datetime import datetime
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))    # chạy được cả `py real_run.py` từ thư mục tests
+sys.stdout.reconfigure(encoding="utf-8")                            # log tiếng Việt không lỗi trên console Windows
+
 import adbutils
 import cv2
 
 from bot.context import BotContext, StopRequested
 
-SERIAL = os.environ.get("EVONY_SERIAL", "127.0.0.1:21923")   # máy khác: đặt EVONY_SERIAL=127.0.0.1:21913
+SERIAL = os.environ.get("EVONY_SERIAL", "127.0.0.1:21913")   # máy khác: đặt EVONY_SERIAL=127.0.0.1:21913
 
 # Việc coi như đã xong hôm nay khi bắt đầu, VD {"crazy_eggs_lucky_hammer"} để không dùng búa vàng.
 DAILY_DONE: set[str] = set()
@@ -32,40 +36,36 @@ def target(bot):
     """Hàm cần test — sửa ở đây."""
     # EVONY_TEST=redeem: chỉ đổi quà event 3 ngày (đang ở sẵn màn event); three_day: cả event 3 ngày;
     # mặc định chạy nhiệm vụ Daily Trade Carriage.
-    if os.environ.get("EVONY_TEST") == "redeem":
-        return test_three_day_redeem(bot)
-    if os.environ.get("EVONY_TEST") == "three_day":
-        return test_three_day(bot)
-    if os.environ.get("EVONY_TEST") == "city_vip":
-        # Route tạm dựng từ FIXED của civ1 (không lưu DB) để thử flow nhận VIP khi máy chưa quét route.
-        from bot.activities.daily_activities import city_vip
-        from bot.city.civ1 import city_tour
-        bot.civilization = 1
-        bot.city_map = {"keep": [0, 0], **city_tour.FIXED}
-        return city_vip.claim_vip(bot)
-    if os.environ.get("EVONY_TEST") == "alliance_vip":
-        from bot.activities.daily_activities import alliance_vip
-        return alliance_vip.buy_vip(bot, True, True)
-    if os.environ.get("EVONY_TEST") == "rewards":
-        from bot.activities.daily_activities import common
-        return common.collect_activity_rewards(bot)
-    if os.environ.get("EVONY_TEST") == "open_task":
-        return test_open_task(bot)
-    if os.environ.get("EVONY_TEST") == "greet":
-        return test_greet_champion(bot)
-    if os.environ.get("EVONY_TEST") == "recruit":
-        return test_recruit_general(bot)
-    if os.environ.get("EVONY_TEST") == "recruit_tap":
-        return test_recruit_tap(bot)
-    if os.environ.get("EVONY_TEST") == "recruit_buy":
-        return test_recruit_buy(bot)
-    if os.environ.get("EVONY_TEST") == "arc":
-        # Đang ở bản đồ thế giới: quét hình quạt EVONY_DEG="bắt đầu,kết thúc" (mặc định -15,15); EVONY_R = bán kính km (mặc định 300).
-        from bot.common.arc_sweep import arc_sweep
-        radius = float(os.environ.get("EVONY_R", 300))
-        start, end = (float(d) for d in os.environ.get("EVONY_DEG", "-15,15").split(","))
-        return arc_sweep(bot, start, end, radius, on_step=lambda u, v: bot.log(f"arc: tới ({u:.0f}, {v:.0f})") or False)
-    return test_trade_carriage(bot)
+    # if os.environ.get("EVONY_TEST") == "redeem":
+    #     return test_three_day_redeem(bot)
+    # if os.environ.get("EVONY_TEST") == "three_day":
+    #     return test_three_day(bot)
+    # if os.environ.get("EVONY_TEST") == "city_vip":
+    #     # Route tạm dựng từ FIXED của civ1 (không lưu DB) để thử flow nhận VIP khi máy chưa quét route.
+    #     from bot.activities.daily_activities import city_vip
+    #     from bot.city.civ1 import city_tour
+    #     bot.civilization = 1
+    #     bot.city_map = {"keep": [0, 0], **city_tour.FIXED}
+    #     return city_vip.claim_vip(bot)
+    # if os.environ.get("EVONY_TEST") == "alliance_vip":
+    #     from bot.activities.daily_activities import alliance_vip
+    #     return alliance_vip.buy_vip(bot, True, True)
+    # if os.environ.get("EVONY_TEST") == "rewards":
+    #     from bot.activities.daily_activities import common
+    #     return common.collect_activity_rewards(bot)
+    # if os.environ.get("EVONY_TEST") == "open_task":
+    #     return test_open_task(bot)
+    # if os.environ.get("EVONY_TEST") == "greet":
+    #     return test_greet_champion(bot)
+    # if os.environ.get("EVONY_TEST") == "recruit":
+    #     return test_recruit_general(bot)
+    # if os.environ.get("EVONY_TEST") == "recruit_tap":
+    #     return test_recruit_tap(bot)
+    # if os.environ.get("EVONY_TEST") == "recruit_buy":
+    #     return test_recruit_buy(bot)
+    # if os.environ.get("EVONY_TEST") == "arc":
+    return test_arc_sweep(bot)
+    # return test_trade_carriage(bot)
 
 
 def test_trade_carriage(bot):
@@ -114,6 +114,16 @@ def test_recruit_general(bot):
     bot.city_map = _db_city_map()   # route đã lưu trong DB (chưa có thì activity quét)
     bot.set_city_map = lambda city_map: setattr(bot, "city_map", city_map)
     return recruit_general.run(bot, {"buy_with": os.environ.get("EVONY_BUY", "Recruit General")})
+
+
+def test_arc_sweep(bot):
+    """Đang ở bản đồ thế giới: quét cung quanh chỗ camera đang đứng (bot/common/arc_scan.py).
+    EVONY_DEG="bắt đầu,kết thúc" (độ 0 .. 360, ngược chiều kim đồng hồ từ bắt đầu tới kết thúc; mặc định 345,15; 0,360 = cả vòng tròn), EVONY_R = bán kính km (mặc định 40).
+    góc theo màn hình: 0° = ngang sang phải, 90° = thẳng lên. Chạy tay: tests/run_arc.py (không cần env)."""
+    from bot.common.arc_sweep import arc_sweep
+    start, end = (float(d) for d in os.environ.get("EVONY_DEG", "345,15").split(","))
+    radius = float(os.environ.get("EVONY_R", 40))
+    return arc_sweep(bot, start, end, radius)
 
 
 def test_recruit_buy(bot):

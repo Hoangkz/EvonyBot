@@ -9,6 +9,7 @@ class and the image folders every activity scans). One function per module:
 - delay:         Utils.delay
 - current_focus: the focused Android window
 - go_home:       Utils.Home — recover when nothing known is on screen
+- to_city:       world map -> tap the city button to return to the main city
 - get_server:    read the account's server number
 - bubble:        giữ bubble: đọc thời gian còn lại, sắp hết thì dùng bubble mới
 - wait_gone:     wait until a recognised screen goes away
@@ -20,9 +21,9 @@ from .delay import delay
 from .exit_images import exit_images
 from .find_first import find_first
 from .get_server import get_server
-from .go_home import GAME_PACKAGE, go_home
+from .go_home import GAME_PACKAGE, go_home, to_city
 from .images_in import images_in
 from .wait_gone import wait_gone
 
 __all__ = ["BUBBLE_DURATIONS", "GAME_PACKAGE", "NotEnoughGems", "keep_bubble", "click_images", "current_focus", "delay", "exit_images",
-           "find_first", "get_server", "go_home", "images_in", "wait_gone"]
+           "find_first", "get_server", "go_home", "to_city", "images_in", "wait_gone"]

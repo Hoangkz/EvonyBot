@@ -160,6 +160,7 @@ class BotWorker(QThread):
             self.ctx.forget_daily = self._forget_daily
             self.ctx.daily_keys = lambda: list(self.daily_done)
             self.ctx.server_time = lambda: self.server_time
+            self.ctx.server = self.server
             self.ctx.record = self.record
             # Nền văn minh đã lưu DB (None = chưa biết); bot tự xếp thì lưu lại qua signal.
             self.ctx.civilization = self.settings.get("Initialization", {}).get("civilization") or None
@@ -399,6 +400,7 @@ class BotWorker(QThread):
         server = self.guards.call("Get Server", get_server, self.ctx)
         if server:
             self.server = server
+            self.ctx.server = server
             self.record(f"Đọc được server: {server}")
             self._register_boss_listener()
             # Gửi server cho UI xử lý/lưu; worker chỉ cập nhật self.server.

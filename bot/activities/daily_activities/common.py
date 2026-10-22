@@ -9,7 +9,7 @@ from dataclasses import dataclass
 
 import cv2
 
-from ...common import click_images, delay, exit_images, find_first, go_home
+from ...common import click_images, delay, exit_images, find_first, go_home, to_city
 from ...context.templates import TEMPLATE_DIR, read_image
 from ..result import NOT_DONE, TaskResult, clear, done, save_errors, take
 from .constants import (
@@ -569,6 +569,7 @@ def daily_job(task: Task, after_go, target: str | None = None) -> dict:
     @save_errors(task.key)   # lỗi thì lưu `<key>_error` vào DB
     def run(ctx, settings):
         ctx.log(f"Daily Activities: {task.label}")
+        to_city(ctx)   # đang ở bản đồ thế giới thì về thành chính trước
         clear(ctx)
         if open_task_or_finish(ctx, task):
             after_go(ctx)
@@ -591,6 +592,7 @@ def hourly_job(task: Task, attempt, consts) -> dict:
     @save_errors(task.key)   # lỗi thì lưu `<key>_error` vào DB
     def run(ctx, settings):
         ctx.log(f"Daily Activities: {task.label} (every {hourly_hours(settings, consts)}h)")
+        to_city(ctx)   # đang ở bản đồ thế giới thì về thành chính trước
         record_result(ctx, task.key, attempt(ctx))   # xong thì lưu "xong hôm nay" vào DB
         # Lưu giờ vừa làm vào DB (`<key>_tried`): worker chỉ so giờ này để biết tới giờ làm lại chưa. Bị ngắt / lỗi giữa
         # chừng thì tới đây không chạy tới, chưa lưu giờ: lượt sau làm tiếp.

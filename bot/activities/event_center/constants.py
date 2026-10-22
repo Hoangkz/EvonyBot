@@ -34,8 +34,8 @@ OPEN_SETTLE = 3
 
 # Danh sách event trong tab: không thấy icon thì cuộn xuống, quá LIST_MAX_SCROLLS lần vẫn
 # không thấy thì BACK.
-LIST_SWIPE = (50, 74, 50, 56)   # % màn hình, ngón tay kéo lên = cuộn danh sách xuống (vuốt dài/nhanh thì lố)
-LIST_SWIPE_DURATION = 1.0
+LIST_SWIPE = (50, 78, 50, 54)   # % màn hình, ngón tay kéo lên = cuộn danh sách xuống (vuốt dài/nhanh thì lố)
+LIST_SWIPE_DURATION = 0.8
 LIST_MAX_SCROLLS = 8
 # Không thấy tab cần mở / icon event (cuộn hết vẫn không có, VD danh sách bị cuộn sẵn quá icon):
 # run_task_with_retry thử tới ATTEMPTS lần (mỗi lần BACK rồi vào lại Event Center), vẫn không được
