@@ -220,6 +220,81 @@ class WorkerLoopTests(unittest.TestCase):
         self.run_until_stop(worker)
         self.assertEqual(calls, [("a", None, False), ("b", None, False)])
 
+    def test_idle_only_task_runs_only_when_nothing_else_is_pending(self):
+        """Việc idle_only chỉ chạy khi hết mọi nhiệm vụ khác, và tới giờ (due)."""
+        calls = []
+        worker = self.make_worker(["G"], [("a", 9, lambda c, s: calls.append("a"))])
+        idle = Task("idle", "G", 700, idle_only=True, run=lambda c, s: (calls.append("idle"), worker._stop.set()),
+                    due=lambda c, s: True)
+        bot_worker.build_tasks.return_value.append(idle)     # ưu tiên cao hơn "a" nhưng vẫn phải đợi "a"
+        self.run_until_stop(worker)
+        self.assertEqual(calls, ["a", "idle"])
+
+    def test_idle_only_without_due_repeats_while_idle(self):
+        """Việc idle_only không có due (Find Boss): hết nhiệm vụ khác thì làm liên tục, mỗi lượt xét lại nhiệm vụ khác."""
+        calls = []
+
+        def run(c, s):
+            calls.append("idle")
+            if len(calls) == 3:
+                worker._stop.set()
+
+        worker = self.make_worker(["G"], [])
+        bot_worker.build_tasks.return_value.append(Task("idle", "G", 1, idle_only=True, run=run))
+        self.run_until_stop(worker)
+        self.assertEqual(calls, ["idle"] * 3)
+
+    def test_idle_only_yields_when_a_timed_task_becomes_due(self):
+        """Đang quét (idle_only) mà việc theo giờ tới giờ: ngắt quét, làm việc theo giờ, rồi quay lại quét."""
+        calls, due = [], [False]
+
+        def idle(c, s):
+            calls.append("idle")
+            if len(calls) == 1:
+                due[0] = True
+                with mock.patch.object(bot_worker, "IDLE_RECHECK", 0):
+                    worker.ctx.check()           # tới lượt nhiệm vụ khác -> YieldToTask
+                calls.append("not-interrupted")
+
+        def hourly(c, s):
+            calls.append("hourly")
+            due[0] = False
+            worker._stop.set()
+
+        worker = self.make_worker(["G"], [])
+        tasks = bot_worker.build_tasks.return_value
+        tasks.append(Task("idle", "G", 1, idle_only=True, run=idle))
+        tasks.append(Task("hourly", "G", 9, run=hourly, due=lambda c, s: due[0]))
+        self.run_until_stop(worker)
+        self.assertEqual(calls, ["idle", "hourly"])
+
+    def test_idle_only_task_not_due_does_not_run(self):
+        calls, sleeps = [], []
+        worker = self.make_worker(["G"], [])
+        bot_worker.build_tasks.return_value.append(Task("idle", "G", 1, idle_only=True, run=lambda c, s: calls.append("idle"), due=lambda c, s: False))
+
+        def sleep(seconds):
+            sleeps.append(seconds)
+            worker._stop.set()
+            worker.ctx.check()
+
+        worker.ctx.sleep = sleep
+        self.run_until_stop(worker)
+        self.assertEqual(calls, [])
+
+    def test_idle_only_has_no_120s_limit_with_boss(self):
+        seen = []
+
+        def run(ctx, settings):
+            seen.append((ctx._deadline, ctx._boss_interrupt_enabled))
+            self.assertIsNotNone(ctx.swipe_watch)
+            worker._stop.set()
+
+        worker = self.make_worker([JOIN_BOSS], [])
+        bot_worker.build_tasks.return_value.append(Task("idle", "G", 1, idle_only=True, run=run, due=lambda c, s: True))
+        self.run_until_stop(worker, lambda activity, settings: BOSS_IDLE)
+        self.assertEqual(seen, [(None, False)])      # boss mới không ngắt cả việc: kiểm tra mỗi 3 cú kéo (swipe_watch)
+
     def test_task_limited_to_120s_with_boss(self):
         """Có Join Boss: mỗi nhiệm vụ tối đa 120 giây; hết giờ thì sau Join Boss làm tiếp chính nhiệm vụ đó."""
         calls = []

@@ -9,6 +9,7 @@ the selected device's tabbed control panel.
 import ctypes
 import os
 import platform
+import random
 import sys
 import threading
 from datetime import datetime, timedelta
@@ -24,6 +25,8 @@ from PyQt5.QtWidgets import (
     QApplication, QDialog, QHBoxLayout, QLabel, QMainWindow, QMessageBox, QStackedWidget, QVBoxLayout, QWidget,
 )
 
+from bot.activities.find_boss.angles import split_angles
+from bot.activities.find_boss.constants import END_KEY, START_KEY
 from bot.common import GAME_PACKAGE
 
 from bot.worker import BotManager
@@ -39,7 +42,14 @@ from ui.tabs.logs_tab import SHOW_SECONDS
 
 
 CONTACT_HINT = f"Contact: {licensing.ADMIN_CONTACT}" if licensing.ADMIN_CONTACT else ""
-LICENSE_CHECK_MS = 60 * 60 * 1000   # re-check the activation code with the server every hour
+# Re-check the activation code with the server at a random gap in this range (not a fixed period, so nobody can
+# time their cheating around the check).
+LICENSE_CHECK_MIN_MS = 10 * 60 * 1000
+LICENSE_CHECK_MAX_MS = 60 * 60 * 1000
+
+
+def next_license_check_ms() -> int:
+    return random.randint(LICENSE_CHECK_MIN_MS, LICENSE_CHECK_MAX_MS)
 
 
 def ensure_license() -> tuple[bool, str | None]:
@@ -120,11 +130,12 @@ class MainWindow(QMainWindow):
         self._license_worker: LicenseWorker | None = None
         self._license_notice: str | None = None
         self._license_timer = QTimer(self)
-        self._license_timer.setInterval(LICENSE_CHECK_MS)
+        self._license_timer.setSingleShot(True)
         self._license_timer.timeout.connect(self._check_license)
-        self._license_timer.start()
+        self._license_timer.start(next_license_check_ms())
 
         self.bots = BotManager(self)
+        self.bots.max_running = licensing.max_devices()
         self.bots.activity_changed.connect(
             lambda serial, activity: self.home_view.update_device(serial, activity=activity)
         )
@@ -164,11 +175,14 @@ class MainWindow(QMainWindow):
         self.home_view.exit_all_requested.connect(self._on_exit_all_requested)
 
     def _check_license(self):
+        self._license_timer.start(next_license_check_ms())   # next check at a new random gap
         if self._license_worker is not None and self._license_worker.isRunning():
             return
-        self._license_worker = LicenseWorker("verify", parent=self)
-        self._license_worker.done.connect(lambda: self.notify_license(None))
-        self._license_worker.refused.connect(self.notify_license)
+        self._license_worker = LicenseWorker("verify", parent=self, running=self.bots.running_serials(),
+                                             peak=self.bots.peak_devices())
+        # The server received the report (accepted or refused): start counting the next peak. Offline keeps it.
+        self._license_worker.done.connect(lambda: (self.bots.reset_peak(), self.notify_license(None)))
+        self._license_worker.refused.connect(lambda msg: (self.bots.reset_peak(), self.notify_license(msg)))
         # Offline is fine while the last signed answer is inside the grace period.
         self._license_worker.offline.connect(lambda _m: self.notify_license(licensing.check_local()))
         self._license_worker.start()
@@ -177,6 +191,7 @@ class MainWindow(QMainWindow):
         """License problem (revoked, expired...): stop the bots, lock the whole UI behind a red banner and show a popup
         (once per notice). The window stays open and the license file untouched; a valid answer unlocks it again."""
         locked = bool(notice)
+        self.bots.max_running = licensing.max_devices()   # giấy phép vừa làm mới có thể đổi giới hạn
         self.content.setEnabled(not locked)
         self.license_banner.setVisible(locked)
         if not locked:
@@ -233,6 +248,7 @@ class MainWindow(QMainWindow):
         view.stop_all_requested.connect(self._on_stop_all_requested)
         view.apply_all_requested.connect(self._on_apply_all_requested)
         view.server_changed.connect(self._on_server_changed)
+        view.auto_angles_requested.connect(self._on_auto_angles)
         view.civilization_changed.connect(self._on_civilization_changed)
         view.reset_progress_requested.connect(self._on_reset_progress)
         view.reset_info_requested.connect(self._on_reset_info)
@@ -292,6 +308,17 @@ class MainWindow(QMainWindow):
         self.db.save_many_settings(
             {device_id: view.get_settings() for device_id, view in self.device_views.items()}
         )
+
+    def _on_auto_angles(self, device_id: str):
+        """Nút Auto của tab Find Boss: chia đều 0..360° cho mọi thiết bị cùng server với `device_id` (xếp theo device id), mỗi máy một cung liền nhau,
+        bội của ANGLE_STEP. Chưa biết server thì chỉ máy này (cả vòng)."""
+        server = self.device_views[device_id].initialization_tab.get_settings()["server"].strip()
+        ids = sorted(d for d, v in self.device_views.items() if server and v.initialization_tab.get_settings()["server"].strip() == server)
+        if device_id not in ids:
+            ids = [device_id]
+        for d, (start, end) in zip(ids, split_angles(len(ids))):
+            self.device_views[d].find_boss_tab.set_settings({START_KEY: start, END_KEY: end})
+            self.db.save_settings(d, {"Find Boss": self.device_views[d].find_boss_tab.get_settings()})
 
     def _refresh_profiles(self, device_id: str, view: DeviceView):
         """Hàng nút hồ sơ của thiết bị: các hồ sơ đã tạo (không gồm default) + hồ sơ đang dùng."""
@@ -358,6 +385,9 @@ class MainWindow(QMainWindow):
         thiết bị đang chạy được giữ nguyên."""
         for device_id in self.device_views:
             if not self.bots.is_running(device_id):
+                if self.bots.at_limit():
+                    self.bots.start(device_id, [], {})   # chỉ để ghi log báo đã đạt giới hạn
+                    break
                 self._start_bot(device_id)
 
     def _on_stop_all_requested(self):

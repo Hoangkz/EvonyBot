@@ -7,17 +7,20 @@ original Form3 (Initialization, Join Monster War, Alliance Capacity,
 Daily Activities, Open Gift Box, Black Market, Event),
 plus a Logs tab showing this device's bot log (not a settings tab).
 """
-from PyQt5.QtCore import QTimer, pyqtSignal
+from PyQt5.QtCore import Qt, QTimer, pyqtSignal
 from PyQt5.QtWidgets import (
-    QAbstractButton, QAbstractSpinBox, QCheckBox, QComboBox, QLineEdit, QRadioButton, QTabWidget, QVBoxLayout,
-    QWidget,
+    QAbstractButton, QAbstractSpinBox, QButtonGroup, QCheckBox, QComboBox, QLineEdit, QPushButton, QRadioButton, QTabWidget,
+    QVBoxLayout, QWidget,
 )
+
+from .flow_layout import FlowLayout
 
 from .tabs import (
     AllianceCapacityTab,
     BlackMarketTab,
     DailyActivitiesTab,
     EventTab,
+    FindBossTab,
     InitializationTab,
     JoinMonsterWarTab,
     LogsTab,
@@ -39,7 +42,8 @@ class DeviceView(QWidget):
     civilization_changed = pyqtSignal(str, int)   # (device_id, nền văn minh 1..7, 0 = tự nhận)
     # (device_id, {tab title: settings}) — một tab có `settings_changed` vừa được người dùng sửa.
     tab_settings_changed = pyqtSignal(str, dict)
-    profile_selected = pyqtSignal(str, str)   # (device_id, tên hồ sơ) bấm nút hồ sơ
+    auto_angles_requested = pyqtSignal(str)   # device_id: nút Auto của tab Find Boss
+    profile_selected = pyqtSignal(str, str)  # (device_id, tên hồ sơ) bấm nút hồ sơ
     profile_added = pyqtSignal(str, str)      # (device_id, tên hồ sơ mới) nút "+"
     profile_deleted = pyqtSignal(str, str)    # (device_id, tên hồ sơ)
 
@@ -51,7 +55,17 @@ class DeviceView(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(16, 16, 16, 16)
 
+        # Hàng tab nằm ngay phía trên nội dung như thanh tab thường nhưng tự xuống hàng (tối đa vài hàng) khi không đủ chỗ, nên luôn thấy hết
+        # mà không phải cuộn. QTabWidget vẫn là nơi chứa các trang (view.tabs: settings, main.py), chỉ ẩn thanh tab của nó; hai bên đồng bộ chỉ mục.
+        self.tab_strip = QWidget()
+        self.tab_strip.setObjectName("TabStrip")
+        self.tab_flow = FlowLayout(self.tab_strip, spacing=2)
+        self.tab_buttons = QButtonGroup(self)
+        self.tab_buttons.setExclusive(True)
+        layout.addWidget(self.tab_strip)
         self.tabs = QTabWidget()
+        self.tabs.tabBar().hide()
+        self.tabs.currentChanged.connect(self._sync_tab_buttons)
         layout.addWidget(self.tabs)
 
         self.initialization_tab = InitializationTab(device_id=device_id)
@@ -72,9 +86,12 @@ class DeviceView(QWidget):
         # Recruit General: đứng ngay trên tab Logs.
         self.recruit_general_tab = RecruitGeneralTab()
         self._add_tab(self.recruit_general_tab, "Recruit General")
+        self.find_boss_tab = FindBossTab()
+        self._add_tab(self.find_boss_tab, "Find Boss")
+        self.find_boss_tab.auto_clicked.connect(lambda: self.auto_angles_requested.emit(self.device_id))
         # Logs không có cấu hình: thêm thẳng, không nối Apply ALL / settings.
         self.logs_tab = LogsTab()
-        self.tabs.addTab(self.logs_tab, "Logs")
+        self._add_tab_button("Logs", self.tabs.addTab(self.logs_tab, "Logs"))
 
         self.initialization_tab.start_clicked.connect(
             lambda: self.start_requested.emit(self.device_id)
@@ -101,8 +118,24 @@ class DeviceView(QWidget):
             lambda civilization: self.civilization_changed.emit(self.device_id, civilization)
         )
 
+    def _add_tab_button(self, title: str, index: int):
+        """Nút trên hàng tab cho tab `index`: bấm thì mở tab đó."""
+        button = QPushButton(title)
+        button.setObjectName("TabButton")
+        button.setCheckable(True)
+        button.setCursor(Qt.PointingHandCursor)
+        self.tab_buttons.addButton(button, index)
+        self.tab_flow.addWidget(button)
+        button.clicked.connect(lambda _checked=False, i=index: self.tabs.setCurrentIndex(i))
+        self._sync_tab_buttons(self.tabs.currentIndex())
+
+    def _sync_tab_buttons(self, index: int):
+        button = self.tab_buttons.button(index)
+        if button is not None:
+            button.setChecked(True)
+
     def _add_tab(self, widget: QWidget, title: str):
-        self.tabs.addTab(widget, title)
+        self._add_tab_button(title, self.tabs.addTab(widget, title))
         widget.setProperty("tab_title", title)
         widget.apply_all_clicked.connect(self._on_apply_all)
         if hasattr(widget, "settings_changed"):

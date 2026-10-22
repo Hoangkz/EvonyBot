@@ -28,9 +28,10 @@ General chạy trước các nhiệm vụ Daily. Kết quả lưu độc lập b
 
 ### Nhiệm vụ Daily (theo thứ tự trong `priority.py`)
 
-Offering, Resource Tax, Gold Levy, Troop Training, Troop Healing, Trap Building, Black Market, General Enhancing, Wheel of
-Fortune, Patrol, Material Composing, Research technologies, Greet Champion, Trade Carriage. Alliance Donation / Alliance
-Help là việc theo giờ (ô chọn giờ, không phải ô tích), chạy sau nhận thưởng.
+Xếp từ trên xuống dưới đúng thứ tự danh sách Activity của game (đọc trên máy 21913): Research, Offering, Resource Tax,
+Gold Levy, Troop Training, Troop Healing, Trap Building, Alliance Help, Alliance Donation (hai việc này theo giờ, ô chọn giờ
+không phải ô tích), Alliance VIP, Black Market, General Enhancing (Cultivate Generals), Wheel of Fortune, Patrol, Material
+Composing, Greet Champion, Ranger Knight, Trade Carriage, rồi nhận thưởng.
 
 ## 3. Một nhiệm vụ chạy thế nào (`daily_job`)
 

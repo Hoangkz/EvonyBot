@@ -3,7 +3,7 @@ flow.py — flow control: stop / time-out checks, interruptible sleep, log.
 """
 import time
 
-from .errors import BossAvailable, BubbleDue, RestartDue, ResetDue, StopRequested, TimedOut
+from .errors import BossAvailable, BubbleDue, RestartDue, ResetDue, StopRequested, TimedOut, YieldToTask
 
 
 class FlowMixin:
@@ -21,6 +21,8 @@ class FlowMixin:
             raise ResetDue()
         if self._boss_interrupt_enabled and self._boss_event.is_set():
             raise BossAvailable()
+        if self._idle_abort is not None and self._idle_abort():
+            raise YieldToTask()
         if self._deadline is not None and time.monotonic() >= self._deadline:
             raise TimedOut()
 

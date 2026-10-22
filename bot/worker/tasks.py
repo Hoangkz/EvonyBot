@@ -3,7 +3,7 @@ tasks.py — danh sách nhiệm vụ của worker, dựng từ bảng priority.p
 
 Mỗi dòng của bảng có `run` (một hàm trơn `run(ctx, cấu hình tab)`, hoặc một dict `{"run", "enabled", "done", "every"}` do code của
 nhiệm vụ dựng sẵn, VD daily_job(...), event_job(...)), `priority`, và tuỳ chọn `must_finish`, `once`,
-`group` (nhóm chọn nhiệm vụ, nếu khác nhóm chứa dòng), `saves` (hàm `run` tự lưu key của dòng vào DB khi làm xong:
+`group` (nhóm chọn nhiệm vụ, nếu khác nhóm chứa dòng), `idle_only` (chỉ chạy khi không còn nhiệm vụ nào khác), `saves` (hàm `run` tự lưu key của dòng vào DB khi làm xong:
 xong hôm nay = key đó có trong DB). Luật của từng nhiệm vụ (được tích chưa, hôm nay xong chưa — đọc từ DB —
 bao lâu làm một lần) nằm trong dict đó, cạnh code của nhiệm vụ; ở đây chỉ ghép lại thành `Task` cho vòng lặp ở bot_worker.py.
 """
@@ -29,6 +29,7 @@ class Task:
     must_finish: bool = False   # bắt đầu rồi thì chạy tới xong, không bị ngắt (trừ Stop)
     tail: bool = False          # nhiệm vụ nhận thưởng cuối chuỗi: nhiệm vụ cùng nhóm bị chuyển xuống cuối thì dừng trước nó
     once: bool = False          # xong rồi thì không đưa lại vào danh sách khi sang ngày mới (chỉ chạy lại khi Start lại)
+    idle_only: bool = False     # chỉ chạy khi RẢNH: không còn nhiệm vụ nào khác tới lượt (kể cả việc theo giờ chưa tới giờ); không bị giới hạn 120 giây
     needs_city_map: bool = False  # cần route công trình: chưa có bản đồ thành trong DB thì worker quét trước khi chạy
     run: Callable | None = None  # run(ctx, cấu hình tab của group): làm nhiệm vụ rồi lưu kết quả vào DB
     enabled: Callable[[dict], bool] = always       # enabled(cấu hình tab của group) -> nhiệm vụ này đã được tích?
@@ -60,7 +61,7 @@ def build_task(row: dict, group: str) -> Task:
             return hours > 0 and (since is None or since >= hours)
 
     return Task(key, row.get("group", group), int(row.get("priority", DEFAULT_PRIORITY)),
-                must_finish=bool(row.get("must_finish")), once=bool(row.get("once")), tail=bool(row.get("tail")), needs_city_map=bool(row.get("needs_city_map")),
+                must_finish=bool(row.get("must_finish")), once=bool(row.get("once")), tail=bool(row.get("tail")), idle_only=bool(row.get("idle_only")), needs_city_map=bool(row.get("needs_city_map")),
                 run=job["run"], enabled=job.get("enabled", always), due=due,
                 done=job.get("done") or ((lambda ctx, settings: ctx.is_daily_done(key)) if row.get("saves") else None))
 

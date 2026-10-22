@@ -17,6 +17,9 @@ Thứ tự ưu tiên: Bubble > Auto Times Out > Join Boss > nhiệm vụ.
   Join Boss dừng hẳn (không phải rảnh) -> vẫn chạy tiếp các nhiệm vụ.
 - Nhiệm vụ must_finish (priority.py): đã bắt đầu thì chạy tới xong; Bubble / Auto Times Out / boss mới /
   120 giây không ngắt (chỉ Stop). Xong rồi mới tới Bubble, Auto Times Out và Join Boss.
+- Nhiệm vụ idle_only (priority.py, VD Find Boss): chỉ chạy khi RẢNH, tức không còn nhiệm vụ nào khác tới lượt (kể cả việc theo giờ chưa
+  tới giờ); việc theo giờ (due) thì tới giờ mới làm, không có due thì làm liên tục; không bị giới hạn 120 giây và boss mới không ngắt nó: sau mỗi cú kéo kiểm tra số boss (arc_sweep.WATCH_EVERY), tăng thì vào Join Boss tới khi rảnh rồi kéo tiếp; bị ngắt bởi Bubble / Auto Times Out / reset server và khi có nhiệm vụ khác tới lượt (việc theo giờ tới giờ, City VIP
+  lúc 0h...: YieldToTask, xét mỗi 5 giây), xong việc đó rảnh lại thì quét lại.
 - Không chọn Join Boss: không có giới hạn 120 giây, các nhiệm vụ chạy lần lượt tới khi xong.
 - Activity chạy một mình (activities.EXCLUSIVE_ACTIVITIES, VD Recruit General): chỉ chạy hàm của nó, KHÔNG liên quan Bubble
   (kể cả đã tích), Auto Times Out, reset server, Join Boss hay nhiệm vụ nào khác (_run_exclusive).
@@ -48,7 +51,7 @@ from ..ocr.read_boss_count import crop as boss_count_crop, run as read_boss_coun
 from ..common import get_server
 from ..daily_reset import done_today, last_reset
 from ..context import BotContext, BotInterrupted, TimedOut
-from ..context.errors import BossAvailable, StopRequested, YieldToBoss
+from ..context.errors import BossAvailable, StopRequested, YieldToBoss, YieldToTask
 from .guards import Guards
 from .server_clock import ServerClock
 from .tasks import build_tasks, sink
@@ -59,6 +62,7 @@ OTHERS_WINDOW = 120   # giây tối đa cho 1 nhiệm vụ khi có Join Boss (kh
 # Icon listboss: ảnh mẫu cắt phần giữa avatar, bỏ viền vàng (viền vàng sáng lên khi có boss mới nên ảnh mẫu có viền sẽ khớp kém).
 BOSS_ICON_REGION = (80, 20, 100, 90)   # % màn hình: cột icon bên phải
 MAX_ATTEMPTS = 6       # số lần tối đa mỗi ngày một nhiệm vụ chạy hết một lượt mà vẫn chưa xong (quá thì bỏ qua tới ngày mới)
+IDLE_RECHECK = 5       # giây: việc idle_only đang chạy xét lại xem có nhiệm vụ khác tới lượt chưa
 IDLE_WAIT = 5         # giây nghỉ khi không còn nhiệm vụ nào tới lượt
 
 
@@ -225,6 +229,8 @@ class BotWorker(QThread):
         if boss and not tasks:
             self._run_once([JOIN_BOSS])   # chỉ Join Boss: chạy liên tục như trước
             return
+        idle = [task for task in tasks if task.idle_only]          # chỉ làm khi rảnh (hết mọi nhiệm vụ khác), vd Find Boss
+        tasks = [task for task in tasks if not task.idle_only]
         timed = [task for task in tasks if task.due is not None]   # việc theo giờ: giờ lần làm trước lưu trong DB
         order = [task for task in tasks if task.due is None]       # thứ tự làm: chưa xong thì chuyển xuống cuối
         reset = last_reset(self.server_time)
@@ -274,6 +280,19 @@ class BotWorker(QThread):
                         self.guards.call(None, scan_city, self.ctx, "City scan",
                                          self._watch_boss_count if boss and not stamina_wait_on else None)
                         continue
+                    # Rảnh hẳn: làm việc `idle_only` đã tới giờ (không bao giờ chen vào lúc còn nhiệm vụ khác).
+                    idle_task = next((t for t in idle if t.key not in ran_once and not skip(t) and (t.due is None or self._is_due(t))), None)
+                    if idle_task is not None:
+                        last_look = [0.0]
+
+                        def others_waiting():   # nhiệm vụ khác (việc theo giờ tới giờ, City VIP 0h, ...) tới lượt: nhường; xét tối đa 5 giây một lần
+                            if time.monotonic() - last_look[0] < IDLE_RECHECK:
+                                return False
+                            last_look[0] = time.monotonic()
+                            return any(not skip(t) for t in order) or any(not skip(t) and self._is_due(t) for t in timed)
+
+                        self._run_task(idle_task, boss and not stamina_wait_on, others_waiting)
+                        continue
                     self.guards.call(None, self.ctx.sleep, IDLE_WAIT)
                     continue
                 task = pending[0]
@@ -307,17 +326,17 @@ class BotWorker(QThread):
             return 0
         return read_boss_count(boss_count_crop(screen, icon))
 
-    def _watch_boss_count(self, bot):
+    def _watch_boss_count(self, bot) -> bool:
         """Gọi lúc scan_city bắt đầu và cứ 3 cú vuốt: so số boss (OCR huy hiệu icon listboss) với lần đọc trước. Bằng thì vuốt
         tiếp; giảm thì ghi đè số cũ; tăng thì có boss mới: vào Join Boss tới khi rảnh (Join Boss dừng hẳn thì thôi theo dõi),
         rồi đọc lại số làm mốc và vuốt tiếp."""
         count = self._read_boss_count()
         if count is None:
-            return
+            return False
         previous = self._boss_count
         if previous is None or count <= previous:
             self._boss_count = count
-            return
+            return False
         self.record(f"Tìm route: số boss tăng {previous} -> {count}, vào Join Boss")
         self.activity_changed.emit(self.serial, JOIN_BOSS)
         self._ensure_server()
@@ -325,6 +344,7 @@ class BotWorker(QThread):
         again = self._read_boss_count()
         self._boss_count = again if again is not None else count
         self.record("Join Boss rảnh, tiếp tục tìm route")
+        return True          # đã rời màn đang quét (scan_city bỏ qua; quét thế giới thì về gốc kéo lại)
 
     def _is_done(self, task, ran) -> bool:
         """Nhiệm vụ đã xong hôm nay: theo dấu trong DB (`done`), hoặc (không có dấu) đã chạy hết một lượt."""
@@ -347,14 +367,29 @@ class BotWorker(QThread):
         self.record("Join Monster War dừng; chạy tiếp các nhiệm vụ khác")
         return False
 
-    def _run_task(self, task, boss: bool) -> bool:
+    def _run_task(self, task, boss: bool, idle_abort=None) -> bool:
         """Chạy 1 nhiệm vụ. Có Join Boss: tối đa OTHERS_WINDOW giây, boss mới cũng ngắt; không có Join
         Boss: không giới hạn thời gian. must_finish: không bị Bubble / boss / thời gian ngắt (chỉ Stop).
+        Việc idle_only: `idle_abort` = có nhiệm vụ khác tới lượt thì ngắt; có Join Boss thì sau mỗi cú kéo kiểm tra số boss (arc_sweep.WATCH_EVERY) (vào Join Boss rồi
+        kéo tiếp, không bị boss mới ngắt cả việc).
         True nếu chạy hết một lượt, False nếu bị ngắt (chưa xong: chuyển xuống cuối danh sách)."""
         if boss and not task.must_finish:
-            # Timeout chỉ phát hiện khi BotContext kiểm tra; không ngắt cưỡng chế.
-            self.ctx._deadline = time.monotonic() + OTHERS_WINDOW
-            self.ctx._boss_interrupt_enabled = True
+            # Timeout chỉ phát hiện khi BotContext kiểm tra; không ngắt cưỡng chế. Việc `idle_only` (quét dài) không giới hạn 120 giây, chỉ boss mới ngắt.
+            if not task.idle_only:
+                self.ctx._deadline = time.monotonic() + OTHERS_WINDOW
+            self.ctx._boss_interrupt_enabled = not task.idle_only
+        self.ctx._idle_abort = idle_abort
+        if task.idle_only and boss:
+            self._boss_count = None
+            self.ctx.swipe_count = 0
+
+            def watch(bot):          # vào Join Boss giữa chừng thì không để "có nhiệm vụ khác tới lượt" ngắt Join Boss
+                aborting, self.ctx._idle_abort = self.ctx._idle_abort, None
+                try:
+                    return self._watch_boss_count(bot)
+                finally:
+                    self.ctx._idle_abort = aborting
+            self.ctx.swipe_watch = watch   # chỉ việc idle_only: có nhiệm vụ khác tới lượt thì ngắt (YieldToTask)
         try:
             # Lo bubble trước (không có Join Boss thì không có bước nào khác lo), rồi xét Stop / boss mới.
             self.guards.call(None, self.ctx.check)
@@ -382,6 +417,9 @@ class BotWorker(QThread):
         except BossAvailable:
             self.record(f"Tạm dừng: {task.key} (có boss mới, chuyển sang Join Monster War)")
             return False
+        except YieldToTask:
+            self.record(f"Tạm dừng: {task.key} (có nhiệm vụ khác tới lượt)")
+            return False
         except YieldToBoss:
             self.record(f"Tạm dừng: {task.key} (nhường lượt cho Join Monster War)")
             return False
@@ -391,6 +429,8 @@ class BotWorker(QThread):
         # Luôn gỡ deadline, kể cả khi Stop/lỗi, để không ảnh hưởng lượt chạy boss.
         finally:
             self.guards.release()
+            self.ctx._idle_abort = None
+            self.ctx.swipe_watch = None
             self.ctx._boss_interrupt_enabled = False
             self.ctx._deadline = None
 

@@ -12,3 +12,11 @@
 ## Chưa làm
 - [ ] Flow test từ Go (cần ảnh danh sách Activity + màn thành có trái tim + menu Keep + màn Champion các trạng thái;
       đã có ảnh Helen 0/10, Cleopatra / Coatlicue (Unlock), popup xác nhận, Helen 10/10 ở thư mục Screenshots của MEmu).
+
+## Cần test (logic mới: lưu xong sau 2 lần chào + `daily_greet_champion_more`, bỏ `must_finish`)
+
+- [ ] Viết flow test (chưa có `tests/daily_activities/greet_champion/`): đủ 2 lần → lưu `daily_greet_champion`; 10/10 / hết mỹ nữ → lưu `daily_greet_champion_more`; `more_done`.
+- [ ] Máy thật: bot đếm lần chào bằng key `daily_greet_champion_greet_<n>` (đếm theo lần bấm Greet) có khớp số lần game tính không.
+- [ ] Máy thật: bị ngắt giữa chừng, `daily_greet_champion_more` tìm thành → trái tim / Keep → Champion → chào tiếp tới 10/10.
+- [ ] Ngắt giữa màn Champion: nhiệm vụ kế tiếp có tự về màn thành sạch không.
+- [ ] `city_map.reach_building(KEEP)` trong `daily_greet_champion_more` (Keep đang thấy / có route → goto / chưa route → scan_city lưu DB → goto): chưa chạy, cần test thật.

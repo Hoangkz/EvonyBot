@@ -19,6 +19,8 @@ class BotContext(FlowMixin, InputMixin, ScreenMixin):
         self._deadline = deadline    # time.monotonic() value, or None for no limit
         self._boss_event = threading.Event()
         self._boss_interrupt_enabled = False
+        # Việc `idle_only` đang chạy: hàm trả True khi có nhiệm vụ khác tới lượt (worker gán, gỡ sau khi xong); check() ném YieldToTask.
+        self._idle_abort = None
         # time.monotonic() lúc cần quay lại xử lý bubble (None = không theo dõi).
         self._bubble_due_at: float | None = None
         # time.monotonic() lúc tới giờ Auto Times Out: đóng game (None = không theo dõi).

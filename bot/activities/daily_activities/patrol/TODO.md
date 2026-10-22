@@ -16,3 +16,13 @@ Chỗ chờ số giây viết cứng, không có vòng kiểm tra rồi thử l�
 ### [run.py](run.py)
 
 - [ ] [run.py:25](run.py#L25) (1s): `bot.back(delay=1)`
+
+## Cần test (logic mới: lưu xong sớm + `daily_patrol_more`, bỏ `must_finish`)
+
+- [ ] Chạy `tests/daily_activities/patrol/test_flow.py` (test mới `PatrolMoreFlow` chưa chạy lần nào, ảnh/bước `to_city` có thể cần chỉnh).
+- [ ] Máy thật: sau lượt 1, `daily_patrol` đã vào DB ngay (ngắt giữa chừng bằng boss / hết 120 giây vẫn thấy xong).
+- [ ] Máy thật: `daily_patrol_more` tìm thành → Tường thành → Patrol, đếm tiếp lượt (`daily_patrol_round_<n>`) tới 10 / hết Refresh, lưu `daily_patrol_more`.
+- [ ] Ngắt giữa màn Patrol: nhiệm vụ kế tiếp có tự về màn thành sạch không.
+- [ ] Task `daily_patrol_more` có bị bỏ qua đúng khi Daily Patrol chưa xong không (scheduler).
+- [ ] `city_map.reach_building` (tường đang thấy / có route → goto / chưa route → scan_city lưu DB → goto): chưa chạy, cần test thật; cân nhắc test với `scan_city` giả.
+- [ ] `scan_city` khi gọi từ nhiệm vụ không truyền `watch` boss: ngắt bằng `bot.check()` ở mỗi cú vuốt có đủ nhanh khi có boss mới không.
