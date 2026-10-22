@@ -1013,6 +1013,21 @@ class FixedGiftFlowTests(unittest.TestCase):
         bot.tap.assert_called_once_with(
             35, 260, delay=event_center.WISHFUL_SETTLE_SECONDS)
 
+    def test_wishful_reward_chest_opens_done_one_panel(self):
+        bot = mock.Mock()
+        with mock.patch.object(
+                event_center, "_wait_for",
+                side_effect=(None, None, (62, 248), (198, 24))) as wait:
+            self.assertTrue(event_center._wishful_open_blessings(bot))
+
+        chest_call = wait.call_args_list[2]
+        self.assertEqual("WishfulWindmillFestival/button_reward_chest",
+                         chest_call.args[1])
+        self.assertEqual(0.82, chest_call.kwargs["threshold"])
+        self.assertEqual((0, 12, 100, 85), chest_call.kwargs["region"])
+        bot.tap.assert_called_once_with(
+            62, 248, delay=event_center.WISHFUL_SETTLE_SECONDS)
+
     def test_star_trail_coin_claim_uses_exact_user_crop(self):
         claim = cv2.imread(str(IMAGES / "GiftClaims" / "GraceOfStarTrail" /
                                "button_claim.png"))

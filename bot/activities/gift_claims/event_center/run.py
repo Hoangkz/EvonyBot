@@ -377,12 +377,23 @@ def _wishful_open_blessings(bot) -> bool:
     entry = _wait_for(bot, "WishfulWindmillFestival/button_wind_blessings",
                       attempts=5, threshold=0.68, region=(0, 12, 100, 85),
                       delay=WISHFUL_SETTLE_SECONDS)
+    entry_name = "Wind Blessings"
     if entry is None:
-        bot.record("Gift Claims: Wishful Windmill không thấy icon Wind "
-                   "Blessings sau 5 lần; giữ PENDING")
-        return False
+        # Some event rotations show only the small reward chest supplied by
+        # the user instead of the Wind Blessings tile.  It opens the same
+        # first reward panel, so accept it only at a deliberately high score
+        # and still require the Wind Blessings title after tapping.
+        entry = _wait_for(bot, "WishfulWindmillFestival/button_reward_chest",
+                          attempts=5, threshold=0.82,
+                          region=(0, 12, 100, 85),
+                          delay=WISHFUL_SETTLE_SECONDS)
+        entry_name = "rương DONE 1"
+        if entry is None:
+            bot.record("Gift Claims: Wishful Windmill không thấy icon Wind "
+                       "Blessings hoặc rương DONE 1 sau 5 lần; giữ PENDING")
+            return False
     bot.record("Gift Claims: Wishful Windmill chờ trang ổn định rồi tap "
-               "Wind Blessings")
+               f"{entry_name}")
     bot.tap(*entry, delay=WISHFUL_SETTLE_SECONDS)
     opened = _wait_for(bot, "WishfulWindmillFestival/title_wind_blessings",
                        attempts=5, threshold=0.68,
