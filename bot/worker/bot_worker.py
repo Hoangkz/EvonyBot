@@ -399,8 +399,17 @@ class BotWorker(QThread):
                 self.guards.hold()
             self.activity_changed.emit(self.serial, task.group)
             self.record(f"Bắt đầu: {task.key}")
-            self._run_one(task)
-            self.record(f"Xong: {task.key}")
+            result = self._run_one(task)
+            if result is False:
+                self.record(f"Kết thúc lượt: {task.key} (còn PENDING; "
+                            "chuyển nhiệm vụ kế tiếp)")
+            elif (task.done is not None
+                    and not task.done(self.ctx,
+                                      self.settings.get(task.group, {}))):
+                self.record(f"Kết thúc lượt: {task.key} (chưa DONE trong DB; "
+                            "sẽ chạy lại)")
+            else:
+                self.record(f"Xong: {task.key}")
             return True
         # Bị ngắt: chưa xong, nhiệm vụ giữ vị trí và được gọi lại từ đầu hàm run() sau Join Boss; worker không lưu điểm thực thi.
         except TimedOut:

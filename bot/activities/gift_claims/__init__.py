@@ -9,6 +9,7 @@ Event Center trước Valuable Event và Super Value Return (``bot/worker/priori
 "Claim Event Gifts" ở tab Daily Activities được tích (``settings["General"]["gift_claims"]`, mặc định bật).
 """
 from importlib import import_module
+import time
 
 from . import event_center, valuable_event
 from .valuable_event import super_value_return
@@ -22,13 +23,42 @@ from .common import (TEXT_CLAIM_CONTROLS, back_if_close_x,
                      return_home)
 from .screens import GiftScreen
 
+RETRY_WINDOW_SECONDS = 120.0
+RETRY_AFTER_ATTR = "_gift_claims_zone_retry_after"
+
+
+def _retry_after(ctx) -> dict[str, float]:
+    values = getattr(ctx, RETRY_AFTER_ATTR, None)
+    if not isinstance(values, dict):
+        values = {}
+        setattr(ctx, RETRY_AFTER_ATTR, values)
+    return values
 
 
 def job(zone) -> dict:
     """Dòng nhiệm vụ cho bảng ``priority.py``: chạy ``zone.run`` khi ô nhận quà được tích; xong khi key tổng của zone có trong DB."""
-    return {"run": lambda ctx, settings: zone.run(ctx),
+    def run(ctx, _settings):
+        window_started = time.monotonic()
+        completed = bool(zone.run(ctx))
+        retry_after = _retry_after(ctx)
+        if completed:
+            retry_after.pop(zone.KEY, None)
+        else:
+            # The next eligibility is measured from when this zone started,
+            # not from when a slow 30-device run finally returned.
+            retry_after[zone.KEY] = window_started + RETRY_WINDOW_SECONDS
+            ctx.record(f"Gift Claims: {zone.KEY} còn PENDING; nghỉ đến lượt "
+                       "120s kế tiếp để chạy khu nhận quà tiếp theo")
+        return completed
+
+    def done(ctx, _settings):
+        if ctx.is_daily_done(zone.KEY):
+            return True
+        return time.monotonic() < _retry_after(ctx).get(zone.KEY, 0.0)
+
+    return {"run": run,
             "enabled": lambda settings: bool((settings.get("General") or {}).get("gift_claims", True)),
-            "done": lambda ctx, settings: ctx.is_daily_done(zone.KEY)}
+            "done": done}
 
 
 __all__ = ["event_center", "super_value_return", "valuable_event", "job"]

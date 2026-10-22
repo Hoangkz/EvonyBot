@@ -1,7 +1,9 @@
 """Vòng kiểm tra 3 lần của hoạt động quà (bot/activities/gift_claims/scan.py)."""
 import unittest
 from unittest import mock
+from types import SimpleNamespace
 
+from bot.activities import gift_claims
 from bot.activities.gift_claims import scan
 from bot.activities.gift_claims.common import mark_task_done
 from bot.activities.gift_claims.event_center import zone as event_center_zone
@@ -24,6 +26,20 @@ TASKS = [("a", "A"), ("b", "B")]
 
 
 class ScanTest(unittest.TestCase):
+    def test_zone_pending_waits_for_next_120_second_window(self):
+        bot = FakeBot()
+        zone = SimpleNamespace(KEY="gift_zone", run=mock.Mock(return_value=False))
+        job = gift_claims.job(zone)
+
+        with mock.patch.object(gift_claims.time, "monotonic",
+                               side_effect=(100.0, 219.9, 220.0)):
+            self.assertFalse(job["run"](bot, {}))
+            self.assertTrue(job["done"](bot, {}))
+            self.assertFalse(job["done"](bot, {}))
+
+        zone.run.assert_called_once_with(bot)
+        self.assertTrue(any("120s kế tiếp" in line for line in bot.log))
+
     def test_three_misses_mark_done(self):
         bot, calls = FakeBot(), []
 

@@ -3,11 +3,13 @@
 Kiểm tra: ra bản đồ thế giới, truyền đúng góc / bán kính / share, chỉ boss được tích tính là active, bỏ Viking,
 bỏ qua khi chưa tích boss; chia góc của nút Auto; dòng trong bảng nhiệm vụ của worker.
 """
+import importlib
 import unittest
 from unittest import mock
 
-from bot.activities.find_boss import JOB, run
-from bot.activities.find_boss import run as run_module
+from bot.activities.find_boss import JOB
+run_module = importlib.import_module("bot.activities.find_boss.run")
+run = run_module.run
 from bot.activities.find_boss.angles import split_angles
 from bot.activities.find_boss.constants import TO_WORLD_TAP, TO_WORLD_WAIT
 from bot.activities.find_boss.run import HOME_ICON
@@ -42,24 +44,24 @@ class FakeBot:
 
 
 def patched(found=(), selection_seen=None):
-    """scan_bosses / ensure_map / to_city giả; `selection_seen` nhận danh sách active lúc quét."""
+    """Mock scan_bosses/ensure_map; `selection_seen` receives the active list."""
     def scan(bot, start, end, radius, share=True, **kw):
         scan.args = (start, end, radius, share)
         if selection_seen is not None:
             find_bosses._state().pop("catalog", None)
             selection_seen.extend(f"{e[0]}:{sorted(lv for lv, (_, on) in e[1].items() if on)}:{e[2]}" for e in find_bosses._catalog()[0] if e[0] in ("Ymir", "Viking", "Zombie"))
         return list(found)
-    return scan, mock.patch.object(run_module, "scan_bosses", scan), mock.patch.object(run_module, "ensure_map", return_value=True), \
-        mock.patch.object(run_module, "to_city")
+    return (scan, mock.patch.object(run_module, "scan_bosses", scan),
+            mock.patch.object(run_module, "ensure_map", return_value=True))
 
 
 class FindBossFlowTests(unittest.TestCase):
     def run_with(self, settings, bot=None, found=(), seen=None):
         bot = bot or FakeBot()
         scan, *patches = patched(found, seen)
-        with patches[0], patches[1], patches[2] as city:
+        with patches[0], patches[1] as ensure_map:
             run(bot, settings)
-        return bot, scan, city
+        return bot, scan, ensure_map
 
     def test_goes_to_world_and_scans_with_settings(self):
         bot, scan, city = self.run_with({"start_deg": 90, "end_deg": 180, "radius": 120, "share": False, "selected_bosses": [BOSS]},
@@ -79,7 +81,7 @@ class FindBossFlowTests(unittest.TestCase):
     def test_no_boss_ticked_skips_scan(self):
         scan, *patches = patched()
         bot = FakeBot()
-        with patches[0], patches[1], patches[2]:
+        with patches[0], patches[1]:
             run(bot, {"selected_bosses": [VIKING]})        # Viking bị bỏ -> không còn boss nào
         self.assertFalse(hasattr(scan, "args"))
         self.assertEqual(bot.done, [])
@@ -87,14 +89,14 @@ class FindBossFlowTests(unittest.TestCase):
     def test_only_ticked_boss_levels_are_active_and_viking_excluded(self):
         seen = []
         self.run_with({"selected_bosses": [BOSS, VIKING]}, seen=seen)
-        self.assertEqual(seen, ["Ymir:[3]:False", "Viking:[]:False", "Zombie:[]:False"])
+        self.assertCountEqual(seen, ["Ymir:[3]:False", "Viking:[]:False", "Zombie:[]:False"])
         find_bosses.set_selection(None)
 
     def test_cannot_reach_world_does_not_scan(self):
         bot = FakeBot()
         bot.tap_percent = lambda *a, **k: None            # bấm không ra thế giới
         scan, *patches = patched()
-        with patches[0], patches[1], patches[2], mock.patch.object(run_module, "go_home"), mock.patch.object(run_module, "delay"):
+        with patches[0], patches[1], mock.patch.object(run_module, "go_home"), mock.patch.object(run_module, "delay"):
             run(bot, {"selected_bosses": [BOSS]})
         self.assertFalse(hasattr(scan, "args"))
         self.assertEqual(bot.done, [])

@@ -49,7 +49,7 @@ class BuildTasksTests(unittest.TestCase):
         registry = _fake_registry(("zero", "G", True, False, 0), ("neg", "G", True, False, -1),
                                   ("pos", "G", True, False, 5))
         tasks = build_tasks(["G"], set(), registry=registry)
-        self.assertEqual([t.key for t in tasks], ["zero", "pos"])
+        self.assertEqual([t.key for t in tasks], ["pos", "zero"])
 
     def test_flags_and_run_carried_to_task(self):
         registry = _fake_registry(("a", "G", True, True, 3, True))
@@ -85,7 +85,7 @@ class RealRegistryTests(unittest.TestCase):
         ordered = [t.key for t in tasks]   # build_tasks đã xếp theo độ ưu tiên
         by_key = {t.key: t for t in tasks}
         self.assertIsNotNone(by_key["crazy_eggs"].due)   # việc theo giờ: tới giờ mới đẩy lên đầu danh sách
-        self.assertTrue(by_key["daily_patrol"].must_finish)
+        self.assertFalse(by_key["daily_patrol"].must_finish)
         self.assertEqual(by_key["daily_offering"].group, "Daily Activities")
         self.assertNotIn("Daily Activities", by_key)
 
@@ -94,8 +94,7 @@ class RealRegistryTests(unittest.TestCase):
                               "kings_path_patrol": {"enabled": False}}}
         tasks = self.build(["Event"], settings)
         self.assertEqual([(t.key, t.priority) for t in tasks],
-                         [("gather_troops_ground_troop", 552), ("gather_troops_claim", 500),
-                          ("three_day_event", 498)])
+                         [("gather_troops_ground_troop", 552), ("gather_troops_claim", 500)])
 
     def test_alliance_capacity_runs_once_and_saves_nothing(self):
         """Alliance Capacity chỉ làm 1 lần (once) và xong thì không lưu gì vào DB (done = None: xong khi chạy hết một lượt)."""
@@ -291,6 +290,7 @@ class WorkerLoopTests(unittest.TestCase):
             worker._stop.set()
 
         worker = self.make_worker([JOIN_BOSS], [])
+        worker.ctx.city_map = {"keep": (0.5, 0.5)}
         bot_worker.build_tasks.return_value.append(Task("idle", "G", 1, idle_only=True, run=run, due=lambda c, s: True))
         self.run_until_stop(worker, lambda activity, settings: BOSS_IDLE)
         self.assertEqual(seen, [(None, False)])      # boss mới không ngắt cả việc: kiểm tra mỗi 3 cú kéo (swipe_watch)

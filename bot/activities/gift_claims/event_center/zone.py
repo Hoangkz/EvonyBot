@@ -3,7 +3,8 @@ from .. import back_to_territory, scan
 from ..common import open_event_center, return_home
 from ..screens import GiftScreen, identify
 from .run import (EVENT_POLICIES, POLICY_CATEGORIES, SCAN_COMPLETE_ATTR,
-                  SCANNED_CATEGORIES_ATTR, SEEN_POLICIES_ATTR, run_opened)
+                  SCANNED_CATEGORIES_ATTR, SEEN_POLICIES_ATTR,
+                  PENDING_THIS_RUN_ATTR, run_opened)
 
 KEY = "gift_event_center"
 HANDLED_ATTR = "_gift_claims_event_center_handled"
@@ -72,10 +73,15 @@ def _sweep(bot, pending: list[str]) -> set[str]:
 
 def run(bot) -> bool:
     """Chạy hoạt động Event Center; True khi mọi event con đã xong hôm nay."""
+    setattr(bot, PENDING_THIS_RUN_ATTR, set())
     # Two independently verified categories: up to three complete Limited
     # passes, then up to three Activities passes, all in the same opened page.
-    done = scan.run_zone(bot, KEY, TASKS, _sweep,
-                         max_sweeps=scan.MAX_MISSES * 2)
+    try:
+        done = scan.run_zone(bot, KEY, TASKS, _sweep,
+                             max_sweeps=scan.MAX_MISSES * 2)
+    finally:
+        if hasattr(bot, PENDING_THIS_RUN_ATTR):
+            delattr(bot, PENDING_THIS_RUN_ATTR)
     return_home(bot)
     if done and hasattr(bot, HANDLED_ATTR):
         delattr(bot, HANDLED_ATTR)

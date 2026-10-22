@@ -24,6 +24,7 @@ class GiftScreen(str, Enum):
     GIANTS_WISDOM_TEMPLE = "GiantsWisdomTemple"
     WISHFUL_WINDMILL_FESTIVAL = "WishfulWindmillFestival"
     EAGLE_OF_FREEDOM = "EagleOfFreedom"
+    LEGION_HUNTING = "LegionHunting"
 
 
 TITLE_TEMPLATES = {
@@ -34,6 +35,7 @@ TITLE_TEMPLATES = {
     # Check Eagle before Grace: their wide red title bars score about 0.727
     # against each other, while Eagle's supplied title is an exact 1.0 match.
     GiftScreen.EAGLE_OF_FREEDOM: "EagleOfFreedom/title",
+    GiftScreen.LEGION_HUNTING: "LegionHunting/title",
     GiftScreen.GRACE_OF_STAR_TRAIL: "GraceOfStarTrail/title",
     GiftScreen.BACCHUS_TAVERN: "BacchusTavern/title",
     GiftScreen.BACK_TO_TERRITORY: "BackToTerritory/title",

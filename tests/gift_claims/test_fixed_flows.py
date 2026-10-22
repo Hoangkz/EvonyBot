@@ -29,6 +29,8 @@ strategic_stockpile = import_module(
     "bot.activities.gift_claims.valuable_event.strategic_stockpile.run")
 runestone_consumption_sprint = import_module(
     "bot.activities.gift_claims.valuable_event.runestone_consumption_sprint.run")
+refining_weekly_card = import_module(
+    "bot.activities.gift_claims.valuable_event.refining_weekly_card.run")
 super_value_return = import_module(
     "bot.activities.gift_claims.valuable_event.super_value_return.run")
 super_value_zone = import_module(
@@ -563,6 +565,43 @@ class FixedGiftFlowTests(unittest.TestCase):
                     if spec.task.key == "gift_city_growth_plan")
         self.assertEqual(("CityGrowthPlan/level_15_claimed",), city.flow.done)
 
+    def test_refining_weekly_card_does_not_treat_go_as_done(self):
+        self.assertEqual((), refining_weekly_card.FLOW.done)
+        self.assertEqual((refining_weekly_card.CLAIM,),
+                         refining_weekly_card.FLOW.claims)
+
+    def test_refining_weekly_card_swipes_only_inside_green_reward_frame(self):
+        bot = mock.Mock()
+        screen = np.zeros((704, 396, 3), dtype=np.uint8)
+        bot.screenshot.return_value = screen
+
+        with (mock.patch.object(refining_weekly_card, "find",
+                                return_value=None),
+              mock.patch.object(refining_weekly_card,
+                                "EDGE_CONFIRMATIONS", 1)):
+            self.assertTrue(refining_weekly_card.claim_opened(bot))
+
+        self.assertGreater(bot.swipe_percent.call_count, 0)
+        allowed = {refining_weekly_card.SCAN_SWIPE,
+                   refining_weekly_card.RETURN_TOP_SWIPE}
+        for call in bot.swipe_percent.call_args_list:
+            self.assertIn(call.args[:4], allowed)
+            self.assertTrue(67 <= call.args[1] <= 98)
+            self.assertTrue(67 <= call.args[3] <= 98)
+
+    def test_refining_weekly_card_requires_clean_followup_pass(self):
+        bot = mock.Mock()
+        screen = np.zeros((704, 396, 3), dtype=np.uint8)
+        bot.screenshot.return_value = screen
+
+        with (mock.patch.object(refining_weekly_card, "_swipe_to_top"),
+              mock.patch.object(refining_weekly_card, "_scan_full_list",
+                                side_effect=[(True, False), (False, False)]) as scan):
+            self.assertTrue(refining_weekly_card.claim_opened(bot))
+
+        self.assertEqual(2, scan.call_count)
+        bot.sleep.assert_called_once_with(refining_weekly_card.STEP_DELAY)
+
     def test_login_gifts_uses_fixed_fallback_when_reward_image_is_missing(self):
         bot = mock.Mock()
         bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
@@ -687,6 +726,54 @@ class FixedGiftFlowTests(unittest.TestCase):
         self.assertIsNone(common.sparkle_point(
             screen, after, region=event_center.SPARKLE_SAFE))
 
+    def test_legion_hunting_assets_and_limited_registration(self):
+        for name in ("list_row.png", "title.png", "button_claim.png"):
+            self.assertTrue((IMAGES / "GiftClaims" / "LegionHunting" /
+                             name).is_file())
+        legion = next(policy for policy in event_center.EVENT_POLICIES
+                      if policy.key == "gift_legion_hunting")
+        self.assertEqual(GiftScreen.LEGION_HUNTING, legion.screen)
+        self.assertNotIn(legion.key, event_center.POLICY_CATEGORIES)
+        self.assertTrue(any(row[0] == "LegionHunting/list_row"
+                            and row[2] == GiftScreen.LEGION_HUNTING
+                            for row in event_center.FORCED_LIMITED_ROWS))
+
+    def test_legion_hunting_title_identifies_opened_page(self):
+        title = cv2.imread(str(IMAGES / "GiftClaims" / "LegionHunting" /
+                               "title.png"))
+        screen = np.zeros((704, 396, 3), dtype=np.uint8)
+        height, width = title.shape[:2]
+        screen[5:5 + height, 100:100 + width] = title
+        self.assertEqual(GiftScreen.LEGION_HUNTING,
+                         identify(CvBot(), screen))
+
+    def test_legion_hunting_done_only_after_full_claim_free_pass(self):
+        bot = mock.Mock()
+        with (mock.patch.object(event_center, "_legion_swipe_to_top",
+                                return_value=True),
+              mock.patch.object(event_center, "_scan_legion_once",
+                                side_effect=[
+                                    (common.ClaimReport(1, 1), True, False),
+                                    (common.ClaimReport(), True, False),
+                                ]) as scan):
+            report, done = event_center._handle_legion_hunting(bot)
+
+        self.assertTrue(done)
+        self.assertEqual(common.ClaimReport(1, 1), report)
+        self.assertEqual(2, scan.call_count)
+        bot.sleep.assert_called_once_with(event_center.UI_SETTLE_SECONDS)
+
+    def test_legion_hunting_keeps_pending_when_claim_does_not_disappear(self):
+        bot = mock.Mock()
+        with (mock.patch.object(event_center, "_legion_swipe_to_top",
+                                return_value=True),
+              mock.patch.object(event_center, "_scan_legion_once",
+                                return_value=(common.ClaimReport(1, 0),
+                                              False, True))):
+            _, done = event_center._handle_legion_hunting(bot)
+
+        self.assertFalse(done)
+
     def test_event_center_persistent_inner_badge_is_processed_once(self):
         screen = np.zeros((704, 396, 3), dtype=np.uint8)
         bot = mock.Mock()
@@ -751,7 +838,8 @@ class FixedGiftFlowTests(unittest.TestCase):
             report = event_center._tap_special_navigation(bot)
 
         self.assertEqual(common.ClaimReport(1, 1), report)
-        bot.tap.assert_called_once_with(49, 235, delay=1)
+        bot.tap.assert_called_once_with(
+            49, 235, delay=event_center.UI_SETTLE_SECONDS)
 
     def test_named_event_without_special_control_stops_immediately(self):
         bot = mock.Mock()
@@ -803,7 +891,8 @@ class FixedGiftFlowTests(unittest.TestCase):
             report = event_center._tap_special_navigation(bot, attempts=4)
 
         self.assertEqual(common.ClaimReport(1, 1), report)
-        bot.tap.assert_called_once_with(357, 164, delay=1)
+        bot.tap.assert_called_once_with(
+            357, 164, delay=event_center.UI_SETTLE_SECONDS)
 
     def test_named_navigation_event_never_falls_through_to_sparkles(self):
         bot = mock.Mock()
@@ -851,7 +940,8 @@ class FixedGiftFlowTests(unittest.TestCase):
             report = event_center._tap_special_navigation(bot, attempts=4)
 
         self.assertEqual(common.ClaimReport(1, 1), report)
-        bot.tap.assert_called_once_with(356, 180, delay=1)
+        bot.tap.assert_called_once_with(
+            356, 180, delay=event_center.UI_SETTLE_SECONDS)
 
     def test_poseidon_opens_captured_tab_then_claims_daily_free(self):
         bot = mock.Mock()
@@ -875,8 +965,10 @@ class FixedGiftFlowTests(unittest.TestCase):
             report = event_center._tap_special_navigation(bot)
 
         self.assertEqual(common.ClaimReport(2, 1), report)
-        self.assertEqual([mock.call(34, 78, delay=1),
-                          mock.call(355, 155, delay=1)],
+        self.assertEqual([mock.call(34, 78,
+                                    delay=event_center.UI_SETTLE_SECONDS),
+                          mock.call(355, 155,
+                                    delay=event_center.UI_SETTLE_SECONDS)],
                          bot.tap.call_args_list)
 
     def test_star_trail_gift_is_tapped_and_verified(self):
@@ -889,8 +981,52 @@ class FixedGiftFlowTests(unittest.TestCase):
             report = event_center._tap_reward_navigation(bot)
 
         self.assertEqual(common.ClaimReport(2, 1), report)
-        self.assertEqual([mock.call(360, 90, delay=1),
-                          mock.call(40, 240, delay=1)], bot.tap.call_args_list)
+        self.assertEqual([mock.call(360, 90,
+                                    delay=event_center.UI_SETTLE_SECONDS),
+                          mock.call(40, 240,
+                                    delay=event_center.UI_SETTLE_SECONDS)],
+                         bot.tap.call_args_list)
+
+    def test_wishful_uses_extra_settle_time_on_multi_device_hosts(self):
+        self.assertEqual(1.5, event_center.UI_SETTLE_SECONDS)
+        self.assertEqual(2.0, event_center.WISHFUL_SETTLE_SECONDS)
+        bot = mock.Mock()
+        bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
+        with mock.patch.object(event_center, "find", return_value=None):
+            self.assertIsNone(event_center._wait_for(
+                bot, "WishfulWindmillFestival/button_claim", attempts=3,
+                delay=event_center.WISHFUL_SETTLE_SECONDS))
+        self.assertEqual(
+            [mock.call(event_center.WISHFUL_SETTLE_SECONDS)] * 2,
+            bot.sleep.call_args_list)
+
+    def test_wishful_searches_wind_blessings_across_content_not_right_only(self):
+        bot = mock.Mock()
+        with mock.patch.object(event_center, "_wait_for",
+                               side_effect=(None, (35, 260), (198, 24))) as wait:
+            self.assertTrue(event_center._wishful_open_blessings(bot))
+
+        entry_call = wait.call_args_list[1]
+        self.assertEqual("WishfulWindmillFestival/button_wind_blessings",
+                         entry_call.args[1])
+        self.assertEqual((0, 12, 100, 85), entry_call.kwargs["region"])
+        bot.tap.assert_called_once_with(
+            35, 260, delay=event_center.WISHFUL_SETTLE_SECONDS)
+
+    def test_wishful_reward_chest_opens_done_one_panel(self):
+        bot = mock.Mock()
+        with mock.patch.object(
+                event_center, "_wait_for",
+                side_effect=(None, None, (62, 248), (198, 24))) as wait:
+            self.assertTrue(event_center._wishful_open_blessings(bot))
+
+        chest_call = wait.call_args_list[2]
+        self.assertEqual("WishfulWindmillFestival/button_reward_chest",
+                         chest_call.args[1])
+        self.assertEqual(0.82, chest_call.kwargs["threshold"])
+        self.assertEqual((0, 12, 100, 85), chest_call.kwargs["region"])
+        bot.tap.assert_called_once_with(
+            62, 248, delay=event_center.WISHFUL_SETTLE_SECONDS)
 
     def test_star_trail_coin_claim_uses_exact_user_crop(self):
         claim = cv2.imread(str(IMAGES / "GiftClaims" / "GraceOfStarTrail" /
@@ -1353,7 +1489,7 @@ class FixedGiftFlowTests(unittest.TestCase):
         bot.tap.assert_called_once_with(72, 78,
                                         delay=event_center.UI_SETTLE_SECONDS)
 
-    def test_event_center_does_not_open_activities_while_limited_pending(self):
+    def test_event_center_continues_activities_while_limited_is_pending(self):
         bot = mock.Mock()
         bot.is_daily_done.return_value = False
         bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
@@ -1365,8 +1501,24 @@ class FixedGiftFlowTests(unittest.TestCase):
               mock.patch.object(event_center, "return_home")):
             self.assertFalse(event_center.run_opened(bot, set()))
 
-        select.assert_called_once_with(bot, "limited", 18)
-        scan.assert_called_once_with(bot, "limited", mock.ANY)
+        self.assertEqual([mock.call(bot, "limited", 18),
+                          mock.call(bot, "activities", 49)],
+                         select.call_args_list)
+        self.assertEqual(["limited", "activities"],
+                         [call.args[1] for call in scan.call_args_list])
+
+    def test_event_center_exact_pending_is_remembered_for_current_window(self):
+        bot = mock.Mock()
+        setattr(bot, event_center.PENDING_THIS_RUN_ATTR, set())
+        policy = next(policy for policy in event_center.EVENT_POLICIES
+                      if policy.key == "gift_wishful_windmill_festival")
+        with mock.patch.dict(event_center.EXACT_HANDLERS,
+                             {policy.screen: lambda _bot:
+                              (common.ClaimReport(), False)}):
+            event_center._process_known_event(bot, policy)
+
+        self.assertIn(policy.key,
+                      getattr(bot, event_center.PENDING_THIS_RUN_ATTR))
 
     def test_limited_scan_never_counts_lucky_apple_as_missing(self):
         bot = mock.Mock()

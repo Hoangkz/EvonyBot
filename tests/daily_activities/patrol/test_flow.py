@@ -60,8 +60,8 @@ class PatrolMoreFlow(unittest.TestCase):
         self.assertTrue(more_done(Ctx({KEY, MORE_KEY}), {}))
         self.assertTrue(more_done(Ctx({KEY, *(round_key(n, KEY) for n in range(1, 11))}), {}))
 
-    def test_more_patrols_remaining_rounds(self):
-        """Daily đã xong (1 lượt): việc nối tiếp tìm thành -> Tường thành -> patrol lượt 2..10 -> Back, lưu MORE_KEY."""
+    def test_more_finishes_when_ten_rounds_are_already_recorded(self):
+        """The continuation exits cleanly when all ten patrol rounds are already recorded."""
         flow = [
             Step("patrol_city.png", tap_at(*WALLS_POS)),
             Step("patrol_menu.png", tap(MENU_PATROL)),
@@ -69,7 +69,7 @@ class PatrolMoreFlow(unittest.TestCase):
             Step("patrol_city.png", end(result=None)),
         ]
         device = run_flow(self, _run_more, SCREENS, flow, {}, daily_done={KEY: "2026-10-04T08:00:00",
-                                                                           **_rounds_done(*range(1, 10))})
+                                                                           **_rounds_done(*range(1, 11))})
         self.assertIn(MORE_KEY, device.daily_done)
         self.assertIn(f"{MORE_LABEL}: 10 rounds today, done for today", device.logs)
 

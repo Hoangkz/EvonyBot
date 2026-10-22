@@ -1,3 +1,8 @@
 # Refining Weekly Card
 
-Nếu chưa thấy `Go`/`Continue`, quét vùng danh sách dưới `y > 125`, nhấn toàn bộ `Claim` và lướt chậm ngay trong vùng danh sách. Hết Claim mới kiểm tra lại điều kiện DONE.
+- Chỉ tìm và lướt trong khung danh sách phần thưởng màu xanh (`x=2..98%`, `y=67..98%`).
+- Bấm tất cả nút `Claim` nhìn thấy, chờ 1 giây giữa các thao tác.
+- `Go` và `Continue` **không** phải điều kiện DONE.
+- Sau khi có lần nhận quà, quay về đầu danh sách và quét lại.
+- Chỉ DONE khi đã lướt trọn từ đầu tới cuối mà không còn `Claim` nào.
+- Nếu `Claim` vẫn còn nhưng không bấm được, giữ `PENDING`; không đoán DONE.
