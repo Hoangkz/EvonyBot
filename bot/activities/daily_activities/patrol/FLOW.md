@@ -23,3 +23,9 @@ Giống hệt King's Path Patrol sau Go: dùng chung `event/kings_path/patrol/ru
 Cùng ưu tiên 387, xếp ngay sau Daily Patrol. Bỏ qua khi Daily Patrol chưa xong, hoặc `daily_patrol_more` đã lưu, hoặc đủ 10 lượt.
 Chạy: về thành → tìm thành (`open_building`, Tường thành ở giữa) → màn Patrol → `patrol_rounds` (cùng key `daily_patrol`, nên
 đếm tiếp lượt đã làm) → đủ 10 lượt / hết Refresh → Back, lưu `daily_patrol_more`. Bị ngắt: lượt sau làm tiếp từ lượt đã đếm.
+
+Bước tới Tường thành của `daily_patrol_more` (`city_map.reach_building`, dùng chung với Greet Champion):
+1. Về thành, **thấy Tường thành trên màn** → làm Patrol luôn.
+2. Không thấy, máy **đã có route** (`bot.city_map` trong DB) → `city_map.goto` vuốt thẳng tới Tường thành.
+3. Không thấy, máy **chưa có route** → `city_map.scan_city` tìm route và **lưu vào DB** (`bot.set_city_map`, lần sau dùng lại), rồi `goto`.
+4. Không tới được (không tìm được route / không thấy mốc) → bỏ lượt này, lượt sau thử lại.

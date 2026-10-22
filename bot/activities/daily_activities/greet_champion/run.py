@@ -14,6 +14,7 @@ import cv2
 
 from ...event.city_building import KEEP
 from ...event.kings_path.building import open_menu
+from ....city.city_map import reach_building
 from ....common import to_city
 from ...result import save_errors
 from ..common import Task, mark_task_done
@@ -70,10 +71,12 @@ def after_go(bot) -> bool:
 
 @save_errors(MORE_KEY)
 def run_more(ctx, settings):
-    """Việc nối tiếp: tìm thành -> trái tim / Keep -> Champion -> chào tiếp tới 10/10 (hoặc hết mỹ nữ), lưu MORE_KEY. Bị ngắt
+    """Việc nối tiếp: tới Keep (city_map.reach_building) -> trái tim / Keep -> Champion -> chào tiếp tới 10/10 (hoặc hết mỹ nữ), lưu MORE_KEY. Bị ngắt
     giữa chừng: không lưu, lượt sau làm tiếp (số lần chào đếm trong DB, màn Champion cho biết 10/10)."""
     ctx.log(f"Daily Activities: {MORE_LABEL}")
     to_city(ctx)
+    if not reach_building(ctx, MORE_LABEL, KEEP):   # thấy Keep thì làm luôn; có route thì đi; chưa có route thì tìm + lưu DB
+        return
     if not _open_champion(ctx):
         return
     outcome = _greet_loop(ctx)

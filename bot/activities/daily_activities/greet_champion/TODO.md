@@ -19,3 +19,4 @@
 - [ ] Máy thật: bot đếm lần chào bằng key `daily_greet_champion_greet_<n>` (đếm theo lần bấm Greet) có khớp số lần game tính không.
 - [ ] Máy thật: bị ngắt giữa chừng, `daily_greet_champion_more` tìm thành → trái tim / Keep → Champion → chào tiếp tới 10/10.
 - [ ] Ngắt giữa màn Champion: nhiệm vụ kế tiếp có tự về màn thành sạch không.
+- [ ] `city_map.reach_building(KEEP)` trong `daily_greet_champion_more` (Keep đang thấy / có route → goto / chưa route → scan_city lưu DB → goto): chưa chạy, cần test thật.

@@ -11,6 +11,7 @@ from ...event.city_building import WALLS
 from ...event.kings_path.building import open_building
 from ...event.kings_path.patrol.constants import MENU_PATROL, PATROL_TITLE, ROUNDS_PER_DAY
 from ...event.kings_path.patrol.run import patrol_rounds, rounds_today
+from ....city.city_map import reach_building
 from ....common import to_city
 from ...result import save_errors
 from ..common import Task, mark_task_done
@@ -39,10 +40,13 @@ def after_go(bot) -> bool:
 
 @save_errors(MORE_KEY)
 def run_more(ctx, settings):
-    """Việc nối tiếp: tìm thành -> Tường thành -> Patrol tiếp (đếm lượt chung với Daily, daily_patrol_round_<n>) tới đủ 10
-    lượt / hết Refresh -> Back, lưu MORE_KEY. Bị ngắt giữa chừng: không lưu, lượt sau làm tiếp từ lượt đã đếm."""
+    """Việc nối tiếp: tới Tường thành (city_map.reach_building: đang thấy thì làm luôn; có route thì đi; chưa có route thì tìm route, lưu DB,
+    rồi đi) -> Patrol tiếp (đếm lượt chung với Daily, daily_patrol_round_<n>) tới đủ 10 lượt / hết Refresh -> Back, lưu MORE_KEY.
+    Bị ngắt giữa chừng: không lưu, lượt sau làm tiếp từ lượt đã đếm."""
     ctx.log(f"Daily Activities: {MORE_LABEL}")
     to_city(ctx)
+    if not reach_building(ctx, MORE_LABEL, WALLS):
+        return
     if not open_building(ctx, MORE_LABEL, WALLS, MENU_PATROL, PATROL_TITLE):
         return
 

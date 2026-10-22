@@ -24,3 +24,5 @@ Chỗ chờ số giây viết cứng, không có vòng kiểm tra rồi thử l�
 - [ ] Máy thật: `daily_patrol_more` tìm thành → Tường thành → Patrol, đếm tiếp lượt (`daily_patrol_round_<n>`) tới 10 / hết Refresh, lưu `daily_patrol_more`.
 - [ ] Ngắt giữa màn Patrol: nhiệm vụ kế tiếp có tự về màn thành sạch không.
 - [ ] Task `daily_patrol_more` có bị bỏ qua đúng khi Daily Patrol chưa xong không (scheduler).
+- [ ] `city_map.reach_building` (tường đang thấy / có route → goto / chưa route → scan_city lưu DB → goto): chưa chạy, cần test thật; cân nhắc test với `scan_city` giả.
+- [ ] `scan_city` khi gọi từ nhiệm vụ không truyền `watch` boss: ngắt bằng `bot.check()` ở mỗi cú vuốt có đủ nhanh khi có boss mới không.

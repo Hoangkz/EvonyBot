@@ -33,7 +33,7 @@ flowchart TD
 - Greet 10/10: nút đen, chữ "10/10" (`GreetFull.png`, khớp 1,00; "0/10" 0,68, "2/10" ≤ 0,63, ngưỡng 0,9). Bấm vào chỉ
   hiện "Purchase the Champion Monthly Card...".
 - Đủ `GREET_REQUIRED` = 2 lần chào (bot đếm `daily_greet_champion_greet_<n>` trong DB): **lưu ngay "xong hôm nay"** rồi chào tiếp tới 10/10 / hết mỹ nữ / bị ngắt; hai trường hợp đầu lưu thêm `daily_greet_champion_more`. Không còn `must_finish`.
-- Việc nối tiếp `daily_greet_champion_more` (`run.MORE_JOB`, ưu tiên 385, không đi qua Go): bỏ qua khi Daily Greet chưa xong / đã lưu more / đủ 10 lần; chạy: về thành → trái tim hoặc Keep → Champion → cùng vòng chào → lưu `daily_greet_champion_more`.
+- Việc nối tiếp `daily_greet_champion_more` (`run.MORE_JOB`, ưu tiên 385, không đi qua Go): bỏ qua khi Daily Greet chưa xong / đã lưu more / đủ 10 lần; chạy: về thành → tới Keep (`city_map.reach_building`: thấy Keep thì làm luôn; có route thì `goto`; chưa có route thì `scan_city` tìm và lưu DB rồi `goto`) → trái tim hoặc Keep → Champion → cùng vòng chào → lưu `daily_greet_champion_more`.
 - Giới hạn cả nhiệm vụ `TASK_MAX_SECONDS` = 600 s (10 lần Greet ~ 10 phút).
 - Giao diện Activity **bản cũ** (lưới thẻ): không làm nhiệm vụ này. Không có `Card.png` nên `open_task` trả TASK_UNKNOWN, bỏ qua, không đánh dấu.
 - Keep là công trình cố định ở giữa thành (như Gold Levy) nên dùng chung `open_menu` + `KEEP`.
