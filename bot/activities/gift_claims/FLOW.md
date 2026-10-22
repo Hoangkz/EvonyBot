@@ -7,6 +7,9 @@ Worker chạy nhóm quà sau khi hoàn thành các Daily Activities và ưu tiê
 thứ tự **Event Center -> Valuable Event -> Super Value Return** khi ô **Claim Event Gifts** ở tab Daily
 Activities được tích (`settings["General"]["gift_claims"]`, mặc định bật):
 
+Khu nào còn PENDING sau một lượt sẽ tạm nghỉ 120 giây thay vì chặn khu kế
+tiếp. Khi cửa sổ mới bắt đầu, thứ tự trên được áp dụng lại từ Event Center.
+
 - `gift_claims.valuable_event.run`: chỉ Valuable Event. Key tổng `gift_valuable_event`.
 - `gift_claims.super_value_return.run`: Login Gifts, Empire Depot, Lucky Raffle,
   City Growth Plan Stage 1 và Refining Weekly Card. Key tổng
@@ -108,8 +111,10 @@ giây và chờ 1 giây để các máy chạy đồng thời có thời gian �
   để nhận tất cả nút Claim trùng nhau. Chỉ sau đó mới dò sparkle; một sparkle
   không sinh Congratulations thì dừng tab đó. Nếu người dùng bấm Stop giữa
   tab, tab đó chưa được ghi nhớ và phải được mở lại ở lần chạy sau.
-- Event Center: quét xong toàn bộ nhóm Limited trước, chỉ khi các key Limited
-  đều DONE hôm nay mới chuyển sang Activities; không vào Competition. Mỗi nhóm
+- Event Center: quét xong toàn bộ nhóm Limited trước rồi luôn chuyển sang
+  Activities; không vào Competition. Một nhiệm vụ đã thấy nhưng chạy hết flow
+  riêng mà chưa DONE được giữ PENDING và không được mở lại trong cùng lượt
+  120 giây. Mỗi nhóm
   chỉ duyệt tối đa bốn vị trí danh sách (vị trí đầu và ba lần lướt chậm). Ở
   từng vị trí bot log rõ danh sách tên nhiệm vụ còn pending trước khi dò và
   bấm. Event không xuất hiện trong một lượt quét đầy đủ được log `lần 1/3`,
@@ -118,6 +123,9 @@ giây và chờ 1 giây để các máy chạy đồng thời có thời gian �
   di chuyển hai lần liên tiếp, nhận từng nút Claim và chỉ DONE sau khi đã lướt
   hết mà không còn Claim. Ảnh `Claimed` được loại trừ trước khi tìm `Claim`,
   vì template của từ ngắn có thể khớp nhầm vào đầu từ dài.
+  Legion Hunting cũng mở bằng dòng tên và xác nhận bằng title riêng; bot chỉ
+  lướt trong khung nhiệm vụ màu xanh, nhận mọi nút Claim và chỉ DONE sau một
+  lượt quét đầy đủ từ đầu tới đáy không còn Claim.
   Một tọa độ Claim chỉ được bấm một lần trong cùng một vùng để tránh lặp vô hạn
   khi giao diện lag hoặc nút chưa kịp biến mất.
   Precious Blazon Exchange và Hypnos' Dream chỉ mở Rewards khi

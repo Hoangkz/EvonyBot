@@ -6,6 +6,7 @@ from . import (blessing_of_pallas, dragon_battle, dwarfs_lucky_apple,
                dwarfs_treasure,
                eagle_of_freedom,
                giants_wisdom_temple, grace_of_star_trail, hypnos_dream,
+               legion_hunting,
                poseidons_day, precious_blazon_exchange, revelation_of_horus,
                sealed_imperial_treasury, wishful_windmill_festival)
 from ..common import (ClaimReport, GiftTask, TEXT_CLAIM_CONTROLS, back_if_close_x,
@@ -27,6 +28,14 @@ MAX_SCROLLS = 3
 # swipes at the real bottom, not from a fixed number of four content screens.
 MAX_EAGLE_CONTENT_SWIPES = 12
 EAGLE_BOTTOM_CONFIRMATIONS = 2
+# Legion Hunting uses the green quest list (roughly y=39..98%).  Its DONE
+# contract is one complete top-to-bottom pass without a Claim button.
+LEGION_CONTENT_REGION = (2, 39, 98, 98)
+LEGION_CLAIM_REGION = (65, 39, 100, 98)
+MAX_LEGION_CONTENT_SWIPES = 12
+MAX_LEGION_VERIFY_PASSES = 3
+MAX_LEGION_CLAIMS_PER_VIEW = 6
+LEGION_EDGE_CONFIRMATIONS = 2
 # Text controls such as Blessing of Pallas' green Claim sit as low as 91% of
 # the 396x704 frame.  Fixed text templates are safe to search down to the
 # bottom because they only match Claim/Free/Daily Free words.  Sparkle remains
@@ -53,12 +62,13 @@ APPLE_STATE_MISS_RETRIES = 3
 # MEmu can become noticeably slower when the worker controls many devices at
 # once.  Keep every Event Center interaction paced from one place so image
 # recognition never samples the previous frame immediately after a tap/swipe.
-UI_SETTLE_SECONDS = 1.0
-SWIPE_DURATION_SECONDS = 0.8
+UI_SETTLE_SECONDS = 1.5
+SWIPE_DURATION_SECONDS = 1.0
 # A 30-emulator host can keep moving/repainting the Event Center list after
 # ADB has finished the swipe.  List navigation therefore gets a longer pause
 # than ordinary taps, and every list position is sampled twice before moving.
 LIST_SCROLL_SETTLE_SECONDS = 2.0
+WISHFUL_SETTLE_SECONDS = 2.0
 EMPTY_POSITION_CHECKS = 2
 CATEGORIES = (
     ("limited", 18),
@@ -70,6 +80,7 @@ POLICY_SEEN_PREFIX = b"__policy_seen__\0"
 SEEN_POLICIES_ATTR = "_gift_claims_event_center_seen_policies"
 SCAN_COMPLETE_ATTR = "_gift_claims_event_center_scan_complete"
 SCANNED_CATEGORIES_ATTR = "_gift_claims_event_center_scanned_categories"
+PENDING_THIS_RUN_ATTR = "_gift_claims_event_center_pending_this_run"
 EVENT_POLICIES = (
     blessing_of_pallas.POLICY,
     dragon_battle.POLICY,
@@ -81,6 +92,7 @@ EVENT_POLICIES = (
     dwarfs_treasure.POLICY,
     dwarfs_lucky_apple.POLICY,
     eagle_of_freedom.POLICY,
+    legion_hunting.POLICY,
     giants_wisdom_temple.POLICY,
     wishful_windmill_festival.POLICY,
     revelation_of_horus.POLICY,
@@ -120,6 +132,9 @@ FORCED_LIMITED_ROWS = (
     ("EagleOfFreedom/list_row", FORCED_EVENT_PREFIX + b"eagle_of_freedom",
      GiftScreen.EAGLE_OF_FREEDOM, "Eagle of Freedom",
      eagle_of_freedom.POLICY.key),
+    ("LegionHunting/list_row", FORCED_EVENT_PREFIX + b"legion_hunting",
+     GiftScreen.LEGION_HUNTING, "Legion Hunting",
+     legion_hunting.POLICY.key),
 )
 FORCED_ACTIVITY_ROWS = (
     ("DwarfsLuckyApple/list_row",
@@ -181,14 +196,15 @@ def _close_exact_congratulations(bot) -> bool:
 
 
 def _wait_for(bot, template: str, *, attempts=4, threshold=0.68,
-              region=(0, 0, 100, 100)):
+              region=(0, 0, 100, 100), delay=None):
+    delay = UI_SETTLE_SECONDS if delay is None else delay
     for attempt in range(attempts):
         screen = bot.screenshot()
         pos = find(bot, template, screen, threshold=threshold, region=region)
         if pos is not None:
             return pos
         if attempt + 1 < attempts:
-            bot.sleep(UI_SETTLE_SECONDS)
+            bot.sleep(delay)
     return None
 
 
@@ -355,65 +371,103 @@ def _handle_dwarf(bot):
 
 def _wishful_open_blessings(bot) -> bool:
     if _wait_for(bot, "WishfulWindmillFestival/title_wind_blessings",
-                 attempts=1, threshold=0.68) is not None:
+                 attempts=1, threshold=0.68,
+                 delay=WISHFUL_SETTLE_SECONDS) is not None:
         return True
     entry = _wait_for(bot, "WishfulWindmillFestival/button_wind_blessings",
-                      attempts=4, threshold=0.68, region=(65, 15, 100, 60))
+                      attempts=5, threshold=0.68, region=(0, 12, 100, 85),
+                      delay=WISHFUL_SETTLE_SECONDS)
     if entry is None:
+        bot.record("Gift Claims: Wishful Windmill không thấy icon Wind "
+                   "Blessings sau 5 lần; giữ PENDING")
         return False
-    bot.tap(*entry, delay=UI_SETTLE_SECONDS)
-    return _wait_for(bot, "WishfulWindmillFestival/title_wind_blessings",
-                     attempts=4, threshold=0.68) is not None
+    bot.record("Gift Claims: Wishful Windmill chờ trang ổn định rồi tap "
+               "Wind Blessings")
+    bot.tap(*entry, delay=WISHFUL_SETTLE_SECONDS)
+    opened = _wait_for(bot, "WishfulWindmillFestival/title_wind_blessings",
+                       attempts=5, threshold=0.68,
+                       delay=WISHFUL_SETTLE_SECONDS) is not None
+    if not opened:
+        bot.record("Gift Claims: Wishful Windmill đã tap icon nhưng chưa thấy "
+                   "title Wind Blessings; giữ PENDING")
+    return opened
 
 
 def _handle_wishful(bot):
     attempted = 0
+    bot.record("Gift Claims: Wishful Windmill chờ 2s để trang sự kiện render "
+               "ổn định trên nhiều máy")
+    bot.sleep(WISHFUL_SETTLE_SECONDS)
     if not _wishful_open_blessings(bot):
         return ClaimReport(), False
     no_records = _wait_for(bot, "WishfulWindmillFestival/status_no_records",
-                           attempts=2, threshold=0.68, region=(0, 18, 100, 92))
+                           attempts=3, threshold=0.68, region=(0, 18, 100, 92),
+                           delay=WISHFUL_SETTLE_SECONDS)
     if no_records is None:
         claim_all = _wait_for(bot, "WishfulWindmillFestival/button_claim_all",
-                              attempts=4, threshold=0.68, region=(35, 15, 100, 95))
+                              attempts=5, threshold=0.68,
+                              region=(35, 15, 100, 95),
+                              delay=WISHFUL_SETTLE_SECONDS)
         if claim_all is None:
+            bot.record("Gift Claims: Wishful Windmill chưa thấy Claim All sau "
+                       "5 lần; giữ PENDING")
             return ClaimReport(), False
         attempted += 1
         bot.record("Gift Claims: Wishful Windmill tap Claim All")
-        bot.tap(*claim_all, delay=UI_SETTLE_SECONDS)
+        bot.tap(*claim_all, delay=WISHFUL_SETTLE_SECONDS)
         _close_exact_congratulations(bot)
+        bot.sleep(WISHFUL_SETTLE_SECONDS)
         # Claim All returns to the main event; if it did not, one Back is safe
         # because the Wind Blessings title proves the child panel.
         if _wait_for(bot, "WishfulWindmillFestival/button_wind_blessings",
-                     attempts=2, threshold=0.68, region=(65, 15, 100, 60)) is None:
-            bot.back(delay=UI_SETTLE_SECONDS)
+                     attempts=3, threshold=0.68, region=(0, 12, 100, 85),
+                     delay=WISHFUL_SETTLE_SECONDS) is None:
+            bot.back(delay=WISHFUL_SETTLE_SECONDS)
         if not _wishful_open_blessings(bot):
             return ClaimReport(attempted, 0), False
         no_records = _wait_for(bot, "WishfulWindmillFestival/status_no_records",
-                               attempts=4, threshold=0.68, region=(0, 18, 100, 92))
+                               attempts=5, threshold=0.68,
+                               region=(0, 18, 100, 92),
+                               delay=WISHFUL_SETTLE_SECONDS)
     if no_records is None:
+        bot.record("Gift Claims: Wishful Windmill chưa thấy No Records sau "
+                   "khi nhận Claim All; giữ PENDING")
         return ClaimReport(attempted, 0), False
 
     bot.record("Gift Claims: Wishful Windmill phần Wind Blessings = No Records")
-    bot.back(delay=UI_SETTLE_SECONDS)
+    bot.back(delay=WISHFUL_SETTLE_SECONDS)
     storage = _wait_for(bot, "WishfulWindmillFestival/tab_wind_power_storage",
-                        attempts=4, threshold=0.68, region=(20, 5, 80, 20))
+                        attempts=5, threshold=0.68, region=(0, 5, 100, 25),
+                        delay=WISHFUL_SETTLE_SECONDS)
     if storage is None:
+        bot.record("Gift Claims: Wishful Windmill chưa thấy tab Wind Power "
+                   "Storage; giữ PENDING")
         return ClaimReport(attempted, 1), False
-    bot.tap(*storage, delay=UI_SETTLE_SECONDS)
+    bot.record("Gift Claims: Wishful Windmill tap Wind Power Storage")
+    bot.tap(*storage, delay=WISHFUL_SETTLE_SECONDS)
     challenge = _wait_for(bot, "WishfulWindmillFestival/button_challenge_quest",
-                          attempts=4, threshold=0.68, region=(0, 10, 100, 95))
+                          attempts=5, threshold=0.68,
+                          region=(0, 10, 100, 95),
+                          delay=WISHFUL_SETTLE_SECONDS)
     if challenge is None:
+        bot.record("Gift Claims: Wishful Windmill chưa thấy Challenge Quest; "
+                   "giữ PENDING")
         return ClaimReport(attempted, 1), False
-    bot.tap(*challenge, delay=UI_SETTLE_SECONDS)
+    bot.record("Gift Claims: Wishful Windmill tap Challenge Quest")
+    bot.tap(*challenge, delay=WISHFUL_SETTLE_SECONDS)
     for _ in range(12):
         claim = _wait_for(bot, "WishfulWindmillFestival/button_claim",
-                          attempts=2, threshold=0.68, region=(35, 15, 100, 95))
+                          attempts=3, threshold=0.68,
+                          region=(35, 15, 100, 95),
+                          delay=WISHFUL_SETTLE_SECONDS)
         if claim is None:
             bot.record("Gift Claims: Wishful Windmill phần Challenge Quest hết Claim")
             return ClaimReport(attempted, 2), True
         attempted += 1
-        bot.tap(*claim, delay=UI_SETTLE_SECONDS)
+        bot.record("Gift Claims: Wishful Windmill tap Claim trong Challenge Quest")
+        bot.tap(*claim, delay=WISHFUL_SETTLE_SECONDS)
         _close_exact_congratulations(bot)
+        bot.sleep(WISHFUL_SETTLE_SECONDS)
     return ClaimReport(attempted, 1), False
 
 
@@ -543,7 +597,8 @@ def _apple_phase(bot, active: str, finished: str,
         # and obtain a fresh frame on the next loop iteration.
         if _apple_congratulations_hit(bot, screen) is not None:
             bot.record("Gift Claims: Dwarf's Lucky Apple còn Congratulations; "
-                       "đóng popup và chờ 1s trước khi nhận dạng DONE/ACTIVE")
+                       f"đóng popup và chờ {UI_SETTLE_SECONDS:g}s trước khi "
+                       "nhận dạng DONE/ACTIVE")
             _close_apple_congratulations(bot, attempts=1)
             bot.sleep(UI_SETTLE_SECONDS)
             continue
@@ -739,6 +794,141 @@ def _handle_eagle_of_freedom(bot):
     return ClaimReport(attempted, max(verified, int(done))), done
 
 
+def _legion_claims(bot, screen):
+    return find_all(bot, "LegionHunting/button_claim", screen,
+                    threshold=0.78, region=LEGION_CLAIM_REGION)
+
+
+def _legion_content_signature(screen):
+    """dHash only the green quest frame; ignore animation in the banner."""
+    height, width = screen.shape[:2]
+    x0, y0, x1, y1 = LEGION_CONTENT_REGION
+    patch = cv2.cvtColor(
+        screen[int(height * y0 / 100):int(height * y1 / 100),
+               int(width * x0 / 100):int(width * x1 / 100)],
+        cv2.COLOR_BGR2GRAY,
+    )
+    tiny = cv2.resize(patch, (33, 16), interpolation=cv2.INTER_AREA)
+    return np.packbits(tiny[:, 1:] > tiny[:, :-1]).tobytes()
+
+
+def _legion_content_moved(before, after) -> bool:
+    old = np.frombuffer(_legion_content_signature(before), dtype=np.uint8)
+    new = np.frombuffer(_legion_content_signature(after), dtype=np.uint8)
+    return int(np.unpackbits(np.bitwise_xor(old, new)).sum()) > 8
+
+
+def _legion_swipe_to_top(bot) -> bool:
+    """Reach the real top using touches confined to the green quest frame."""
+    unchanged = 0
+    for _ in range(MAX_LEGION_CONTENT_SWIPES):
+        before = bot.screenshot()
+        bot.swipe_percent(50, 52, 50, 90,
+                          duration=SWIPE_DURATION_SECONDS,
+                          delay=LIST_SCROLL_SETTLE_SECONDS)
+        after = bot.screenshot()
+        if _legion_content_moved(before, after):
+            unchanged = 0
+        else:
+            unchanged += 1
+            if unchanged >= LEGION_EDGE_CONFIRMATIONS:
+                return True
+    return False
+
+
+def _scan_legion_once(bot) -> tuple[ClaimReport, bool, bool]:
+    """Return (report, reached_bottom, unresolved_claim) for one full pass."""
+    attempted = verified = 0
+    bottom_checks = 0
+    for position in range(1, MAX_LEGION_CONTENT_SWIPES + 2):
+        bot.record("Gift Claims: Legion Hunting quét vùng nhiệm vụ màu xanh "
+                   f"vị trí {position}")
+        blocked_positions = []
+        empty_checks = 0
+        while attempted < 30:
+            bot.check()
+            screen = bot.screenshot()
+            claim = next(
+                (pos for pos in _legion_claims(bot, screen)
+                 if all((pos[0] - old[0]) ** 2 + (pos[1] - old[1]) ** 2
+                        > 30 ** 2 for old in blocked_positions)),
+                None,
+            )
+            if claim is None:
+                empty_checks += 1
+                if empty_checks < EMPTY_POSITION_CHECKS:
+                    bot.sleep(UI_SETTLE_SECONDS)
+                    continue
+                break
+
+            empty_checks = 0
+            blocked_positions.append(claim)
+            attempted += 1
+            bot.record(f"Gift Claims: Legion Hunting tap Claim tại {claim}")
+            bot.tap(*claim, delay=LIST_SCROLL_SETTLE_SECONDS)
+            close_congratulations(bot, attempts=2)
+            after_tap = bot.screenshot()
+            if any(abs(pos[0] - claim[0]) <= 35 and
+                   abs(pos[1] - claim[1]) <= 30
+                   for pos in _legion_claims(bot, after_tap)):
+                bot.record("Gift Claims: Legion Hunting nút Claim vẫn còn sau "
+                           "khi bấm; giữ PENDING")
+                return ClaimReport(attempted, verified), False, True
+            verified += 1
+
+            if len(blocked_positions) >= MAX_LEGION_CLAIMS_PER_VIEW:
+                break
+
+        before = bot.screenshot()
+        if position > MAX_LEGION_CONTENT_SWIPES:
+            return ClaimReport(attempted, verified), False, False
+        bot.record("Gift Claims: Legion Hunting đã kiểm tra khung hiện tại; "
+                   "lướt chậm tìm Claim phía dưới")
+        bot.swipe_percent(50, 90, 50, 52,
+                          duration=SWIPE_DURATION_SECONDS,
+                          delay=LIST_SCROLL_SETTLE_SECONDS)
+        after = bot.screenshot()
+        if _legion_content_moved(before, after):
+            bottom_checks = 0
+            continue
+        bottom_checks += 1
+        bot.record("Gift Claims: Legion Hunting danh sách không di chuyển "
+                   f"({bottom_checks}/{LEGION_EDGE_CONFIRMATIONS})")
+        if bottom_checks >= LEGION_EDGE_CONFIRMATIONS:
+            return ClaimReport(attempted, verified), True, False
+    return ClaimReport(attempted, verified), False, False
+
+
+def _handle_legion_hunting(bot):
+    """Claim rows, then require one whole Claim-free sweep before DONE."""
+    total = ClaimReport()
+    for pass_number in range(1, MAX_LEGION_VERIFY_PASSES + 1):
+        bot.record("Gift Claims: Legion Hunting bắt đầu lượt quét đầy đủ "
+                   f"{pass_number}/{MAX_LEGION_VERIFY_PASSES}")
+        if not _legion_swipe_to_top(bot):
+            bot.record("Gift Claims: Legion Hunting chưa xác nhận được đầu "
+                       "danh sách; giữ PENDING")
+            return total, False
+        report, reached_bottom, unresolved = _scan_legion_once(bot)
+        total = ClaimReport(total.attempted + report.attempted,
+                            total.verified + report.verified)
+        if unresolved or not reached_bottom:
+            if not reached_bottom and not unresolved:
+                bot.record("Gift Claims: Legion Hunting chưa xác nhận được đáy "
+                           "danh sách; giữ PENDING")
+            return total, False
+        if report.attempted == 0:
+            bot.record("Gift Claims: Legion Hunting đã lướt một lượt từ đầu "
+                       "tới cuối và không còn Claim; DONE")
+            return total, True
+        bot.record("Gift Claims: Legion Hunting vừa nhận được quà; quay về đầu "
+                   "và quét lại để xác nhận không còn Claim")
+        bot.sleep(UI_SETTLE_SECONDS)
+    bot.record("Gift Claims: Legion Hunting chưa có lượt quét sạch Claim; "
+               "giữ PENDING")
+    return total, False
+
+
 EXACT_HANDLERS = {
     GiftScreen.PRECIOUS_BLAZON_EXCHANGE: _handle_precious,
     GiftScreen.POSEIDONS_DAY: _handle_poseidon,
@@ -749,6 +939,7 @@ EXACT_HANDLERS = {
     GiftScreen.WISHFUL_WINDMILL_FESTIVAL: _handle_wishful,
     GiftScreen.DWARFS_LUCKY_APPLE: _handle_dwarfs_lucky_apple,
     GiftScreen.EAGLE_OF_FREEDOM: _handle_eagle_of_freedom,
+    GiftScreen.LEGION_HUNTING: _handle_legion_hunting,
 }
 
 
@@ -959,6 +1150,9 @@ def _process_known_event(bot, policy) -> ClaimReport:
         report, completed = exact(bot)
         if completed:
             return _finish_event(bot, policy, report)
+        pending = getattr(bot, PENDING_THIS_RUN_ATTR, None)
+        if isinstance(pending, set) and policy.key is not None:
+            pending.add(policy.key)
         bot.record(f"Gift Claims: {policy.label} chưa đạt điều kiện DONE riêng; giữ PENDING")
         return report
 
@@ -1282,6 +1476,9 @@ def _scan_category(bot, category: str, visited: set[bytes]) -> bool:
         seen_policies = set()
         setattr(bot, SEEN_POLICIES_ATTR, seen_policies)
     seen_policies.update(seen_policy_keys)
+    pending_this_run = getattr(bot, PENDING_THIS_RUN_ATTR, None)
+    if not isinstance(pending_this_run, set):
+        pending_this_run = set()
     # Evony remembers a separate vertical position for each category. Always
     # establish the top boundary first; otherwise opening Activities after a
     # prior run can start below Dwarf's Lucky Apple and only scan downward.
@@ -1323,6 +1520,19 @@ def _scan_category(bot, category: str, visited: set[bytes]) -> bool:
                     row = find(bot, template, screen, threshold=0.90,
                                region=(10, 15, 75, 98))
                     if isinstance(row, tuple) and len(row) == 2:
+                        if policy_key in pending_this_run:
+                            # This named task already exhausted its own bounded
+                            # checks during the current Gift Claims window.
+                            # Remember both its named key and visual row so the
+                            # generic red-dot scanner cannot reopen it again.
+                            tap_y = min(screen.shape[0] - 1, row[1] + 18)
+                            visited.add(key)
+                            visited.add(_category_signature(
+                                category, _row_signature(screen, tap_y)))
+                            bot.record(f"Gift Claims: {event_label} đang PENDING "
+                                       "trong lượt 120s này; bỏ qua để làm "
+                                       "nhiệm vụ kế tiếp")
+                            continue
                         if policy_key is not None:
                             seen_policy_keys.add(policy_key)
                             seen_policies.add(policy_key)
@@ -1344,6 +1554,12 @@ def _scan_category(bot, category: str, visited: set[bytes]) -> bool:
                         # below it so a small residual scroll cannot select
                         # the preceding event (observed with Dwarf -> Sealed).
                         tap_y = min(screen.shape[0] - 1, row[1] + 18)
+                        # Also checkpoint the visual row. If this exact task
+                        # becomes PENDING after its bounded handler, the
+                        # generic red-dot pass must not reopen the same row a
+                        # second time during this 120-second gift window.
+                        visited.add(_category_signature(
+                            category, _row_signature(screen, tap_y)))
                         candidate = (tap_y, key, expected_screen, event_label,
                                      policy_key)
                         bot.record(f"Gift Claims: Event Center mở {event_label} "
@@ -1377,7 +1593,8 @@ def _scan_category(bot, category: str, visited: set[bytes]) -> bool:
                 empty_checks += 1
                 if empty_checks < EMPTY_POSITION_CHECKS:
                     bot.record(f"Gift Claims: Event Center/{category} chưa thấy "
-                               "nhiệm vụ ở khung hiện tại; chờ 1s rồi quét lại")
+                               "nhiệm vụ ở khung hiện tại; chờ "
+                               f"{UI_SETTLE_SECONDS:g}s rồi quét lại")
                     bot.sleep(UI_SETTLE_SECONDS)
                     continue
                 break
@@ -1396,6 +1613,8 @@ def _scan_category(bot, category: str, visited: set[bytes]) -> bool:
                         "này trong lượt quét và không kết luận event vắng mặt")
                 failed_forced.add(key)
                 if forced_policy_key is not None:
+                    if isinstance(pending_this_run, set):
+                        pending_this_run.add(forced_policy_key)
                     seen_policy_keys.add(forced_policy_key)
                     seen_policies.add(forced_policy_key)
                     visited.add(_policy_seen_checkpoint(forced_policy_key))
@@ -1418,6 +1637,9 @@ def _scan_category(bot, category: str, visited: set[bytes]) -> bool:
                             f"{getattr(actual_screen, 'value', actual_screen)}; "
                             "không đánh dấu DONE, giữ PENDING")
                     failed_forced.add(key)
+                    if (forced_policy_key is not None
+                            and isinstance(pending_this_run, set)):
+                        pending_this_run.add(forced_policy_key)
                     if not _back_to_list(bot):
                         return False
                     continue
@@ -1455,7 +1677,7 @@ def _scan_category(bot, category: str, visited: set[bytes]) -> bool:
     if clean:
         _record_missing_event_policies(bot, seen_policy_keys, category)
     bot.record(f"Gift Claims: Event Center/{category} đã mở {opened_count} dòng đỏ; "
-               + ("DONE, danh sách hết đỏ" if clean
+               + ("đã quét sạch badge; chờ xác nhận các key DB" if clean
                   else "chưa DONE, danh sách vẫn còn đỏ"))
     return clean
 
@@ -1507,9 +1729,8 @@ def run_opened(bot, handled=None):
                            f"nhưng còn {len(pending)} key PENDING trong DB")
 
         if category == "limited" and not category_done:
-            bot.record("Gift Claims: Limited chưa hoàn tất; chưa chuyển sang "
-                       "Activities trong lượt này")
-            break
+            bot.record("Gift Claims: Limited còn PENDING; vẫn chuyển sang "
+                       "Activities để làm các nhiệm vụ khác trong lượt này")
 
     return all_clean
 

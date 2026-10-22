@@ -5,3 +5,6 @@
 3. Trở lại trang chính, mở `Wind Power Storage` / `Challenge Quest`.
 4. Bấm hết các nút `Claim`; phần này DONE khi không còn `Claim`.
 5. Chỉ ghi DB DONE khi cả hai phần đều hoàn tất.
+6. Chờ 2 giây sau mỗi lần mở trang, bấm nút, đóng Congratulations hoặc chuyển
+   tab; mỗi ảnh quan trọng được kiểm tra 3-5 lần để máy chạy đồng thời không
+   đọc phải khung hình cũ.

@@ -81,6 +81,8 @@ def run_opened(bot, due_keys: set[str], *, handled: set[str] | None = None
                 bot.tap(*pos, delay=STEP_DELAY)
                 if key == login_gifts.KEY:
                     completed = login_gifts.claim_opened(bot)
+                elif key == refining_weekly_card.KEY:
+                    completed = refining_weekly_card.claim_opened(bot)
                 else:
                     completed = process_exact(bot, spec.flow)
                 attempted_this_sweep.add(key)
