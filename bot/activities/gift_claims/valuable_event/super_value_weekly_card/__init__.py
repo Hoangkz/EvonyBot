@@ -1,4 +1,4 @@
 """Super Value Weekly Card gifts (city-side event)."""
-from .run import KEY, TASK, run
+from .run import FLOW, KEY, TASK, run
 
-__all__ = ["KEY", "TASK", "run"]
+__all__ = ["FLOW", "KEY", "TASK", "run"]

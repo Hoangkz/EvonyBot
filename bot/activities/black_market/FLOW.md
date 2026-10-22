@@ -13,10 +13,10 @@ Market (tiêu đề, 6 ô, Confirm, Instant Refresh, icon kim cương) dùng chu
 | `check_gold` | vàng < 2.000.000 thì dừng (kim cương < 50 thì **luôn** dừng) |
 | `refresh` | số lần Instant Refresh tối đa ("ALL" = không giới hạn) |
 | `quantity_buy` | số lần mua tối đa ("ALL" = không giới hạn) |
-| `resources` | mua gói tài nguyên 4 loại lương thực / gỗ / đá / quặng (mặc định tích) |
-| `items` | `{id: bool}` các món trong items.py (Chips 100 mặc định tích) |
+| `resources` | ô Resource trong nhóm General: mua gói tài nguyên 4 loại lương thực / gỗ / đá / quặng (mặc định tích) |
+| `items` | `{id: bool}` các món trong items.py; nhóm General gồm Chips 100, Stamina 50 và Tribute (Chips 100 mặc định tích) |
 
-Món `buy_with_gems: true` trong items.py (Stamina 50, các loại đá, Tactic Scroll, Medal — chỉ bán bằng kim cương)
+Món `buy_with_gems: true` trong items.py (Stamina 50, Tribute, các loại đá, Tactic Scroll, Medal)
 được mua bằng kim cương; Resource và Chips **không bao giờ** mua bằng kim cương.
 
 ## Luồng

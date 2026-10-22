@@ -7,8 +7,7 @@ tên; đổi sang .py để Nuitka compile cùng code, không cần ship file ri
 DATA = {
   "source": "Máy 21913 (tài khoản VIP), 2026-10-05: 61 bộ hàng = 366 ô, 60 lần Instant Refresh. seen = số ô thấy món đó; pay = số ô theo loại tiền (gem / gold / resource). Giá không OCR. buy_with_gems: món chỉ bán bằng kim cương -> được mua bằng kim cương; Resource / Chips không bao giờ mua bằng kim cương (ô giá kim cương bị bỏ).",
   "groups": {
-    "resource": "Resource",
-    "stamina_chips": "Stamina / Chips",
+    "general": "General",
     "stone": "Stones",
     "other": "Other"
   },
@@ -176,7 +175,7 @@ DATA = {
     {
       "id": "chips_100",
       "name": "Chips 100",
-      "group": "stamina_chips",
+      "group": "general",
       "seen": 8,
       "pay": {
         "resource": 8
@@ -190,7 +189,7 @@ DATA = {
     {
       "id": "stamina_50",
       "name": "Stamina 50",
-      "group": "stamina_chips",
+      "group": "general",
       "seen": 8,
       "pay": {
         "gem": 8
@@ -198,6 +197,18 @@ DATA = {
       "icons": [
         "Black Market/Items/stamina_50.png"
       ],
+      "buy_with_gems": True
+    },
+    {
+      "id": "tribute",
+      "name": "Tribute",
+      "group": "general",
+      "seen": 0,
+      "pay": {},
+      "icons": [
+        "Black Market/Items/Tribute.png"
+      ],
+      "default": False,
       "buy_with_gems": True
     },
     {

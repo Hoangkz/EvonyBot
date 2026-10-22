@@ -1,8 +1,9 @@
 # Flow: Strategic Stockpile
 
-1. Mở Valuable Event, chọn Strategic Stockpile rồi subtab Stockpile.
-2. Tìm Redeem trong vùng nội dung; bấm Redeem chỉ khi có phần thưởng dùng vé miễn phí.
-3. Bấm Confirm Redeem trong popup và chỉ đếm khi nhận được xác minh.
-4. Lặp tối đa 6 lần cho các rương hợp lệ, rồi về màn thành.
+1. Mở Valuable Event và tìm đúng tab Strategic Stockpile bằng ảnh `tab_current`.
+2. Xác nhận trang bằng dòng chữ `title`.
+3. Kiểm tra đúng chữ `Free` trong vùng nhận thưởng. Chỉ khi thấy `Free`, từ tâm
+   ảnh dịch `x + 10 px`, `y - 10 px` rồi mới bấm.
+4. Chỉ ghi DONE khi thấy ảnh rương `chest_claimed`.
 
-Không bấm nếu không thấy Confirm Redeem; không dùng tài nguyên mua rương.
+Không bấm nút mua và không coi việc biến mất tạm thời của chữ Free là DONE.

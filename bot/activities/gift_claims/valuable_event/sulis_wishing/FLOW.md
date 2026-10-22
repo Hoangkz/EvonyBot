@@ -1,7 +1,7 @@
 # Flow: Sulis Wishing Pool
 
-1. Mở Valuable Event, chọn Sulis Wishing Pool có badge đỏ.
-2. Chỉ kiểm tra các nút nhận miễn phí/Claim cố định ở tab hiện tại.
-3. Xác minh quà và về màn thành.
+1. Nếu carousel Valuable Event xuất hiện Sulis Wishing Pool, không mở và không
+   thực hiện bất kỳ thao tác nhận/quay nào.
+2. Ghi nhiệm vụ Sulis Wishing Pool là DONE trong ngày để carousel tiếp tục.
 
-Không thực hiện điều ước quay/gacha hoặc thao tác tiêu tài nguyên.
+Sự kiện này được cấu hình bỏ qua hoàn toàn.

@@ -2,10 +2,14 @@
 import cv2
 import numpy as np
 
-from . import (blessing_of_pallas, dragon_battle, dwarfs_treasure, grace_of_star_trail,
-               hypnos_dream, poseidons_day, precious_blazon_exchange,
-               revelation_of_horus, sealed_imperial_treasury)
+from . import (blessing_of_pallas, dragon_battle, dwarfs_lucky_apple,
+               dwarfs_treasure,
+               eagle_of_freedom,
+               giants_wisdom_temple, grace_of_star_trail, hypnos_dream,
+               poseidons_day, precious_blazon_exchange, revelation_of_horus,
+               sealed_imperial_treasury, wishful_windmill_festival)
 from ..common import (ClaimReport, GiftTask, TEXT_CLAIM_CONTROLS, back_if_close_x,
+                     _scaled_template,
                      claim_fixed_controls, claim_sparkles,
                      close_congratulations, find, find_all,
                      mark_task_done, open_event_center, return_home)
@@ -15,7 +19,14 @@ KEY = "gift_event_center_limited"
 PAGE = "EventCenter/title"
 DOT = "EventCenter/notification_dot"
 CONGRATULATIONS = "LoginGifts/congratulations"
-MAX_SCROLLS = 8
+# At most four stable list positions. Each position is sampled twice before
+# moving, which is more reliable than nine rapid swipes on 30 emulators.
+MAX_SCROLLS = 3
+# Eagle of Freedom owns a vertically scrolling quest panel.  This limit is a
+# safety ceiling only; normal completion is detected from two no-movement
+# swipes at the real bottom, not from a fixed number of four content screens.
+MAX_EAGLE_CONTENT_SWIPES = 12
+EAGLE_BOTTOM_CONFIRMATIONS = 2
 # Text controls such as Blessing of Pallas' green Claim sit as low as 91% of
 # the 396x704 frame.  Fixed text templates are safe to search down to the
 # bottom because they only match Claim/Free/Daily Free words.  Sparkle remains
@@ -29,11 +40,36 @@ SPARKLE_SAFE = (5, 18, 90, 78)
 INNER_TOP = (0, 7, 100, 15)
 MAX_INNER_SWIPES = 4
 MAX_EVENT_VERIFY_PASSES = 2
+APPLE_STATE_THRESHOLD = 0.80
+# Active orange buttons can score lower against the template while their glow
+# is animating. DONE remains strict (including both ornaments), but an active
+# control is safe to tap at this still-conservative score.
+APPLE_ACTIVE_THRESHOLD = 0.75
+APPLE_DONE_MARGIN = 0.05
+APPLE_ORNAMENT_THRESHOLD = 0.70
+APPLE_ORNAMENT_WIDTH_RATIO = 0.18
+MAX_APPLE_TAPS_PER_PHASE = 100
+APPLE_STATE_MISS_RETRIES = 3
+# MEmu can become noticeably slower when the worker controls many devices at
+# once.  Keep every Event Center interaction paced from one place so image
+# recognition never samples the previous frame immediately after a tap/swipe.
+UI_SETTLE_SECONDS = 1.0
+SWIPE_DURATION_SECONDS = 0.8
+# A 30-emulator host can keep moving/repainting the Event Center list after
+# ADB has finished the swipe.  List navigation therefore gets a longer pause
+# than ordinary taps, and every list position is sampled twice before moving.
+LIST_SCROLL_SETTLE_SECONDS = 2.0
+EMPTY_POSITION_CHECKS = 2
 CATEGORIES = (
     ("limited", 18),
+    ("activities", 49),
 )
 CATEGORY_DONE_PREFIX = b"__category_done__\0"
 FORCED_EVENT_PREFIX = b"__forced_event__\0"
+POLICY_SEEN_PREFIX = b"__policy_seen__\0"
+SEEN_POLICIES_ATTR = "_gift_claims_event_center_seen_policies"
+SCAN_COMPLETE_ATTR = "_gift_claims_event_center_scan_complete"
+SCANNED_CATEGORIES_ATTR = "_gift_claims_event_center_scanned_categories"
 EVENT_POLICIES = (
     blessing_of_pallas.POLICY,
     dragon_battle.POLICY,
@@ -43,6 +79,10 @@ EVENT_POLICIES = (
     grace_of_star_trail.POLICY,
     sealed_imperial_treasury.POLICY,
     dwarfs_treasure.POLICY,
+    dwarfs_lucky_apple.POLICY,
+    eagle_of_freedom.POLICY,
+    giants_wisdom_temple.POLICY,
+    wishful_windmill_festival.POLICY,
     revelation_of_horus.POLICY,
 )
 POLICY_BY_SCREEN = {policy.screen: policy for policy in EVENT_POLICIES
@@ -54,23 +94,51 @@ SKIPPED_SCREENS = {policy.screen: policy for policy in EVENT_POLICIES
 FIXED_CLAIMS = TEXT_CLAIM_CONTROLS
 REWARD_NAVIGATION = grace_of_star_trail.POLICY.reward_navigation
 FORCED_LIMITED_ROWS = (
+    ("BlessingOfPallas/list_row", FORCED_EVENT_PREFIX + b"blessing_of_pallas",
+     None, "Blessing of Pallas", blessing_of_pallas.POLICY.key),
     ("DragonBattle/list_row", FORCED_EVENT_PREFIX + b"dragon_battle",
-     GiftScreen.DRAGON_BATTLE, "Dragon Battle"),
+     GiftScreen.DRAGON_BATTLE, "Dragon Battle", dragon_battle.POLICY.key),
+    ("PreciousBlazonExchange/list_row",
+     FORCED_EVENT_PREFIX + b"precious_blazon_exchange",
+     GiftScreen.PRECIOUS_BLAZON_EXCHANGE, "Precious Blazon Exchange",
+     precious_blazon_exchange.POLICY.key),
     ("GraceOfStarTrail/list_row", FORCED_EVENT_PREFIX + b"grace_of_star_trail",
-     GiftScreen.GRACE_OF_STAR_TRAIL, "Grace of Star Trail"),
+     GiftScreen.GRACE_OF_STAR_TRAIL, "Grace of Star Trail",
+     grace_of_star_trail.POLICY.key),
     # Dwarf's Treasure may lose its outer Event Center badge while the
     # Daily Free chest inside is still claimable.  Check the named row once
     # per daily run instead of using the outer badge as its source of truth.
     ("DwarfsTreasure/list_row", FORCED_EVENT_PREFIX + b"dwarfs_treasure",
-     GiftScreen.DWARFS_TREASURE, "Dwarf's Treasure"),
+     GiftScreen.DWARFS_TREASURE, "Dwarf's Treasure", dwarfs_treasure.POLICY.key),
+    ("GiantsWisdomTemple/list_row", FORCED_EVENT_PREFIX + b"giants_wisdom_temple",
+     GiftScreen.GIANTS_WISDOM_TEMPLE, "Giant's Wisdom Temple",
+     giants_wisdom_temple.POLICY.key),
+    ("WishfulWindmillFestival/list_row",
+     FORCED_EVENT_PREFIX + b"wishful_windmill_festival",
+     GiftScreen.WISHFUL_WINDMILL_FESTIVAL, "Wishful Windmill Festival",
+     wishful_windmill_festival.POLICY.key),
+    ("EagleOfFreedom/list_row", FORCED_EVENT_PREFIX + b"eagle_of_freedom",
+     GiftScreen.EAGLE_OF_FREEDOM, "Eagle of Freedom",
+     eagle_of_freedom.POLICY.key),
 )
+FORCED_ACTIVITY_ROWS = (
+    ("DwarfsLuckyApple/list_row",
+     FORCED_EVENT_PREFIX + b"dwarfs_lucky_apple",
+     GiftScreen.DWARFS_LUCKY_APPLE, "Dwarf's Lucky Apple",
+     dwarfs_lucky_apple.POLICY.key),
+)
+POLICY_CATEGORIES = {
+    dwarfs_lucky_apple.POLICY.key: "activities",
+}
 
 
 def run(bot):
     screen = open_event_center(bot)
     if screen is None:
         return False
-    return run_opened(bot)
+    completed = run_opened(bot)
+    return_home(bot)
+    return completed
 
 
 def _row_dots(bot, screen):
@@ -95,9 +163,593 @@ def _close_congratulations(bot):
     screen = bot.screenshot()
     if find(bot, CONGRATULATIONS, screen, threshold=0.78,
             region=(0, 38, 100, 62)) is not None:
-        bot.back(delay=0.8)
+        bot.back(delay=UI_SETTLE_SECONDS)
         return True
     return False
+
+
+def _close_exact_congratulations(bot) -> bool:
+    """Close either supplied Event Center congratulations marker."""
+    if close_congratulations(bot, attempts=1):
+        return True
+    screen = bot.screenshot()
+    if find(bot, "PreciousBlazonExchange/popup_congratulations", screen,
+            threshold=0.72, region=(0, 35, 100, 65)) is None:
+        return False
+    bot.back(delay=UI_SETTLE_SECONDS)
+    return True
+
+
+def _wait_for(bot, template: str, *, attempts=4, threshold=0.68,
+              region=(0, 0, 100, 100)):
+    for attempt in range(attempts):
+        screen = bot.screenshot()
+        pos = find(bot, template, screen, threshold=threshold, region=region)
+        if pos is not None:
+            return pos
+        if attempt + 1 < attempts:
+            bot.sleep(UI_SETTLE_SECONDS)
+    return None
+
+
+def _ensure_skip_animation(bot, folder: str) -> bool:
+    """Enable Skip animation and require the supplied green checked state."""
+    region = (35, 35, 100, 92)
+    checked = f"{folder}/checkbox_skip_animation_checked"
+    unchecked = f"{folder}/checkbox_skip_animation_unchecked"
+    if _wait_for(bot, checked, attempts=2, region=region) is not None:
+        return True
+    # Background art differs between events, so the full supplied crop can
+    # score poorly even though the green check itself is unchanged. Detect
+    # that check by colour/shape inside the named Skip-animation strip.
+    screen = bot.screenshot()
+    height, width = screen.shape[:2]
+    area = screen[int(height * .35):int(height * .92),
+                  int(width * .35):width]
+    hsv = cv2.cvtColor(area, cv2.COLOR_BGR2HSV)
+    green = cv2.inRange(hsv, np.array((35, 100, 80)),
+                        np.array((95, 255, 255)))
+    _, _, stats, _ = cv2.connectedComponentsWithStats(green)
+    scale = width / 396
+    if any(6 * scale <= w <= 28 * scale and 6 * scale <= h <= 28 * scale
+           and pixels >= 18 * scale * scale
+           for _, _, w, h, pixels in stats[1:]):
+        bot.record(f"Gift Claims: {folder} đã có dấu tích xanh Skip animation")
+        return True
+    pos = _wait_for(bot, unchecked, attempts=3, region=region)
+    if pos is None:
+        bot.log(f"Gift Claims: {folder} không nhận diện được Skip animation")
+        return False
+    bot.record(f"Gift Claims: {folder} bật Skip animation")
+    bot.tap(*pos, delay=UI_SETTLE_SECONDS)
+    return _wait_for(bot, checked, attempts=3, region=region) is not None
+
+
+def _handle_precious(bot):
+    attempted = 0
+    for attempt in range(4):
+        screen = bot.screenshot()
+        if find(bot, "PreciousBlazonExchange/status_rewards_claimed", screen,
+                threshold=0.68, region=(0, 12, 40, 48)) is not None:
+            return ClaimReport(attempted, 1), True
+        rewards = find(bot, "PreciousBlazonExchange/button_rewards_text", screen,
+                       threshold=0.62, region=(0, 12, 45, 48))
+        if rewards is not None:
+            attempted += 1
+            bot.record("Gift Claims: Precious Blazon Exchange tap exact Rewards")
+            bot.tap(*rewards, delay=UI_SETTLE_SECONDS)
+            if _close_exact_congratulations(bot):
+                return ClaimReport(attempted, 1), True
+        if attempt + 1 < 4:
+            bot.sleep(UI_SETTLE_SECONDS)
+    done = _wait_for(bot, "PreciousBlazonExchange/status_rewards_claimed", attempts=2,
+                     threshold=0.68, region=(0, 12, 40, 48)) is not None
+    return ClaimReport(attempted, int(done)), done
+
+
+def _handle_hypnos(bot):
+    attempted = 0
+    # The page is already identified by its fixed title.  Four misses in the
+    # exact upper-right reward area means its chest/Rewards control is gone.
+    for attempt in range(4):
+        screen = bot.screenshot()
+        rewards = find(bot, "HypnosDream/button_rewards_text", screen,
+                       threshold=0.62, region=(65, 12, 100, 38))
+        if rewards is None:
+            if attempt + 1 < 4:
+                bot.sleep(UI_SETTLE_SECONDS)
+                continue
+            bot.record("Gift Claims: Hypnos' Dream không còn Rewards ở góc phải")
+            return ClaimReport(attempted, 1), True
+        attempted += 1
+        bot.record("Gift Claims: Hypnos' Dream tap exact Rewards")
+        bot.tap(*rewards, delay=UI_SETTLE_SECONDS)
+        if _close_exact_congratulations(bot):
+            return ClaimReport(attempted, 1), True
+    return ClaimReport(attempted, 0), False
+
+
+def _handle_poseidon(bot):
+    attempted = 0
+    for attempt in range(5):
+        screen = bot.screenshot()
+        if find(bot, "PoseidonsDay/status_daily_free_claimed", screen, threshold=0.68,
+                region=(65, 12, 100, 38)) is not None:
+            return ClaimReport(attempted, 1), True
+        daily = find(bot, "PoseidonsDay/button_daily_free_text", screen,
+                     threshold=0.62, region=(65, 12, 100, 38))
+        if daily is not None:
+            attempted += 1
+            bot.record("Gift Claims: Poseidon's Day tap exact Daily Free")
+            bot.tap(*daily, delay=UI_SETTLE_SECONDS)
+            if _close_exact_congratulations(bot):
+                return ClaimReport(attempted, 1), True
+        elif attempt == 0:
+            package = find(bot, "PoseidonsDay/tab_packages_red_dot", screen,
+                           threshold=0.68, region=(45, 5, 90, 18))
+            if package is not None:
+                attempted += 1
+                bot.record("Gift Claims: Poseidon's Day mở tab Packages có chấm đỏ")
+                bot.tap(*package, delay=UI_SETTLE_SECONDS)
+        if attempt + 1 < 5:
+            bot.sleep(UI_SETTLE_SECONDS)
+    done = _wait_for(bot, "PoseidonsDay/status_daily_free_claimed", attempts=2, threshold=0.68,
+                     region=(65, 12, 100, 38)) is not None
+    return ClaimReport(attempted, int(done)), done
+
+
+def _handle_grace(bot):
+    report = _tap_reward_navigation(bot)
+    return report, report.verified > 0
+
+
+def _handle_giant(bot):
+    ended = _wait_for(bot, "GiantsWisdomTemple/status_event_ended",
+                      attempts=2, threshold=0.70,
+                      region=(0, 8, 100, 75))
+    if ended is not None:
+        bot.record("Gift Claims: Giant's Wisdom Temple hiện Event has ended; DONE")
+        return ClaimReport(0, 1), True
+    if not _ensure_skip_animation(bot, "GiantsWisdomTemple"):
+        return ClaimReport(), False
+    target = _wait_for(bot, "GiantsWisdomTemple/button_free_wisdom_tile", attempts=4,
+                       threshold=0.70, region=(0, 30, 100, 92))
+    if target is None:
+        return ClaimReport(), False
+    bot.record("Gift Claims: Giant's Wisdom Temple tap exact free tile")
+    # The result animation is noticeably slower on a multi-emulator host.
+    bot.tap(*target, delay=LIST_SCROLL_SETTLE_SECONDS)
+    if _close_exact_congratulations(bot):
+        return ClaimReport(1, 1), True
+    ended = _wait_for(bot, "GiantsWisdomTemple/status_event_ended",
+                      attempts=4, threshold=0.70,
+                      region=(0, 8, 100, 75))
+    if ended is not None:
+        bot.record("Gift Claims: Giant's Wisdom Temple nhận Event has ended; DONE")
+        return ClaimReport(1, 1), True
+    done = _wait_for(bot, "GiantsWisdomTemple/message_not_enough_items", attempts=4,
+                     threshold=0.70, region=(0, 15, 100, 45)) is not None
+    return ClaimReport(1, int(done)), done
+
+
+def _handle_dwarf(bot):
+    if not _ensure_skip_animation(bot, "DwarfsTreasure"):
+        return ClaimReport(), False
+    daily = _wait_for(bot, "DwarfsTreasure/button_daily_free_chest", attempts=4,
+                      threshold=0.66, region=(65, 12, 100, 38))
+    if daily is None:
+        # The exact Dwarf page and checked Skip-animation state prove that the
+        # page finished loading.  Daily Free disappears after it is claimed,
+        # so four paced misses are the terminal already-claimed state rather
+        # than an unfinished task.
+        bot.record("Gift Claims: Dwarf's Treasure không còn Daily Free; DONE")
+        return ClaimReport(0, 1), True
+    bot.record("Gift Claims: Dwarf's Treasure tap exact Daily Free")
+    bot.tap(*daily, delay=UI_SETTLE_SECONDS)
+    if _close_exact_congratulations(bot):
+        return ClaimReport(1, 1), True
+    gone = _wait_for(bot, "DwarfsTreasure/button_daily_free_chest", attempts=3,
+                     threshold=0.66, region=(65, 12, 100, 38)) is None
+    return ClaimReport(1, int(gone)), gone
+
+
+def _wishful_open_blessings(bot) -> bool:
+    if _wait_for(bot, "WishfulWindmillFestival/title_wind_blessings",
+                 attempts=1, threshold=0.68) is not None:
+        return True
+    entry = _wait_for(bot, "WishfulWindmillFestival/button_wind_blessings",
+                      attempts=4, threshold=0.68, region=(65, 15, 100, 60))
+    if entry is None:
+        return False
+    bot.tap(*entry, delay=UI_SETTLE_SECONDS)
+    return _wait_for(bot, "WishfulWindmillFestival/title_wind_blessings",
+                     attempts=4, threshold=0.68) is not None
+
+
+def _handle_wishful(bot):
+    attempted = 0
+    if not _wishful_open_blessings(bot):
+        return ClaimReport(), False
+    no_records = _wait_for(bot, "WishfulWindmillFestival/status_no_records",
+                           attempts=2, threshold=0.68, region=(0, 18, 100, 92))
+    if no_records is None:
+        claim_all = _wait_for(bot, "WishfulWindmillFestival/button_claim_all",
+                              attempts=4, threshold=0.68, region=(35, 15, 100, 95))
+        if claim_all is None:
+            return ClaimReport(), False
+        attempted += 1
+        bot.record("Gift Claims: Wishful Windmill tap Claim All")
+        bot.tap(*claim_all, delay=UI_SETTLE_SECONDS)
+        _close_exact_congratulations(bot)
+        # Claim All returns to the main event; if it did not, one Back is safe
+        # because the Wind Blessings title proves the child panel.
+        if _wait_for(bot, "WishfulWindmillFestival/button_wind_blessings",
+                     attempts=2, threshold=0.68, region=(65, 15, 100, 60)) is None:
+            bot.back(delay=UI_SETTLE_SECONDS)
+        if not _wishful_open_blessings(bot):
+            return ClaimReport(attempted, 0), False
+        no_records = _wait_for(bot, "WishfulWindmillFestival/status_no_records",
+                               attempts=4, threshold=0.68, region=(0, 18, 100, 92))
+    if no_records is None:
+        return ClaimReport(attempted, 0), False
+
+    bot.record("Gift Claims: Wishful Windmill phần Wind Blessings = No Records")
+    bot.back(delay=UI_SETTLE_SECONDS)
+    storage = _wait_for(bot, "WishfulWindmillFestival/tab_wind_power_storage",
+                        attempts=4, threshold=0.68, region=(20, 5, 80, 20))
+    if storage is None:
+        return ClaimReport(attempted, 1), False
+    bot.tap(*storage, delay=UI_SETTLE_SECONDS)
+    challenge = _wait_for(bot, "WishfulWindmillFestival/button_challenge_quest",
+                          attempts=4, threshold=0.68, region=(0, 10, 100, 95))
+    if challenge is None:
+        return ClaimReport(attempted, 1), False
+    bot.tap(*challenge, delay=UI_SETTLE_SECONDS)
+    for _ in range(12):
+        claim = _wait_for(bot, "WishfulWindmillFestival/button_claim",
+                          attempts=2, threshold=0.68, region=(35, 15, 100, 95))
+        if claim is None:
+            bot.record("Gift Claims: Wishful Windmill phần Challenge Quest hết Claim")
+            return ClaimReport(attempted, 2), True
+        attempted += 1
+        bot.tap(*claim, delay=UI_SETTLE_SECONDS)
+        _close_exact_congratulations(bot)
+    return ClaimReport(attempted, 1), False
+
+
+def _apple_done_ornament_matches(screen, template, center) -> tuple[bool, tuple[float, float]]:
+    """Require both dark ornamental side borders of an Apple DONE control."""
+    height, width = template.shape[:2]
+    # ScreenMixin.best_match() reports ``top_left + size // 2``. Reverse that
+    # exact integer operation here. ``round(center - size / 2)`` is wrong for
+    # odd-sized Apple templates (111 px wide): depending on coordinate parity
+    # banker's rounding shifts the ornamental border by one pixel and turns an
+    # exact DONE match into false border scores around 0.1-0.3.
+    left = center[0] - width // 2
+    top = center[1] - height // 2
+    right, bottom = left + width, top + height
+    if left < 0 or top < 0 or right > screen.shape[1] or bottom > screen.shape[0]:
+        return False, (0.0, 0.0)
+    patch = screen[top:bottom, left:right]
+    border = max(4, round(width * APPLE_ORNAMENT_WIDTH_RATIO))
+
+    def score(actual, expected):
+        if actual.shape != expected.shape or actual.size == 0:
+            return 0.0
+        return float(cv2.matchTemplate(
+            actual, expected, cv2.TM_CCOEFF_NORMED)[0, 0])
+
+    scores = (score(patch[:, :border], template[:, :border]),
+              score(patch[:, -border:], template[:, -border:]))
+    return min(scores) >= APPLE_ORNAMENT_THRESHOLD, scores
+
+
+def _apple_button_state(bot, screen, active: str, finished: str,
+                        region=(0, 15, 100, 98)):
+    """Distinguish the orange active button from the grey disabled button.
+
+    Their wording and coin icon are nearly identical, so testing the disabled
+    template first with a loose threshold can classify an active orange button
+    as DONE. Compare both full-colour scores from the same frame instead. DONE
+    must beat the active score by a visible margin; an ambiguous result is
+    deliberately treated as active/PENDING rather than completed.
+    """
+    active_template = _scaled_template(bot, active, screen)
+    done_template = _scaled_template(bot, finished, screen)
+    active_score, active_pos = bot.best_match(
+        active_template, screen=screen, region=region)
+    done_score, done_pos = bot.best_match(
+        done_template, screen=screen, region=region)
+    bot.record(f"Gift Claims: Dwarf's Lucky Apple so màu nút "
+               f"active={active_score:.3f}, done={done_score:.3f}")
+    if (done_pos is not None and done_score >= APPLE_STATE_THRESHOLD
+            and done_score >= active_score + APPLE_DONE_MARGIN):
+        ornament_ok, ornament_scores = _apple_done_ornament_matches(
+            screen, done_template, done_pos)
+        bot.record("Gift Claims: Dwarf's Lucky Apple kiểm tra hoa văn DONE "
+                   f"trái={ornament_scores[0]:.3f}, "
+                   f"phải={ornament_scores[1]:.3f} -> "
+                   f"{'đạt' if ornament_ok else 'không đạt'}")
+        if ornament_ok:
+            return "done", done_pos
+        bot.record("Gift Claims: ảnh giống DONE nhưng thiếu viền hoa văn; "
+                   "không được kết luận DONE")
+    if active_pos is not None and active_score >= APPLE_ACTIVE_THRESHOLD:
+        if active_score < APPLE_STATE_THRESHOLD:
+            bot.record("Gift Claims: Dwarf's Lucky Apple ảnh ACTIVE đang đổi "
+                       f"sáng nhưng đạt ngưỡng riêng {active_score:.3f} >= "
+                       f"{APPLE_ACTIVE_THRESHOLD:.2f}; tiếp tục bấm")
+        return "active", active_pos
+    return None, None
+
+
+def _apple_congratulations_hit(bot, screen):
+    """Return a Lucky Apple popup match without taking a second screenshot."""
+    for template in (CONGRATULATIONS,
+                     "PreciousBlazonExchange/popup_congratulations"):
+        hit = find(bot, template, screen, threshold=0.78,
+                   region=(0, 35, 100, 65))
+        if hit is not None:
+            return hit
+    return None
+
+
+def _close_apple_congratulations(bot, attempts=3,
+                                 *, safe_tap_after_reward=False) -> bool:
+    """Dismiss Lucky Apple Congratulations at the approved fixed top point.
+
+    Back can close the entire Dwarf's Lucky Apple page on this event.  The
+    fixed point (195, 20) is in the safe title ribbon, outside every reward
+    control, and keeps the current green/red phase open.
+    """
+    for attempt in range(attempts):
+        screen = bot.screenshot()
+        hit = _apple_congratulations_hit(bot, screen)
+        if hit is not None:
+            bot.record("Gift Claims: Dwarf's Lucky Apple tap cố định (195, 20) "
+                       "để đóng Congratulations; không dùng Back")
+            bot.tap(195, 20, delay=UI_SETTLE_SECONDS)
+            return True
+        if attempt + 1 < attempts:
+            bot.sleep(UI_SETTLE_SECONDS)
+    if safe_tap_after_reward:
+        # The Congratulations artwork fades/animates and occasionally misses
+        # both templates on overloaded multi-device hosts. This call is made
+        # only immediately after tapping a verified Apple reward button. The
+        # approved title coordinate is harmless without a popup and guarantees
+        # that a visually present but unmatched popup is dismissed.
+        bot.record("Gift Claims: Dwarf's Lucky Apple không bắt được ảnh "
+                   "Congratulations sau nút nhận; vẫn tap an toàn (195, 20)")
+        bot.tap(195, 20, delay=UI_SETTLE_SECONDS)
+        return True
+    return False
+
+
+def _apple_phase(bot, active: str, finished: str,
+                 *, max_taps=MAX_APPLE_TAPS_PER_PHASE):
+    """Continuously tap one Lucky Apple phase until its disabled state.
+
+    A short fade/animation must not eject the task between taps. Unreadable
+    frames are retried in-place; only the worker's 120-second deadline may
+    interrupt the phase and resume it later.
+    """
+    attempted = 0
+    missing_frames = 0
+    while attempted < max_taps:
+        bot.check()
+        screen = bot.screenshot()
+        # Never compare ACTIVE/DONE against a frame still covered by the
+        # Congratulations overlay. Dismiss it, wait one full UI interval,
+        # and obtain a fresh frame on the next loop iteration.
+        if _apple_congratulations_hit(bot, screen) is not None:
+            bot.record("Gift Claims: Dwarf's Lucky Apple còn Congratulations; "
+                       "đóng popup và chờ 1s trước khi nhận dạng DONE/ACTIVE")
+            _close_apple_congratulations(bot, attempts=1)
+            bot.sleep(UI_SETTLE_SECONDS)
+            continue
+        state, button = _apple_button_state(bot, screen, active, finished)
+        if state == "done":
+            return ClaimReport(attempted, attempted), True
+        if state != "active" or button is None:
+            missing_frames += 1
+            bot.record(f"Gift Claims: Dwarf's Lucky Apple chưa đọc được trạng "
+                       f"thái pha hiện tại ({missing_frames}/"
+                       f"{APPLE_STATE_MISS_RETRIES}); chờ rồi kiểm tra lại")
+            if missing_frames % APPLE_STATE_MISS_RETRIES == 0:
+                bot.record("Gift Claims: Dwarf's Lucky Apple vẫn ở nguyên "
+                           "trang để đọc lại; không chuyển PENDING/không Back")
+            bot.sleep(UI_SETTLE_SECONDS)
+            continue
+        missing_frames = 0
+        attempted += 1
+        bot.record(f"Gift Claims: Dwarf's Lucky Apple tap {active} "
+                   f"({attempted}/{max_taps})")
+        bot.tap(*button, delay=UI_SETTLE_SECONDS)
+        _close_apple_congratulations(
+            bot, attempts=1, safe_tap_after_reward=True)
+        # Keep recognition separate from the tap/animation delay. The next
+        # ACTIVE/DONE comparison must use a stable post-popup frame.
+        bot.sleep(UI_SETTLE_SECONDS)
+    bot.record(f"Gift Claims: Dwarf's Lucky Apple chạm giới hạn an toàn "
+               f"{max_taps} lần ở một pha; giữ PENDING")
+    return ClaimReport(attempted, 0), False
+
+
+def _handle_dwarfs_lucky_apple(bot):
+    """Complete green x100/x10, then red x10; final disabled red is DONE."""
+    # The page artwork and buttons fade in after the title is already visible.
+    # Always begin from the green tab.  Never probe the red DONE template on
+    # the initial/default page: a grey green-x10 state has nearly identical
+    # wording and could otherwise shortcut the whole task as completed.
+    bot.sleep(UI_SETTLE_SECONDS)
+    green = _wait_for(bot, "DwarfsLuckyApple/tab_green_apple", attempts=4,
+                      threshold=0.70, region=(45, 40, 100, 68))
+    if green is None:
+        return ClaimReport(), False
+    bot.tap(*green, delay=UI_SETTLE_SECONDS)
+
+    first, first_done = _apple_phase(
+        bot, "DwarfsLuckyApple/button_green_wish_x100",
+        "DwarfsLuckyApple/status_green_wish_x100_done")
+    if not first_done:
+        return first, False
+    bot.record("Gift Claims: Dwarf's Lucky Apple xanh x100 DONE; "
+               "chuyển sang xanh x10")
+    second, second_done = _apple_phase(
+        bot, "DwarfsLuckyApple/button_green_wish_x10",
+        "DwarfsLuckyApple/status_green_wish_x10_done")
+    total = ClaimReport(first.attempted + second.attempted,
+                        first.verified + second.verified)
+    if not second_done:
+        return total, False
+    bot.record("Gift Claims: Dwarf's Lucky Apple xanh x10 DONE; "
+               "chuyển sang táo đỏ")
+
+    red = _wait_for(bot, "DwarfsLuckyApple/tab_red_apple", attempts=4,
+                    threshold=0.70, region=(0, 40, 55, 68))
+    if red is None:
+        return total, False
+    bot.record("Gift Claims: Dwarf's Lucky Apple bấm tab táo đỏ; chỉ từ "
+               "thời điểm này mới được xét DONE toàn nhiệm vụ")
+    bot.tap(*red, delay=UI_SETTLE_SECONDS)
+    third, third_done = _apple_phase(
+        bot, "DwarfsLuckyApple/button_red_wish_x10",
+        "DwarfsLuckyApple/status_red_wish_x10_done")
+    final = ClaimReport(total.attempted + third.attempted,
+                        total.verified + third.verified)
+    if third_done:
+        bot.record("Gift Claims: Dwarf's Lucky Apple đỏ x10 đã hiện trạng "
+                   "thái DONE; hoàn thành toàn bộ nhiệm vụ")
+    return final, third_done
+
+
+def _eagle_active_claims(bot, screen):
+    """Return Claim buttons without confusing the prefix in ``Claimed``.
+
+    OpenCV template matching quite correctly finds the shorter word Claim
+    inside the longer word Claimed.  A captured Claimed marker therefore owns
+    the nearby match and removes it from the actionable list.
+    """
+    claimed = find_all(bot, "EagleOfFreedom/status_claimed", screen,
+                       threshold=0.72, region=(55, 18, 100, 98))
+    claims = find_all(bot, "EagleOfFreedom/button_claim", screen,
+                      threshold=0.68, region=(55, 18, 100, 98))
+    return [
+        pos for pos in claims
+        if all(abs(pos[0] - done[0]) > 55 or abs(pos[1] - done[1]) > 24
+               for done in claimed)
+    ]
+
+
+def _eagle_content_signature(screen):
+    """Animation-tolerant dHash for detecting the vertical list boundary."""
+    height, width = screen.shape[:2]
+    patch = cv2.cvtColor(screen[int(height * .18):int(height * .98), :width],
+                         cv2.COLOR_BGR2GRAY)
+    tiny = cv2.resize(patch, (33, 16), interpolation=cv2.INTER_AREA)
+    return np.packbits(tiny[:, 1:] > tiny[:, :-1]).tobytes()
+
+
+def _eagle_content_moved(before, after) -> bool:
+    old = np.frombuffer(_eagle_content_signature(before), dtype=np.uint8)
+    new = np.frombuffer(_eagle_content_signature(after), dtype=np.uint8)
+    distance = int(np.unpackbits(np.bitwise_xor(old, new)).sum())
+    return distance > 8
+
+
+def _handle_eagle_of_freedom(bot):
+    """Claim every exact Claim control until the real bottom of the panel."""
+    attempted = 0
+    verified = 0
+    unresolved = False
+    bottom_checks = 0
+    position = 0
+    swipes = 0
+    while True:
+        position += 1
+        bot.record(f"Gift Claims: Eagle of Freedom kiểm tra vùng nhiệm vụ "
+                   f"{position} (lướt tới đáy thực tế)")
+        empty_checks = 0
+        blocked_positions = []
+        while attempted < 20:
+            bot.check()
+            screen = bot.screenshot()
+            claims = _eagle_active_claims(bot, screen)
+            claim = next(
+                (pos for pos in claims
+                 if all((pos[0] - old[0]) ** 2 + (pos[1] - old[1]) ** 2
+                        > 30 ** 2 for old in blocked_positions)),
+                None,
+            )
+            if claim is None:
+                empty_checks += 1
+                if empty_checks < EMPTY_POSITION_CHECKS:
+                    bot.sleep(UI_SETTLE_SECONDS)
+                    continue
+                break
+            empty_checks = 0
+            attempted += 1
+            blocked_positions.append(claim)
+            bot.record(f"Gift Claims: Eagle of Freedom tap Claim "
+                       f"({attempted}/20) tại {claim}")
+            bot.tap(*claim, delay=LIST_SCROLL_SETTLE_SECONDS)
+            _close_exact_congratulations(bot)
+            after_tap = bot.screenshot()
+            still_active = any(
+                abs(pos[0] - claim[0]) <= 35 and abs(pos[1] - claim[1]) <= 30
+                for pos in _eagle_active_claims(bot, after_tap)
+            )
+            if still_active:
+                unresolved = True
+                bot.record("Gift Claims: Eagle of Freedom nút vẫn là Claim sau "
+                           "khi bấm; giữ PENDING để lần sau kiểm tra lại")
+            else:
+                verified += 1
+                bot.record("Gift Claims: Eagle of Freedom nút đã thành Claimed")
+
+        before_swipe = bot.screenshot()
+        if swipes >= MAX_EAGLE_CONTENT_SWIPES:
+            bot.record("Gift Claims: Eagle of Freedom chạm giới hạn an toàn "
+                       "12 lần lướt nhưng chưa xác nhận đáy; giữ PENDING")
+            return ClaimReport(attempted, verified), False
+        bot.record("Gift Claims: Eagle of Freedom đã kiểm tra khung hiện tại; "
+                   "lướt chậm tìm đáy danh sách")
+        bot.swipe_percent(50, 88, 50, 45,
+                          duration=SWIPE_DURATION_SECONDS,
+                          delay=LIST_SCROLL_SETTLE_SECONDS)
+        swipes += 1
+        after_swipe = bot.screenshot()
+        if _eagle_content_moved(before_swipe, after_swipe):
+            bottom_checks = 0
+            continue
+        bottom_checks += 1
+        bot.record(f"Gift Claims: Eagle of Freedom danh sách không di chuyển "
+                   f"({bottom_checks}/{EAGLE_BOTTOM_CONFIRMATIONS})")
+        if bottom_checks < EAGLE_BOTTOM_CONFIRMATIONS:
+            continue
+        final_claims = _eagle_active_claims(bot, after_swipe)
+        done = not final_claims and not unresolved
+        break
+
+    if done:
+        bot.record("Gift Claims: Eagle of Freedom đã lướt hết và không còn Claim; DONE")
+    elif unresolved:
+        bot.record("Gift Claims: Eagle of Freedom đã tới đáy nhưng còn nút Claim "
+                   "chưa đổi trạng thái; giữ PENDING")
+    return ClaimReport(attempted, max(verified, int(done))), done
+
+
+EXACT_HANDLERS = {
+    GiftScreen.PRECIOUS_BLAZON_EXCHANGE: _handle_precious,
+    GiftScreen.POSEIDONS_DAY: _handle_poseidon,
+    GiftScreen.HYPNOS_DREAM: _handle_hypnos,
+    GiftScreen.GRACE_OF_STAR_TRAIL: _handle_grace,
+    GiftScreen.GIANTS_WISDOM_TEMPLE: _handle_giant,
+    GiftScreen.DWARFS_TREASURE: _handle_dwarf,
+    GiftScreen.WISHFUL_WINDMILL_FESTIVAL: _handle_wishful,
+    GiftScreen.DWARFS_LUCKY_APPLE: _handle_dwarfs_lucky_apple,
+    GiftScreen.EAGLE_OF_FREEDOM: _handle_eagle_of_freedom,
+}
 
 
 def _inner_red_dots(screen):
@@ -151,7 +803,7 @@ def _back_to_list(bot):
         if find(bot, PAGE, screen, threshold=0.72,
                 region=(0, 0, 100, 13)) is not None:
             return True
-        bot.back(delay=1)
+        bot.back(delay=UI_SETTLE_SECONDS)
     return False
 
 
@@ -178,7 +830,7 @@ def _tap_special_navigation(bot, *, attempts=4) -> ClaimReport:
             pos = find(bot, template, screen, threshold=0.68, region=LOWER)
             if pos is not None:
                 bot.record(f"Gift Claims: Event Center tap {label} ({template})")
-                bot.tap(*pos, delay=1)
+                bot.tap(*pos, delay=UI_SETTLE_SECONDS)
                 attempted_count += 1
                 if close_congratulations(bot):
                     bot.record(f"Gift Claims: verified {label} Congratulations")
@@ -208,10 +860,10 @@ def _tap_special_navigation(bot, *, attempts=4) -> ClaimReport:
                         opened_entries.add(entry)
                         attempted_count += 1
                         bot.record(f"Gift Claims: Event Center mở tab {entry}")
-                        bot.tap(*entry_pos, delay=1)
+                        bot.tap(*entry_pos, delay=UI_SETTLE_SECONDS)
                         break
         if attempt + 1 < attempts:
-            bot.sleep(0.6)
+            bot.sleep(UI_SETTLE_SECONDS)
     if attempted_count:
         bot.log(f"Gift Claims: Rewards/Daily Free vẫn còn sau {attempted_count} lần; "
                 "đánh dấu bỏ qua mục")
@@ -229,7 +881,7 @@ def _tap_reward_navigation(bot) -> ClaimReport:
         if pos is None:
             continue
         bot.record(f"Gift Claims: Event Center tap Star Trail Gift ({template})")
-        bot.tap(*pos, delay=1)
+        bot.tap(*pos, delay=UI_SETTLE_SECONDS)
         if close_congratulations(bot):
             bot.record("Gift Claims: verified Star Trail Gift Congratulations")
             return ClaimReport(1, 1)
@@ -241,7 +893,7 @@ def _tap_reward_navigation(bot) -> ClaimReport:
             if claim is not None:
                 attempted += 1
                 bot.record("Gift Claims: tap Grace of Star Trail coin Claim")
-                bot.tap(*claim, delay=1)
+                bot.tap(*claim, delay=UI_SETTLE_SECONDS)
                 if close_congratulations(bot):
                     bot.record("Gift Claims: verified Star Trail coin Congratulations")
                     return ClaimReport(attempted, 1)
@@ -251,9 +903,11 @@ def _tap_reward_navigation(bot) -> ClaimReport:
                     bot.record("Gift Claims: verified Star Trail coin Claim disappeared")
                     return ClaimReport(attempted, 1)
             if attempt < 3:
-                bot.sleep(0.5)
-        bot.log("Gift Claims: đã mở Star Trail Gift nhưng chưa thấy/nhận được coin Claim")
-        return ClaimReport(attempted, 0)
+                bot.sleep(UI_SETTLE_SECONDS)
+        # The user-defined terminal state is the opened Star Trail Gift page
+        # with no remaining coin Claim control.
+        bot.record("Gift Claims: Star Trail Gift đã mở và không còn coin Claim; DONE")
+        return ClaimReport(attempted, 1)
     return ClaimReport()
 
 
@@ -300,6 +954,14 @@ def _finish_event(bot, policy, report: ClaimReport) -> ClaimReport:
 
 def _process_known_event(bot, policy) -> ClaimReport:
     """Check a named event twice when no reward success can be verified."""
+    exact = EXACT_HANDLERS.get(policy.screen)
+    if exact is not None:
+        report, completed = exact(bot)
+        if completed:
+            return _finish_event(bot, policy, report)
+        bot.record(f"Gift Claims: {policy.label} chưa đạt điều kiện DONE riêng; giữ PENDING")
+        return report
+
     total = ClaimReport()
     for pass_number in range(1, MAX_EVENT_VERIFY_PASSES + 1):
         bot.check()
@@ -326,7 +988,15 @@ def _process_opened_event(bot):
     opened = bot.screenshot()
     name = identify(bot, opened)
     policy = POLICY_BY_SCREEN.get(name)
+    if (policy is not None and policy.key is not None
+            and bot.is_daily_done(policy.key) is True):
+        bot.record(f"Gift Claims: {policy.label} đã DONE trong DB hôm nay; bỏ qua")
+        return ClaimReport()
     skipped = SKIPPED_SCREENS.get(name)
+    if name == GiftScreen.EVENT_CENTER:
+        bot.log("Gift Claims: cú bấm vẫn ở danh sách Event Center; không xử lý "
+                "chấm đỏ của thanh nhóm như tab quà")
+        return ClaimReport()
     if skipped is not None:
         bot.record(f"Gift Claims: {skipped.label} - {skipped.skip_reason}")
         return _finish_event(bot, skipped, ClaimReport())
@@ -341,9 +1011,19 @@ def _process_opened_event(bot):
     # slice.  Inspect the page body exactly once; its fixed Claim/Free controls
     # are still handled, but decorative red pixels can no longer drive taps.
     if name is None:
+        if find(bot, "BlessingOfPallas/status_claimed", opened, threshold=0.68,
+                region=LOWER) is not None:
+            bot.record("Gift Claims: Blessing of Pallas đã hiện Claimed")
+            mark_task_done(bot, blessing_of_pallas.POLICY.key)
+            return ClaimReport(0, 1)
         bot.record("Gift Claims: Event Center page chưa có title template; "
                    "kiểm tra nội dung một lần, không quét dot trong artwork")
         report, _ = _process_current_event_content(bot)
+        after = bot.screenshot()
+        if find(bot, "BlessingOfPallas/status_claimed", after, threshold=0.68,
+                region=LOWER) is not None:
+            bot.record("Gift Claims: Blessing of Pallas xác minh Claim -> Claimed")
+            mark_task_done(bot, blessing_of_pallas.POLICY.key)
         return report
 
     # Grace may keep its claim badge only on the nested Star Trail Gift icon,
@@ -396,7 +1076,7 @@ def _process_opened_event(bot):
                 dot, signature = candidate
                 bot.record(f"Gift Claims: Event Center mở tab đỏ bên trong {dot}")
                 bot.tap(max(0, dot[0] - 25), min(screen.shape[0] - 1, dot[1] + 15),
-                        delay=1)
+                        delay=UI_SETTLE_SECONDS)
                 report, closed = _process_current_event_content(bot)
                 total = ClaimReport(total.attempted + report.attempted,
                                     total.verified + report.verified)
@@ -419,9 +1099,13 @@ def _process_opened_event(bot):
                 before_swipe = bot.screenshot()
                 before_dots = _inner_red_dots(before_swipe)
                 if direction < 0:
-                    bot.swipe_percent(85, 11, 20, 11, duration=0.45, delay=0.7)
+                    bot.swipe_percent(85, 11, 20, 11,
+                                      duration=SWIPE_DURATION_SECONDS,
+                                      delay=UI_SETTLE_SECONDS)
                 else:
-                    bot.swipe_percent(20, 11, 85, 11, duration=0.45, delay=0.7)
+                    bot.swipe_percent(20, 11, 85, 11,
+                                      duration=SWIPE_DURATION_SECONDS,
+                                      delay=UI_SETTLE_SECONDS)
                 # At either carousel boundary a swipe can be a no-op.  Without
                 # this guard the same persistent badge is revisited once per
                 # step merely because its animated pixels changed slightly.
@@ -449,6 +1133,20 @@ def _category_done_key(category: str) -> bytes:
     return CATEGORY_DONE_PREFIX + category.encode("ascii")
 
 
+def _category_policy_keys(category: str) -> tuple[str, ...]:
+    """Daily DB keys that must be DONE before leaving one category."""
+    return tuple(
+        policy.key for policy in EVENT_POLICIES
+        if policy.key is not None
+        and POLICY_CATEGORIES.get(policy.key, "limited") == category
+    )
+
+
+def _category_db_done(bot, category: str) -> bool:
+    return all(bool(bot.is_daily_done(key))
+               for key in _category_policy_keys(category))
+
+
 def _category_seen(category: str, signature: bytes, visited, max_distance=28) -> bool:
     prefix = category.encode("ascii") + b"\0"
     current = np.frombuffer(signature, dtype=np.uint8)
@@ -464,38 +1162,29 @@ def _category_seen(category: str, signature: bytes, visited, max_distance=28) ->
     return False
 
 
-def _activities_facebook_red(bot, screen) -> bool:
-    """Activities is complete when its Facebook row still owns a red badge."""
-    activity_icons = find_all(bot, "EventCenter/facebook_activity", screen,
-                              threshold=0.72, region=(0, 13, 35, 35))
-    activity_tab_red = any(abs(x - screen.shape[1] * 0.64) <=
-                           24 * screen.shape[1] / 396
-                           for x, _ in _inner_red_dots(screen))
-    if activity_icons and activity_tab_red:
-        return True
-
-    # Fallback for layouts where the Facebook row is lower and its own badge
-    # is fully visible rather than partly covered by the category header.
-    icons = find_all(bot, "FollowUs/facebook_icon", screen, threshold=0.65,
-                     region=(0, 15, 35, 98))
-    if not icons:
-        return False
-    dots = find_all(bot, DOT, screen, threshold=0.62, region=(0, 15, 35, 98))
-    scale = screen.shape[1] / 396
-    return any(abs(dot[0] - icon[0]) <= 55 * scale and
-               abs(dot[1] - icon[1]) <= 55 * scale
-               for icon in icons for dot in dots)
-
-
 def _select_category(bot, name: str, x_percent: int) -> bool:
     bot.record(f"Gift Claims: Event Center chọn nhóm {name}")
-    bot.tap_percent(x_percent, 11, delay=1)
+    screen = bot.screenshot()
+    # Always select Limited explicitly after opening Event Center.  Evony can
+    # remember the previously selected Activities tab, so starting the list
+    # scan without this click may inspect the wrong category.  Use the exact
+    # text crop supplied from the live UI; the coordinate is only a fallback
+    # for a temporarily animated/blurred tab.
+    category_template = ("EventCenter/tab_activities"
+                         if name == "activities"
+                         else "EventCenter/tab_limited")
+    category_pos = find(bot, category_template, screen, threshold=0.72,
+                        region=(0, 5, 80, 18))
+    if category_pos is not None:
+        bot.tap(*category_pos, delay=UI_SETTLE_SECONDS)
+    else:
+        bot.tap_percent(x_percent, 11, delay=UI_SETTLE_SECONDS)
     for _ in range(4):
         screen = bot.screenshot()
         if find(bot, PAGE, screen, threshold=0.72,
                 region=(0, 0, 100, 13)) is not None:
             return True
-        bot.sleep(0.6)
+        bot.sleep(UI_SETTLE_SECONDS)
     return False
 
 
@@ -514,26 +1203,65 @@ def _same_list_position(before: bytes, after: bytes, max_distance=18) -> bool:
         np.unpackbits(np.bitwise_xor(old, new)).sum()) <= max_distance
 
 
-def _verify_clean(bot, category: str, ignored=()) -> bool:
-    # Return to the top, then scan the complete vertical list once more.
-    for _ in range(MAX_SCROLLS):
+def _return_list_to_top(bot, category: str) -> None:
+    """Reset a category's remembered scroll position before top-down scan."""
+    bot.record(f"Gift Claims: Event Center/{category} đưa danh sách về đầu")
+    for step in range(MAX_SCROLLS):
         bot.check()
         before = _list_signature(bot.screenshot())
-        bot.swipe_percent(50, 32, 50, 86, duration=0.5, delay=0.7)
-        if _same_list_position(before, _list_signature(bot.screenshot())):
+        bot.swipe_percent(50, 32, 50, 86,
+                          duration=SWIPE_DURATION_SECONDS,
+                          delay=LIST_SCROLL_SETTLE_SECONDS)
+        after = _list_signature(bot.screenshot())
+        bot.record(f"Gift Claims: Event Center/{category} dừng "
+                   f"{LIST_SCROLL_SETTLE_SECONDS:.0f}s sau lướt về đầu "
+                   f"({step + 1}/{MAX_SCROLLS})")
+        if _same_list_position(before, after):
             break
+
+
+def _record_missing_event_policies(bot, seen_policy_keys: set[str],
+                                   category="limited") -> set[str]:
+    """Report policies absent in this pass without prematurely writing DONE."""
+    missing = set()
+    for policy in EVENT_POLICIES:
+        if policy.key is None or policy.key in seen_policy_keys:
+            continue
+        if POLICY_CATEGORIES.get(policy.key, "limited") != category:
+            continue
+        if bot.is_daily_done(policy.key):
+            continue
+        bot.record(f"Gift Claims: không tìm thấy {policy.label} trong lượt quét "
+                   f"{category} từ đầu tới cuối; ghi nhận một lượt không thấy")
+        missing.add(policy.key)
+    return missing
+
+
+def _policy_seen_checkpoint(policy_key: str) -> bytes:
+    return POLICY_SEEN_PREFIX + policy_key.encode("utf-8")
+
+
+def _verify_clean(bot, category: str, ignored=()) -> bool:
+    if category == "activities":
+        # Activities owns exactly one supported task: Dwarf's Lucky Apple.
+        # Its named row/terminal state is authoritative; red badges in this
+        # category often belong to Facebook and must never affect the flow.
+        bot.record("Gift Claims: Activities bỏ toàn bộ nhận diện dấu đỏ; "
+                   "chỉ dùng dòng Dwarf's Lucky Apple")
+        return True
+    # Return to the top, then scan the complete vertical list once more.
+    _return_list_to_top(bot, category)
     for step in range(MAX_SCROLLS + 1):
         bot.check()
         screen = bot.screenshot()
-        if category == "activities" and _activities_facebook_red(bot, screen):
-            bot.record("Gift Claims: Activities có Facebook kèm dấu đỏ; coi nhóm đã DONE")
-            return True
         if any(not _category_seen(category, _row_signature(screen, y), ignored)
                for _, y in _row_dots(bot, screen)):
             return False
         if step < MAX_SCROLLS:
             before = _list_signature(screen)
-            bot.swipe_percent(50, 86, 50, 32, duration=0.5, delay=0.7)
+            bot.swipe_percent(50, 86, 50, 32,
+                              duration=SWIPE_DURATION_SECONDS,
+                              delay=LIST_SCROLL_SETTLE_SECONDS)
             if _same_list_position(before, _list_signature(bot.screenshot())):
                 break
     return True
@@ -544,23 +1272,61 @@ def _scan_category(bot, category: str, visited: set[bytes]) -> bool:
     opened_count = 0
     failed_forced = set()
     recentered_forced = set()
+    recentered_rows = set()
+    seen_policy_keys: set[str] = {
+        item[len(POLICY_SEEN_PREFIX):].decode("utf-8")
+        for item in visited if item.startswith(POLICY_SEEN_PREFIX)
+    }
+    seen_policies = getattr(bot, SEEN_POLICIES_ATTR, None)
+    if not isinstance(seen_policies, set):
+        seen_policies = set()
+        setattr(bot, SEEN_POLICIES_ATTR, seen_policies)
+    seen_policies.update(seen_policy_keys)
+    # Evony remembers a separate vertical position for each category. Always
+    # establish the top boundary first; otherwise opening Activities after a
+    # prior run can start below Dwarf's Lucky Apple and only scan downward.
+    _return_list_to_top(bot, category)
     for scroll in range(MAX_SCROLLS + 1):
         bot.check()
+        empty_checks = 0
+        bot.record(f"Gift Claims: Event Center/{category} quét vị trí danh sách "
+                   f"{scroll + 1}/{MAX_SCROLLS + 1}")
+        pending_labels = [
+            policy.label for policy in EVENT_POLICIES
+            if policy.key is not None
+            and POLICY_CATEGORIES.get(policy.key, "limited") == category
+            and not bot.is_daily_done(policy.key)
+        ]
+        bot.record(f"Gift Claims: Event Center/{category} đang kiểm tra: "
+                   + (", ".join(pending_labels) if pending_labels else
+                      "không còn nhiệm vụ PENDING"))
         while True:
             bot.check()
             screen = bot.screenshot()
-            if category == "activities" and _activities_facebook_red(bot, screen):
-                bot.record("Gift Claims: Activities thấy Facebook có dấu đỏ; "
-                           "không mở Facebook và đánh dấu nhóm DONE")
-                return True
             candidate = None
-            if category == "limited":
-                for template, key, expected_screen, event_label in FORCED_LIMITED_ROWS:
+            forced_rows = (FORCED_LIMITED_ROWS if category == "limited"
+                           else FORCED_ACTIVITY_ROWS
+                           if category == "activities" else ())
+            if forced_rows:
+                for (template, key, expected_screen, event_label,
+                     policy_key) in forced_rows:
                     if key in visited or key in failed_forced:
                         continue
-                    row = find(bot, template, screen, threshold=0.76,
+                    if (policy_key is not None
+                            and bot.is_daily_done(policy_key) is True):
+                        # A forced row exists only to inspect named events that
+                        # can lose their outer red badge.  Once its durable DB
+                        # key is current, reopening it wastes several seconds
+                        # per device and may revisit paid/decorative controls.
+                        visited.add(key)
+                        continue
+                    row = find(bot, template, screen, threshold=0.90,
                                region=(10, 15, 75, 98))
                     if isinstance(row, tuple) and len(row) == 2:
+                        if policy_key is not None:
+                            seen_policy_keys.add(policy_key)
+                            seen_policies.add(policy_key)
+                            visited.add(_policy_seen_checkpoint(policy_key))
                         if (row[1] > int(screen.shape[0] * 0.80)
                                 and key not in recentered_forced):
                             # A row title can be visible above the bottom bar
@@ -570,34 +1336,83 @@ def _scan_category(bot, category: str, visited: set[bytes]) -> bool:
                             bot.record(f"Gift Claims: kéo {event_label} từ sát đáy "
                                        "lên giữa màn hình trước khi bấm")
                             bot.swipe_percent(50, 82, 50, 52,
-                                              duration=0.4, delay=0.8)
+                                              duration=SWIPE_DURATION_SECONDS,
+                                              delay=LIST_SCROLL_SETTLE_SECONDS)
                             candidate = "recenter"
                             break
                         # The title sits near the top edge of a list row. Tap
                         # below it so a small residual scroll cannot select
                         # the preceding event (observed with Dwarf -> Sealed).
                         tap_y = min(screen.shape[0] - 1, row[1] + 18)
-                        candidate = tap_y, key, expected_screen, event_label
+                        candidate = (tap_y, key, expected_screen, event_label,
+                                     policy_key)
                         bot.record(f"Gift Claims: Event Center mở {event_label} "
                                    "để kiểm tra quà bên trong dù dòng ngoài không đỏ "
                                    f"(y={tap_y})")
                         break
                 if candidate == "recenter":
                     continue
-            for _, y in _row_dots(bot, screen):
-                if candidate is not None:
-                    break
-                signature = _row_signature(screen, y)
-                key = _category_signature(category, signature)
-                if not _category_seen(category, signature, visited):
-                    candidate = y, key, None, None
-                    break
+            if category != "activities":
+                for _, y in _row_dots(bot, screen):
+                    if candidate is not None:
+                        break
+                    signature = _row_signature(screen, y)
+                    key = _category_signature(category, signature)
+                    if not _category_seen(category, signature, visited):
+                        if (y > int(screen.shape[0] * 0.80)
+                                and key not in recentered_rows):
+                            recentered_rows.add(key)
+                            bot.record("Gift Claims: kéo hàng đỏ sát đáy lên giữa trước khi bấm")
+                            bot.swipe_percent(50, 82, 50, 52,
+                                              duration=SWIPE_DURATION_SECONDS,
+                                              delay=LIST_SCROLL_SETTLE_SECONDS)
+                            candidate = "recenter"
+                            break
+                        candidate = y, key, None, None, None
+                        break
+            if candidate == "recenter":
+                empty_checks = 0
+                continue
             if candidate is None:
+                empty_checks += 1
+                if empty_checks < EMPTY_POSITION_CHECKS:
+                    bot.record(f"Gift Claims: Event Center/{category} chưa thấy "
+                               "nhiệm vụ ở khung hiện tại; chờ 1s rồi quét lại")
+                    bot.sleep(UI_SETTLE_SECONDS)
+                    continue
                 break
-            y, key, expected_screen, event_label = candidate
-            bot.tap_percent(52, y * 100 / screen.shape[0], delay=1)
-            if expected_screen is not None:
+            empty_checks = 0
+            y, key, expected_screen, event_label, forced_policy_key = candidate
+            bot.tap_percent(52, y * 100 / screen.shape[0],
+                            delay=UI_SETTLE_SECONDS)
+            actual_screen = identify(bot)
+            for _ in range(4):
+                if actual_screen != GiftScreen.EVENT_CENTER:
+                    break
+                bot.sleep(UI_SETTLE_SECONDS)
                 actual_screen = identify(bot)
+            if actual_screen == GiftScreen.EVENT_CENTER:
+                bot.log("Gift Claims: bấm hàng nhưng vẫn ở Event Center; bỏ vị trí "
+                        "này trong lượt quét và không kết luận event vắng mặt")
+                failed_forced.add(key)
+                if forced_policy_key is not None:
+                    seen_policy_keys.add(forced_policy_key)
+                    seen_policies.add(forced_policy_key)
+                    visited.add(_policy_seen_checkpoint(forced_policy_key))
+                visited.add(key)
+                continue
+            actual_policy = POLICY_BY_SCREEN.get(actual_screen)
+            if actual_policy is not None and actual_policy.key is not None:
+                seen_policy_keys.add(actual_policy.key)
+                seen_policies.add(actual_policy.key)
+                visited.add(_policy_seen_checkpoint(actual_policy.key))
+            elif forced_policy_key is not None:
+                # Pallas currently has no stable page-title crop; the exact
+                # list label is its identity.
+                seen_policy_keys.add(forced_policy_key)
+                seen_policies.add(forced_policy_key)
+                visited.add(_policy_seen_checkpoint(forced_policy_key))
+            if expected_screen is not None:
                 if actual_screen != expected_screen:
                     bot.log(f"Gift Claims: bấm hàng {event_label} nhưng mở "
                             f"{getattr(actual_screen, 'value', actual_screen)}; "
@@ -617,7 +1432,11 @@ def _scan_category(bot, category: str, visited: set[bytes]) -> bool:
                 return False
         if scroll < MAX_SCROLLS:
             before = _list_signature(bot.screenshot())
-            bot.swipe_percent(50, 86, 50, 32, duration=0.5, delay=1)
+            bot.swipe_percent(50, 86, 50, 32,
+                              duration=SWIPE_DURATION_SECONDS,
+                              delay=LIST_SCROLL_SETTLE_SECONDS)
+            bot.record(f"Gift Claims: Event Center/{category} đã dừng "
+                       f"{LIST_SCROLL_SETTLE_SECONDS:.0f}s sau lướt; bắt đầu quét")
             if _same_list_position(before, _list_signature(bot.screenshot())):
                 bot.log(f"Gift Claims: Event Center/{category} đã tới cuối danh sách")
                 break
@@ -633,6 +1452,8 @@ def _scan_category(bot, category: str, visited: set[bytes]) -> bool:
         bot.record(f"Gift Claims: Event Center/{category} còn badge đỏ dai dẳng "
                    "sau khi đã quét; đánh dấu skip/done")
         clean = True
+    if clean:
+        _record_missing_event_policies(bot, seen_policy_keys, category)
     bot.record(f"Gift Claims: Event Center/{category} đã mở {opened_count} dòng đỏ; "
                + ("DONE, danh sách hết đỏ" if clean
                   else "chưa DONE, danh sách vẫn còn đỏ"))
@@ -640,7 +1461,7 @@ def _scan_category(bot, category: str, visited: set[bytes]) -> bool:
 
 
 def run_opened(bot, handled=None):
-    """Scan only Limited, resuming its handled rows after a Boss yield."""
+    """Finish Limited first, then Activities, resuming after a Boss yield."""
     screen = bot.screenshot()
     if find(bot, PAGE, screen, threshold=0.72,
             region=(0, 0, 100, 13)) is None:
@@ -651,6 +1472,11 @@ def run_opened(bot, handled=None):
     all_clean = True
     for category, x_percent in CATEGORIES:
         bot.check()
+        if _category_db_done(bot, category):
+            bot.record(f"Gift Claims: Event Center/{category} toàn bộ key đã "
+                       "DONE trong DB; chuyển sang nhóm kế tiếp")
+            visited.add(_category_done_key(category))
+            continue
         if _category_done_key(category) in visited:
             bot.record(f"Gift Claims: Event Center/{category} đã DONE ở lát trước; bỏ qua")
             continue
@@ -658,15 +1484,33 @@ def run_opened(bot, handled=None):
             bot.log(f"Gift Claims: không mở được nhóm Event Center/{category}")
             all_clean = False
             continue
-        if _scan_category(bot, category, visited):
+        scanned_clean = _scan_category(bot, category, visited)
+        setattr(bot, SCAN_COMPLETE_ATTR, scanned_clean)
+        if scanned_clean:
+            scanned_categories = getattr(bot, SCANNED_CATEGORIES_ATTR, None)
+            if not isinstance(scanned_categories, set):
+                scanned_categories = set()
+                setattr(bot, SCANNED_CATEGORIES_ATTR, scanned_categories)
+            scanned_categories.add(category)
+        category_done = scanned_clean and _category_db_done(bot, category)
+        if category_done:
             # Persist category completion in the same in-memory checkpoint set
             # as its rows, so a 120-second boss yield cannot force a full list
             # verification of Limited/Activities again.
             visited.add(_category_done_key(category))
         else:
             all_clean = False
+            if scanned_clean:
+                pending = [key for key in _category_policy_keys(category)
+                           if not bot.is_daily_done(key)]
+                bot.record(f"Gift Claims: Event Center/{category} đã quét hết "
+                           f"nhưng còn {len(pending)} key PENDING trong DB")
 
-    return_home(bot)
+        if category == "limited" and not category_done:
+            bot.record("Gift Claims: Limited chưa hoàn tất; chưa chuyển sang "
+                       "Activities trong lượt này")
+            break
+
     return all_clean
 
 

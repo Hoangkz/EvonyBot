@@ -366,8 +366,9 @@ DATA ={
             "needs_city_map": True,   # nhiệm vụ cần route: chỉ vào danh sách khi máy đã có bản đồ thành (worker quét lúc Join Boss rảnh)
         }
     ],
-    # Nhận quà event: làm SAU CÙNG mỗi ngày, sau mọi nhiệm vụ của mọi activity (priority 0 và đứng cuối bảng nên xếp sau cả
-    # Black Market, cùng priority 0). Thuộc nhóm Daily Activities: ô tích "Claim Event Gifts" ở tab đó (settings["General"]["gift_claims"]).
+    # Nhận quà event: chạy sau các Daily Activities; Event Center luôn đứng
+    # trước hai khu quà ngoài thành. Thuộc nhóm Daily Activities: ô tích
+    # "Claim Event Gifts" ở tab đó (settings["General"]["gift_claims"]).
     "Gift Claims": [
         {
             "key": gift_claims.valuable_event.KEY,
@@ -377,11 +378,18 @@ DATA ={
             "priority": 2,
         },
         {
+            "key": gift_claims.super_value_return.KEY,
+            "group": "Daily Activities",
+            "run": gift_claims.job(gift_claims.super_value_return),
+            "label": "Gift Claims: Super Value Return",
+            "priority": 1,
+        },
+        {
             "key": gift_claims.event_center.KEY,
             "group": "Daily Activities",
             "run": gift_claims.job(gift_claims.event_center),
             "label": "Gift Claims: Event Center",
-            "priority": 1,
+            "priority": 3,
         },
     ],
 }
