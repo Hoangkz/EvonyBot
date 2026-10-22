@@ -452,6 +452,14 @@ class FixedGiftFlowTests(unittest.TestCase):
                            priorities["gift_super_value_return"])
         self.assertLess(priorities["gift_event_center"], 10)
 
+    def test_gift_zones_are_tail_tasks_after_all_daily_work(self):
+        from bot.worker.priority import DATA
+
+        for row in DATA["Gift Claims"]:
+            with self.subTest(key=row["key"]):
+                self.assertEqual("Daily Activities", row["group"])
+                self.assertTrue(row.get("tail"))
+
     def test_strategic_stockpile_uses_free_offset_and_claimed_chest(self):
         flow = strategic_stockpile.FLOW
         self.assertEqual(("StrategicStockpile/title",), flow.opened)
@@ -1027,6 +1035,32 @@ class FixedGiftFlowTests(unittest.TestCase):
         self.assertEqual((0, 12, 100, 85), chest_call.kwargs["region"])
         bot.tap.assert_called_once_with(
             62, 248, delay=event_center.WISHFUL_SETTLE_SECONDS)
+
+    def test_wishful_retries_only_after_refinding_same_launcher(self):
+        bot = mock.Mock()
+        with mock.patch.object(
+                event_center, "_wait_for",
+                side_effect=(None, (35, 260), None, (36, 261), (198, 24))):
+            self.assertTrue(event_center._wishful_open_blessings(bot))
+
+        self.assertEqual(
+            [mock.call(35, 260, delay=event_center.WISHFUL_SETTLE_SECONDS),
+             mock.call(36, 261, delay=event_center.WISHFUL_SETTLE_SECONDS)],
+            bot.tap.call_args_list)
+
+    def test_event_row_wait_does_not_treat_loading_frame_as_opened(self):
+        bot = mock.Mock()
+        with mock.patch.object(
+                event_center, "identify",
+                side_effect=(None, None,
+                             GiftScreen.WISHFUL_WINDMILL_FESTIVAL)) as identify_page:
+            opened = event_center._wait_event_row_open(
+                bot, GiftScreen.WISHFUL_WINDMILL_FESTIVAL)
+
+        self.assertEqual(GiftScreen.WISHFUL_WINDMILL_FESTIVAL, opened)
+        self.assertEqual(3, identify_page.call_count)
+        self.assertEqual([mock.call(event_center.UI_SETTLE_SECONDS)] * 2,
+                         bot.sleep.call_args_list)
 
     def test_star_trail_coin_claim_uses_exact_user_crop(self):
         claim = cv2.imread(str(IMAGES / "GiftClaims" / "GraceOfStarTrail" /

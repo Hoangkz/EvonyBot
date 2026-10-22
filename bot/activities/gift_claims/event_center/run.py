@@ -395,6 +395,8 @@ def _wishful_open_blessings(bot) -> bool:
                       attempts=5, threshold=0.68, region=(0, 12, 100, 85),
                       delay=WISHFUL_SETTLE_SECONDS)
     entry_name = "Wind Blessings"
+    entry_template = "WishfulWindmillFestival/button_wind_blessings"
+    entry_threshold = 0.68
     if entry is None:
         # Some event rotations show only the small reward chest supplied by
         # the user instead of the Wind Blessings tile.  It opens the same
@@ -405,6 +407,8 @@ def _wishful_open_blessings(bot) -> bool:
                           region=(0, 12, 100, 85),
                           delay=WISHFUL_SETTLE_SECONDS)
         entry_name = "rương DONE 1"
+        entry_template = "WishfulWindmillFestival/button_reward_chest"
+        entry_threshold = 0.82
         if entry is None:
             bot.record("Gift Claims: Wishful Windmill không thấy icon Wind "
                        "Blessings hoặc rương DONE 1 sau 5 lần; giữ PENDING")
@@ -416,9 +420,50 @@ def _wishful_open_blessings(bot) -> bool:
                        attempts=5, threshold=0.68,
                        delay=WISHFUL_SETTLE_SECONDS) is not None
     if not opened:
+        # A glow/animation can absorb the first tap on this event.  Retry only
+        # after finding the same approved launcher again, so we never tap a
+        # stale coordinate on a page that has already changed.
+        entry = _wait_for(bot, entry_template, attempts=2,
+                          threshold=entry_threshold,
+                          region=(0, 12, 100, 85),
+                          delay=WISHFUL_SETTLE_SECONDS)
+        if entry is not None:
+            bot.record(f"Gift Claims: Wishful Windmill {entry_name} vẫn còn "
+                       "sau cú tap đầu; tap lại đúng ảnh")
+            bot.tap(*entry, delay=WISHFUL_SETTLE_SECONDS)
+            opened = _wait_for(
+                bot, "WishfulWindmillFestival/title_wind_blessings",
+                attempts=5, threshold=0.68,
+                delay=WISHFUL_SETTLE_SECONDS) is not None
+    if not opened:
         bot.record("Gift Claims: Wishful Windmill đã tap icon nhưng chưa thấy "
                    "title Wind Blessings; giữ PENDING")
     return opened
+
+
+def _wait_event_row_open(bot, expected_screen=None):
+    """Wait through Event Center transition frames after selecting one row.
+
+    ``identify`` legitimately returns ``None`` while the new page is painting;
+    that is not proof that navigation finished.  Forced rows wait for their
+    exact captured title.  Generic red rows accept any identified non-list
+    Event Center page.
+    """
+    actual = None
+    for attempt in range(5):
+        actual = identify(bot)
+        if expected_screen is not None and actual == expected_screen:
+            return actual
+        if (expected_screen is None
+                and actual not in (None, GiftScreen.EVENT_CENTER)):
+            return actual
+        if (expected_screen is not None
+                and actual not in (None, GiftScreen.EVENT_CENTER,
+                                   expected_screen)):
+            return actual
+        if attempt < 4:
+            bot.sleep(UI_SETTLE_SECONDS)
+    return actual
 
 
 def _handle_wishful(bot):
@@ -1598,8 +1643,11 @@ def _scan_category(bot, category: str, visited: set[bytes]) -> bool:
                         # second time during this 120-second gift window.
                         visited.add(_category_signature(
                             category, _row_signature(screen, tap_y)))
-                        candidate = (tap_y, key, expected_screen, event_label,
-                                     policy_key)
+                        # Use the detected title's horizontal centre instead
+                        # of a fixed x=52%.  Wishful's row caption can sit far
+                        # left on narrower/scaled emulator frames.
+                        candidate = (row[0], tap_y, key, expected_screen,
+                                     event_label, policy_key)
                         bot.record(f"Gift Claims: Event Center mở {event_label} "
                                    "để kiểm tra quà bên trong dù dòng ngoài không đỏ "
                                    f"(y={tap_y})")
@@ -1622,7 +1670,7 @@ def _scan_category(bot, category: str, visited: set[bytes]) -> bool:
                                               delay=LIST_SCROLL_SETTLE_SECONDS)
                             candidate = "recenter"
                             break
-                        candidate = y, key, None, None, None
+                        candidate = round(screen.shape[1] * 0.52), y, key, None, None, None
                         break
             if candidate == "recenter":
                 empty_checks = 0
@@ -1637,15 +1685,27 @@ def _scan_category(bot, category: str, visited: set[bytes]) -> bool:
                     continue
                 break
             empty_checks = 0
-            y, key, expected_screen, event_label, forced_policy_key = candidate
-            bot.tap_percent(52, y * 100 / screen.shape[0],
+            x, y, key, expected_screen, event_label, forced_policy_key = candidate
+            bot.tap(x, y, delay=UI_SETTLE_SECONDS)
+            actual_screen = _wait_event_row_open(bot, expected_screen)
+            if (actual_screen == GiftScreen.EVENT_CENTER
+                    and expected_screen is not None):
+                # The first tap can be swallowed while the scrolling list is
+                # still settling.  Re-find the exact named row before retrying
+                # so a changed list position can never open the wrong event.
+                row_template = next(
+                    (template for template, row_key, *_ in forced_rows
+                     if row_key == key), None)
+                refreshed = (find(bot, row_template, bot.screenshot(),
+                                  threshold=0.90, region=(10, 15, 75, 98))
+                             if row_template is not None else None)
+                if isinstance(refreshed, tuple) and len(refreshed) == 2:
+                    retry_y = min(screen.shape[0] - 1, refreshed[1] + 18)
+                    bot.record(f"Gift Claims: {event_label} vẫn ở danh sách sau "
+                               "cú tap đầu; tìm lại đúng hàng và tap lần 2")
+                    bot.tap(refreshed[0], retry_y,
                             delay=UI_SETTLE_SECONDS)
-            actual_screen = identify(bot)
-            for _ in range(4):
-                if actual_screen != GiftScreen.EVENT_CENTER:
-                    break
-                bot.sleep(UI_SETTLE_SECONDS)
-                actual_screen = identify(bot)
+                    actual_screen = _wait_event_row_open(bot, expected_screen)
             if actual_screen == GiftScreen.EVENT_CENTER:
                 bot.log("Gift Claims: bấm hàng nhưng vẫn ở Event Center; bỏ vị trí "
                         "này trong lượt quét và không kết luận event vắng mặt")

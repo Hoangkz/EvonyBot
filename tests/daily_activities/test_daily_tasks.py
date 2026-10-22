@@ -149,7 +149,7 @@ class DailyTaskTests(unittest.TestCase):
         self.assertTrue(DEFS["daily_rewards"].done(bot, {"Offering": True}))
 
     def test_gift_claims_is_not_chained_after_daily_activities(self):
-        """Gift Claims chờ điểm chạy riêng, không còn là đuôi của Daily."""
+        """Daily reward code does not call Gift Claims directly; the worker owns its tail tasks."""
         self.assertNotIn("daily_gift_claims", DEFS)
 
 

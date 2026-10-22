@@ -401,6 +401,7 @@ DATA ={
             "run": gift_claims.job(gift_claims.valuable_event),
             "label": "Gift Claims: Valuable Event",
             "priority": 2,
+            "tail": True,
         },
         {
             "key": gift_claims.super_value_return.KEY,
@@ -408,6 +409,7 @@ DATA ={
             "run": gift_claims.job(gift_claims.super_value_return),
             "label": "Gift Claims: Super Value Return",
             "priority": 1,
+            "tail": True,
         },
         {
             "key": gift_claims.event_center.KEY,
@@ -415,6 +417,7 @@ DATA ={
             "run": gift_claims.job(gift_claims.event_center),
             "label": "Gift Claims: Event Center",
             "priority": 3,
+            "tail": True,
         },
     ],
 }
