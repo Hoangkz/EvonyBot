@@ -9,6 +9,11 @@ from PyQt5.QtWidgets import (QCheckBox, QComboBox, QGridLayout, QGroupBox, QHBox
                              QPushButton, QWidget)
 
 from bot.activities.daily_activities import alliance_donation, alliance_help
+from bot.activities.daily_activities.alliance_vip.catalog import (
+    ITEMS as ALLIANCE_VIP_ITEMS,
+    SETTINGS_KEY as ALLIANCE_VIP_ITEMS_KEY,
+    normalized as normalized_alliance_vip,
+)
 from bot.activities.event_center.crazy_eggs import constants as eggs
 from bot.activities.daily_activities.offering.constants import (
     OFFER_GEMS_CHOICES,
@@ -79,6 +84,7 @@ class DailyActivitiesTab(BaseTab):
 
         self.task_boxes: dict[str, QCheckBox] = {}
         self.hourly_combos: dict[str, QComboBox] = {}
+        self.alliance_vip_checks: dict[str, QCheckBox] = {}
 
         general = QGroupBox("General")
         general_grid = QGridLayout(general)
@@ -163,7 +169,21 @@ class DailyActivitiesTab(BaseTab):
             tax_grid.addWidget(count, index, 1)
             tax_grid.addWidget(free, index, 2)
         tax_grid.setColumnStretch(3, 1)
-        selection_grid.addWidget(tax, (len(SUPPORTED_TASKS) + 3) // 4, 0, 1, 4)
+        last_row = (len(SUPPORTED_TASKS) + 3) // 4
+        selection_grid.addWidget(tax, last_row, 0, 1, 2)
+
+        # Chỉ dùng checkbox: khi bật, bot luôn chọn MAX trong popup mua.
+        # Đặt cạnh City Tax để không chiếm thêm một hàng/nhóm lớn ở cuối tab.
+        alliance_shop = QGroupBox("Alliance VIP Shop (Buy MAX)")
+        alliance_grid = QGridLayout(alliance_shop)
+        for index, item in enumerate(ALLIANCE_VIP_ITEMS):
+            check = QCheckBox(item.label)
+            check.setChecked(item.default)
+            check.setToolTip(f"Mua toàn bộ, tối đa {item.maximum} lượt; nút xám = DONE.")
+            check.clicked.connect(self.settings_changed)
+            self.alliance_vip_checks[item.key] = check
+            alliance_grid.addWidget(check, index // 3, index % 3)
+        selection_grid.addWidget(alliance_shop, last_row, 2, 1, 2)
         for column in range(4):
             selection_grid.setColumnStretch(column, 1)
         self.add_row(selection)
@@ -204,6 +224,11 @@ class DailyActivitiesTab(BaseTab):
         tax = {name: int(box.currentText()) for name, box in self.tax_counts.items()}
         tax[TAX_FREE_KEY] = next((name for name, box in self.tax_free.items() if box.isChecked()), None)
         settings[TAX_KEY] = tax
+        alliance_items = {
+            item.key: self.alliance_vip_checks[item.key].isChecked()
+            for item in ALLIANCE_VIP_ITEMS
+        }
+        settings[ALLIANCE_VIP_ITEMS_KEY] = alliance_items
         quantity = int(self.stamina_quantity.currentText())
         settings[GENERAL_KEY] = {
             "buy_stamina": quantity > 0,
@@ -217,7 +242,8 @@ class DailyActivitiesTab(BaseTab):
     def set_settings(self, data: dict):
         # Avoid writing partially restored state while loading a device.
         widgets = [self.stamina_quantity, self.buy_hammers, self.gift_claims, self.crazy_eggs, self.offer_gems, *self.hourly_combos.values(),
-                   *self.task_boxes.values(), *self.tax_counts.values(), *self.tax_free.values()]
+                   *self.task_boxes.values(), *self.tax_counts.values(), *self.tax_free.values(),
+                   *self.alliance_vip_checks.values()]
         blockers = [QSignalBlocker(widget) for widget in widgets]
         try:
             for key, box in self.task_boxes.items():
@@ -260,6 +286,12 @@ class DailyActivitiesTab(BaseTab):
                 box.setCurrentText(count if box.findText(count) >= 0 else str(TAX_DEFAULT))
             for name, box in self.tax_free.items():
                 box.setChecked(tax.get(TAX_FREE_KEY, TAX_FREE_DEFAULT) == name)
+            alliance_items = normalized_alliance_vip(
+                data.get(ALLIANCE_VIP_ITEMS_KEY), legacy_defaults=True)
+            for item in ALLIANCE_VIP_ITEMS:
+                value = alliance_items[item.key]
+                check = self.alliance_vip_checks[item.key]
+                check.setChecked(value > 0)
         finally:
             # Keep blockers alive through every assignment, then release together.
             del blockers

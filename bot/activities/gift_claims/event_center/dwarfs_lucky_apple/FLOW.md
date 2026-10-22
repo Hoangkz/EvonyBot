@@ -1,12 +1,15 @@
 # Dwarf's Lucky Apple
 
 1. Mở Event Center, chọn Activities bằng ảnh chữ và tìm đúng dòng Dwarf's Lucky Apple.
-2. Xác nhận title, chọn táo xanh.
+2. Xác nhận title, chọn táo xanh bằng một trong hai ảnh
+   `tab_green_apple` hoặc `tab_green_apple_1`; cả hai dùng chính tâm ảnh tìm
+   được làm vị trí bấm.
 3. Làm liên tục trong cùng một lần mở nhiệm vụ: bấm `button_green_wish_x100`
    cho tới `status_green_wish_x100_done`; đây chỉ là mốc chuyển pha, chưa DONE.
 4. Tiếp tục bấm `button_green_wish_x10` cho tới
    `status_green_wish_x10_done`; đây cũng chỉ là mốc chuyển sang táo đỏ.
-5. Chọn táo đỏ và bấm `button_red_wish_x10` liên tục cho tới
+5. Chọn táo đỏ bằng `tab_red_apple` hoặc `tab_red_apple_1` rồi bấm
+   `button_red_wish_x10` liên tục cho tới
    `status_red_wish_x10_done`. Chỉ trạng thái đỏ cuối cùng này mới ghi toàn bộ
    Dwarf's Lucky Apple DONE. Mỗi lần thấy `Congratulations!` đều tap cố định
    `(195, 20)` ở vùng title phía trên để đóng popup, rồi kiểm tra lại nút trên

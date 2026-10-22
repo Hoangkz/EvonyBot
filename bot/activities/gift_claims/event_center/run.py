@@ -208,6 +208,23 @@ def _wait_for(bot, template: str, *, attempts=4, threshold=0.68,
     return None
 
 
+def _wait_for_any(bot, templates: tuple[str, ...], *, attempts=4,
+                  threshold=0.68, region=(0, 0, 100, 100), delay=None):
+    """Find the first matching visual variant on each freshly captured frame."""
+    delay = UI_SETTLE_SECONDS if delay is None else delay
+    for attempt in range(attempts):
+        screen = bot.screenshot()
+        for template in templates:
+            pos = find(bot, template, screen, threshold=threshold,
+                       region=region)
+            if pos is not None:
+                bot.record(f"Gift Claims: nhận diện {template}")
+                return pos
+        if attempt + 1 < attempts:
+            bot.sleep(delay)
+    return None
+
+
 def _ensure_skip_animation(bot, folder: str) -> bool:
     """Enable Skip animation and require the supplied green checked state."""
     region = (35, 35, 100, 92)
@@ -648,9 +665,14 @@ def _handle_dwarfs_lucky_apple(bot):
     # the initial/default page: a grey green-x10 state has nearly identical
     # wording and could otherwise shortcut the whole task as completed.
     bot.sleep(UI_SETTLE_SECONDS)
-    green = _wait_for(bot, "DwarfsLuckyApple/tab_green_apple", attempts=4,
-                      threshold=0.70, region=(45, 40, 100, 68))
+    green = _wait_for_any(
+        bot,
+        ("DwarfsLuckyApple/tab_green_apple",
+         "DwarfsLuckyApple/tab_green_apple_1"),
+        attempts=4, threshold=0.70, region=(45, 40, 100, 68))
     if green is None:
+        bot.record("Gift Claims: Dwarf's Lucky Apple không nhận diện được "
+                   "cả hai ảnh tab táo xanh; giữ PENDING")
         return ClaimReport(), False
     bot.tap(*green, delay=UI_SETTLE_SECONDS)
 
@@ -671,9 +693,14 @@ def _handle_dwarfs_lucky_apple(bot):
     bot.record("Gift Claims: Dwarf's Lucky Apple xanh x10 DONE; "
                "chuyển sang táo đỏ")
 
-    red = _wait_for(bot, "DwarfsLuckyApple/tab_red_apple", attempts=4,
-                    threshold=0.70, region=(0, 40, 55, 68))
+    red = _wait_for_any(
+        bot,
+        ("DwarfsLuckyApple/tab_red_apple",
+         "DwarfsLuckyApple/tab_red_apple_1"),
+        attempts=4, threshold=0.70, region=(0, 40, 55, 68))
     if red is None:
+        bot.record("Gift Claims: Dwarf's Lucky Apple không nhận diện được "
+                   "cả hai ảnh tab táo đỏ; giữ PENDING")
         return total, False
     bot.record("Gift Claims: Dwarf's Lucky Apple bấm tab táo đỏ; chỉ từ "
                "thời điểm này mới được xét DONE toàn nhiệm vụ")

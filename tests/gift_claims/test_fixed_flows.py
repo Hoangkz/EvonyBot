@@ -1100,7 +1100,7 @@ class FixedGiftFlowTests(unittest.TestCase):
         bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
         with (mock.patch.object(event_center, "_apple_button_state",
                                 return_value=("done", (300, 620))) as state,
-              mock.patch.object(event_center, "_wait_for", return_value=None)):
+              mock.patch.object(event_center, "_wait_for_any", return_value=None)):
             report, done = event_center._handle_dwarfs_lucky_apple(bot)
 
         self.assertFalse(done)
@@ -1277,7 +1277,7 @@ class FixedGiftFlowTests(unittest.TestCase):
         reports = ((common.ClaimReport(2, 2), True),
                    (common.ClaimReport(3, 3), True),
                    (common.ClaimReport(4, 4), True))
-        with (mock.patch.object(event_center, "_wait_for",
+        with (mock.patch.object(event_center, "_wait_for_any",
                                 side_effect=((300, 300), (100, 300))),
               mock.patch.object(event_center, "_apple_phase",
                                 side_effect=reports) as phase):
@@ -1298,7 +1298,7 @@ class FixedGiftFlowTests(unittest.TestCase):
     def test_lucky_apple_green_done_never_finishes_whole_task(self):
         bot = mock.Mock()
         bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
-        with (mock.patch.object(event_center, "_wait_for",
+        with (mock.patch.object(event_center, "_wait_for_any",
                                 return_value=(300, 300)),
               mock.patch.object(event_center, "_apple_phase",
                                 side_effect=((common.ClaimReport(2, 2), True),
@@ -1306,6 +1306,25 @@ class FixedGiftFlowTests(unittest.TestCase):
             _report, done = event_center._handle_dwarfs_lucky_apple(bot)
 
         self.assertFalse(done)
+
+    def test_lucky_apple_tab_variants_use_the_same_tap_position(self):
+        bot = mock.Mock()
+        bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
+
+        def find_variant(_bot, template, *_args, **_kwargs):
+            if template.endswith("tab_green_apple_1"):
+                return (287, 319)
+            return None
+
+        with mock.patch.object(event_center, "find", side_effect=find_variant):
+            position = event_center._wait_for_any(
+                bot,
+                ("DwarfsLuckyApple/tab_green_apple",
+                 "DwarfsLuckyApple/tab_green_apple_1"),
+                attempts=4, threshold=0.70, region=(45, 40, 100, 68))
+
+        self.assertEqual((287, 319), position)
+        bot.screenshot.assert_called_once()
 
     def test_dwarfs_lucky_apple_policy_belongs_to_activities(self):
         self.assertEqual(
