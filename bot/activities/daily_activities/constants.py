@@ -43,15 +43,16 @@ ROW_BUTTON_TOLERANCE = 10
 # ở 446, Go không khớp) -> chờ ROW_SETTLE_WAIT giây, chụp lại, xét lại một lần.
 ROW_SETTLE_WAIT = 1
 # Nút của dòng phải nằm trên thanh Claim All (y ~638, che nút Go của dòng sát đáy, VD Levy tiêu đề
-# y 621): tiêu đề thấp hơn ROW_TITLE_MAX_Y thì coi như chưa thấy, cuộn tiếp (LIST_SWIPE ~105 px) để
+# y 621): tiêu đề thấp hơn ROW_TITLE_MAX_Y thì coi như chưa thấy, cuộn tiếp (LIST_SWIPE ~141 px) để
 # cả dòng lên trên thanh.
 ROW_TITLE_MAX_Y = 580
-LIST_SWIPE = (70, 70, 55, 55)        # % màn hình: ngón tay kéo lên = cuộn danh sách xuống
+LIST_SWIPE = (70, 73, 55, 53)        # % màn hình: ngón tay kéo lên = cuộn danh sách xuống (~141 px; trước (70, 70, 55, 55) ~105 px, người dùng thấy ngắn)
+LIST_SWIPE_DURATION = 0.8            # giây mỗi cú cuộn (trước 1.0, người dùng thấy chậm)
 LIST_MAX_SCROLLS = 25
 # Lướt hết danh sách không thấy nhiệm vụ: Back (đóng bảng Activity) rồi mở lại từ đầu, tìm thêm
 # LIST_RETRIES lần (lần cuộn trước có thể trượt qua dòng) rồi mới coi là không có (TASK_NOT_FOUND).
 LIST_RETRIES = 2
-TICK_TRIES = 3   # số lần liên tiếp thấy dấu tích (Back, mở lại danh sách giữa các lần) mới coi nhiệm vụ đã xong
+TICK_TRIES = 2   # số lần liên tiếp thấy dấu tích (Back, mở lại danh sách giữa các lần) mới coi nhiệm vụ đã xong
 # Bảng Activity đã mở sẵn (có thể đang ở giữa danh sách): Back rồi mở lại từ đầu. Không bao giờ cuộn lên.
 LIST_END_SAME = 0.99                 # vùng danh sách trước / sau khi cuộn giống cỡ này = hết danh sách
 OPEN_ACTIVITY_TRIES = 8

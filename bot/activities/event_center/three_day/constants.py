@@ -87,12 +87,12 @@ CLAIM_SAME_MAX = 6   # bấm Claim cùng chỗ quá số lần này mà nút v�
 
 # Cuộn danh sách nhiệm vụ / quà (ngón tay kéo lên = xuống cuối danh sách; mỗi lần ~280 px < cao 1
 # cửa sổ 400 px nên không sót dòng). Màn không đổi sau khi cuộn = hết danh sách.
-SWIPE = (50, 75, 50, 55)       # ~141 px: dài / nhanh hơn thì danh sách trôi lố (máy thật: bỏ sót dòng)
+SWIPE = (50, 78, 50, 52)       # ~183 px (trước 141 px, người dùng thấy ngắn): dài / nhanh hơn nhiều thì danh sách trôi lố (máy thật: bỏ sót dòng)
 SWIPE_BACK = (50, 55, 50, 75)
 # Đã thấy dòng của nhiệm vụ: cuộn bước nhỏ để có màn thấy đủ 3 dòng cùng nhiệm vụ (cửa sổ chỉ rộng ~145 px mà bước
 # cuộn thường thực trôi ~185 px nên 3 dòng Claimed cứ bị cắt đầu / cuối: máy 21943).
-SWIPE_FINE = (50, 70, 50, 57)   # ~92 px vuốt -> ~120 px danh sách trôi
-SWIPE_DURATION = 1.0
+SWIPE_FINE = (50, 71, 50, 54)   # ~120 px vuốt (trước 92 px)
+SWIPE_DURATION = 0.8
 SWIPE_WAIT = 1.5
 SAME_DIFF = 2.0         # độ lệch điểm ảnh trung bình < mức này = màn không đổi
 MAX_ITERATIONS = 40     # số bước tối đa một lần quét danh sách (cuộn + bấm Claim)
@@ -129,9 +129,9 @@ ROW_PITCH = 110.7
 ROW_TARGET_Y = 450
 SCREEN_H = 704
 DRAG_MID = 62         # % chiều cao: giữa vùng danh sách
-DRAG_MAX = 200        # px mỗi lần vuốt tối đa (dài hơn thì trôi lố)
+DRAG_MAX = 240        # px mỗi lần vuốt tối đa (trước 200, người dùng thấy ngắn; dài hơn nhiều thì trôi lố)
 DRAG_MIN = 20         # lệch dưới mức này thì không vuốt
-DRAG_DURATION = 1.2
+DRAG_DURATION = 1.0
 # Đo thật (ảnh máy 21923): danh sách trôi ~1,5 - 1,7 lần quãng vuốt (quán tính) -> hệ số ban đầu DRAG_FACTOR, tự
 # hiệu chỉnh sau mỗi lần vuốt (EMA, chỉ khi vuốt > FACTOR_MIN_DRAG px). Tới hàng: tối đa GOTO_TRIES vòng (đo vị
 # trí, vuốt, đo lại); lệch dưới GOTO_TOL px mà vẫn chưa thấy icon thì xê dịch NUDGE px (đổi chiều mỗi vòng).

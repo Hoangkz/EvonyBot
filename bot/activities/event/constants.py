@@ -42,9 +42,14 @@ EVENT_CENTER_REGION = (60, 0, 100, 50)
 #   0,85 / 0,80 -> thấy 80/80 (thấp nhất 0,883), không khớp nhầm màn nào.
 #   0,75 .. 0,65: dự phòng nền hay hiệu ứng lạ; màn khác cao nhất 0,436.
 EVENT_CENTER_THRESHOLDS = (0.85, 0.80, 0.75, 0.70, 0.65)
-# Nút event ngay dưới chữ "Event Center": lệch so với tâm chữ (x, y). Chỉ bấm vào đây khi không
-# tìm thấy ruy băng nào (xem RIBBON_SEARCH).
-EVENT_BUTTON_OFFSET = (10, 40)
+# Thấy Event Center mà không thấy ruy băng nào (xem RIBBON_SEARCH) = event 7 ngày đã hết. Phải kiểm đủ số lần này (kể cả lần đầu,
+# các lần sau cách 1 giây) đều không thấy mới kết luận, phòng ruy băng đang chớp / chuyển cảnh.
+EVENT_ENDED_CHECKS = 5
+# Trước mỗi lần kiểm lại: Back để biết game không lag / không đang load (màn thành sạch: hiện hộp thoát game -> Cancel; có popup: popup
+# đóng). Back mà màn không đổi = game chưa phản hồi: không tính lần kiểm đó, chờ rồi Back lại; tối đa số lần Back này thì thôi.
+EVENT_ENDED_MAX_BACKS = 12
+EVENT_ENDED_LAG_WAIT = 2     # giây chờ khi Back mà màn không đổi
+EVENT_ENDED_SAME_DIFF = 2.0  # độ lệch điểm ảnh trung bình < mức này = màn không đổi
 
 # ---- Nút event (nút có ruy băng đỏ đếm ngược "3d 14:00") -------------------
 # Đuôi trái ruy băng 7x7 (toàn phần đỏ, không dính nền lẫn chữ số); icon nút đổi theo mùa
@@ -58,8 +63,7 @@ RIBBON_TAIL = f"{EV}/ribbonTail.png"
 # Trên chính ảnh chụp vừa thấy nút "•••", tìm đuôi ở 2 vùng cố định (% màn hình): vùng nào trả về
 # toạ độ thì vùng đó đúng -> MỘT nút duy nhất (cả 2 cùng thấy thì lấy chỗ khớp cao hơn; trên các
 # ảnh đo chỉ 1 vùng có ruy băng). Mỗi vùng một dãy ngưỡng giảm dần: lần đầu ngưỡng đầu, không vùng
-# nào đạt thì thử tiếp 3 ngưỡng thấp hơn; vẫn không thấy thì bấm Event Center + EVENT_BUTTON_OFFSET
-# như trước.
+# nào đạt thì thử tiếp 3 ngưỡng thấp hơn; vẫn không thấy mà có Event Center thì coi như event đã hết (EVENT_ENDED_CHECKS).
 # KHÔNG tìm nút trên cùng bên phải (đuôi (331, 105) = (83.6%, 14.9%), có trên mọi màn chính):
 # không phải nút event.
 #   Cột trái  x 60-70 %, y 12-40 % (x 237-277, y 84-281): đuôi (253, 105) / (253, 173);

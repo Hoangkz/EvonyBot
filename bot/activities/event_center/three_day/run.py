@@ -212,6 +212,9 @@ def _run_tasks(bot, pending, ctx):
     def handle(action, pos, screen):
         if action != c.ON_EVENT:
             return None
+        if not ctx.get("end_read"):   # vừa vào màn event: đọc "Ends in ..." một lần mỗi lượt, lưu giờ event hết (mốc reset King's Path)
+            ctx["end_read"] = True
+            cycle.observe_three_day(bot)
         return _scan_tasks(bot, pending, ctx)
 
     return run_task(bot, NAME, LIMITED, c.icons(), handle, targets=_event_targets(),

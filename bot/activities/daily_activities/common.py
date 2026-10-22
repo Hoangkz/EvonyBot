@@ -9,7 +9,7 @@ from dataclasses import dataclass
 
 import cv2
 
-from ...common import click_images, delay, exit_images, find_first, go_home
+from ...common import click_images, delay, exit_images, find_first, go_home, to_city
 from ...context.templates import TEMPLATE_DIR, read_image
 from ..result import NOT_DONE, TaskResult, clear, done, save_errors, take
 from .constants import (
@@ -32,6 +32,7 @@ from .constants import (
     LIST_MAX_SCROLLS,
     LIST_RETRIES,
     LIST_SWIPE,
+    LIST_SWIPE_DURATION,
     MAIN_MORE,
     OLD_ACTIVITY_TITLE,
     OLD_CARD,
@@ -328,7 +329,7 @@ def _search_list(bot, titles, max_scrolls: int, tap_go: bool = True) -> str:
         if scrolls >= max_scrolls or at_end:
             break
         previous = screen
-        bot.swipe_percent(*LIST_SWIPE, duration=1.0, delay=1)
+        bot.swipe_percent(*LIST_SWIPE, duration=LIST_SWIPE_DURATION, delay=1)
         scrolls += 1
     bot.log(f"Daily Activities: {titles[0] if titles else '?'} not found in Activity list")
     return TASK_NOT_FOUND
@@ -393,7 +394,7 @@ def _search_grid(bot, cards, max_scrolls: int, done_cards=(), tap_go: bool = Tru
         if scrolls >= max_scrolls or (previous is not None and _same_list(previous, screen)):
             break
         previous = screen
-        bot.swipe_percent(*LIST_SWIPE, duration=1.0, delay=1)
+        bot.swipe_percent(*LIST_SWIPE, duration=LIST_SWIPE_DURATION, delay=1)
         scrolls += 1
     bot.log(f"Daily Activities: {cards[0]} not found in Activity grid")
     return TASK_NOT_FOUND
@@ -569,6 +570,7 @@ def daily_job(task: Task, after_go, target: str | None = None) -> dict:
     @save_errors(task.key)   # lỗi thì lưu `<key>_error` vào DB
     def run(ctx, settings):
         ctx.log(f"Daily Activities: {task.label}")
+        to_city(ctx)   # đang ở bản đồ thế giới thì về thành chính trước
         clear(ctx)
         if open_task_or_finish(ctx, task):
             after_go(ctx)
@@ -591,6 +593,7 @@ def hourly_job(task: Task, attempt, consts) -> dict:
     @save_errors(task.key)   # lỗi thì lưu `<key>_error` vào DB
     def run(ctx, settings):
         ctx.log(f"Daily Activities: {task.label} (every {hourly_hours(settings, consts)}h)")
+        to_city(ctx)   # đang ở bản đồ thế giới thì về thành chính trước
         record_result(ctx, task.key, attempt(ctx))   # xong thì lưu "xong hôm nay" vào DB
         # Lưu giờ vừa làm vào DB (`<key>_tried`): worker chỉ so giờ này để biết tới giờ làm lại chưa. Bị ngắt / lỗi giữa
         # chừng thì tới đây không chạy tới, chưa lưu giờ: lượt sau làm tiếp.

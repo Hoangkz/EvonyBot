@@ -17,7 +17,7 @@ Bị ngắt giữa chừng: lượt sau đọc lại số đã làm ở dòng Go
 import math
 
 from ...city_building import MARKET
-from ...common import EventState, mark_target_reached
+from ...common import EventState, mark_daily_activity, mark_target_reached
 from .. import path_task
 from ..building import open_building
 from .constants import (
@@ -82,6 +82,7 @@ def _tax(bot, path, done, target):
             return None
     bot.record(f"{NAME}: all rows taxed, done")
     mark_target_reached(bot, path.key)
+    mark_daily_activity(bot, "tax")   # đã thu thuế thật: việc Daily Resource Tax hôm nay cũng xong
     return None
 
 

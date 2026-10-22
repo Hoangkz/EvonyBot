@@ -9,6 +9,7 @@ Mỗi nhiệm vụ là một file riêng (gather_troops/..., kings_path/...) v�
 hình chính tới nút event dùng chung ở common.py. `state` (EventState) giữ quà đăng nhập chỉ nhận 1 lần mỗi lượt.
 """
 from . import claim, cycle
+from ...common import to_city
 from ..result import NOT_DONE, TaskResult, clear, save_errors, take_all
 from .common import EventState
 from .constants import GATHER_TROOPS_ICON, KINGS_PATH_ICON
@@ -46,7 +47,11 @@ def perform_task(bot, key: str, run_task, config) -> TaskResult:
     báo xong; mọi kết quả báo giữa chừng (xong / hết Go / đạt mục tiêu / Day khoá) nằm trong `outcomes` để worker ghi."""
     clear(bot)
     bot.check()
-    run_task(bot, config, EventState())
+    state = EventState()
+    run_task(bot, config, state)
+    for event in state.absent:   # event không còn trong game: mọi nhiệm vụ của event đó bỏ qua tới lần reset server
+        bot.mark_daily_done(absent_key(event))
+        bot.record(f"Event: không thấy {event} trong game, đã lưu DB ({absent_key(event)}), bỏ qua tới lần reset server")
     outcomes = tuple(take_all(bot))
     done = any(o.done and o.key == key for o in outcomes)
     return TaskResult(done=done, outcomes=outcomes) if outcomes else NOT_DONE
@@ -64,7 +69,8 @@ def claim_event(bot, event: str, name: str, icon: str):
 # - `key`                      xong hôm nay (hết lượt / hết tài nguyên cũng tính), hết hạn ở lần reset server;
 # - `key_complete`             hết nút Go: xong hẳn, mọi mục tiêu;
 # - `key_complete_<N>` + `key_reached_<N>`  đạt mục tiêu N người dùng chọn mà vẫn còn Go (tăng mục tiêu thì chạy lại);
-# - `key_locked`               Day / cấp lính còn khoá: bỏ qua tới lần reset server.
+# - `key_locked`               Day / cấp lính còn khoá: bỏ qua tới lần reset server;
+# - `<event>_absent`           event không còn trong game: mọi nhiệm vụ của event bỏ qua tới lần reset server.
 # "Xong" luôn tính lại từ các dấu đó (đọc DB) mỗi vòng lặp.
 # =============================================================================================
 _KEY_OF = {run: key for _, _, _, tasks in EVENTS for key, run in tasks}   # hàm làm việc -> key nhiệm vụ
@@ -112,6 +118,11 @@ def locked_key(key: str) -> str:
     return f"{key}_locked"
 
 
+def absent_key(event: str) -> str:
+    """Key daily_done: event `event` không còn trong game (hết ruy băng / không thấy icon), bỏ qua tới lần reset server."""
+    return f"{event}_absent"
+
+
 def claim_key(event: str, done_count: int) -> str:
     """Key daily_done: đã nhận thưởng của `event` khi có `done_count` nhiệm vụ xong."""
     return f"{event}_claimed_{done_count}"
@@ -153,6 +164,8 @@ def skip_reason(ctx, settings: dict, key: str) -> str | None:
         return "already done"
     if ctx.is_daily_done(locked_key(key)):
         return "day still locked, skipped until server reset"
+    if ctx.is_daily_done(absent_key(_EVENT_OF[key])):
+        return "event not in game, skipped until server reset"
     return None
 
 
@@ -186,6 +199,7 @@ def event_job(event: str, run_task) -> dict:
 
     @save_errors(key)   # lỗi thì lưu `<key>_error` vào DB
     def run(ctx, settings):
+        to_city(ctx)   # đang ở bản đồ thế giới thì về thành chính trước
         result = perform_task(ctx, key, run_task, settings.get(key))   # kết quả báo giữa chừng (xong / hết Go / đạt mục tiêu / khoá)
         # Lưu từng kết quả vào DB ngay tại đây (record_outcome); worker không ghi gì.
         for outcome in result.outcomes:
@@ -219,6 +233,8 @@ def claim_job(event: str) -> dict:
     def done(ctx, settings):
         """Đã nhận thưởng ứng với số nhiệm vụ xong hiện tại; chưa nhiệm vụ nào xong thì chỉ coi là xong khi mọi nhiệm vụ đã
         tích của event này không còn phải chạy (VD Day khoá), để không chờ vô ích."""
+        if ctx.is_daily_done(absent_key(event)):
+            return True   # event không còn trong game: không có gì để nhận
         count, key = done_count(ctx)
         if count:
             return ctx.is_daily_done(key)

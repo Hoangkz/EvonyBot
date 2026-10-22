@@ -65,3 +65,18 @@ def go_home(bot, screen):
         bot.tap(*to_city, delay=TO_CITY_WAIT)
     else:
         bot.back()
+
+
+def to_city(bot, tries: int = 3) -> bool:
+    """Đang ở bản đồ thế giới (thấy nút toà thành góc dưới phải) thì bấm nút đó để về thành; lặp tới khi hết thấy nút (tối đa
+    `tries` lần). True nếu đã bấm ít nhất một lần. Màn thế giới cũng có nút "•••" và Event Center nên nhận nhầm là màn thành chính:
+    nhiệm vụ Daily / Event gọi hàm này trước khi bắt đầu."""
+    tapped = False
+    for _ in range(tries):
+        button = bot.find(TO_CITY, region=TO_CITY_REGION)
+        if button is None:
+            break
+        bot.log("Home: on the world map, tap the city button")
+        bot.tap(*button, delay=TO_CITY_WAIT)
+        tapped = True
+    return tapped

@@ -69,3 +69,26 @@ def run(image: np.ndarray) -> int | None:
         return None
     hours, minutes, seconds = map(int, match.groups())
     return None if minutes >= 60 or seconds >= 60 else hours * 3600 + minutes * 60 + seconds
+
+
+# Màn event 3 ngày (Event Center > Limited): "Ends in 2d 21:27" (hoặc "Ends in 17:10:11" dưới 1 ngày) ngay trên banner, chữ xanh lá,
+# không có đồng hồ cát nên neo bằng chữ "Ends in": cắt vùng ngay bên phải chữ đó.
+ENDS_IN = "EventCenter/ThreeDay/endsIn.png"
+ENDS_IN_REGION = (20, 27, 60, 36)     # % màn hình
+ENDS_IN_THRESHOLD = 0.8               # 1,00 trên màn của nó (máy 21943 0,90); màn khác <= 0,48
+# Vùng chữ so với mép phải của chữ "Ends in": (dx, dy, rộng, cao) — cao 16 px bao dải chữ số (cao 10 px), rộng 72 px chưa chạm
+# hình quả bên phải banner.
+TEXT_FROM_ENDS_IN = (3, 0, 72, 16)
+
+
+def read_ends_in(bot, screen) -> int | None:
+    """Số giây còn lại của event 3 ngày trên `screen` (màn event, tab nhiệm vụ hoặc Redeem): tìm chữ "Ends in", cắt chữ bên phải rồi
+    OCR. None nếu không thấy chữ hoặc không đọc được."""
+    from ..context.templates import read_image, TEMPLATE_DIR   # import trong hàm: tránh vòng import khi nạp bot.ocr
+    pos = bot.find(ENDS_IN, threshold=ENDS_IN_THRESHOLD, screen=screen, region=ENDS_IN_REGION)
+    template = read_image(TEMPLATE_DIR / ENDS_IN)
+    if pos is None or template is None:
+        return None
+    dx, dy, w, h = TEXT_FROM_ENDS_IN
+    height, width = template.shape[:2]
+    return run(bot.crop(screen, pos[0] + width // 2 + dx, pos[1] - h // 2 + dy, w, h))

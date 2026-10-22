@@ -15,7 +15,7 @@ vào event sau đọc lại.
 """
 from datetime import datetime, timedelta
 
-from ...ocr.read_event_countdown import read as read_countdown
+from ...ocr.read_event_countdown import read as read_countdown, read_ends_in
 from .constants import GATHER_TROOPS_ICON, KINGS_PATH_ICON
 
 EVENT_DAYS = 7           # event có nhiệm vụ trong 7 ngày (chặn đọc sai thời gian còn lại)
@@ -80,7 +80,7 @@ def three_day_waiting(ctx, now: datetime | None = None) -> bool:
 
 
 def describe(keys, event: str, now: datetime | None = None) -> str | None:
-    """Dòng chữ cho tab Event: thời gian còn lại của event / ngày event mới. None nếu chưa có mốc nào (chưa đọc được)."""
+    """Dòng chữ cho tab Event: event 7 ngày (King's Path, Gather Troops) chỉ hiện ngày kết thúc; event 3 ngày hiện thời gian còn lại. None nếu chưa có mốc nào (chưa đọc được)."""
     now = now or datetime.now()
     if event == THREE_DAY:
         window = three_day_window(keys, now)
@@ -88,18 +88,12 @@ def describe(keys, event: str, now: datetime | None = None) -> str | None:
             return None
         start, end = window
         if now < start:
-            return f"bắt đầu sau {_left(start - now)} ({start:%d/%m/%Y %H:%M})"
-        return f"còn {_left(end - now)}"
+            return f"starts in {_left(start - now)} ({start:%d/%m/%Y %H:%M})"
+        return f"{_left(end - now)} left"
     found = resets_from_keys(keys, event)
     if not found:
         return None
-    reset = found[-1]
-    end = event_end(reset)
-    if now < end:
-        return f"còn {_left(end - now)}"
-    if now < reset:
-        return f"hết event, event 3 ngày tới {reset:%d/%m/%Y %H:%M}"
-    return "đã quá mốc reset, chờ đọc lại"
+    return f"ends {event_end(found[-1]):%d/%m/%Y %H:%M}"
 
 
 # ---- Dùng trong bot (ctx = BotContext) ----------------------------------------------------------------------
@@ -140,12 +134,12 @@ def valid(ctx, event: str, done_at: str | None, now: datetime | None = None) -> 
         return False
 
 
-def read_remaining(bot) -> int | None:
+def read_remaining(bot, reader=read_countdown) -> int | None:
     """Thời gian còn lại của event (giây) trên màn event, đọc 2 lần cách nhau 1 giây phải giống nhau. None (và ghi log) nếu
     đọc ra ? / không chắc."""
-    first = read_countdown(bot, bot.screenshot())
+    first = reader(bot, bot.screenshot())
     bot.sleep(1)
-    second = read_countdown(bot, bot.screenshot())
+    second = reader(bot, bot.screenshot())
     if first is None or second is None:
         bot.record(f"Event: cannot read event countdown ({first}, {second}), not saved, will retry next time")
         return None
@@ -155,10 +149,11 @@ def read_remaining(bot) -> int | None:
     return second
 
 
-def record(bot, event: str, remaining: int, now: datetime | None = None) -> datetime:
-    """Lưu mốc reset của `event` (bây giờ + thời gian còn lại + THREE_DAY_LENGTH ngày (lúc event 3 ngày hết), làm tròn tới phút) vào DB."""
+def record(bot, event: str, remaining: int, now: datetime | None = None, extra_days: int = THREE_DAY_LENGTH) -> datetime:
+    """Lưu mốc reset của `event` (bây giờ + thời gian còn lại + `extra_days` ngày (mặc định THREE_DAY_LENGTH: lúc event 3 ngày hết), làm
+    tròn tới phút) vào DB."""
     now = now or datetime.now()
-    when = (now + timedelta(seconds=remaining, days=THREE_DAY_LENGTH)).replace(second=0, microsecond=0)
+    when = (now + timedelta(seconds=remaining, days=extra_days)).replace(second=0, microsecond=0)
     bot.mark_daily_done(f"{_prefix(event)}{when:{_FORMAT}}")
     bot.record(f"Event: {event} ends in {remaining // 86400}d {remaining % 86400 // 3600:02d}:{remaining % 3600 // 60:02d}, "
                f"tasks reset at {when:%d/%m/%Y %H:%M}")
@@ -174,3 +169,20 @@ def observe(bot, icon: str) -> None:
     remaining = read_remaining(bot)
     if remaining is not None:
         record(bot, event, remaining)
+
+
+SAME_RESET = timedelta(minutes=10)   # mốc đã lưu lệch mới đọc không quá mức này = cùng một mốc (OCR làm tròn tới phút)
+
+
+def observe_three_day(bot) -> None:
+    """Gọi khi vừa mở màn event 3 ngày: đọc "Ends in ..." (OCR, 2 lần phải giống nhau) rồi lưu giờ event 3 ngày hết, chính là mốc reset
+    của King's Path (xem three_day_window). Mốc King's Path đã lưu mà lệch không quá SAME_RESET thì không lưu thêm."""
+    remaining = read_remaining(bot, read_ends_in)
+    if remaining is None:
+        return
+    now = datetime.now()
+    end = now + timedelta(seconds=remaining)
+    if any(abs(old - end) <= SAME_RESET for old in resets(bot, "kings_path")):
+        bot.log("Event: 3-day event end already saved")
+        return
+    record(bot, "kings_path", remaining, now, extra_days=0)
