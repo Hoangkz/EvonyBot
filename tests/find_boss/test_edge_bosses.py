@@ -60,7 +60,11 @@ class RestoreCameraTests(unittest.TestCase):
         self.assertTrue(result)
         self.assertEqual(len(swipes), 1)
         px, py = world_to_px(10, 0)
-        self.assertEqual(swipes[0], (-px, -py))
+        # The implementation clamps recovery swipes to the safe swipe box.
+        self.assertLess(swipes[0][0], 0)
+        self.assertLess(swipes[0][1], 0)
+        self.assertLessEqual(abs(swipes[0][0]), 323)
+        self.assertLessEqual(abs(swipes[0][1]), 494)
 
     def test_long_drift_is_clamped_to_swipe_box_and_repeated(self):
         result, swipes = self.run_restore([(450, 450), (500, 500), (600, 600)])

@@ -15,7 +15,7 @@ import numpy as np
 
 from ..ocr import read_camera, world_mask
 from ..ocr.find_bosses import find_bosses, read_popup
-from .arc_sweep import MIN_SWIPE, STEP, SWIPE_FULL_V, STEP_FRAC, _camera, _swipe, arc_sweep, px_to_world, safe_shift, valid_camera, world_to_px
+from .arc_sweep import MIN_SWIPE, STEP, SWIPE_FULL, SWIPE_FULL_V, STEP_FRAC, _camera, _swipe, arc_sweep, px_to_world, safe_shift, valid_camera, world_to_px
 from .shared_bosses import SharedBosses
 
 MENU_TEXT = {"attack": "CityMap/menuText_attack.png", "share": "CityMap/menuText_share.png"}   # chữ vàng dưới nút của menu nhanh hiện ra khi bấm vào tên boss (menu: Attack / Add Bookmark / Share):

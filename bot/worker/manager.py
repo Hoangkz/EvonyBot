@@ -10,6 +10,16 @@ from .server_clock import ServerClock
 from .status import STATUS_STOPPING
 
 
+def _safe_print(message: str):
+    """Print Vietnamese logs even when the Windows console uses cp1252."""
+    try:
+        print(message)
+    except UnicodeEncodeError:
+        import sys
+        encoding = getattr(sys.stdout, "encoding", None) or "utf-8"
+        print(message.encode(encoding, errors="replace").decode(encoding))
+
+
 class BotManager(QObject):
     activity_changed = pyqtSignal(str, str)   # (serial, activity)
     status_changed = pyqtSignal(str, str)     # (serial, status)
@@ -61,7 +71,7 @@ class BotManager(QObject):
             return False
         if self.at_limit():
             msg = f"Giấy phép chỉ cho chạy tối đa {self.max_running} giả lập cùng lúc"
-            print(f"[{serial}] {msg}")
+            _safe_print(f"[{serial}] {msg}")
             self.log_message.emit(serial, msg)
             return False
         if not activities:
