@@ -7,6 +7,7 @@ run.py — Daily Activities "Alliance Help": một lần thử theo giờ (worke
 Đường tới Liên minh giống King's Path Donate (event/kings_path/donate/alliance.py _open_science), đích là dòng
 "Alliance Help" (thấy ngay, không cần cuộn).
 """
+from ....common import no_alliance
 from ....common import click_images, delay, exit_images, find_first, go_home
 from ...event.kings_path.donate.constants import ALLIANCE_BUTTON, OUT_ALLIANCE
 from ...result import NOT_DONE, TaskResult
@@ -24,7 +25,7 @@ from .constants import (
     NO_RECORDS,
 )
 
-_ON_HELP, _TAP, _BACK, _OUT = "on_help", "tap", "back", "out_alliance"
+_ON_HELP, _TAP, _BACK, _OUT, _OPEN = "on_help", "tap", "back", "out_alliance", "open_alliance"
 
 
 def help_all(bot) -> TaskResult:
@@ -72,16 +73,22 @@ def _open_help(bot) -> bool:
         (HELP_ROW, _TAP),
         *[(path, _BACK) for path in exit_images()],
         *[(path, _TAP) for path in click_images()],
-        (ALLIANCE_BUTTON, _TAP),
+        (ALLIANCE_BUTTON, _OPEN),
     ]
     for _ in range(NAV_MAX_STEPS):
         screen = bot.screenshot()
+        if no_alliance.check(bot, screen):
+            return False
         action, pos = find_first(bot, screen, targets, top_left={_OUT})
         if action == _ON_HELP:
             return True
         if action == _TAP:
             bot.tap(*pos)
             delay(bot, 2)
+        elif action == _OPEN:
+            bot.tap(*pos)
+            if no_alliance.wait_menu(bot):
+                return False
         elif action == _OUT:
             bot.tap(pos[0] + 40, pos[1] + 40)
             delay(bot, 2)

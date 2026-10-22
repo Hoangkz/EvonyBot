@@ -105,6 +105,7 @@ DATA ={
     "Alliance Capacity": [
         { 
             "key": "alliance_capacity",
+            "needs_alliance": True,
             "run": alliance_capacity,
             "label": "Alliance Capacity: donate Alliance Science",
             "priority": 777,
@@ -261,6 +262,7 @@ DATA ={
         },
         { 
             "key": "daily_alliance_donation",
+            "needs_alliance": True,
             "run": hourly_job(alliance_donation_task, donate_free, alliance_donation_constants),
             "must_finish": True,
             "label": "Alliance Donation",
@@ -269,6 +271,7 @@ DATA ={
         },
         { 
             "key": "daily_alliance_help",
+            "needs_alliance": True,
             "run": hourly_job(alliance_help_task, help_all, alliance_help_constants),
             "must_finish": True,
             "label": "Alliance Help",
@@ -291,6 +294,7 @@ DATA ={
         },
         { 
             "key": "daily_alliance_vip",
+            "needs_alliance": True,
             "run": daily_alliance_vip,
             "label": "Alliance VIP",
             "priority": 390,

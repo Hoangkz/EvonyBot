@@ -7,6 +7,9 @@ from PyQt5.QtWidgets import (
 from .boss import DATA
 from .tab_placeholder import BaseTab
 
+VIKING_LEVELS = ["Easy", "Normal", "Hard", "Hell"]   # cấp độ Viking khi Summon
+VIKING_LEVEL_DEFAULT = "Hard"
+
 TROOP_RADIOS = [f"troop_{i}" for i in range(1, 9)]
 STAMINA_OPTIONS = ["ALL", "100", "200", "300", "400", "500", "No"]
 
@@ -110,6 +113,13 @@ class JoinMonsterWarTab(BaseTab):
                         summon = QCheckBox("Summon")
                         self.controls["viking_summon"] = summon
                         options.addWidget(summon)
+                        level = QComboBox()
+                        level.addItems(VIKING_LEVELS)
+                        level.setCurrentText(VIKING_LEVEL_DEFAULT)
+                        level.setEnabled(False)
+                        summon.toggled.connect(level.setEnabled)
+                        self.controls["viking_level"] = level
+                        options.addWidget(level)
                         options.addStretch()
                         row.addLayout(options)
                     else:
@@ -208,6 +218,7 @@ class JoinMonsterWarTab(BaseTab):
             "select_assistant_general": c["checkBoxAssistantGeneral"].isChecked(),
             "development_general": c["checkBoxDevelopmentGeneral"].isChecked(),
             "viking_summon": c["viking_summon"].isChecked() if "viking_summon" in c else False,
+            "viking_level": c["viking_level"].currentText() if "viking_level" in c else VIKING_LEVEL_DEFAULT,
             "selected_bosses": [
                 {"category_key": category, "name": name,
                  "levels": [level for level, box in levels.items() if box.isChecked()]}
@@ -229,6 +240,9 @@ class JoinMonsterWarTab(BaseTab):
         c["checkBoxDevelopmentGeneral"].setChecked(bool(data.get("development_general", False)))
         if "viking_summon" in c:
             c["viking_summon"].setChecked(bool(data.get("viking_summon", False)))
+        if "viking_level" in c:
+            level = str(data.get("viking_level", VIKING_LEVEL_DEFAULT))
+            c["viking_level"].setCurrentText(level if level in VIKING_LEVELS else VIKING_LEVEL_DEFAULT)
         if "selected_bosses" in data:
             selected = {(boss["category_key"], boss["name"]): boss.get("levels", [])
                         for boss in data["selected_bosses"]}

@@ -15,6 +15,7 @@ import numpy as np
 
 from ..ocr import read_camera, world_mask
 from ..ocr.find_bosses import find_bosses, read_popup
+from . import no_alliance
 from .arc_sweep import MIN_SWIPE, STEP, SWIPE_FULL_V, STEP_FRAC, _camera, _swipe, arc_sweep, px_to_world, safe_shift, valid_camera, world_to_px
 from .shared_bosses import SharedBosses
 
@@ -191,6 +192,8 @@ def share_boss(bot, boss: dict, shared: SharedBosses) -> str:
     """Bấm tên boss; khi menu nhanh hiện (có nút Share) đọc toạ độ X:Y của boss ở thanh toạ độ (bấm vào boss làm camera dời ra đúng boss; hộp Share sau đó làm tối thanh nên phải đọc
     lúc này). Boss ở toạ độ đó đã chia sẻ trước đây (`shared`) thì dừng: ALREADY. Chưa thì bấm Share, chọn liên minh, Confirm (share_to_alliance), ghi toạ độ vào `shared`: SHARED.
     FAILED nếu Share không hiện, không đọc được toạ độ (không biết đã chia sẻ chưa nên không gửi) hoặc hộp chọn kênh / Confirm không hiện. boss thêm "x", "y" (toạ độ đọc được)."""
+    if no_alliance.known(bot):
+        return FAILED                                        # chưa có liên minh: không có chỗ chia sẻ
     bot.tap(*boss["pos"], delay=0)
     for _ in range(POLL_TRIES):
         bot.sleep(POLL)

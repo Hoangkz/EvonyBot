@@ -31,6 +31,7 @@ class Task:
     once: bool = False          # xong rồi thì không đưa lại vào danh sách khi sang ngày mới (chỉ chạy lại khi Start lại)
     idle_only: bool = False     # chỉ chạy khi RẢNH: không còn nhiệm vụ nào khác tới lượt (kể cả việc theo giờ chưa tới giờ); không bị giới hạn 120 giây
     needs_city_map: bool = False  # cần route công trình: chưa có bản đồ thành trong DB thì worker quét trước khi chạy
+    needs_alliance: bool = False  # việc liên minh: tài khoản chưa có liên minh (common/no_alliance.py) thì worker bỏ qua
     run: Callable | None = None  # run(ctx, cấu hình tab của group): làm nhiệm vụ rồi lưu kết quả vào DB
     enabled: Callable[[dict], bool] = always       # enabled(cấu hình tab của group) -> nhiệm vụ này đã được tích?
     done: Callable | None = None                   # done(ctx, cấu hình tab của group) -> hôm nay đã xong chưa? (đọc DB)
@@ -62,6 +63,7 @@ def build_task(row: dict, group: str) -> Task:
 
     return Task(key, row.get("group", group), int(row.get("priority", DEFAULT_PRIORITY)),
                 must_finish=bool(row.get("must_finish")), once=bool(row.get("once")), tail=bool(row.get("tail")), idle_only=bool(row.get("idle_only")), needs_city_map=bool(row.get("needs_city_map")),
+                needs_alliance=bool(row.get("needs_alliance")),
                 run=job["run"], enabled=job.get("enabled", always), due=due,
                 done=job.get("done") or ((lambda ctx, settings: ctx.is_daily_done(key)) if row.get("saves") else None))
 

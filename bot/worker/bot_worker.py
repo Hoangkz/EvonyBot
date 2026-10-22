@@ -48,7 +48,7 @@ from ..activities.join_monster_war import IDLE as BOSS_IDLE
 from ..activities.join_monster_war import stamina_wait
 from ..activities.join_monster_war.constants import LISTBOSS
 from ..ocr.read_boss_count import crop as boss_count_crop, run as read_boss_count
-from ..common import get_server
+from ..common import get_server, no_alliance
 from ..daily_reset import done_today, last_reset
 from ..context import BotContext, BotInterrupted, TimedOut
 from ..context.errors import BossAvailable, StopRequested, YieldToBoss, YieldToTask
@@ -262,6 +262,7 @@ class BotWorker(QThread):
             # không được thì thôi chờ, nhiệm vụ tự xoay xở.
             waiting = lambda t: t.needs_city_map and not self.ctx.city_map and not scan_tried
             skip = lambda t: ((t.once and t.key in ran_once) or attempts.get(t.key, 0) >= MAX_ATTEMPTS
+                              or (t.needs_alliance and no_alliance.known(self.ctx))
                               or waiting(t) or self._is_done(t, ran))
             # Việc theo giờ: chỉ cần so giờ đã lưu trong DB; tới giờ thì làm ngay, trước các việc trong danh sách.
             task = next((t for t in timed if not skip(t) and self._is_due(t)), None)

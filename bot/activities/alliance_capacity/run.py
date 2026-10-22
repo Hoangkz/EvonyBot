@@ -8,10 +8,11 @@ xong khi hàm chạy hết một lượt); chỉ lỗi thật mới lưu `allian
 
 Each loop takes one screenshot, finds the first known image on it (checked in list order) and acts on it.
 """
+from ...common import no_alliance
 from ...common import click_images, delay, exit_images, find_first, go_home
 from ..daily_activities.alliance_donation.constants import TRIED_KEY as DONATION_TRIED_KEY
 from ..result import save_errors
-from .constants import BACK, BOSS, DONATE, DONE, GEMS, OUT_ALLIANCE, SCIENCE, SCROLL, TAP
+from .constants import BACK, BOSS, DONATE, DONE, GEMS, OPEN, OUT_ALLIANCE, SCIENCE, SCROLL, TAP
 
 
 @save_errors("alliance_capacity")   # lỗi thì lưu `alliance_capacity_error` vào DB
@@ -23,6 +24,8 @@ def run(bot, settings: dict):
 
     while True:
         screen = bot.screenshot()
+        if no_alliance.check(bot, screen):
+            return   # chưa có liên minh: không donate nên cũng không đánh dấu Alliance Donation
         # outLM's tap is an offset from the image's top-left corner.
         action, pos = find_first(bot, screen, targets, top_left={OUT_ALLIANCE})
 
@@ -41,6 +44,10 @@ def run(bot, settings: dict):
         elif action == TAP:
             bot.tap(*pos)
             delay(bot, 2)
+        elif action == OPEN:
+            bot.tap(*pos)
+            if no_alliance.wait_menu(bot):
+                return
         elif action == BACK:
             bot.back()
             delay(bot, 3)
@@ -73,7 +80,7 @@ def _targets() -> list[tuple[str, str]]:
         (f"{BOSS}/chientranh.png", SCROLL),
         *[(path, BACK) for path in exit_images()],
         *[(path, TAP) for path in click_images()],
-        (f"{BOSS}/lienminh.png", TAP),
+        (f"{BOSS}/lienminh.png", OPEN),
     ]
 
 
