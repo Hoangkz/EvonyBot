@@ -651,7 +651,38 @@ def _camera(bot, screen=None):
     return valid_camera(read_camera(screen))
 
 
-def _walk(bot, path, origin, seen, on_step, resync, screen=None, shifts=None):
+WATCH_EVERY = 1              # cú kéo: cứ chừng ấy cú thì gọi bot.swipe_watch (kiểm tra boss mới cho Join Boss, như scan_city)
+
+
+def _watched(bot) -> bool:
+    """Sau mỗi cú kéo: cứ WATCH_EVERY cú thì gọi bot.swipe_watch(bot) nếu có (worker gán cho việc quét lúc rảnh). True nếu nó báo đã rời bản đồ
+    (VD vào Join Boss): camera không còn ở chỗ dự tính, phải về gốc rồi kéo lại tới chỗ đang dở."""
+    watch = getattr(bot, "swipe_watch", None)
+    if watch is None:
+        return False
+    bot.swipe_count = getattr(bot, "swipe_count", 0) + 1
+    return bot.swipe_count % WATCH_EVERY == 0 and bool(watch(bot))
+
+
+def _rewind(bot, path, k: int, origin, seen, resync, shifts):
+    """Sau khi rời bản đồ (Join Boss): đưa game về bản đồ thế giới (bot.swipe_recover: Back, KHÔNG bấm về thành) rồi kéo tiếp từ ô đang dở `path[k]`. Camera vẫn đứng
+    đúng chỗ (lệch <= RESYNC_DRIFT km so với ô dự tính) thì không làm gì thêm; lệch nhiều (game đã dời camera) thì mới bấm nút về thành (gốc) và kéo lại không dừng tới
+    path[k]. Trả (số cú đã kéo, ảnh màn hình cuối)."""
+    recover = getattr(bot, "swipe_recover", None)
+    if recover is not None:
+        recover(bot)
+    if origin:
+        target = px_to_world(*path[k])
+        now = _camera(bot)
+        if now is not None and math.hypot(now[0] - origin[0] - target[0], now[1] - origin[1] - target[1]) > RESYNC_DRIFT:
+            bot.log("arc: camera đã dời khỏi ô đang dở, về gốc rồi kéo lại")
+            go_home(bot)
+            swipes, _, screen = _walk(bot, path[:k + 1], origin, seen, None, resync, None, shifts[:k] if shifts else None, watch=False)
+            return swipes, screen
+    return 0, None
+
+
+def _walk(bot, path, origin, seen, on_step, resync, screen=None, shifts=None, watch=True):
     """Đi hết `path` (các điểm dừng px so với gốc, điểm đầu là chỗ đang đứng): mỗi bước một cú kéo, ghi log độ lệch, gọi resync khi lệch nhiều và
     on_step ở ô mới ghé. Trả (số cú đã kéo, có bị on_step dừng không, ảnh màn hình cuối)."""
     swipes = 0
@@ -662,6 +693,10 @@ def _walk(bot, path, origin, seen, on_step, resync, screen=None, shifts=None):
             if not moved:
                 bot.log(f"arc: cú kéo tới điểm ({x:.0f}, {y:.0f}) px không làm màn đổi")
             swipes += 1
+            if watch and _watched(bot):
+                bot.log("arc: đã rời bản đồ (Join Boss), quay lại bản đồ thế giới rồi kéo tiếp")
+                done, screen = _rewind(bot, path, k, origin, seen, resync, shifts)
+                swipes += done
         target = px_to_world(x, y)
         if origin:
             now = _camera(bot, screen)
@@ -901,6 +936,7 @@ def arc_sweep(bot, start_deg: float, end_deg: float, radius: float = RADIUS, on_
     if home:
         go_home(bot)
     origin = _camera(bot)
+    bot.sweep_origin = origin                                # boss_scan dùng để biết camera DỰ TÍNH ở mỗi ô (gốc + (dX, dY))
     span = 360.0 if end_deg - start_deg >= 360 else (end_deg - start_deg) % 360
     pieces = plan_pieces(start_deg, span, radius, origin, near_first, no_back, zigzag, band_km, piece_deg, circular)
     if all(len(path) < 2 for path, _, _, _ in pieces):

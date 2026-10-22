@@ -18,6 +18,7 @@ from .tabs import (
     BlackMarketTab,
     DailyActivitiesTab,
     EventTab,
+    FindBossTab,
     InitializationTab,
     JoinMonsterWarTab,
     LogsTab,
@@ -39,7 +40,8 @@ class DeviceView(QWidget):
     civilization_changed = pyqtSignal(str, int)   # (device_id, nền văn minh 1..7, 0 = tự nhận)
     # (device_id, {tab title: settings}) — một tab có `settings_changed` vừa được người dùng sửa.
     tab_settings_changed = pyqtSignal(str, dict)
-    profile_selected = pyqtSignal(str, str)   # (device_id, tên hồ sơ) bấm nút hồ sơ
+    auto_angles_requested = pyqtSignal(str)   # device_id: nút Auto của tab Find Boss
+    profile_selected = pyqtSignal(str, str)  # (device_id, tên hồ sơ) bấm nút hồ sơ
     profile_added = pyqtSignal(str, str)      # (device_id, tên hồ sơ mới) nút "+"
     profile_deleted = pyqtSignal(str, str)    # (device_id, tên hồ sơ)
 
@@ -72,6 +74,9 @@ class DeviceView(QWidget):
         # Recruit General: đứng ngay trên tab Logs.
         self.recruit_general_tab = RecruitGeneralTab()
         self._add_tab(self.recruit_general_tab, "Recruit General")
+        self.find_boss_tab = FindBossTab()
+        self._add_tab(self.find_boss_tab, "Find Boss")
+        self.find_boss_tab.auto_clicked.connect(lambda: self.auto_angles_requested.emit(self.device_id))
         # Logs không có cấu hình: thêm thẳng, không nối Apply ALL / settings.
         self.logs_tab = LogsTab()
         self.tabs.addTab(self.logs_tab, "Logs")

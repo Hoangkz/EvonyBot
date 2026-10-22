@@ -24,6 +24,8 @@ from PyQt5.QtWidgets import (
     QApplication, QDialog, QHBoxLayout, QLabel, QMainWindow, QMessageBox, QStackedWidget, QVBoxLayout, QWidget,
 )
 
+from bot.activities.find_boss.angles import split_angles
+from bot.activities.find_boss.constants import END_KEY, START_KEY
 from bot.common import GAME_PACKAGE
 
 from bot.worker import BotManager
@@ -233,6 +235,7 @@ class MainWindow(QMainWindow):
         view.stop_all_requested.connect(self._on_stop_all_requested)
         view.apply_all_requested.connect(self._on_apply_all_requested)
         view.server_changed.connect(self._on_server_changed)
+        view.auto_angles_requested.connect(self._on_auto_angles)
         view.civilization_changed.connect(self._on_civilization_changed)
         view.reset_progress_requested.connect(self._on_reset_progress)
         view.reset_info_requested.connect(self._on_reset_info)
@@ -292,6 +295,17 @@ class MainWindow(QMainWindow):
         self.db.save_many_settings(
             {device_id: view.get_settings() for device_id, view in self.device_views.items()}
         )
+
+    def _on_auto_angles(self, device_id: str):
+        """Nút Auto của tab Find Boss: chia đều 0..360° cho mọi thiết bị cùng server với `device_id` (xếp theo device id), mỗi máy một cung liền nhau,
+        bội của ANGLE_STEP. Chưa biết server thì chỉ máy này (cả vòng)."""
+        server = self.device_views[device_id].initialization_tab.get_settings()["server"].strip()
+        ids = sorted(d for d, v in self.device_views.items() if server and v.initialization_tab.get_settings()["server"].strip() == server)
+        if device_id not in ids:
+            ids = [device_id]
+        for d, (start, end) in zip(ids, split_angles(len(ids))):
+            self.device_views[d].find_boss_tab.set_settings({START_KEY: start, END_KEY: end})
+            self.db.save_settings(d, {"Find Boss": self.device_views[d].find_boss_tab.get_settings()})
 
     def _refresh_profiles(self, device_id: str, view: DeviceView):
         """Hàng nút hồ sơ của thiết bị: các hồ sơ đã tạo (không gồm default) + hồ sơ đang dùng."""

@@ -61,6 +61,7 @@ from ..activities.event.run import claim_job, event_job
 from ..activities.event_center.crazy_eggs.run import JOB as crazy_eggs
 from ..activities.event_center.three_day.run import JOB as three_day_event
 from ..activities.open_gift_box.run import run as open_gift_box
+from ..activities.find_boss import JOB as find_boss_job
 from ..activities import gift_claims, join_monster_war
 
 DATA ={
@@ -356,8 +357,18 @@ DATA ={
             "tail": True,
         },
     ],
+    "Find Boss": [
+        {
+            "key": "find_boss",
+            "run": find_boss_job,
+            "label": "Find Boss: quét bản đồ thế giới tìm boss",
+            "priority": 700,
+            "idle_only": True,   # chỉ làm khi không còn nhiệm vụ nào khác
+            "note": "CHỈ khi rảnh (hết mọi nhiệm vụ khác): quét xong thì về toạ độ của mình rồi quét tiếp; chia sẻ boss đang tích vào liên minh",
+        }
+    ],
     "Black Market": [
-        { 
+        {
             "key": "black_market_market",
             "run": black_market_market,
             "label": "Black Market: mua ở Market",
