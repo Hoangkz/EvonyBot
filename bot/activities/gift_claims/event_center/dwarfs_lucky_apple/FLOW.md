@@ -30,3 +30,6 @@
    vụ và chụp lại mỗi 1 giây; ba lần không đọc được không được chuyển PENDING
    hoặc Back ra danh sách. Chỉ bộ đếm 120 giây của worker mới được ngắt để quay
    lại Join Boss, rồi lần chạy sau tiếp tục nhiệm vụ chưa DONE.
+   Ngay khi vào Dwarf, log ghi rõ deadline worker còn bao nhiêu giây.
+   Nếu log báo không có deadline thì Join Boss không hoạt động hoặc
+   worker đang chờ thể lực; Dwarf vẫn thuộc Event Center/Activities.

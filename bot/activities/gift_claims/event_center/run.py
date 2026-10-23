@@ -1,4 +1,6 @@
 """Scroll Event Center and process every red-dot row safely."""
+import time
+
 import cv2
 import numpy as np
 
@@ -883,6 +885,16 @@ def _apple_phase(bot, active: str, finished: str,
 
 def _handle_dwarfs_lucky_apple(bot):
     """Complete green x100/x10, then red x10; final disabled red is DONE."""
+    deadline = getattr(bot, "_deadline", None)
+    if isinstance(deadline, (int, float)):
+        remaining = max(0, round(deadline - time.monotonic()))
+        bot.record("Gift Claims: Dwarf's Lucky Apple thuộc Event Center/"
+                   f"Activities; deadline worker còn {remaining}s, hết giờ sẽ "
+                   "nhường Join Monster War")
+    else:
+        bot.record("Gift Claims: Dwarf's Lucky Apple thuộc Event Center/"
+                   "Activities; lượt này không có deadline 120s (Join Boss "
+                   "không hoạt động hoặc đang chờ thể lực)")
     # The page artwork and buttons fade in after the title is already visible.
     # Always begin from the green tab.  Never probe the red DONE template on
     # the initial/default page: a grey green-x10 state has nearly identical

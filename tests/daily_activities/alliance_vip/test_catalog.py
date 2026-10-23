@@ -97,12 +97,17 @@ class TruceColorTests(unittest.TestCase):
                  if item.key.startswith("truce_agreement_")]
         for visible in items:
             image = bot._template(visible.template)
-            center = (image.shape[1] // 2, image.shape[0] // 2)
+            screen = np.zeros((120, 160, 3), dtype=np.uint8)
+            top, left = 40, 50
+            screen[top:top + image.shape[0],
+                   left:left + image.shape[1]] = image
+            center = (left + image.shape[1] // 2,
+                      top + image.shape[0] // 2)
             for expected in items:
                 self.assertEqual(
                     visible.key == expected.key,
                     run._truce_color_matches(
-                        bot, image, center, expected.template),
+                        bot, screen, center, expected.template),
                     f"visible={visible.key}, expected={expected.key}",
                 )
 
@@ -117,7 +122,7 @@ class TruceColorTests(unittest.TestCase):
                 distance = cv2.compareHist(
                     histograms[left.key], histograms[right.key],
                     cv2.HISTCMP_BHATTACHARYYA)
-                self.assertGreater(distance, run.TRUCE_COLOR_MIN_MARGIN)
+                self.assertGreater(distance, 0.08)
 
 
 class DoneTests(unittest.TestCase):
@@ -201,7 +206,7 @@ class SingleSessionTests(unittest.TestCase):
                          run.MONTH_KEY, run.DAY_KEY,
                          run._item_done_key("chip_100")}.issubset(ctx.done))
 
-    def test_shop_requires_weekly_marker_and_three_stable_swipes_for_bottom(self):
+    def test_shop_swipes_exactly_twice_after_weekly_marker(self):
         ctx = self.Ctx()
         settings = {SETTINGS_KEY: {"chip_100": True}}
         ranges = {"monthly": None, "daily": None}
@@ -214,11 +219,11 @@ class SingleSessionTests(unittest.TestCase):
               mock.patch.object(run, "SCROLLS", 10)):
             run._run_shop_session(ctx, settings)
 
-        self.assertEqual(3, ctx.swipes)
+        self.assertEqual(2, ctx.swipes)
         self.assertTrue(any("xác nhận đã tới cuối" in line
                             for line in ctx.logs))
 
-    def test_shop_does_not_call_stable_frame_bottom_before_weekly_marker(self):
+    def test_shop_does_not_call_bottom_before_weekly_marker(self):
         ctx = self.Ctx()
         settings = {SETTINGS_KEY: {"chip_100": True}}
         ranges = {"monthly": None, "daily": None}

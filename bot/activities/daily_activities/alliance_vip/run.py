@@ -20,8 +20,6 @@ from .constants import (
     BUY_BUTTON_BOX,
     BUY_MIN_SATURATION,
     BUY_WAIT,
-    BOTTOM_CONFIRMATIONS,
-    BOTTOM_SIGNATURE_DISTANCE,
     CONFIRM_BUTTON,
     CONFIRM_CHECKS,
     DAILY_HEADER,
@@ -54,11 +52,10 @@ from .constants import (
     TOP_SWIPES,
     TRIBUTE_DAY_KEY,
     TRIBUTE_MONTH_KEY,
-    TRUCE_COLOR_MAX_DISTANCE,
-    TRUCE_COLOR_MIN_MARGIN,
     TRUCE_COLOR_SATURATION_MIN,
     TRUCE_COLOR_VALUE_MIN,
     WEEKLY_HEADER,
+    WEEKLY_EXTRA_SWIPES,
 )
 
 _ON_SHOP, _TAP, _BACK, _SCROLL, _OUT, _OPEN = "on_shop", "tap", "back", "scroll", "out_alliance", "open_alliance"
@@ -82,7 +79,7 @@ def _hue_histogram(image) -> np.ndarray | None:
 
 
 def _truce_color_matches(bot, screen, center, template: str) -> bool:
-    """Xác nhận 8h/24h/3d bằng dải Hue sau khi đã khớp hình."""
+    """Luôn phân loại 8h/24h/3d theo màu gần nhất."""
     expected = next((item for item in _TRUCE_ITEMS
                      if item.template == template), None)
     if expected is None:
@@ -92,28 +89,31 @@ def _truce_color_matches(bot, screen, center, template: str) -> bool:
     candidate = bot.crop(screen, center[0] - width // 2,
                          center[1] - height // 2, width, height)
     candidate_hist = _hue_histogram(candidate)
-    if candidate_hist is None:
-        bot.record(f"{LABEL}: {expected.label} không đủ pixel màu; "
-                   "không mua để tránh nhầm")
-        return False
-
     distances = []
     for item in _TRUCE_ITEMS:
-        reference_hist = _hue_histogram(bot._template(item.template))
-        distance = (1.0 if reference_hist is None else
-                    float(cv2.compareHist(candidate_hist, reference_hist,
-                                          cv2.HISTCMP_BHATTACHARYYA)))
+        reference = bot._template(item.template)
+        reference_hist = _hue_histogram(reference)
+        if candidate_hist is not None and reference_hist is not None:
+            distance = float(cv2.compareHist(
+                candidate_hist, reference_hist, cv2.HISTCMP_BHATTACHARYYA))
+        else:
+            # Hiếm gặp khi glow/ổ khóa che gần hết màu. Vẫn phải
+            # chọn một loại thay vì PENDING: so full-colour sau resize.
+            resized = cv2.resize(candidate, (reference.shape[1],
+                                             reference.shape[0]))
+            similarity = float(cv2.matchTemplate(
+                resized, reference, cv2.TM_CCOEFF_NORMED)[0, 0])
+            distance = 1.0 - similarity
         distances.append((distance, item))
     distances.sort(key=lambda pair: pair[0])
     best_distance, best_item = distances[0]
     runner_up = distances[1][0]
     margin = runner_up - best_distance
-    accepted = (best_item.key == expected.key and
-                best_distance <= TRUCE_COLOR_MAX_DISTANCE and
-                margin >= TRUCE_COLOR_MIN_MARGIN)
+    accepted = best_item.key == expected.key
     bot.record(f"{LABEL}: dải màu Truce nhận {best_item.label}, "
                f"yêu cầu {expected.label}, khoảng cách {best_distance:.3f}, "
-               f"chênh {margin:.3f} -> {'đúng' if accepted else 'loại'}")
+               f"chênh {margin:.3f} -> "
+               f"{'đúng loại' if accepted else 'không phải loại này'}")
     return accepted
 
 
@@ -179,28 +179,6 @@ def _shop_to_top(bot) -> None:
     for _ in range(TOP_SWIPES):
         bot.swipe_percent(*TOP_SWIPE, duration=TOP_SWIPE_DURATION, delay=0)
     bot.sleep(TOP_SETTLE)
-
-
-def _shop_scroll_signature(screen) -> np.ndarray:
-    """Stable edge dHash for the scrolling shop body.
-
-    Price glows and item artwork animate even at the real bottom, so raw pixel
-    difference can report movement forever.  Blurred structural edges in the
-    left/centre list body preserve row movement while suppressing that glow.
-    """
-    height, width = screen.shape[:2]
-    patch = screen[int(height * .10):int(height * .95),
-                   int(width * .03):int(width * .76)]
-    gray = cv2.cvtColor(patch, cv2.COLOR_BGR2GRAY)
-    edges = cv2.Canny(cv2.GaussianBlur(gray, (5, 5), 0), 45, 120)
-    tiny = cv2.resize(edges, (33, 24), interpolation=cv2.INTER_AREA)
-    return np.packbits(tiny[:, 1:] > tiny[:, :-1])
-
-
-def _shop_scroll_distance(before, after) -> int:
-    old = _shop_scroll_signature(before)
-    new = _shop_scroll_signature(after)
-    return int(np.unpackbits(np.bitwise_xor(old, new)).sum())
 
 
 def _buy_button_active(bot, screen, center) -> bool:
@@ -422,7 +400,7 @@ def _run_shop_session(ctx, settings: dict,
     best_scores: dict[str, float] = {}
     daily_reached = False
     weekly_reached = False
-    stagnant_swipes = 0
+    swipes_after_weekly = 0
     for step in range(SCROLLS + 1):
         # Xử lý hết mọi vật phẩm trong cùng khung; popup đóng xong chụp lại,
         # tuyệt đối không Back ra Alliance Shop rồi vào lại.
@@ -491,27 +469,17 @@ def _run_shop_session(ctx, settings: dict,
             break
         if step >= SCROLLS:
             ctx.record(f"{LABEL}: đã đủ {SCROLLS} lượt lướt nhưng chưa có "
-                       "3 xác nhận đáy liên tiếp; dừng theo trần an toàn")
+                       "mốc Weekly Sale; dừng theo trần an toàn")
             break
         ctx.record(f"{LABEL}: đã xử lý hết khung {step + 1}/{SCROLLS + 1}; vuốt chậm 1s rồi dừng 1s để quét")
-        before_scroll = screen
         ctx.swipe_percent(*SWIPE, duration=SWIPE_DURATION, delay=SCAN_SETTLE)
-        after_scroll = ctx.screenshot()
-        distance = _shop_scroll_distance(before_scroll, after_scroll)
-        stable = distance <= BOTTOM_SIGNATURE_DISTANCE
-        if stable and weekly_reached:
-            stagnant_swipes += 1
-        else:
-            stagnant_swipes = 0
-        ctx.record(f"{LABEL}: kiểm tra đáy bằng dải cấu trúc: khoảng cách "
-                   f"{distance}, Weekly={'đã thấy' if weekly_reached else 'chưa thấy'}, "
-                   f"ổn định={stagnant_swipes}/{BOTTOM_CONFIRMATIONS}")
-        if stable and not weekly_reached:
-            ctx.record(f"{LABEL}: khung chưa dịch chuyển nhưng chưa thấy mốc "
-                       "Weekly Sale; tiếp tục lướt, chưa được kết luận đáy")
-        if stagnant_swipes >= BOTTOM_CONFIRMATIONS:
-            ctx.record(f"{LABEL}: đã thấy Weekly Sale và vùng danh sách không "
-                       f"dịch chuyển {BOTTOM_CONFIRMATIONS} lần; xác nhận đã tới cuối")
+        if weekly_reached:
+            swipes_after_weekly += 1
+            ctx.record(f"{LABEL}: đã thấy Weekly Sale; lướt thêm "
+                       f"{swipes_after_weekly}/{WEEKLY_EXTRA_SWIPES} để xuống cuối")
+        if swipes_after_weekly >= WEEKLY_EXTRA_SWIPES:
+            ctx.record(f"{LABEL}: đã thấy Weekly Sale và lướt thêm "
+                       f"đủ {WEEKLY_EXTRA_SWIPES} lần; xác nhận đã tới cuối")
             break
 
     for key in ("tribute", "vip_points"):

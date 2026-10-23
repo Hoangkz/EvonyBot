@@ -9,6 +9,7 @@ import numpy as np
 from bot.activities import gift_claims
 from bot.activities.gift_claims import common, lobby
 from bot.activities.gift_claims.screens import GiftScreen, TITLE_TEMPLATES, identify
+from bot.context.errors import TimedOut
 
 event_center = import_module("bot.activities.gift_claims.event_center.run")
 event_center_zone = import_module("bot.activities.gift_claims.event_center.zone")
@@ -1423,6 +1424,16 @@ class FixedGiftFlowTests(unittest.TestCase):
         self.assertTrue(done)
         self.assertEqual(4, state.call_count)
         bot.back.assert_not_called()
+
+    def test_lucky_apple_immediately_propagates_worker_120s_timeout(self):
+        bot = mock.Mock()
+        bot.check.side_effect = TimedOut()
+
+        with self.assertRaises(TimedOut):
+            event_center._apple_phase(
+                bot, "active.png", "done.png", max_taps=100)
+
+        bot.screenshot.assert_not_called()
 
     def test_lucky_apple_runs_three_phases_continuously_before_done(self):
         bot = mock.Mock()
