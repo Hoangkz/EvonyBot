@@ -996,9 +996,9 @@ class FixedGiftFlowTests(unittest.TestCase):
                                     delay=event_center.UI_SETTLE_SECONDS)],
                          bot.tap.call_args_list)
 
-    def test_wishful_uses_extra_settle_time_on_multi_device_hosts(self):
+    def test_wishful_uses_one_second_settle_time(self):
         self.assertEqual(1.5, event_center.UI_SETTLE_SECONDS)
-        self.assertEqual(2.0, event_center.WISHFUL_SETTLE_SECONDS)
+        self.assertEqual(1.0, event_center.WISHFUL_SETTLE_SECONDS)
         bot = mock.Mock()
         bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
         with mock.patch.object(event_center, "find", return_value=None):
@@ -1458,6 +1458,32 @@ class FixedGiftFlowTests(unittest.TestCase):
               "DwarfsLuckyApple/status_red_wish_x10_done")],
             [call.args[1:] for call in phase.call_args_list])
         self.assertEqual(2, bot.tap.call_count)
+
+    def test_lucky_apple_green_wish_once_skips_directly_to_red_done(self):
+        bot = mock.Mock()
+        bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
+        green_state = ("DwarfsLuckyApple/status_green_wish_once", (250, 540))
+        red_state = ("DwarfsLuckyApple/status_red_wish_once_done", (250, 540))
+        with (mock.patch.object(event_center, "_wait_for_any",
+                                side_effect=((300, 300), (100, 300))),
+              mock.patch.object(event_center, "_wait_apple_special_state",
+                                side_effect=(green_state, red_state)),
+              mock.patch.object(event_center, "_apple_phase") as phase):
+            report, done = event_center._handle_dwarfs_lucky_apple(bot)
+
+        self.assertTrue(done)
+        self.assertEqual(common.ClaimReport(0, 1), report)
+        phase.assert_not_called()
+        self.assertEqual(2, bot.tap.call_count)
+
+    def test_lucky_apple_new_state_crops_match_supplied_files(self):
+        folder = IMAGES / "GiftClaims" / "DwarfsLuckyApple"
+        self.assertEqual((37, 106), cv2.imread(str(
+            folder / "status_green_wish_once.png")).shape[:2])
+        self.assertEqual((40, 147), cv2.imread(str(
+            folder / "status_green_wish_once_gray.png")).shape[:2])
+        self.assertEqual((38, 151), cv2.imread(str(
+            folder / "status_red_wish_once_done.png")).shape[:2])
 
     def test_lucky_apple_green_done_never_finishes_whole_task(self):
         bot = mock.Mock()

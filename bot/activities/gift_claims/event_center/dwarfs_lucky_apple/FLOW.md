@@ -18,6 +18,11 @@
    không dùng Back vì Back có thể thoát khỏi trang sự kiện. Ngay sau một lần
    bấm nút nhận Apple, nếu hiệu ứng làm template `Congratulations!` nhận hụt,
    bot vẫn phải tap an toàn `(195, 20)` một lần trước khi xét trạng thái mới.
+   Cơ chế mới: ở nhánh táo xanh, thấy
+   `status_green_wish_once` (Screenshot `073765`) hoặc
+   `status_green_wish_once_gray` (`073766`) thì bỏ qua các pha xanh còn
+   lại và chuyển thẳng sang táo đỏ. Sau khi mở táo đỏ, thấy
+   `status_red_wish_once_done` (`073767`) thì DONE toàn nhiệm vụ ngay.
 6. Mọi ảnh trạng thái DONE phải xác minh thêm cả hoa văn viền trái và viền phải
    của template. Nếu thiếu một trong hai viền thì không được kết luận DONE.
 7. ACTIVE/DONE còn được phân biệt bằng dải màu HSV 70x24 ở tâm nút. Nút vàng

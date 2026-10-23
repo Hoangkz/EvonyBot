@@ -3,6 +3,8 @@
 1. Mở đúng hàng `Wishful Windmill Festival` trong Limited.
 2. Vào `Wind Blessings` bằng icon thường, rương cũ `button_reward_chest`, hoặc
    rương có nhãn Wind mới `button_reward_chest_wind` (ngưỡng cao `0.86`).
+   Không có bước dừng 2 giây chờ trang/rương ổn định: tìm và bấm
+   ngay; sau mỗi thao tác chỉ chờ 1 giây.
 3. Chỉ xác nhận đã mở panel khi thấy một trong hai ảnh title, gồm crop chữ mới
    `title_wind_blessings_text` từ `Screenshot_20261023-073761`.
 4. Ở nguyên panel, chỉ tìm và bấm `Claim` trong vùng xanh `(3, 26, 97, 88)`.
@@ -17,5 +19,4 @@
    đến khi không còn Claim. Đây là DONE 2.
 8. Chỉ ghi DB DONE khi cả DONE 1 và DONE 2 đều hoàn tất. Nếu chạm giới hạn an
    toàn 12 lượt lướt hoặc còn Claim chưa xác minh thì giữ PENDING.
-9. Chờ 1 giây trước khi xác minh trạng thái sau popup và 2 giây sau thao tác
-   chính để máy chạy đồng thời không đọc phải khung hình cũ.
+9. Chờ 1 giây sau thao tác/popup trước khi chụp và xác minh khung mới.
