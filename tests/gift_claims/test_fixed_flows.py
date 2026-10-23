@@ -1394,7 +1394,7 @@ class FixedGiftFlowTests(unittest.TestCase):
         self.assertEqual(common.ClaimReport(1, 1), report)
         gray_done.assert_called_once()
 
-    def test_lucky_apple_done_is_rejected_without_both_ornaments(self):
+    def test_lucky_apple_gray_button_is_done_even_without_both_ornaments(self):
         bot = mock.Mock()
         screen = np.zeros((704, 396, 3), dtype=np.uint8)
         bot.best_match.side_effect = ((0.60, (300, 620)),
@@ -1410,8 +1410,31 @@ class FixedGiftFlowTests(unittest.TestCase):
                 "DwarfsLuckyApple/button_red_wish_x10",
                 "DwarfsLuckyApple/status_red_wish_x10_done")
 
-        self.assertIsNone(state)
-        self.assertIsNone(position)
+        self.assertEqual("done", state)
+        self.assertEqual((300, 620), position)
+
+    def test_lucky_apple_live_low_done_score_uses_located_gray_band(self):
+        bot = mock.Mock()
+        screen = np.zeros((704, 396, 3), dtype=np.uint8)
+        # Values captured from the stuck live log: the shared active artwork
+        # locates the x-control, but it is visually grey and the DONE crop is
+        # a weaker match because this account renders a different border.
+        bot.best_match.side_effect = ((0.742, (300, 620)),
+                                      (0.560, (300, 620)))
+        with (mock.patch.object(event_center, "_scaled_template",
+                                side_effect=lambda _bot, name, _screen: name),
+              mock.patch.object(event_center, "_apple_button_color_band",
+                                return_value=(26.0, 0.07)),
+              mock.patch.object(event_center, "_apple_done_ornament_matches")
+              as ornament):
+            state, position = event_center._apple_button_state(
+                bot, screen,
+                "DwarfsLuckyApple/button_red_wish_x10",
+                "DwarfsLuckyApple/status_red_wish_x10_done")
+
+        self.assertEqual("done", state)
+        self.assertEqual((300, 620), position)
+        ornament.assert_not_called()
 
     def test_lucky_apple_low_animated_active_wins_when_done_lacks_ornaments(self):
         bot = mock.Mock()

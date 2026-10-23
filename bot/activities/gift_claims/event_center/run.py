@@ -838,9 +838,26 @@ def _apple_button_state(bot, screen, active: str, finished: str,
         bot.record("Gift Claims: Dwarf's Lucky Apple dải vàng đạt chuẩn; "
                    "xác nhận nút ACTIVE và tiếp tục bấm")
         return "active", locate_pos
+    # A live account can render the already-pressed x100/x10 control with a
+    # slightly different border/crop from the supplied DONE template.  In the
+    # failing layout the shared button artwork still locates the exact control
+    # reliably (for example ACTIVE=0.742), while the DONE crop scores only
+    # about 0.56.  Its colour band is nevertheless unambiguously grey
+    # (S~26, saturated ratio~0.07).  Treat that state as DONE instead of
+    # leaving the phase in an endless unreadable-frame loop.  Yellow always
+    # wins above, so an actionable control cannot enter this branch.
+    located_is_gray = (
+        locate_color[0] <= APPLE_DONE_SATURATION_MAX and
+        locate_color[1] <= APPLE_DONE_COLOR_RATIO_MAX)
+    if (locate_pos is not None and
+            locate_score >= APPLE_COLOR_LOCATE_THRESHOLD and
+            located_is_gray):
+        bot.record("Gift Claims: Dwarf's Lucky Apple đã định vị đúng nút và "
+                   "dải màu đã xám; xác nhận DONE không chờ template/hoa văn")
+        return "done", locate_pos
     if done_pos is not None and done_score >= APPLE_STATE_THRESHOLD:
         bot.record("Gift Claims: Dwarf's Lucky Apple ảnh gần DONE nhưng dải "
-                   "màu chưa đủ xám hoặc hoa văn chưa đạt; chờ frame ổn định")
+                   "màu chưa đủ xám; chờ frame ổn định")
     return None, None
 
 
