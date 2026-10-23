@@ -22,7 +22,7 @@ from .constants import (ALLIANCE_ICON, ASSISTANT_GENERAL, BACK, BOSS_MONSTER, CH
                         LIST_END_MAX_LIGHT, LIST_END_REGION, LISTBOSS, LOCATION, MARCH, MARCH_SCREEN,
                         NO_BOSS, NOT_ENOUGH_STAMINA, OUT_OF_STAMINA, PRESET_ACTIVE_MIN_PIXELS, PRESET_ACTIVE_WAIT,
                         PRESET_COUNT, PRESET_DX, PRESET_RING_R, PRESET_LOCKED, PRESET_LOCKED_THRESHOLD, PRESET_X0, PRESET_Y, PVP_WAR, REGIONS, SAME_SPOT, SCROLL, SELECT,
-                        SELECT_GENERAL, STAMINA_ITEM_USE, STAMINA_REFILL_WAIT, STAMINA_SLIDER_END,
+                        SELECT_GENERAL, STAMINA_ITEM_USE, STAMINA_ITEM_USE_SMALL, STAMINA_REFILL_WAIT, STAMINA_SLIDER_END,
                         STAMINA_ADDED_WAIT, STAMINA_BASE, STAMINA_BAR_REGION, STAMINA_ITEM_MIN_SCORE, STAMINA_ITEM_REGION, STAMINA_ITEMS,
                         STAMINA_PLUS, STAMINA_PLUS_DELAY,
                         STAMINA_USE, TAP, TROOP_BACK_WAIT, TROOP_DETAIL, TROOP_DETAIL_SEEN, WAR_TAB, WAR_TICKED, WAR_UNTICK_TRIES)
@@ -345,9 +345,7 @@ class _Boss:
         bot = self.bot
         _, buttons = self._poll_screen(
             "open_stamina_items",
-            lambda image: sorted(bot.find_all(STAMINA_ITEM_USE, screen=image,
-                                              region=REGIONS[STAMINA_ITEM_USE]),
-                                 key=lambda p: p[1]),
+            lambda image: _item_use_buttons(bot, image),
         )
         if not buttons:
             # Hết vật phẩm (màn Use Item không có nút Use, chỉ còn nút kim cương): Back 3 lần. Boss chưa
@@ -387,8 +385,7 @@ class _Boss:
             shot, closed = self._poll_screen(
                 "stamina_screen_closed",
                 lambda image: (bot.find(STAMINA_USE, screen=image, region=REGIONS[STAMINA_USE]) is None
-                               and not bot.find_all(STAMINA_ITEM_USE, screen=image,
-                                                    region=REGIONS[STAMINA_ITEM_USE])),
+                               and not _item_use_buttons(bot, image)),
                 timeout=STAMINA_CLOSE_WAIT, interval=1,
             )
             if closed:
@@ -929,6 +926,17 @@ def _coords_after_server(image) -> tuple[int, int] | None:
     if len(parts) != 2 or not all(part.isdigit() for part in parts):
         return None
     return int(parts[0]), int(parts[1])
+
+
+def _item_use_buttons(bot, screen) -> list[tuple[int, int]]:
+    """Các nút "Use ( N )" ở màn Use Item, từ trên xuống. Hai ảnh mẫu: chữ "Use" thường và chữ
+    nhỏ (số lượng dài như "1,128" làm chữ co lại)."""
+    points = []
+    for template in (STAMINA_ITEM_USE, STAMINA_ITEM_USE_SMALL):
+        for point in bot.find_all(template, screen=screen, region=REGIONS[STAMINA_ITEM_USE]):
+            if not _near(point, points):
+                points.append(point)
+    return sorted(points, key=lambda p: p[1])
 
 
 def _item_stamina(bot, screen) -> int | None:

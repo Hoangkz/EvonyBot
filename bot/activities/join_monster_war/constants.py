@@ -23,6 +23,9 @@ NOT_ENOUGH_STAMINA = f"{JB}/hettheluc.png"
 # Màn "Use Item" sau khi bấm Confirm: chữ "Use (" của nút "Use ( N )" ở mỗi vật phẩm thể lực
 # (chỉ tìm ở cột nút bên phải: chữ "Use it to gain..." ở cột mô tả cũng khớp).
 STAMINA_ITEM_USE = f"{JB}/staminaItemUse.png"
+# Số lượng lớn ("Use ( 1,128 )") làm chữ "Use" nhỏ lại (~0,94 lần): ảnh trên chỉ khớp 0,806 -> thêm ảnh
+# chữ nhỏ cắt từ nút "Use ( 1,128 )" (khớp 1,00; nút số nhỏ ~0,8). Nút kim cương (hết vật phẩm) chỉ khớp <= 0,42.
+STAMINA_ITEM_USE_SMALL = f"{JB}/staminaItemUseSmall.png"
 # Nút "Use" lớn của popup chọn số lượng.
 STAMINA_USE = f"{JB}/staminaUse.png"
 # Chữ "Total Troops" của màn chi tiết đội (hiện khi cú vuốt cuộn bị game coi là tap vào thẻ rally):
@@ -61,7 +64,7 @@ REGIONS = {
     CHOOSE_DEVELOPMENT: (45, 5, 75, 28),  # đo: búa (219, 77) màn Select a General / (219, 161) màn Generals
     WAR_TICKED: (44, 12, 58, 21),         # đo: ô War x48-54 y15-18 (ô Monster War ở x9-19: ngoài vùng)
     PRESET_LOCKED: (0, 7, 100, 16),       # hàng preset, đo: y 9-13
-    STAMINA_ITEM_USE: (65, 40, 95, 100),  # cột nút Use, đo: (292, 360), (296, 479), (288, 598)
+    STAMINA_ITEM_USE: (65, 25, 95, 100),  # cột nút Use, đo: (292, 360), (296, 479), (288, 598); có banner khuyến mãi (21913) nút đầu ở y 242
     STAMINA_USE: (45, 65, 95, 78),        # đo: (281, 502)
     GENERAL_SEARCH: (80, 50, 97, 60),     # ô Main General, đo: (348, 388); kính lúp tướng phụ ở y 502: ngoài vùng
 }

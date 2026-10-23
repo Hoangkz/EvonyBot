@@ -453,6 +453,16 @@ class JoinBossEdgeCaseTests(unittest.TestCase):
             self.assertEqual(run_module._item_stamina(ctx, screen), amount)
         self.assertIsNone(run_module._item_stamina(ctx, cv2.imread(str(SCREENS / "stamina_use_item_list.png"))))
 
+    def test_use_item_buttons_include_long_counts_and_top_row(self):
+        # 21913: banner khuyến mãi đẩy nút đầu lên y 242; "Use ( 1,128 )" có chữ "Use" nhỏ hơn.
+        from threading import Event
+        from bot.context import BotContext
+        ctx = BotContext(SimpleNamespace(serial="x"), Event(), None, lambda _: None)
+        screen = cv2.imread(str(SCREENS / "stamina_use_item_list_big_count.png"))
+        self.assertEqual([y for _, y in run_module._item_use_buttons(ctx, screen)], [242, 361, 480, 599])
+        # Hết vật phẩm: chỉ còn nút kim cương -> không có nút Use
+        self.assertEqual(run_module._item_use_buttons(ctx, cv2.imread(str(SCREENS / "stamina_no_items.png"))), [])
+
     def test_locked_presets_are_all_counted(self):
         # Ổ khoá khớp chỉ 0,877-0,9 ở vài ô: ngưỡng mặc định 0,9 đếm thiếu (3 thay vì 4, 5 thay vì 6).
         from threading import Event
