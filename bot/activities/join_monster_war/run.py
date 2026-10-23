@@ -14,9 +14,9 @@ from ...ocr.read_power import text as read_power_text
 from . import boss_names, stamina_wait
 from .boss_memory import JOINED as MEMORY_JOINED
 from .boss_memory import BossMemory
-from .constants import (ALLIANCE_ICON, ASSISTANT_GENERAL, BACK, BOSS_MONSTER, CHOOSE_DEVELOPMENT,
+from .constants import (ALLIANCE_ICON, ASSISTANT_GENERAL, ASSISTANT_SELECT_MIN_Y, BACK, BOSS_MONSTER, CHOOSE_DEVELOPMENT,
                         FAVORITE_OFF, FAVORITE_ON,
-                        GENERAL_LIST_INTERVAL, GENERAL_LIST_WAIT, GENERAL_SEARCH, IDLE, JB, MONSTER_TICKED_REGION, MONSTER_TICKED_THRESHOLD,
+                        GENERAL_LIST_INTERVAL, GENERAL_LIST_WAIT, GENERAL_OPEN_INTERVAL, GENERAL_OPEN_WAIT, GENERAL_SEARCH, IDLE, JB, MONSTER_TICKED_REGION, MONSTER_TICKED_THRESHOLD,
                         MONSTER_TICK_TRIES, MONSTER_WAR_TAP, JOIN, JOIN_LIST, JOIN_MAX_Y, JOIN_MIN_Y, MAIN_GENERAL,
                         JOIN_THRESHOLD, JOINED, JOINED_BUTTON, JOINED_OVERLAP, LEAVE_ALLIANCE_POPUP,
                         LIST_END_MAX_LIGHT, LIST_END_REGION, LISTBOSS, LOCATION, MARCH, MARCH_SCREEN,
@@ -605,14 +605,24 @@ class _Boss:
         bot.tap(*plus)
 
         # Chờ màn "Select a General": nhận bằng trái tim lọc (luôn có, kể cả khi danh sách
-        # trống "No favorite General" thì không có nút Select nào)
+        # trống "No favorite General" thì không có nút Select nào). Màn mở mất ~2,2-2,9 s trên MEmu
+        # (mỗi ảnh chụp ~0,7 s): kiểm tra mỗi 1 s, tối đa 8 s, không phải STEP_TIMEOUT 2 s.
         screen, opened = self._poll_screen(
             f"open_{name}",
             lambda image: (bot.find(FAVORITE_ON, screen=image, region=REGIONS[FAVORITE_ON])
                            or bot.find(FAVORITE_OFF, screen=image, region=REGIONS[FAVORITE_OFF])),
+            timeout=GENERAL_OPEN_WAIT, interval=GENERAL_OPEN_INTERVAL,
         )
         if not opened:
             bot.record(f"Chọn {name}: không mở được màn Select a General")
+            # Đã rời màn March (màn chọn tướng mở muộn / đang load): Back về March, không để
+            # _press_march bấm nhầm trên màn khác.
+            if screen is not None and bot.find(MARCH, screen=screen, region=REGIONS[MARCH]) is None:
+                bot.back()
+                self._poll_screen(
+                    f"back_from_{name}",
+                    lambda image: bot.find(MARCH, screen=image, region=REGIONS[MARCH]),
+                )
             return False
 
         # Chỉ hiện tướng phát triển: bấm tab Development (không thấy cái búa = tab đang chọn sẵn)
@@ -642,8 +652,7 @@ class _Boss:
         # màn mở / đổi bộ lọc): chờ tới khi có nút, tối đa GENERAL_LIST_WAIT giây.
         _, buttons = self._poll_screen(
             f"general_list_{name}",
-            lambda image: sorted((p for p in bot.find_all(SELECT, screen=image, region=REGIONS[SELECT])
-                                  if _is_green_button(image, p)), key=lambda p: p[1]),
+            lambda image: _green_selects(bot, image, min_y=0 if slot == MAIN_GENERAL else ASSISTANT_SELECT_MIN_Y),
             timeout=GENERAL_LIST_WAIT, interval=GENERAL_LIST_INTERVAL,
         )
         if not buttons:
@@ -951,6 +960,14 @@ def _item_stamina(bot, screen) -> int | None:
               for amount, template in STAMINA_ITEMS.items()}
     amount = max(scores, key=scores.get)
     return amount if scores[amount] >= STAMINA_ITEM_MIN_SCORE else None
+
+
+def _green_selects(bot, screen, min_y: float = 0) -> list[tuple[int, int]]:
+    """Các nút "Select" màu xanh (chọn được) ở màn Select a General có y > `min_y` (% chiều cao
+    màn hình), từ trên xuống. Nút xám của tướng đang là tướng chính (khớp ảnh mẫu tới 0,88) bị bỏ."""
+    bottom = screen.shape[0] * min_y / 100
+    return sorted((p for p in bot.find_all(SELECT, screen=screen, region=REGIONS[SELECT])
+                   if p[1] > bottom and _is_green_button(screen, p)), key=lambda p: p[1])
 
 
 def _is_green_button(screen, center) -> bool:

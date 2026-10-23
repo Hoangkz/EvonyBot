@@ -197,12 +197,12 @@ Chi tiết triển khai nằm ở [boss_board.py](../../worker/boss_board.py) v�
 
 `_choose_general(ô)` (dùng chung cho tướng chính và tướng phụ; `ô` là vùng % của ô đó trên màn March):
 - Ô không có dấu "+" (`selectGeneral.png`) thì coi là đã có tướng, trả True nếu thấy kính lúp trong ô.
-- Bấm "+", chờ màn "Select a General". Màn này được nhận bằng trái tim lọc (`favoriteOn.png` / `favoriteOff.png`), vì khi không có tướng yêu thích ("No favorite General") thì không có nút Select nào.
+- Bấm "+", chờ màn "Select a General": kiểm tra mỗi 1 giây, tối đa 8 giây (`GENERAL_OPEN_INTERVAL`, `GENERAL_OPEN_WAIT`; đo MEmu mở mất 2,2–2,9 giây). Không mở được mà đã rời màn March (không thấy nút March) thì Back về March, không bấm March nhầm trên màn khác. Màn này được nhận bằng trái tim lọc (`favoriteOn.png` / `favoriteOff.png`), vì khi không có tướng yêu thích ("No favorite General") thì không có nút Select nào.
 - Tab tích **"Development General"**: bấm tab Development (cái búa `chooseDevelopment.png`, vùng hàng tab). Không thấy cái búa thì coi như tab đang chọn sẵn (tab đang chọn hiện chữ "Development").
-- Danh sách tướng load chậm (~3 giây sau khi màn mở / đổi bộ lọc): chờ nút Select xanh, kiểm tra mỗi 0,5 giây, tối đa 5 giây (`GENERAL_LIST_WAIT`); thấy là bấm ngay.
-- Hết 5 giây vẫn không có nút Select xanh nào (không có tướng yêu thích, hoặc chỉ còn tướng chính): nhấn Back về màn March, bỏ qua phần chọn tướng, trả False.
+- Danh sách tướng load chậm (~3 giây sau khi màn mở / đổi bộ lọc): chờ nút Select xanh, kiểm tra mỗi 0,5 giây, tối đa 8 giây (`GENERAL_LIST_WAIT`; lúc đầu thường chỉ hiện tướng chính với nút Select xám, nút xám không tính); thấy là bấm ngay.
+- Hết 8 giây vẫn không có nút Select xanh nào (không có tướng yêu thích, hoặc chỉ còn tướng chính): nhấn Back về màn March, bỏ qua phần chọn tướng, trả False.
 - Trái tim lọc tướng yêu thích chưa tích (`favoriteOff.png`, không thấy `favoriteOn.png`) thì bấm tích.
-- Bấm nút "Select" **màu xanh** trên cùng. Tướng đang là tướng chính có nút Select xám (không chọn được làm tướng phụ) và bị bỏ qua, dù nút xám vẫn khớp ảnh mẫu tới 0,88.
+- **Tướng chính:** bấm nút "Select" **màu xanh** trên cùng. **Tướng phụ:** chỉ xét nút "Select" xanh có **y > 80 %** màn hình (`ASSISTANT_SELECT_MIN_Y`; thẻ đầu danh sách là tướng chính, nút ở y ~53 %). Tướng đang là tướng chính có nút Select xám (không chọn được làm tướng phụ) và bị bỏ qua, dù nút xám vẫn khớp ảnh mẫu tới 0,88.
 - Chờ về màn March, thấy kính lúp trong ô thì đã chọn xong.
 5. Khi vừa vào màn March, tìm các icon LOCATION và OCR tọa độ bên phải (tọa độ bên trái là người gọi rally). Đây là **tọa độ mục tiêu thật** dùng cho lần hành quân; không so với tọa độ đã đọc ở danh sách. Không đọc được thì Back, không March.
 6. Tìm lại MARCH; tap vị trí mới nếu có, nếu không dùng vị trí MARCH đã nhận diện ở vòng chính.

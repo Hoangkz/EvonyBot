@@ -111,7 +111,12 @@ STAMINA_BASE = 100                       # thể lực popup mở sẵn
 STAMINA_PLUS_DELAY = 0                       # giây sau mỗi lần bấm +: mỗi tap ADB đã mất ~0,5 giây
 STAMINA_ADDED_WAIT = 1                   # giây chờ sau khi bấm + xong, trước khi bấm Use
 TROOP_BACK_WAIT = 1   # giây chờ sau khi Back khỏi màn chi tiết đội
-GENERAL_LIST_WAIT = 5                # giây tối đa chờ danh sách tướng load (thường ~3 s) ở màn Select a General
+# Tướng phụ: thẻ đầu danh sách là tướng chính (nút Select xám) -> chỉ lấy nút Select có y > 80 %
+# màn hình (thẻ thứ hai, nút ở y 627 / 704 = 89 %; nút thẻ đầu ở y 373 = 53 %).
+ASSISTANT_SELECT_MIN_Y = 80
+GENERAL_OPEN_WAIT = 8                # giây tối đa chờ màn Select a General mở sau khi bấm "+" (đo MEmu: 2,2-2,9 s)
+GENERAL_OPEN_INTERVAL = 1            # giây giữa các lần kiểm tra màn Select a General đã mở chưa
+GENERAL_LIST_WAIT = 8                # giây tối đa chờ danh sách tướng load (vài giây; lúc đầu chỉ hiện tướng chính nút xám) ở màn Select a General
 GENERAL_LIST_INTERVAL = 0.5          # giây giữa các lần kiểm tra danh sách tướng
 STAMINA_REFILL_WAIT = 2             # giây chờ sau khi bấm Use (game tự đóng popup) rồi mới Back
 PRESET_X0, PRESET_DX, PRESET_Y = 10.4, 11.3, 11

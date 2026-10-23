@@ -342,7 +342,11 @@ class JoinBossEdgeCaseTests(unittest.TestCase):
         boss = _Boss(bot, {"select_general": True})
 
         self.assertFalse(boss._choose_general(MAIN_GENERAL))
-        self.assertEqual(bot.screenshot.call_count, int(STEP_TIMEOUT / POLL_INTERVAL))
+        # Chờ màn mở tối đa GENERAL_OPEN_WAIT; không thấy nút March (đã rời màn March) -> Back rồi chờ về March
+        self.assertEqual(bot.screenshot.call_count,
+                         int(run_module.GENERAL_OPEN_WAIT / run_module.GENERAL_OPEN_INTERVAL)
+                         + int(STEP_TIMEOUT / POLL_INTERVAL))
+        bot.back.assert_called_once()
         self.assertIn("không mở được màn Select a General", bot.record.call_args.args[0])
         self.assertIsNone(boss.memory.status((500, 600)))
 
@@ -360,6 +364,31 @@ class JoinBossEdgeCaseTests(unittest.TestCase):
             self.assertTrue(boss._choose_general(MAIN_GENERAL))
         bot.tap.assert_any_call(330, 250)
         bot.back.assert_not_called()
+
+    def test_general_list_real_screens_wait_past_gray_main_general(self):
+        # Ảnh thật: lúc đầu chỉ có tướng chính (nút Select xám), vài giây sau mới có tướng nút xanh.
+        from threading import Event
+        from bot.context import BotContext
+        ctx = BotContext(SimpleNamespace(serial="x"), Event(), None, lambda _: None)
+        loading = cv2.imread(str(SCREENS / "select_general_loading_only_main.png"))
+        loaded = cv2.imread(str(SCREENS / "select_general_loaded_green.png"))
+        shots = iter([loading] * 8 + [loaded])   # 8 x 0,5 s = 4 s mới load xong
+        ctx.screenshot = lambda: next(shots, loaded)
+        ctx.tap = mock.Mock()
+        ctx.back = mock.Mock()
+        ctx.log = ctx.record = mock.Mock()
+        ctx.boss_memory = BossMemory()
+        boss = _Boss(ctx, {"select_general": True})
+
+        self.assertEqual(run_module._green_selects(ctx, loading), [])   # chỉ có nút xám -> chờ tiếp
+        _, buttons = boss._poll_screen(
+            "general_list", lambda image: run_module._green_selects(ctx, image),
+            timeout=run_module.GENERAL_LIST_WAIT, interval=run_module.GENERAL_LIST_INTERVAL)
+
+        self.assertEqual(buttons, [(329, 627)])   # nút xanh của Cleopatra, không phải nút xám (331, 374)
+        # Tướng phụ chỉ lấy nút Select có y > 80 % màn hình (thẻ đầu là tướng chính, nút ở y 53 %)
+        self.assertEqual(run_module._green_selects(ctx, loaded, run_module.ASSISTANT_SELECT_MIN_Y), [(329, 627)])
+        self.assertEqual(run_module._green_selects(ctx, loading, run_module.ASSISTANT_SELECT_MIN_Y), [])
 
     def test_joined_memory_is_written_after_returning_to_war_list(self):
         bot = fake_bot()
