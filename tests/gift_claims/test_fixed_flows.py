@@ -1438,12 +1438,14 @@ class FixedGiftFlowTests(unittest.TestCase):
     def test_lucky_apple_runs_three_phases_continuously_before_done(self):
         bot = mock.Mock()
         bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
-        reports = ((common.ClaimReport(2, 2), True),
-                   (common.ClaimReport(3, 3), True),
-                   (common.ClaimReport(4, 4), True))
+        reports = ((common.ClaimReport(2, 2), True, True),
+                   (common.ClaimReport(3, 3), True, True),
+                   (common.ClaimReport(4, 4), True, True))
         with (mock.patch.object(event_center, "_wait_for_any",
                                 side_effect=((300, 300), (100, 300))),
-              mock.patch.object(event_center, "_apple_phase",
+              mock.patch.object(event_center, "_wait_apple_special_state",
+                                return_value=("green-once", (250, 540))),
+              mock.patch.object(event_center, "_run_optional_apple_phase",
                                 side_effect=reports) as phase):
             report, done = event_center._handle_dwarfs_lucky_apple(bot)
 
@@ -1456,25 +1458,65 @@ class FixedGiftFlowTests(unittest.TestCase):
               "DwarfsLuckyApple/status_green_wish_x10_done"),
              ("DwarfsLuckyApple/button_red_wish_x10",
               "DwarfsLuckyApple/status_red_wish_x10_done")],
-            [call.args[1:] for call in phase.call_args_list])
+            [call.args[1:3] for call in phase.call_args_list])
         self.assertEqual(2, bot.tap.call_count)
 
-    def test_lucky_apple_green_wish_once_skips_directly_to_red_done(self):
+    def test_lucky_apple_only_once_on_both_tabs_is_done(self):
         bot = mock.Mock()
         bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
         green_state = ("DwarfsLuckyApple/status_green_wish_once", (250, 540))
-        red_state = ("DwarfsLuckyApple/status_red_wish_once_done", (250, 540))
+        red_state = ("DwarfsLuckyApple/status_red_wish_once", (250, 540))
         with (mock.patch.object(event_center, "_wait_for_any",
                                 side_effect=((300, 300), (100, 300))),
               mock.patch.object(event_center, "_wait_apple_special_state",
                                 side_effect=(green_state, red_state)),
-              mock.patch.object(event_center, "_apple_phase") as phase):
+              mock.patch.object(event_center, "_run_optional_apple_phase",
+                                side_effect=((common.ClaimReport(), True, False),
+                                             (common.ClaimReport(), True, False),
+                                             (common.ClaimReport(), True, False))) as phase):
             report, done = event_center._handle_dwarfs_lucky_apple(bot)
 
         self.assertTrue(done)
         self.assertEqual(common.ClaimReport(0, 1), report)
-        phase.assert_not_called()
+        self.assertEqual(3, phase.call_count)
         self.assertEqual(2, bot.tap.call_count)
+
+    def test_lucky_apple_green_x10_without_x100_is_finished_before_red(self):
+        bot = mock.Mock()
+        with (mock.patch.object(event_center, "_wait_for_any",
+                                side_effect=((300, 300), (100, 300))),
+              mock.patch.object(event_center, "_wait_apple_special_state",
+                                return_value=("green-once", (250, 540))),
+              mock.patch.object(event_center, "_run_optional_apple_phase",
+                                side_effect=(
+                                    (common.ClaimReport(), True, False),
+                                    (common.ClaimReport(3, 3), True, True),
+                                    (common.ClaimReport(2, 2), True, True),
+                                )) as phase):
+            report, done = event_center._handle_dwarfs_lucky_apple(bot)
+
+        self.assertTrue(done)
+        self.assertEqual(common.ClaimReport(5, 5), report)
+        self.assertIn("button_green_wish_x10", phase.call_args_list[1].args[1])
+        self.assertIn("button_red_wish_x10", phase.call_args_list[2].args[1])
+
+    def test_lucky_apple_red_x10_takes_priority_over_red_once(self):
+        bot = mock.Mock()
+        with (mock.patch.object(event_center, "_wait_for_any",
+                                side_effect=((300, 300), (100, 300))),
+              mock.patch.object(event_center, "_wait_apple_special_state",
+                                return_value=("green-once", (250, 540))) as once,
+              mock.patch.object(event_center, "_run_optional_apple_phase",
+                                side_effect=(
+                                    (common.ClaimReport(), True, False),
+                                    (common.ClaimReport(), True, False),
+                                    (common.ClaimReport(4, 4), True, True),
+                                ))):
+            report, done = event_center._handle_dwarfs_lucky_apple(bot)
+
+        self.assertTrue(done)
+        self.assertEqual(common.ClaimReport(4, 4), report)
+        once.assert_called_once()
 
     def test_lucky_apple_new_state_crops_match_supplied_files(self):
         folder = IMAGES / "GiftClaims" / "DwarfsLuckyApple"
@@ -1483,16 +1525,18 @@ class FixedGiftFlowTests(unittest.TestCase):
         self.assertEqual((40, 147), cv2.imread(str(
             folder / "status_green_wish_once_gray.png")).shape[:2])
         self.assertEqual((38, 151), cv2.imread(str(
-            folder / "status_red_wish_once_done.png")).shape[:2])
+            folder / "status_red_wish_once.png")).shape[:2])
+        self.assertEqual((41, 154), cv2.imread(str(
+            folder / "status_red_wish_once_gray.png")).shape[:2])
 
     def test_lucky_apple_green_done_never_finishes_whole_task(self):
         bot = mock.Mock()
         bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
         with (mock.patch.object(event_center, "_wait_for_any",
                                 return_value=(300, 300)),
-              mock.patch.object(event_center, "_apple_phase",
-                                side_effect=((common.ClaimReport(2, 2), True),
-                                             (common.ClaimReport(1, 0), False)))):
+              mock.patch.object(event_center, "_run_optional_apple_phase",
+                                side_effect=((common.ClaimReport(2, 2), True, True),
+                                             (common.ClaimReport(1, 0), False, True)))):
             _report, done = event_center._handle_dwarfs_lucky_apple(bot)
 
         self.assertFalse(done)
