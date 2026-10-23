@@ -2,6 +2,7 @@
 initialization_tab.py — 1:1 rebuild of tabPage1 ("Initialization") from
 Form3_Designer.cs: same controls, same nesting, same X/Y/W/H.
 """
+import subprocess
 import time
 from datetime import datetime
 
@@ -26,6 +27,7 @@ from .constants import (
     PROFILE_NAME_MAX,
     PROFILE_ROW_POS,
 )
+from ..emulator_window import EmulatorWindowError, toggle_maximize
 from ..theme import COLORS
 from .tab_placeholder import DesignerTab, confirm_reset
 
@@ -183,6 +185,13 @@ class InitializationTab(DesignerTab):
         self.active_button.setGeometry(reset.x() - width - 6, reset.y(), width, reset.height())
         self.active_button.clicked.connect(lambda: self.active_clicked.emit(not self._active))
         self.set_active(True)
+        # Nút Maximize: phóng to cửa sổ giả lập MEmu của máy này (bấm lại thì thu về), ngay bên trái Active.
+        self._device_id = device_id
+        maximize = QPushButton("Maximize", self.page)
+        maximize.setToolTip("Phóng to cửa sổ giả lập của máy này (bấm lại để thu về).")
+        width = maximize.sizeHint().width()
+        maximize.setGeometry(self.active_button.x() - width - 6, reset.y(), width, reset.height())
+        maximize.clicked.connect(self._toggle_emulator_window)
         # Chưa có số liệu -> tắt cả 2; main sẽ set_run_counts() ngay khi đăng ký thiết bị.
         c["button9"].setEnabled(False)
         c["buttonStopAll"].setEnabled(False)
@@ -269,6 +278,12 @@ class InitializationTab(DesignerTab):
             QMessageBox.warning(self, "New profile", f"A profile named '{name}' already exists.")
             return
         self.profile_added.emit(name)
+
+    def _toggle_emulator_window(self):
+        try:
+            toggle_maximize(self._device_id)
+        except (EmulatorWindowError, OSError, ValueError, AttributeError, subprocess.SubprocessError) as e:
+            QMessageBox.warning(self, "Maximize", str(e))
 
     def _confirm_reset_info(self):
         if confirm_reset(self, "Reset info",
