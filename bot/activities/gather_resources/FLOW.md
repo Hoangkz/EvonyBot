@@ -37,7 +37,7 @@ flowchart TD
     O -- "You can only send one army to the target..." --> F
     O -- không sang màn March --> S2[làm lại cả lượt, tối đa SEND_TRIES = 2] --> F
     O -- màn March --> N{nút March xám?}
-    N -- có: hết lính --> B[Back, mọi đội đến hạn chờ 30 phút, return] --> Z
+    N -- có: hết lính --> B[Back 2 lần: đóng màn March, bảng Search; mọi đội đến hạn chờ 30 phút, return] --> Z
     N --> P[đọc giờ thu thập + giờ đi, bấm March luôn]
     P -- vẫn ở màn March --> B2[Back] --> F
     P --> R[lưu giờ rảnh = bây giờ + thu thập + 2 × đi + 30 giây] --> S
@@ -104,7 +104,8 @@ giờ thu thập (100,608)–(190,630), giờ đi (280,676)–(340,694). Không 
   quái cuối hàng) thì kéo dài 10 % → 200 % về đầu hàng. Tối đa 6 lần kéo. Đo thật: từ cuối hàng ra Gems 12 giây (1 cú dài + 2 nấc);
   đổi loại sau đó chỉ cần 0–1 nấc (Gems → Food, Food → Gems, Gems → Wood: 1 nấc; Wood → Stone: bấm luôn).
 - Back khi bảng Search mở: đóng bảng (menu tròn còn). Back khi menu tròn mở: hộp "thoát game" (như menu công trình).
-- Hết lính: màn March hiện 0 / 207,500 và nút March xám → dừng, chờ 30 phút.
+- Hết lính: màn March hiện 0 / 207,500 và nút March xám → Back 2 lần (màn March, bảng Search) về bản đồ sạch, dừng, chờ 30 phút.
+  Back lần 3 mở hộp "thoát game".
 - Hết đường march (alt 21913 có 5 đường, alt khác tới 8; bot không đếm số đường mà dựa vào thông báo): bấm Occupy không vào màn March, chữ "You cannot send more troops." hiện ~1 giây → dừng, chờ 10 phút
   (trước khi sửa: mỗi đội mất ~2 phút thử lại rồi mới bỏ).
 - Search luôn ra mỏ gần nhất, kể cả mỏ đội mình đang đi tới → Occupy báo "You can only send one army to the target at a time."; Search lại

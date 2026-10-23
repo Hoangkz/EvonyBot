@@ -278,7 +278,7 @@ def _march(bot, troop: int) -> int | None:
     lưu vào DB NGAY TRƯỚC khi bấm March: bị ngắt sau khi bấm (việc khác tới lượt, Stop...) thì vẫn biết đội đã đi, không gửi thêm."""
     screen = bot.screenshot()
     if _no_troops(bot, screen):
-        for _ in range(NO_TROOP_BACKS):      # đóng màn March, bảng Search, menu tròn
+        for _ in range(NO_TROOP_BACKS):      # đóng màn March, bảng Search
             bot.back()
             delay(bot, 1)
         raise _out_of_troops()

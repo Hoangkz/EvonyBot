@@ -80,6 +80,6 @@ SEND_TRIES = 2            # Occupy không sang màn March: làm lại cả lư�
 WAIT_TRIES, WAIT_INTERVAL = 8, 1   # chờ màn hình đổi: xem lại mỗi 1 giây, tối đa 8 lần
 FREE_MARGIN = 30          # giây cộng thêm vào giờ đội về
 NO_TROOP_WAIT = 30 * 60   # hết lính: mọi đội chờ 30 phút rồi thử lại
-NO_TROOP_BACKS = 3        # hết lính: bấm Back 3 lần (đóng màn March, bảng Search, menu tròn)
+NO_TROOP_BACKS = 2        # hết lính: Back 2 lần (đóng màn March, bảng Search); lần 3 mở hộp "thoát game" (đo thật)
 MARCH_FULL_WAIT = 10 * 60  # hết đường march: mọi đội chờ 10 phút (đường trống lại khi một đội bất kỳ về)
 FAIL_WAIT = 10 * 60       # không gửi được đội (không tìm thấy mỏ, mỏ trùng...): đội đó chờ 10 phút

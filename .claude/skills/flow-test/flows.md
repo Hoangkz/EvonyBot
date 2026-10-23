@@ -312,4 +312,4 @@ Settings: `{"squads": [{"resource": "food", "level": 10}]}` (đội n = dòng th
 | 05  | Màn March (có lính)                                  | `tap("Gather/marchButton.png")`           |
 | 07  | Bản đồ, đội đang đi                                  | `end()` (lưu `gather_resources_troop1_<epoch>`) |
 
-Nhánh phụ: màn March nút xám (`05_march_no_troops.png`) → `back()` → `end()`; sau Occupy hiện "You cannot send more troops." (`05_march_full.png`) → `end()` (mọi đội chờ 10 phút); sau Occupy hiện "You can only send one army to the target at a time." (`05_target_taken.png`) → `end()`; Gems Lv 15 (`02_search_gems` `tap_at(159, 490)` → `03_gems_lv15` Search) → `04_no_target.png` "No matching targets" → `end()`.
+Nhánh phụ: màn March nút xám (`05_march_no_troops.png`) → `back(2)` → `end()`; sau Occupy hiện "You cannot send more troops." (`05_march_full.png`) → `end()` (mọi đội chờ 10 phút); sau Occupy hiện "You can only send one army to the target at a time." (`05_target_taken.png`) → `end()`; Gems Lv 15 (`02_search_gems` `tap_at(159, 490)` → `03_gems_lv15` Search) → `04_no_target.png` "No matching targets" → `end()`.
