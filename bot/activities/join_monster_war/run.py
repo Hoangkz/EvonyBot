@@ -22,7 +22,7 @@ from .constants import (ALLIANCE_ICON, ASSISTANT_GENERAL, ASSISTANT_SELECT_MIN_Y
                         LIST_END_MAX_LIGHT, LIST_END_REGION, LISTBOSS, LOCATION, MARCH, MARCH_SCREEN,
                         NO_BOSS, NOT_ENOUGH_STAMINA, OUT_OF_STAMINA, PRESET_ACTIVE_MIN_PIXELS, PRESET_ACTIVE_WAIT,
                         PRESET_COUNT, PRESET_DX, PRESET_RING_R, PRESET_LOCKED, PRESET_LOCKED_THRESHOLD, PRESET_X0, PRESET_Y, PVP_WAR, REGIONS, SAME_SPOT, SCROLL, SELECT,
-                        SELECT_GENERAL, STAMINA_ITEM_USE, STAMINA_ITEM_USE_SMALL, STAMINA_REFILL_WAIT, STAMINA_SLIDER_END,
+                        SELECT_GENERAL, STAMINA_ITEM_USE, STAMINA_ITEM_USE_SMALL, STAMINA_ITEMS_OPEN_INTERVAL, STAMINA_ITEMS_OPEN_WAIT, STAMINA_REFILL_WAIT, STAMINA_SLIDER_END,
                         STAMINA_ADDED_WAIT, STAMINA_BASE, STAMINA_BAR_REGION, STAMINA_ITEM_MIN_SCORE, STAMINA_ITEM_REGION, STAMINA_ITEMS,
                         STAMINA_PLUS, STAMINA_PLUS_DELAY,
                         STAMINA_USE, TAP, TROOP_BACK_WAIT, TROOP_DETAIL, TROOP_DETAIL_SEEN, WAR_TAB, WAR_TICKED, WAR_UNTICK_TRIES)
@@ -343,9 +343,12 @@ class _Boss:
         """Sau khi bấm Confirm ở popup không đủ thể lực: màn "Use Item" -> bấm nút Use đầu
         tiên (vật phẩm trên cùng) -> popup số lượng -> Use -> chờ, Back về màn March, March lại."""
         bot = self.bot
+        # Bấm Confirm xong màn Use Item mở chậm (mỗi ảnh chụp ~0,7 s): kiểm tra mỗi 1 s, tối đa 8 s.
+        # Chờ 2 s như trước thì màn chưa kịp mở -> tưởng hết vật phẩm, nghỉ Join Boss 20 phút.
         _, buttons = self._poll_screen(
             "open_stamina_items",
             lambda image: _item_use_buttons(bot, image),
+            timeout=STAMINA_ITEMS_OPEN_WAIT, interval=STAMINA_ITEMS_OPEN_INTERVAL,
         )
         if not buttons:
             # Hết vật phẩm (màn Use Item không có nút Use, chỉ còn nút kim cương): Back 3 lần. Boss chưa

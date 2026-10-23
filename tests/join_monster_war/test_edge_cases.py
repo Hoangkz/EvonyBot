@@ -307,6 +307,22 @@ class JoinBossEdgeCaseTests(unittest.TestCase):
 
         self.assertIn("Bỏ tọa độ OCR không hợp lệ", bot.log.call_args.args[0])
 
+    def test_slow_use_item_screen_is_not_mistaken_for_no_items(self):
+        # Bấm Confirm xong ~3 s màn Use Item mới mở: không được kết luận hết vật phẩm (nghỉ 20 phút).
+        bot = fake_bot()
+        opening = iter([[], [], [], [(290, 360)]])      # 3 lần kiểm tra (mỗi 1 s) chưa có nút Use
+        bot.find_all.side_effect = lambda template, **_kwargs: (
+            next(opening, [(290, 360)]) if template == run_module.STAMINA_ITEM_USE else [])
+        boss = _Boss(bot, {"use_stamina": "100"})
+        boss._stamina_empty = mock.Mock()
+
+        boss._use_stamina()
+
+        boss._stamina_empty.assert_not_called()
+        bot.tap.assert_any_call(290, 360)
+        self.assertLessEqual(run_module.STAMINA_ITEMS_OPEN_INTERVAL, 1)
+        self.assertGreaterEqual(run_module.STAMINA_ITEMS_OPEN_WAIT, 8)
+
     def test_missing_stamina_quantity_popup_does_not_remember_boss(self):
         bot = fake_bot()
         bot.find_all.return_value = [(290, 360)]

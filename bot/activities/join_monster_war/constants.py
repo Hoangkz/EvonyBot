@@ -118,6 +118,8 @@ GENERAL_OPEN_WAIT = 8                # giây tối đa chờ màn Select a Gener
 GENERAL_OPEN_INTERVAL = 1            # giây giữa các lần kiểm tra màn Select a General đã mở chưa
 GENERAL_LIST_WAIT = 8                # giây tối đa chờ danh sách tướng load (vài giây; lúc đầu chỉ hiện tướng chính nút xám) ở màn Select a General
 GENERAL_LIST_INTERVAL = 0.5          # giây giữa các lần kiểm tra danh sách tướng
+STAMINA_ITEMS_OPEN_WAIT = 8          # giây tối đa chờ màn Use Item (nút "Use ( N )") sau khi bấm Confirm ở popup thiếu thể lực
+STAMINA_ITEMS_OPEN_INTERVAL = 1      # giây giữa các lần kiểm tra màn Use Item
 STAMINA_REFILL_WAIT = 2             # giây chờ sau khi bấm Use (game tự đóng popup) rồi mới Back
 PRESET_X0, PRESET_DX, PRESET_Y = 10.4, 11.3, 11
 

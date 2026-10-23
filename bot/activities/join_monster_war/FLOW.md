@@ -230,7 +230,7 @@ Hàm không trả cờ thành công/thất bại. Khi nó trả về, `_march()`
 
 Được gọi khi vòng lặp chính gặp popup không đủ thể lực (`OUT_OF_STAMINA`) mà `use_stamina` là `ALL` / `100`: bấm Confirm rồi:
 
-1. Màn **Use Item**: tìm các nút "Use ( N )" (`_item_use_buttons`: `staminaItemUse.png` chữ thường + `staminaItemUseSmall.png` chữ nhỏ khi số lượng dài như "1,128"; chỉ trong cột nút bên phải, từ y 25% vì banner khuyến mãi có thể đẩy nút đầu lên y 242), bấm nút **trên cùng** (vật phẩm đầu tiên). Không có nút Use nào (chỉ còn vật phẩm nút kim cương) = hết vật phẩm: log "hết vật phẩm thể lực", **Back 3 lần**, không ghi `JOINED`, rồi đánh dấu rảnh. Lượt Join Boss sau có thể thử lại khi thể lực đã hồi.
+1. Màn **Use Item** (chờ màn mở sau khi bấm Confirm: kiểm tra mỗi 1 giây, tối đa 8 giây, `STAMINA_ITEMS_OPEN_WAIT`; hết 8 giây vẫn không có nút Use mới coi là hết vật phẩm): tìm các nút "Use ( N )" (`_item_use_buttons`: `staminaItemUse.png` chữ thường + `staminaItemUseSmall.png` chữ nhỏ khi số lượng dài như "1,128"; chỉ trong cột nút bên phải, từ y 25% vì banner khuyến mãi có thể đẩy nút đầu lên y 242), bấm nút **trên cùng** (vật phẩm đầu tiên). Không có nút Use nào (chỉ còn vật phẩm nút kim cương) = hết vật phẩm: log "hết vật phẩm thể lực", **Back 3 lần**, không ghi `JOINED`, rồi đánh dấu rảnh. Lượt Join Boss sau có thể thử lại khi thể lực đã hồi.
 2. **Popup số lượng** (nút Use lớn `staminaUse.png`):
    - `100`: bấm Use luôn (số lượng mặc định);
    - `ALL`: bấm gần cuối thanh trượt (`STAMINA_SLIDER_END`, dùng hết), rồi bấm Use.
