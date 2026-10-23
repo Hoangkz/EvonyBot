@@ -410,6 +410,26 @@ def _handle_dwarf(bot):
     return ClaimReport(1, int(gone)), gone
 
 
+def _handle_dragon_battle(bot):
+    """Tap the exact Dragon chest; only Congratulations is DONE."""
+    reward = _wait_for(
+        bot, "DragonBattle/reward_230317", attempts=4, threshold=0.80,
+        region=(0, 15, 100, 95), delay=UI_SETTLE_SECONDS)
+    if reward is None:
+        bot.record("Gift Claims: Dragon Battle không thấy rương "
+                   "Screenshot_20261023-230317; giữ PENDING")
+        return ClaimReport(), False
+    bot.record("Gift Claims: Dragon Battle tap rương "
+               "Screenshot_20261023-230317")
+    bot.tap(*reward, delay=UI_SETTLE_SECONDS)
+    if close_congratulations(bot, attempts=5):
+        bot.record("Gift Claims: Dragon Battle đã hiện Congratulations; DONE")
+        return ClaimReport(1, 1), True
+    bot.record("Gift Claims: Dragon Battle bấm rương nhưng chưa thấy "
+               "Congratulations; giữ PENDING")
+    return ClaimReport(1, 0), False
+
+
 def _wishful_panel_open(bot, *, attempts=5) -> bool:
     """Recognize either captured Wind Blessings title without leaving it."""
     variants = (
@@ -1363,6 +1383,7 @@ def _handle_legion_hunting(bot):
 
 
 EXACT_HANDLERS = {
+    GiftScreen.DRAGON_BATTLE: _handle_dragon_battle,
     GiftScreen.PRECIOUS_BLAZON_EXCHANGE: _handle_precious,
     GiftScreen.POSEIDONS_DAY: _handle_poseidon,
     GiftScreen.HYPNOS_DREAM: _handle_hypnos,

@@ -13,6 +13,8 @@ from bot.context.errors import TimedOut
 
 event_center = import_module("bot.activities.gift_claims.event_center.run")
 event_center_zone = import_module("bot.activities.gift_claims.event_center.zone")
+dragon_battle = import_module(
+    "bot.activities.gift_claims.event_center.dragon_battle.run")
 valuable_event = import_module("bot.activities.gift_claims.valuable_event.run")
 valuable_event_zone = import_module("bot.activities.gift_claims.valuable_event.zone")
 valuable_named_flow = import_module(
@@ -85,6 +87,50 @@ class FixedGiftFlowTests(unittest.TestCase):
     def test_unknown_inner_screen_is_not_guessed(self):
         screen = np.zeros((704, 396, 3), dtype=np.uint8)
         self.assertIsNone(identify(self.bot, screen))
+
+    def test_dragon_battle_new_reward_crop_has_supplied_dimensions(self):
+        reward = cv2.imread(str(
+            IMAGES / "GiftClaims" / "DragonBattle" / "reward_230317.png"))
+        self.assertEqual((25, 33), reward.shape[:2])
+
+    def test_dragon_battle_is_done_only_after_congratulations(self):
+        bot = mock.Mock()
+        with (mock.patch.object(event_center, "_wait_for",
+                                return_value=(210, 500)),
+              mock.patch.object(event_center, "close_congratulations",
+                                return_value=True)):
+            report, done = event_center._handle_dragon_battle(bot)
+
+        self.assertTrue(done)
+        self.assertEqual(common.ClaimReport(1, 1), report)
+        bot.tap.assert_called_once_with(
+            210, 500, delay=event_center.UI_SETTLE_SECONDS)
+
+    def test_dragon_battle_stays_pending_without_congratulations(self):
+        bot = mock.Mock()
+        with (mock.patch.object(event_center, "_wait_for",
+                                return_value=(210, 500)),
+              mock.patch.object(event_center, "close_congratulations",
+                                return_value=False)):
+            report, done = event_center._handle_dragon_battle(bot)
+
+        self.assertFalse(done)
+        self.assertEqual(common.ClaimReport(1, 0), report)
+
+    def test_dragon_battle_standalone_run_requires_congratulations(self):
+        bot = mock.Mock()
+        screen = np.zeros((704, 396, 3), dtype=np.uint8)
+        bot.screenshot.return_value = screen
+        with (mock.patch.object(dragon_battle, "open_event_center_event",
+                                return_value=True),
+              mock.patch.object(dragon_battle, "find",
+                                return_value=(210, 500)),
+              mock.patch.object(dragon_battle, "close_congratulations",
+                                return_value=False),
+              mock.patch.object(dragon_battle, "return_home")):
+            done = dragon_battle.run(bot)
+
+        self.assertFalse(done)
 
     def test_lobby_waits_for_delayed_fixed_inner_title(self):
         bot = mock.Mock()
