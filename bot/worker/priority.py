@@ -391,9 +391,10 @@ DATA ={
             "key": "craft",
             "run": craft_job,
             "label": "Craft: chế tạo trang bị",
-            "priority": 0,   # thấp nhất: chỉ tới khi mọi nhiệm vụ khác đã làm xong
+            "priority": 9,   # thấp nhất: chỉ tới khi mọi nhiệm vụ khác đã làm xong
             "once": True,    # chỉ làm 1 lần (mỗi lần Start): xong thì không làm lại khi sang ngày mới
             "note": "Chế tạo các trang bị đã tích ở tab Craft; một lần duy nhất sau khi hết mọi nhiệm vụ khác",
+            "needs_city_map": True,   # nhiệm vụ cần route: chỉ vào danh sách khi máy đã có bản đồ thành (worker quét lúc Join Boss rảnh)
         }
     ],
     "Black Market": [
