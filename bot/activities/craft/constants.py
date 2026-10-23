@@ -73,7 +73,14 @@ DISABLED = "disabled"
 COLOR_MIN_SATURATION = 120           # dưới mức này (xám, S ~ 12) = Begin chưa chế tạo được
 GREEN_HUE = (40, 70)
 GOLD_HUE = (8, 30)
-ACTION_WAIT = 3                      # giây chờ sau khi bấm Begin / Quick Compose
+ACTION_WAIT = 3                      # giây chờ sau khi bấm Begin
+# Sau Quick Compose: bot.wait_for chờ nút đổi thành Begin vàng, kiểm tra mỗi BEGIN_INTERVAL giây, tối đa BEGIN_TIMEOUT giây (8 lần). Ảnh mẫu chỉ có chữ
+# "Begin" + nền nút (216..324 x 677..688), KHÔNG lấy dòng thời gian bên dưới (mỗi trang bị một số khác): Begin vàng 1,00; Begin xám 0,89; Quick Compose <= 0,49
+# -> ngưỡng 0,95.
+BEGIN_BUTTON = f"{FOLDER}/beginButton.png"
+BEGIN_THRESHOLD = 0.95
+BEGIN_TIMEOUT = 8
+BEGIN_INTERVAL = 1
 
 # ---- Sau Begin: Lò rèn đang chế tạo (ảnh chụp trên 21943 với Iron Ring) ------------------------------------------------------------------
 # Bấm Lò rèn (giữa màn) -> menu tròn có thêm "Speed Up" (tia chớp, (90, 272)) / Instant Finish (kim cương) / Cancel Crafting (KHÔNG bấm) ->

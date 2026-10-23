@@ -14,7 +14,7 @@ Lò rèn chỉ chế tạo MỘT trang bị một lúc, nên mỗi vòng làm đ
    được, bỏ qua trang bị này. Bấm Begin xong game về thành, Lò rèn đang chế tạo.
 4. Tăng tốc: bấm Lò rèn -> "Speed Up" -> màn "Crafting Speedup" -> "Finish All" (vật phẩm tăng tốc, như Heal / train lính) -> về thành -> bấm
    bóng trang bị nổi trên Lò rèn -> "Congratulations on getting" -> Confirm. Rồi làm trang bị kế (số lượng > 1 thì lặp lại cả vòng).
-Bị ngắt giữa chừng (boss / 120 giây) rồi gọi lại từ đầu: số còn lại của từng trang bị nhớ theo thiết bị (_remaining), Lò rèn đang chế tạo dở thì
+Bị ngắt giữa chừng (boss / 120 giây) rồi gọi lại từ đầu: số còn lại của từng trang bị nhớ theo thiết bị (_remaining; trừ khi Lò rèn chế tạo xong, _pending), Lò rèn đang chế tạo dở thì
 tăng tốc trước, nên không làm lặp.
 """
 from functools import lru_cache
@@ -39,11 +39,16 @@ from ..event.kings_path.building import open_menu
 from ..event.kings_path.constants import SCREEN_WAIT
 from ..event.kings_path.refine.constants import CRAFT_TITLE, MENU_CRAFT
 from ..result import save_errors
+from .constants import item_name
 from .constants import (
     ACTION_WAIT,
     ACTIVE_HALF,
     ACTIVE_POS,
     BEGIN,
+    BEGIN_BUTTON,
+    BEGIN_INTERVAL,
+    BEGIN_THRESHOLD,
+    BEGIN_TIMEOUT,
     BUTTON_BOX,
     BUTTON_POS,
     CAROUSEL,
@@ -93,6 +98,13 @@ from .constants import (
 
 # Số còn lại cần chế tạo của từng trang bị, theo thiết bị (id(bot)): bị ngắt rồi gọi lại thì làm tiếp phần còn lại.
 _remaining: dict[int, dict[str, int]] = {}
+# Trang bị vừa bấm Begin mà chưa tăng tốc xong, theo thiết bị: chỉ trừ vào _remaining khi Lò rèn thật sự đã chế tạo xong (xem consume_pending). Bị ngắt
+# ngay sau khi bấm Begin (không biết click đã tới chưa) thì lượt sau nhìn menu Lò rèn: có "Speed Up" = đã bắt đầu -> tăng tốc rồi mới trừ; không có = chưa
+# bắt đầu -> bỏ dấu này, trang bị vẫn còn trong danh sách cần làm.
+_pending: dict[int, str] = {}
+# Tổng số đã chế tạo xong / số cần làm của từng trang bị trong lượt này, theo thiết bị: để ghi log "đã chế tạo X (1/2)" và tổng kết cuối.
+_done: dict[int, dict[str, int]] = {}
+_total: dict[int, dict[str, int]] = {}
 
 
 def selected(settings: dict) -> dict[str, int]:
@@ -203,23 +215,30 @@ def title_matches(bot, item_id: str) -> bool:
     return bot.best_match(name_path(item_id), region=TITLE_REGION)[0] >= TITLE_THRESHOLD
 
 
+def wait_for_begin(bot, item_id: str) -> bool:
+    """Sau Quick Compose: wait_for nút Begin vàng hiện (kiểm tra mỗi BEGIN_INTERVAL giây, tối đa BEGIN_TIMEOUT giây); tên vẫn đúng mới tính."""
+    pos = bot.wait_for(BEGIN_BUTTON, timeout=BEGIN_TIMEOUT, threshold=BEGIN_THRESHOLD, interval=BEGIN_INTERVAL)
+    return pos is not None and title_matches(bot, item_id)
+
+
 def start_craft(bot, item_id: str) -> bool:
     """Trang bị đã chọn (tên đúng): theo nút bên phải đáy màn — xanh lá Quick Compose thì bấm (nút đổi thành Begin), vàng Begin thì bấm, xám / đen thì
     bỏ qua. True nếu đã bấm Begin và game rời màn Craft (về thành: Lò rèn đang chế tạo)."""
     state = button_state(bot.screenshot())
     if state == DISABLED:
-        bot.log(f"{NAME}: {item_id}: Begin disabled, skip")
+        bot.record(f"{NAME}: {item_id}: Begin disabled (not enough materials?), skip")
         return False
     if state == QUICK_COMPOSE:
         bot.log(f"{NAME}: {item_id}: Quick Compose")
-        bot.tap(*BUTTON_POS, delay=ACTION_WAIT)
-        screen = bot.screenshot()
-        if button_state(screen) != BEGIN or not title_matches(bot, item_id):
-            bot.record(f"{NAME}: {item_id}: still cannot craft after Quick Compose, skip")
+        bot.tap(*BUTTON_POS)
+        if not wait_for_begin(bot, item_id):
+            bot.record(f"{NAME}: {item_id}: Begin not shown after Quick Compose, skip")
             return False
     bot.log(f"{NAME}: {item_id}: Begin")
+    _pending[id(bot)] = item_id             # đặt TRƯỚC khi bấm: bị ngắt giữa lúc bấm / chờ thì lượt sau biết đang làm trang bị nào
     bot.tap(*BUTTON_POS, delay=ACTION_WAIT)
     if bot.find(CRAFT_TITLE) is not None:
+        _pending.pop(id(bot), None)
         bot.record(f"{NAME}: {item_id}: Craft screen still shown after Begin, skip")
         return False
     return True
@@ -320,10 +339,37 @@ def collect(bot) -> bool:
     return False
 
 
+def consume_pending(bot):
+    """Trang bị đang chế tạo (_pending) đã tăng tốc xong: trừ 1 vào số còn lại (về 0 thì bỏ khỏi danh sách)."""
+    item_id = _pending.pop(id(bot), None)
+    wanted = _remaining.get(id(bot), {})
+    if item_id in wanted:
+        wanted[item_id] -= 1
+        if wanted[item_id] <= 0:
+            wanted.pop(item_id)
+        done = _done.setdefault(id(bot), {})
+        done[item_id] = done.get(item_id, 0) + 1
+        total = _total.get(id(bot), {}).get(item_id, done[item_id])
+        bot.record(f"{NAME}: crafted {item_name(item_id.split('/', 1)[1])} ({done[item_id]}/{total})")   # History: lưu DB
+        bot.craft_done(item_id)         # UI: tab Craft trừ 1 số lượng (về 0 thì bỏ tích) và lưu DB, lần Start sau không làm lại
+
+
+def summary(bot):
+    """Cuối lượt: một dòng History tổng kết trang bị đã chế tạo (không có gì thì không ghi)."""
+    done = _done.pop(id(bot), {})
+    _total.pop(id(bot), None)
+    if done:
+        text = ", ".join(f"{item_name(item_id.split('/', 1)[1])} x{count}" for item_id, count in done.items())
+        bot.record(f"{NAME}: summary: {text}")
+
+
 def finish_crafting(bot, speed_up) -> bool:
-    """Lò rèn đang chế tạo: bấm "Speed Up" (vị trí `speed_up` trong menu) -> Crafting Speedup -> Finish All -> nhận trang bị."""
+    """Lò rèn đang chế tạo: bấm "Speed Up" (vị trí `speed_up` trong menu) -> Crafting Speedup -> Finish All (xong thì trừ số còn lại) -> nhận trang bị."""
     bot.tap(*speed_up, delay=STEP_WAIT)
-    return finish_all(bot) and collect(bot)
+    if not finish_all(bot):
+        return False
+    consume_pending(bot)
+    return collect(bot)
 
 
 def forge_speed_up(bot) -> bool:
@@ -339,6 +385,12 @@ def run(bot, settings: dict):
     if not wanted:
         _remaining.pop(id(bot), None)
         return
+    _total.setdefault(id(bot), dict(wanted))
+    craft_rounds(bot, wanted)
+    summary(bot)                        # bị ngắt (ngoại lệ) thì không tới đây: số đã làm giữ nguyên cho lượt sau
+
+
+def craft_rounds(bot, wanted: dict[str, int]):
     bot.log(f"{NAME}: {len(wanted)} items ticked ({sum(wanted.values())} to craft)")
     for _ in range(sum(wanted.values()) + len(wanted) + 2):   # mỗi vòng một trang bị (hoặc tăng tốc cái đang làm dở); trần để không lặp mãi
         if not wanted:
@@ -354,6 +406,7 @@ def run(bot, settings: dict):
             if not finish_crafting(bot, pos):
                 return
             continue
+        _pending.pop(id(bot), None)     # Lò rèn rảnh: lượt trước bị ngắt trước khi Begin có hiệu lực -> trang bị đó vẫn còn trong danh sách
         bot.tap(*pos, delay=STEP_WAIT)
         if bot.wait_for(CRAFT_TITLE, timeout=SCREEN_WAIT) is None:
             bot.record(f"{NAME}: Craft screen not shown")
@@ -364,10 +417,7 @@ def run(bot, settings: dict):
                 bot.back(delay=STEP_WAIT)       # không còn trang bị nào làm được: đóng màn Craft
             _remaining.pop(id(bot), None)
             return
-        wanted[started] -= 1                    # đã bấm Begin: trừ ngay (bị ngắt trước khi tăng tốc xong thì lượt sau tăng tốc cái này trước)
-        if wanted[started] <= 0:
-            wanted.pop(started)
-        bot.record(f"{NAME}: {started}: crafting started")
+        bot.record(f"{NAME}: {started}: crafting started")      # chưa trừ: trừ sau khi tăng tốc xong (consume_pending)
         if not forge_speed_up(bot):
             return
     bot.record(f"{NAME}: stopped after too many rounds")

@@ -47,6 +47,12 @@ class Templates(unittest.TestCase):
         for other in ("city.png", "speedup.png", "congrats.png", "cat_ring.png"):
             self.assertLess(score(MENU_SPEED_UP, other), 0.6, other)
 
+    def test_begin_button_template_only_matches_the_gold_button(self):
+        from bot.activities.craft.constants import BEGIN_BUTTON, BEGIN_THRESHOLD
+        self.assertGreaterEqual(score(BEGIN_BUTTON, "begin_gold.png"), BEGIN_THRESHOLD)
+        self.assertLess(score(BEGIN_BUTTON, "cat_ring.png"), BEGIN_THRESHOLD)          # Begin xám
+        self.assertLess(score(BEGIN_BUTTON, "quick_compose.png"), BEGIN_THRESHOLD)     # Quick Compose
+
     def test_speedup_title_and_congrats(self):
         self.assertGreater(score(SPEEDUP_TITLE, "speedup.png"), 0.95)
         self.assertLess(score(SPEEDUP_TITLE, "city.png"), 0.6)
@@ -144,10 +150,41 @@ class Flow(unittest.TestCase):
         device = run_flow(self, lambda bot, settings: craft.start_craft(bot, RING_KING), SCREENS, flow, {})
         self.assertIn("Craft: ring/03_Fearless_King's_Ring: Quick Compose", device.logs)
 
+    def test_begin_marks_the_item_pending_until_it_is_finished(self):
+        """Bấm Begin: ghi trang bị vào _pending (chưa trừ số còn lại); consume_pending trừ 1, về 0 thì bỏ khỏi danh sách."""
+        flow = [Step("begin_gold.png", tap_at(*BUTTON_POS)), Step("city.png", end(True))]
+        device = run_flow(self, lambda bot, settings: craft.start_craft(bot, BOW_FIGHTER), SCREENS, flow, {})
+        bot = device.ctx
+        self.assertEqual(craft._pending.get(id(bot)), BOW_FIGHTER)
+        craft._remaining[id(bot)] = {BOW_FIGHTER: 2, RING_KING: 1}
+        craft._total[id(bot)] = {BOW_FIGHTER: 2, RING_KING: 1}
+        told_ui = []
+        bot.craft_done = told_ui.append                  # worker báo UI trừ 1 ở tab Craft
+        craft.consume_pending(bot)
+        self.assertEqual(told_ui, [BOW_FIGHTER])
+        self.assertIn("Craft: crafted Fighter's Bow (1/2)", device.logs)
+        self.assertEqual(craft._remaining[id(bot)], {BOW_FIGHTER: 1, RING_KING: 1})
+        self.assertNotIn(id(bot), craft._pending)
+        craft._pending[id(bot)] = BOW_FIGHTER
+        craft.consume_pending(bot)
+        self.assertEqual(craft._remaining[id(bot)], {RING_KING: 1})
+        craft.consume_pending(bot)                       # không còn gì chờ: không đổi
+        self.assertEqual(craft._remaining.pop(id(bot)), {RING_KING: 1})
+        craft.summary(bot)
+        self.assertIn("Craft: summary: Fighter's Bow x2", device.logs)
+        self.assertEqual(told_ui, [BOW_FIGHTER, BOW_FIGHTER])
+
+    def test_quick_compose_then_begin(self):
+        """Quick Compose -> bấm; nút đổi thành Begin vàng (cùng tên trang bị) -> bấm Begin -> về thành."""
+        flow = [Step("quick_compose.png", tap_at(*BUTTON_POS)), Step("begin_gold.png", tap_at(*BUTTON_POS)), Step("city.png", end(True))]
+        device = run_flow(self, lambda bot, settings: craft.start_craft(bot, BOW_FIGHTER), SCREENS, flow, {})
+        self.assertIn("Craft: bow/01_Fighter's_Bow: Quick Compose", device.logs)
+        self.assertIn("Craft: bow/01_Fighter's_Bow: Begin", device.logs)
+
     def test_disabled_begin_is_skipped_without_tapping(self):
         device = run_flow(self, lambda bot, settings: craft.start_craft(bot, "ring/01_Fighter's_Ring"), SCREENS,
                           [Step("cat_ring.png", end(False))], {})
-        self.assertIn("Craft: ring/01_Fighter's_Ring: Begin disabled, skip", device.logs)
+        self.assertIn("Craft: ring/01_Fighter's_Ring: Begin disabled (not enough materials?), skip", device.logs)
 
     def test_collect_taps_the_bubble_then_confirm(self):
         """Sau Finish All: bấm bóng trang bị trên Lò rèn -> hộp "Congratulations on getting" -> Confirm."""

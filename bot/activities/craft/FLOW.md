@@ -8,8 +8,10 @@ Tab **Craft** (ui/tabs/craft_tab.py): tích trang bị vàng trở lên cần ch
 
 - `run(bot, settings)` ở [run.py](run.py); dòng `craft` trong [bot/worker/priority.py](../../worker/priority.py): `priority` 0 (thấp nhất, chỉ tới khi
   mọi nhiệm vụ khác đã làm xong), `once` (một lần mỗi lần Start). `JOB.enabled`: có tích ít nhất một trang bị.
-- Bị ngắt giữa chừng (boss / 120 giây) rồi gọi lại từ đầu: số còn lại của từng trang bị nhớ trong `_remaining` (theo thiết bị); trừ ngay khi bấm Begin,
-  và Lò rèn đang chế tạo dở thì tăng tốc trước, nên không chế tạo lặp.
+- Bị ngắt giữa chừng (boss / 120 giây) rồi gọi lại từ đầu: số còn lại của từng trang bị nhớ trong `_remaining` (theo thiết bị). Số này
+  **chỉ trừ khi Lò rèn đã chế tạo xong** (sau Finish All, `consume_pending`): trang bị vừa bấm Begin được ghi vào `_pending` TRƯỚC khi bấm. Bị ngắt
+  giữa chừng thì lượt sau mở menu Lò rèn: có `Speed Up` = đã bắt đầu -> tăng tốc, nhận, rồi mới trừ 1; không có = Begin chưa có hiệu lực -> bỏ dấu
+  `_pending`, trang bị vẫn còn trong danh sách. Ví dụ cần 2 cái A, đã chế tạo xong 1: lượt sau còn A x1, làm đúng 1 cái nữa.
 - Lỗi thì `@save_errors(KEY)` lưu `craft_error` vào DB.
 
 ## Vòng lặp chính
@@ -60,7 +62,7 @@ flowchart TD
 
    | Trạng thái | Màu (đo) | Làm gì |
    | --- | --- | --- |
-   | `QUICK_COMPOSE` ("Quick Compose") | xanh lá, H 53 S 200 | bấm, nút đổi thành Begin (không đổi / tên khác thì bỏ qua trang bị) rồi bấm Begin |
+   | `QUICK_COMPOSE` ("Quick Compose") | xanh lá, H 53 S 200 | bấm; chờ nút đổi thành Begin vàng (`wait_for_begin`: `bot.wait_for` ảnh `Craft/beginButton.png` (chữ Begin + nền nút, không lấy dòng thời gian; vàng 1,00 / xám 0,89 / Quick Compose <= 0,49, ngưỡng 0,95), mỗi 1 s, tối đa 8 s, tên vẫn đúng; không thì bỏ qua trang bị) rồi bấm Begin |
    | `BEGIN` ("Begin") | vàng, H 17 S 233 | bấm; game về thành (không còn tiêu đề Craft) = đã bắt đầu chế tạo |
    | `DISABLED` ("Begin") | xám / đen, S ~12 | không chế tạo được, bỏ qua trang bị này |
 
@@ -69,6 +71,15 @@ flowchart TD
    vàng `Finish All` (100, 674) -> về thành, hiện "Finished All Successfully!".
 7. **Nhận trang bị** (`collect`): chờ 4 s, bóng trang bị vừa làm xong nổi trên Lò rèn (198, 222) -> bấm -> hộp "Congratulations on getting" -> `Confirm`
    (197, 566) -> về thành. Rồi vòng kế (hoặc xong khi hết số lượng).
+
+## Trừ số lượng ở tab và log
+
+- Mỗi trang bị chế tạo xong (sau Finish All, `consume_pending`) bot báo `bot.craft_done(item_id)` -> `BotWorker.craft_done` -> `BotManager.craft_done` -> `main._on_craft_done`
+  -> `DeviceView.apply_craft_done` -> `CraftTab.craft_done`: số lượng ở tab **giảm 1, về 0 thì bỏ tích** (số lượng đặt lại 1), rồi lưu cấu hình mới vào DB. Tắt app
+  bật lại / Start lại thì không chế tạo lại cái đã xong; người dùng tích lại khi muốn làm tiếp. Tab chưa dựng thì sửa cấu hình đang chờ (`_pending_settings`).
+- Log (History, lưu DB bảng `logs`): mỗi trang bị xong một dòng `Craft: crafted Fighter's Bow (1/2)` (đã làm / số cần làm của lượt này), cuối lượt
+  một dòng tổng kết `Craft: summary: Fighter's Bow x2, Fighter's Ring x1`. Trang bị bị bỏ qua có dòng riêng: `Begin disabled (not enough materials?), skip`, `locked, skip`,
+  `behind a locked item, skip`, `not found in the list, skip`, `Begin not shown after Quick Compose, skip` (History).
 
 ## Ngưỡng đã đo
 

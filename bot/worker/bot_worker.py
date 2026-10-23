@@ -105,6 +105,7 @@ class BotWorker(QThread):
     civilization_found = pyqtSignal(str, int) # (serial, nền văn minh bot tự xếp từ ảnh công trình)
     city_map_found = pyqtSignal(str, str)     # (serial, bản đồ thành JSON bot quét được)
     bubble_disabled = pyqtSignal(str)         # (serial) không đủ kim cương -> bỏ tích Bubble
+    craft_done = pyqtSignal(str, str)         # (serial, id trang bị) vừa chế tạo xong một cái -> tab Craft trừ 1 số lượng
     log_message = pyqtSignal(str, str)        # (serial, dòng log) -> tab Logs > Info
     history = pyqtSignal(str, str)            # (serial, sự kiện) -> lưu DB + tab Logs > History
 
@@ -166,6 +167,7 @@ class BotWorker(QThread):
             self.ctx.server_time = lambda: self.server_time
             self.ctx.server = self.server
             self.ctx.record = self.record
+            self.ctx.craft_done = lambda item_id: self.craft_done.emit(self.serial, item_id)
             # Nền văn minh đã lưu DB (None = chưa biết); bot tự xếp thì lưu lại qua signal.
             self.ctx.civilization = self.settings.get("Initialization", {}).get("civilization") or None
             self.ctx.set_civilization = self._set_civilization

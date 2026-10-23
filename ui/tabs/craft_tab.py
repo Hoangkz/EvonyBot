@@ -211,6 +211,17 @@ class CraftTab(BaseTab):
             self._grid.addWidget(self._cells[item_id], i // COLUMNS, i % COLUMNS)
             self._cells[item_id].show()
 
+    def craft_done(self, item_id: str):
+        """Bot vừa chế tạo xong một cái: số lượng giảm 1; về 0 thì bỏ tích (không lưu: người gọi lưu DB)."""
+        if item_id not in self.boxes:
+            return
+        box, spin = self.boxes[item_id]
+        if box.isChecked() and spin.value() > 1:
+            spin.setValue(spin.value() - 1)
+        else:
+            box.setChecked(False)
+            spin.setValue(DEFAULT_QTY)
+
     def get_settings(self) -> dict:
         return {ITEMS_KEY: {item_id: spin.value() for item_id, (box, spin) in self.boxes.items() if box.isChecked()},
                 CLAIM_KEY: self.claim_gifts.isChecked(),

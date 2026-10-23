@@ -189,6 +189,7 @@ class MainWindow(QMainWindow):
         self.bots.civilization_found.connect(self._on_civilization_found)
         self.bots.city_map_found.connect(self.db.set_city_map)
         self.bots.bubble_disabled.connect(self._on_bubble_disabled)
+        self.bots.craft_done.connect(self._on_craft_done)
         self.bots.log_message.connect(self._on_log_message)
         self.bots.history.connect(self._on_history)
         # Sub-tab index kept across devices, so switching device stays on
@@ -617,6 +618,12 @@ class MainWindow(QMainWindow):
         view = self.device_views.get(device_id)
         if view is not None:
             view.initialization_tab.set_settings({"bubble": False})
+
+    def _on_craft_done(self, device_id: str, item_id: str):
+        """Bot vừa chế tạo xong một trang bị: tab Craft trừ 1 số lượng (về 0 thì bỏ tích) rồi lưu cấu hình mới vào DB, lần Start sau không làm lại."""
+        view = self.device_views.get(device_id)
+        if view is not None:
+            self.db.save_settings(device_id, {"Craft": view.apply_craft_done(item_id)})
 
     def _on_log_message(self, device_id: str, message: str):
         """Dòng log của bot -> tab Logs của thiết bị đó."""
