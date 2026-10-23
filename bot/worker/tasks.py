@@ -1,7 +1,7 @@
 """
 tasks.py — danh sách nhiệm vụ của worker, dựng từ bảng priority.py.
 
-Mỗi dòng của bảng có `run` (một hàm trơn `run(ctx, cấu hình tab)`, hoặc một dict `{"run", "enabled", "done", "every"}` do code của
+Mỗi dòng của bảng có `run` (một hàm trơn `run(ctx, cấu hình tab)`, hoặc một dict `{"run", "enabled", "done", "every", "due"}` do code của
 nhiệm vụ dựng sẵn, VD daily_job(...), event_job(...)), `priority`, và tuỳ chọn `must_finish`, `once`,
 `group` (nhóm chọn nhiệm vụ, nếu khác nhóm chứa dòng), `idle_only` (chỉ chạy khi không còn nhiệm vụ nào khác), `saves` (hàm `run` tự lưu key của dòng vào DB khi làm xong:
 xong hôm nay = key đó có trong DB). Luật của từng nhiệm vụ (được tích chưa, hôm nay xong chưa — đọc từ DB —
@@ -52,7 +52,7 @@ def build_task(row: dict, group: str) -> Task:
     key = row["key"]
     job = row["run"] if isinstance(row["run"], dict) else {"run": row["run"]}
     every = job.get("every")
-    due = None
+    due = job.get("due")     # việc theo giờ tự tính giờ của mình: due(ctx, cấu hình tab) -> đã tới giờ chưa
     if every is not None:
         tried_key = f"{key}_tried"
 

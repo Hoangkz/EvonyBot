@@ -298,3 +298,18 @@ Settings: `{}`; ctx có `city_map` (đã có route trong DB).
 | 03  | Hai ô đã tích                                    | `tap_pct(10.6, 83)` (bỏ tích Epic)                |
 | 04  | Popup "Your Tavern has a high quality General"    | `tap("RecruitGeneral/Cancel.png")`, dừng          |
 
+
+## Gather Resources — `tests/gather_resources/`
+
+Settings: `{"squads": [{"resource": "food", "level": 10}]}` (đội n = dòng thứ n, không chọn preset). Ảnh chụp thật 396×704; xem `bot/activities/gather_resources/FLOW.md`.
+
+| #   | Màn hình                                             | Action                                    |
+| --- | ---------------------------------------------------- | ----------------------------------------- |
+| 01  | Bản đồ thế giới (kính lúp)                           | `tap("Gather/search.png")`                |
+| 02  | Bảng Search, hàng loại có "Farm"                     | `tap_at(22, 490)` (icon trên chữ Farm)    |
+| 03  | Farm Lv 10, ô "full resources" đã tích               | `tap("Gather/searchButton.png")`          |
+| 04  | Mỏ ở giữa, menu tròn mở                              | `tap("Gather/occupy.png")`                |
+| 05  | Màn March (có lính)                                  | `tap("Gather/marchButton.png")`           |
+| 07  | Bản đồ, đội đang đi                                  | `end()` (lưu `gather_resources_troop1_<epoch>`) |
+
+Nhánh phụ: màn March nút xám (`05_march_no_troops.png`) → `back()` → `end()`; sau Occupy hiện "You cannot send more troops." (`05_march_full.png`) → `end()` (mọi đội chờ 10 phút); sau Occupy hiện "You can only send one army to the target at a time." (`05_target_taken.png`) → `end()`; Gems Lv 15 (`02_search_gems` `tap_at(159, 490)` → `03_gems_lv15` Search) → `04_no_target.png` "No matching targets" → `end()`.

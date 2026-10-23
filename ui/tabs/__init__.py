@@ -4,6 +4,7 @@ from .craft_tab import CraftTab
 from .daily_activities_tab import DailyActivitiesTab
 from .event_tab import EventTab
 from .find_boss_tab import FindBossTab
+from .gather_resources_tab import GatherResourcesTab
 from .initialization_tab import InitializationTab
 from .join_monster_war_tab import JoinMonsterWarTab
 from .logs_tab import LogsTab
@@ -18,6 +19,7 @@ __all__ = [
     "DailyActivitiesTab",
     "EventTab",
     "FindBossTab",
+    "GatherResourcesTab",
     "InitializationTab",
     "JoinMonsterWarTab",
     "LogsTab",

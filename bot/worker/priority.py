@@ -65,6 +65,7 @@ from ..activities.event_center.three_day.run import JOB as three_day_event
 from ..activities.open_gift_box.run import run as open_gift_box
 from ..activities.find_boss import JOB as find_boss_job
 from ..activities.craft import JOB as craft_job
+from ..activities.gather_resources import JOB as gather_resources_job
 from ..activities import gift_claims, join_monster_war
 
 DATA ={
@@ -391,10 +392,20 @@ DATA ={
             "key": "craft",
             "run": craft_job,
             "label": "Craft: chế tạo trang bị",
-            "priority": 9,   # thấp nhất: chỉ tới khi mọi nhiệm vụ khác đã làm xong
+            "priority": 669,   # cao hơn mọi nhiệm vụ Daily Activities (cao nhất 668): Craft làm trước Daily
             "once": True,    # chỉ làm 1 lần (mỗi lần Start): xong thì không làm lại khi sang ngày mới
-            "note": "Chế tạo các trang bị đã tích ở tab Craft; một lần duy nhất sau khi hết mọi nhiệm vụ khác",
+            "note": "Chế tạo các trang bị đã tích ở tab Craft; một lần duy nhất, ưu tiên cao hơn Daily Activities",
             "needs_city_map": True,   # nhiệm vụ cần route: chỉ vào danh sách khi máy đã có bản đồ thành (worker quét lúc Join Boss rảnh)
+        }
+    ],
+    "Gather Resources": [
+        {
+            "key": "gather_resources",
+            "run": gather_resources_job,
+            "label": "Gather Resources: gửi đội đi thu thập",
+            "priority": 701,     # trong các việc `idle_only`: trước Find Boss (700), chỉ khi có đội đã về
+            "idle_only": True,   # cuối cùng: chỉ làm khi hết mọi nhiệm vụ khác
+            "note": "Cuối cùng (chỉ khi rảnh), theo giờ: tới lượt khi có đội đã về (giờ đội về lưu trong DB, đọc từ màn March); hết lính thì chờ 30 phút",
         }
     ],
     "Black Market": [

@@ -1,8 +1,8 @@
 """
 run.py — "Craft" activity: chế tạo các trang bị đã tích ở tab Craft (settings {"items": {id: số lượng}}). Xem FLOW.md.
 
-Chỉ làm MỘT lần (mỗi lần Start), độ ưu tiên thấp nhất: worker chỉ tới nó khi mọi nhiệm vụ khác đã làm xong (dòng "Craft" ở
-bot/worker/priority.py: priority 0, once). Chưa tích trang bị nào thì nhiệm vụ không vào danh sách.
+Chỉ làm MỘT lần (mỗi lần Start), độ ưu tiên cao hơn Daily Activities (dòng "Craft" ở
+bot/worker/priority.py: priority 669, once). Chưa tích trang bị nào thì nhiệm vụ không vào danh sách.
 
 Lò rèn chỉ chế tạo MỘT trang bị một lúc, nên mỗi vòng làm đúng một cái, rồi tăng tốc cho xong mới làm cái tiếp:
 1. Tới Lò rèn (city_map.reach_building: thấy thì kéo vào giữa; có route thì đi theo route; CHƯA có route thì tự tìm route, lưu DB) -> bấm Lò rèn

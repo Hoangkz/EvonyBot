@@ -19,6 +19,7 @@ from .tabs import (
     AllianceCapacityTab,
     BlackMarketTab,
     CraftTab,
+    GatherResourcesTab,
     DailyActivitiesTab,
     EventTab,
     FindBossTab,
@@ -88,7 +89,8 @@ class DeviceView(QWidget):
                 # Recruit General: đứng ngay trên tab Logs.
                 ("Recruit General", "recruit_general_tab", RecruitGeneralTab),
                 ("Find Boss", "find_boss_tab", FindBossTab),
-                ("Craft", "craft_tab", CraftTab)):
+                ("Craft", "craft_tab", CraftTab),
+                ("Gather Resources", "gather_resources_tab", GatherResourcesTab)):
             self._lazy[title] = (attr, factory)
             self._add_tab_button(title, self.tabs.addTab(QWidget(), title))
         # Logs không có cấu hình: thêm thẳng, không nối Apply ALL / settings.

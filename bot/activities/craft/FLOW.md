@@ -6,8 +6,8 @@ Tab **Craft** (ui/tabs/craft_tab.py): tích trang bị vàng trở lên cần ch
 
 ## Điểm vào
 
-- `run(bot, settings)` ở [run.py](run.py); dòng `craft` trong [bot/worker/priority.py](../../worker/priority.py): `priority` 0 (thấp nhất, chỉ tới khi
-  mọi nhiệm vụ khác đã làm xong), `once` (một lần mỗi lần Start). `JOB.enabled`: có tích ít nhất một trang bị.
+- `run(bot, settings)` ở [run.py](run.py); dòng `craft` trong [bot/worker/priority.py](../../worker/priority.py): `priority` 669 (cao hơn mọi nhiệm vụ
+  Daily Activities, cao nhất 668), `once` (một lần mỗi lần Start). `JOB.enabled`: có tích ít nhất một trang bị.
 - Bị ngắt giữa chừng (boss / 120 giây) rồi gọi lại từ đầu: số còn lại của từng trang bị nhớ trong `_remaining` (theo thiết bị). Số này
   **chỉ trừ khi Lò rèn đã chế tạo xong** (sau Finish All, `consume_pending`): trang bị vừa bấm Begin được ghi vào `_pending` TRƯỚC khi bấm. Bị ngắt
   giữa chừng thì lượt sau mở menu Lò rèn: có `Speed Up` = đã bắt đầu -> tăng tốc, nhận, rồi mới trừ 1; không có = Begin chưa có hiệu lực -> bỏ dấu

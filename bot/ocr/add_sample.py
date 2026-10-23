@@ -59,6 +59,10 @@ The General name font ("GeneralName", read_general_name.py) is split like the bo
 name strip of the Recruit General screen. Example for "Rustam":
 
     python -m bot.ocr.add_sample GeneralName strip.png "r|u|s|t|a|m"
+
+The March screen time font ("MarchTime", read_march_time.py) is split like the bubble timer. Example for "00:48:57":
+
+    python -m bot.ocr.add_sample MarchTime time.png "0|0|:|4|8|:|5|7"
 """
 import sys
 from pathlib import Path
@@ -76,6 +80,7 @@ from .read_general_name import split as split_general_name
 from .read_heal_count import FONT as HEAL_COUNT_FONT
 from .read_heal_count import split as split_heal_count
 from .read_map_level import FONT as MAP_LEVEL_FONT
+from .read_march_time import FONT as MARCH_TIME_FONT
 from .read_map_level import split as split_map_level
 from .read_milestone import FONT as MILESTONE_FONT
 from .read_milestone import split as split_milestone
@@ -90,7 +95,8 @@ from .read_progress import split as split_progress
 PIECE_FONTS = {NAME_FONT: split_name, POWER_FONT: split_power, PROGRESS_FONT: split_progress,
                TIMER_FONT: split_timer, MILESTONE_FONT: split_milestone,
                HEAL_COUNT_FONT: split_heal_count, OFFER_COST_FONT: split_offer_cost,
-               GENERAL_NAME_FONT: split_general_name, MAP_LEVEL_FONT: split_map_level}
+               GENERAL_NAME_FONT: split_general_name, MAP_LEVEL_FONT: split_map_level,
+               MARCH_TIME_FONT: split_timer}
 
 
 NO_COLON_FONTS = {"Camera"}      # chữ số hẹp (5, 7) không được nhầm với ":" (xem split)

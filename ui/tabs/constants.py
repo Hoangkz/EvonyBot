@@ -12,20 +12,21 @@ DESIGNER_DATA = {
     "buttonEvent": {"loc": [740, 53], "size": [230, 40], "text": "Event", "type": "Button"},
     # button9 (Start All) nằm cạnh buttonStopAll (Stop All) dưới GroupBox; 2 nút
     # 125x40 (nhỏ lại so với 140x50 gốc) căn phải theo mép phải GroupBox (x=1075).
-    "button9": {"loc": [815, 421], "size": [125, 40], "text": "Start All", "type": "Button"},
-    "buttonStopAll": {"loc": [950, 421], "size": [125, 40], "text": "Stop All", "type": "Button"},
+    "button9": {"loc": [815, 473], "size": [125, 40], "text": "Start All", "type": "Button"},
+    "buttonStopAll": {"loc": [950, 473], "size": [125, 40], "text": "Stop All", "type": "Button"},
     "buttonAllianceCapacity": {"loc": [409, 117], "size": [230, 40], "text": "Alliance Capacity", "type": "Button"},
     "buttonBlackMarket": {"loc": [740, 117], "size": [230, 40], "text": "Black Market", "type": "Button"},
     "buttonRecruitGeneral": {"loc": [85, 181], "size": [230, 40], "text": "Recruit General", "type": "Button"},
     "buttonFindBoss": {"loc": [409, 181], "size": [230, 40], "text": "Find Boss", "type": "Button"},
     "buttonCraft": {"loc": [740, 181], "size": [230, 40], "text": "Craft", "type": "Button"},
+    "buttonGatherResources": {"loc": [85, 245], "size": [230, 40], "text": "Gather Resources", "type": "Button"},
     "buttonDailyActivities": {"loc": [409, 53], "size": [230, 40], "text": "Daily Activities", "type": "Button"},
     "buttonInitializationApplyAll": {"loc": [935, 16], "size": [132, 43], "text": "Apply ALL", "type": "Button"},
-    "buttonStart": {"loc": [449, 447], "size": [217, 51], "text": "Start", "type": "Button"},
+    "buttonStart": {"loc": [449, 499], "size": [217, 51], "text": "Start", "type": "Button"},
     "groupBox2": {
         "children": ["ButtonJoinMonsterWar", "buttonDailyActivities", "buttonEvent", "ButtonOpenGiftBox",
-                      "buttonAllianceCapacity", "buttonBlackMarket", "buttonRecruitGeneral", "buttonFindBoss", "buttonCraft"],
-        "loc": [13, 150], "size": [1062, 253], "text": "Select Activity", "type": "GroupBox",
+                      "buttonAllianceCapacity", "buttonBlackMarket", "buttonRecruitGeneral", "buttonFindBoss", "buttonCraft", "buttonGatherResources"],
+        "loc": [13, 150], "size": [1062, 305], "text": "Select Activity", "type": "GroupBox",
     },
     "checkBoxBubble": {"loc": [13, 62], "size": [75, 28], "text": "Bubble", "type": "CheckBox"},
     "comboBoxBubbleType": {"loc": [90, 62], "size": [60, 28], "type": "ComboBox"},
@@ -78,6 +79,7 @@ ACTIVITY_BUTTONS = {
     "buttonRecruitGeneral": {"target": "Recruit General", "exclusive": "Recruit General" in EXCLUSIVE_ACTIVITIES},
     "buttonFindBoss": {"target": "Find Boss", "exclusive": False},
     "buttonCraft": {"target": "Craft", "exclusive": False},
+    "buttonGatherResources": {"target": "Gather Resources", "exclusive": False},
 }
 ACTIVITY_BUTTON_TARGETS = {name: info["target"] for name, info in ACTIVITY_BUTTONS.items()}
 
