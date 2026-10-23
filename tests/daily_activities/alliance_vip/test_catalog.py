@@ -1,6 +1,7 @@
 import unittest
 from unittest import mock
 
+import cv2
 import numpy as np
 
 from bot.activities.daily_activities.alliance_vip import run
@@ -69,6 +70,59 @@ class SaturationTests(unittest.TestCase):
 
         screen[:] = 120
         self.assertFalse(run._buy_button_active(bot, screen, center))
+
+
+class TruceColorTests(unittest.TestCase):
+    class Bot:
+        def __init__(self):
+            self.logs = []
+
+        @staticmethod
+        def _template(path):
+            image = cv2.imread(str(run.TEMPLATE_DIR / path), cv2.IMREAD_COLOR)
+            if image is None:
+                raise AssertionError(f"Missing fixture: {path}")
+            return image
+
+        @staticmethod
+        def crop(image, x, y, w, h):
+            return image[y:y + h, x:x + w].copy()
+
+        def record(self, message):
+            self.logs.append(message)
+
+    def test_each_truce_colour_only_matches_its_own_duration(self):
+        bot = self.Bot()
+        items = [item for item in ITEMS
+                 if item.key.startswith("truce_agreement_")]
+        for visible in items:
+            image = bot._template(visible.template)
+            screen = np.zeros((120, 160, 3), dtype=np.uint8)
+            top, left = 40, 50
+            screen[top:top + image.shape[0],
+                   left:left + image.shape[1]] = image
+            center = (left + image.shape[1] // 2,
+                      top + image.shape[0] // 2)
+            for expected in items:
+                self.assertEqual(
+                    visible.key == expected.key,
+                    run._truce_color_matches(
+                        bot, screen, center, expected.template),
+                    f"visible={visible.key}, expected={expected.key}",
+                )
+
+    def test_truce_reference_colours_have_safe_separation(self):
+        bot = self.Bot()
+        histograms = {
+            item.key: run._hue_histogram(bot._template(item.template))
+            for item in run._TRUCE_ITEMS
+        }
+        for left_index, left in enumerate(run._TRUCE_ITEMS):
+            for right in run._TRUCE_ITEMS[left_index + 1:]:
+                distance = cv2.compareHist(
+                    histograms[left.key], histograms[right.key],
+                    cv2.HISTCMP_BHATTACHARYYA)
+                self.assertGreater(distance, 0.08)
 
 
 class DoneTests(unittest.TestCase):
@@ -152,7 +206,7 @@ class SingleSessionTests(unittest.TestCase):
                          run.MONTH_KEY, run.DAY_KEY,
                          run._item_done_key("chip_100")}.issubset(ctx.done))
 
-    def test_shop_requires_weekly_marker_and_three_stable_swipes_for_bottom(self):
+    def test_shop_swipes_exactly_twice_after_weekly_marker(self):
         ctx = self.Ctx()
         settings = {SETTINGS_KEY: {"chip_100": True}}
         ranges = {"monthly": None, "daily": None}
@@ -165,11 +219,11 @@ class SingleSessionTests(unittest.TestCase):
               mock.patch.object(run, "SCROLLS", 10)):
             run._run_shop_session(ctx, settings)
 
-        self.assertEqual(3, ctx.swipes)
+        self.assertEqual(2, ctx.swipes)
         self.assertTrue(any("xác nhận đã tới cuối" in line
                             for line in ctx.logs))
 
-    def test_shop_does_not_call_stable_frame_bottom_before_weekly_marker(self):
+    def test_shop_does_not_call_bottom_before_weekly_marker(self):
         ctx = self.Ctx()
         settings = {SETTINGS_KEY: {"chip_100": True}}
         ranges = {"monthly": None, "daily": None}

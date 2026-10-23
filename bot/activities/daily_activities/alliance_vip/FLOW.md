@@ -30,16 +30,18 @@ flowchart TD
   và "Weekly Sale" (`WeeklySale.png`, ở cuối trang, ngay dưới sách Daily). Tiêu đề nào ra khỏi màn thì dùng tiêu đề còn lại.
 - **Nút giá**: xanh (độ bão hoà màu >= 100) = mua được; xám (VD chưa có thẻ tháng, độ bão hoà ~35) = coi như đã mua, đánh dấu xong
   luôn. Bấm **nút giá** mới hiện popup mua (bấm vào sách thì không).
+- **Ba Truce Agreement** dùng cùng hình con chim nên không chỉ dựa vào
+  điểm template. Sau khi khớp hình, bot so thêm histogram HSV của nền:
+  `8h` tím, `24h` cam, `3d` vàng. Bot luôn chọn loại có dải màu
+  gần nhất, không có nhánh PENDING do ngưỡng màu. Nếu khung hiếm khi
+  không đủ pixel bão hòa, bot phân loại bằng độ tương đồng full-colour.
 - **Popup mua**: bấm giá xong chờ 1 giây, chưa có popup (tìm nút "+") thì chờ thêm tối đa 5 lần (1 giây / lần); sau 5 lần vẫn không có
   popup thì vẫn lưu xong. Có popup: bấm "+" 5 lần rồi bấm nút mua (dưới thanh số lượng) -> hiện hộp xác nhận -> bấm **Confirm** mới là mua thật, SAU ĐÓ mới lưu DB. Chờ Confirm tối đa 5 giây; không có Confirm mà popup mua còn mở, hoặc sau Confirm hộp vẫn còn thì Back, không lưu.
 - **Cuộn**: vừa vào shop đưa danh sách về đầu để ưu tiên Tribute và 100 VIP
   Points. Sau đó quét/mua mọi món đang thấy rồi mới vuốt chậm 1 giây và chờ
-  thêm 1 giây. Trần an toàn tăng lên 32 lượt. Mỗi lượt ghi log khoảng cách
-  chữ ký cấu trúc của vùng danh sách; chỉ xác nhận đã tới cuối khi đã thấy mốc
-  `Weekly Sale` và chữ ký không dịch chuyển 3 lượt liên tiếp. Khung đứng yên
-  trước khi thấy Weekly không được coi là đáy. Nếu đủ 32 lượt mà chưa có ba
-  xác nhận, dừng theo trần an toàn và giữ các món chưa thấy ở trạng thái
-  PENDING.
+  thêm 1 giây. Trần an toàn là 32 lượt. `Weekly Sale` là mốc
+  cuối: ngay khi nhận diện được mốc này, bot vẫn lướt và quét thêm
+  đúng 2 khung rồi mới xác nhận đã tới cuối.
 - **Lỗi / không tới được shop**: không lưu dấu, lần sau làm lại; lỗi lưu `daily_alliance_vip_error` vào DB.
 
 ## Số đo (máy 21913, 396x704)

@@ -1,4 +1,6 @@
 """Scroll Event Center and process every red-dot row safely."""
+import time
+
 import cv2
 import numpy as np
 
@@ -58,6 +60,10 @@ APPLE_ACTIVE_COLOR_RATIO_MIN = 0.35
 APPLE_DONE_SATURATION_MAX = 65.0
 APPLE_DONE_COLOR_RATIO_MAX = 0.20
 APPLE_COLOR_SATURATION_CUTOFF = 100
+# Sau khi chính nút đỏ x10 vừa được nhận diện ACTIVE và được bấm, layout đổi
+# làm template DONE chỉ còn khoảng 0.50 (log thực tế 0.507). Khi đồng thời thấy
+# Once đỏ và dải tại vị trí x10 đã xám, ngưỡng định vị thấp này là an toàn.
+APPLE_RED_POST_TAP_GRAY_LOCATE_THRESHOLD = 0.45
 MAX_APPLE_TAPS_PER_PHASE = 100
 APPLE_STATE_MISS_RETRIES = 3
 # MEmu can become noticeably slower when the worker controls many devices at
@@ -69,7 +75,7 @@ SWIPE_DURATION_SECONDS = 1.0
 # ADB has finished the swipe.  List navigation therefore gets a longer pause
 # than ordinary taps, and every list position is sampled twice before moving.
 LIST_SCROLL_SETTLE_SECONDS = 2.0
-WISHFUL_SETTLE_SECONDS = 2.0
+WISHFUL_SETTLE_SECONDS = 1.0
 WISHFUL_CONFIRMATION_DELAY_SECONDS = 1.0
 WISHFUL_CONTENT_REGION = (3, 26, 97, 88)
 WISHFUL_CLAIM_REGION = (65, 26, 98, 88)
@@ -77,7 +83,17 @@ MAX_WISHFUL_CONTENT_SWIPES = 12
 MAX_WISHFUL_CLAIMS = 30
 MAX_WISHFUL_TAPS_PER_CLAIM = 3
 WISHFUL_EDGE_CONFIRMATIONS = 2
+WISHFUL_DONE_ONE_LIMIT = (
+    "WishfulWindmillFestival/status_done_one_claim_limit", 0.84)
 EMPTY_POSITION_CHECKS = 2
+APPLE_GREEN_ONCE_STATES = (
+    ("DwarfsLuckyApple/status_green_wish_once", 0.84),
+    ("DwarfsLuckyApple/status_green_wish_once_gray", 0.80),
+)
+APPLE_RED_ONCE_STATES = (
+    ("DwarfsLuckyApple/status_red_wish_once", 0.84),
+    ("DwarfsLuckyApple/status_red_wish_once_gray", 0.80),
+)
 CATEGORIES = (
     ("limited", 18),
     ("activities", 49),
@@ -394,6 +410,26 @@ def _handle_dwarf(bot):
     return ClaimReport(1, int(gone)), gone
 
 
+def _handle_dragon_battle(bot):
+    """Tap the exact Dragon chest; only Congratulations is DONE."""
+    reward = _wait_for(
+        bot, "DragonBattle/reward_230317", attempts=4, threshold=0.80,
+        region=(0, 15, 100, 95), delay=UI_SETTLE_SECONDS)
+    if reward is None:
+        bot.record("Gift Claims: Dragon Battle không thấy rương "
+                   "Screenshot_20261023-230317; giữ PENDING")
+        return ClaimReport(), False
+    bot.record("Gift Claims: Dragon Battle tap rương "
+               "Screenshot_20261023-230317")
+    bot.tap(*reward, delay=UI_SETTLE_SECONDS)
+    if close_congratulations(bot, attempts=5):
+        bot.record("Gift Claims: Dragon Battle đã hiện Congratulations; DONE")
+        return ClaimReport(1, 1), True
+    bot.record("Gift Claims: Dragon Battle bấm rương nhưng chưa thấy "
+               "Congratulations; giữ PENDING")
+    return ClaimReport(1, 0), False
+
+
 def _wishful_panel_open(bot, *, attempts=5) -> bool:
     """Recognize either captured Wind Blessings title without leaving it."""
     variants = (
@@ -490,6 +526,13 @@ def _wishful_claims(bot, screen):
                     threshold=0.74, region=WISHFUL_CLAIM_REGION)
 
 
+def _wishful_done_one_limit(bot, screen) -> bool:
+    """The claim-limit toast finishes Wind Blessings DONE 1 only."""
+    template, threshold = WISHFUL_DONE_ONE_LIMIT
+    return find(bot, template, screen, threshold=threshold,
+                region=(0, 5, 100, 95)) is not None
+
+
 def _close_wishful_congratulations(bot) -> bool:
     """Dismiss Congratulations by the user's fixed tap, never with Back."""
     for attempt in range(3):
@@ -511,12 +554,21 @@ def _close_wishful_congratulations(bot) -> bool:
     return False
 
 
-def _tap_wishful_claim(bot, claim: tuple[int, int], phase: str) -> tuple[int, bool]:
-    """Retry one still-active Claim in place before allowing the scan onward."""
+def _tap_wishful_claim(bot, claim: tuple[int, int],
+                       phase: str) -> tuple[int, bool, bool]:
+    """Retry one Claim; third result is the special DONE-1 limit toast."""
     for tap_number in range(1, MAX_WISHFUL_TAPS_PER_CLAIM + 1):
         bot.record(f"Gift Claims: Wishful Windmill {phase} tap Claim "
                    f"lần {tap_number}/{MAX_WISHFUL_TAPS_PER_CLAIM} tại {claim}")
         bot.tap(*claim, delay=WISHFUL_SETTLE_SECONDS)
+        # Screenshot_20261023-073771 is a short-lived toast.  Read the first
+        # post-tap frame before waiting for/dismissing Congratulations.
+        immediate = bot.screenshot()
+        if phase == "DONE 1" and _wishful_done_one_limit(bot, immediate):
+            bot.record("Gift Claims: Wishful Windmill DONE 1 thấy 'Claim "
+                       "failed. The limit has been...'; DONE 1 ngay và chuyển "
+                       "sang kiểm tra DONE 2")
+            return tap_number, True, True
         popup_closed = _close_wishful_congratulations(bot)
         bot.sleep(WISHFUL_CONFIRMATION_DELAY_SECONDS)
         after = bot.screenshot()
@@ -527,12 +579,12 @@ def _tap_wishful_claim(bot, claim: tuple[int, int], phase: str) -> tuple[int, bo
             None,
         )
         if popup_closed or nearby is None:
-            return tap_number, True
+            return tap_number, True, False
         claim = nearby
         if tap_number < MAX_WISHFUL_TAPS_PER_CLAIM:
             bot.record(f"Gift Claims: Wishful Windmill {phase} Claim vẫn còn; "
                        "chờ rồi bấm lại ngay trong panel")
-    return MAX_WISHFUL_TAPS_PER_CLAIM, False
+    return MAX_WISHFUL_TAPS_PER_CLAIM, False, False
 
 
 def _claim_wishful_panel(bot, phase: str) -> tuple[ClaimReport, bool]:
@@ -567,8 +619,12 @@ def _claim_wishful_panel(bot, phase: str) -> tuple[ClaimReport, bool]:
                 break
 
             empty_checks = 0
-            taps, claim_verified = _tap_wishful_claim(bot, claim, phase)
+            taps, claim_verified, done_one_limit = _tap_wishful_claim(
+                bot, claim, phase)
             attempted += taps
+            if done_one_limit:
+                verified += 1
+                return ClaimReport(attempted, verified), True
             if claim_verified:
                 verified += 1
                 bot.record(f"Gift Claims: Wishful Windmill {phase} đã nhận "
@@ -637,9 +693,9 @@ def _wait_event_row_open(bot, expected_screen=None):
 
 
 def _handle_wishful(bot):
-    bot.record("Gift Claims: Wishful Windmill chờ 2s để trang sự kiện render "
-               "ổn định trên nhiều máy")
-    bot.sleep(WISHFUL_SETTLE_SECONDS)
+    bot.record("Gift Claims: Wishful Windmill tìm và tap rương ngay; "
+               "mỗi thao tác chỉ chờ 1s; chỉ nhận Claim, không "
+               "dùng Claim All")
     if not _wishful_open_blessings(bot):
         return ClaimReport(), False
     first, first_done = _claim_wishful_panel(bot, "DONE 1")
@@ -788,6 +844,37 @@ def _apple_button_state(bot, screen, active: str, finished: str,
     return None, None
 
 
+def _apple_red_x10_post_tap_done(bot, screen) -> bool:
+    """Recognize the live red-x10 grey layout after a verified active tap.
+
+    On that layout the yellow Once control wins the ACTIVE-template search,
+    while the real grey x10 only scores about 0.50 against the older DONE
+    crop.  This fallback is called only after this run positively recognized
+    and tapped red x10; it additionally requires an exact red Once state and
+    a grey colour band at the weak x10 match.
+    """
+    finished = "DwarfsLuckyApple/status_red_wish_x10_done"
+    done_template = _scaled_template(bot, finished, screen)
+    done_score, done_pos = bot.best_match(
+        done_template, screen=screen, region=(0, 15, 100, 98))
+    if (done_pos is None or
+            done_score < APPLE_RED_POST_TAP_GRAY_LOCATE_THRESHOLD):
+        return False
+    saturation, color_ratio = _apple_button_color_band(screen, done_pos)
+    if (saturation > APPLE_DONE_SATURATION_MAX or
+            color_ratio > APPLE_DONE_COLOR_RATIO_MAX):
+        return False
+    red_once = _apple_special_state(
+        bot, screen, APPLE_RED_ONCE_STATES,
+        "Wish Once táo đỏ bên cạnh x10 đã xám")
+    if red_once is None:
+        return False
+    bot.record("Gift Claims: Dwarf's Lucky Apple đỏ x10 sau tap đã xám "
+               f"(score={done_score:.3f}, S={saturation:.1f}, tỷ lệ màu="
+               f"{color_ratio:.2f}) và còn Wish Once; xác nhận DONE")
+    return True
+
+
 def _apple_congratulations_hit(bot, screen):
     """Return a Lucky Apple popup match without taking a second screenshot."""
     for template in (CONGRATULATIONS,
@@ -830,6 +917,28 @@ def _close_apple_congratulations(bot, attempts=3,
     return False
 
 
+def _apple_special_state(bot, screen, variants, label: str):
+    """Return an exact user-supplied Apple shortcut state on this frame."""
+    for template, threshold in variants:
+        position = find(bot, template, screen, threshold=threshold,
+                        region=(0, 15, 100, 98))
+        if isinstance(position, tuple) and len(position) == 2:
+            bot.record(f"Gift Claims: Dwarf's Lucky Apple thấy {label} "
+                       f"({template}, ngưỡng {threshold:.2f})")
+            return template, position
+    return None
+
+
+def _wait_apple_special_state(bot, variants, label: str, *, attempts=2):
+    for attempt in range(attempts):
+        state = _apple_special_state(bot, bot.screenshot(), variants, label)
+        if state is not None:
+            return state
+        if attempt + 1 < attempts:
+            bot.sleep(UI_SETTLE_SECONDS)
+    return None
+
+
 def _apple_phase(bot, active: str, finished: str,
                  *, max_taps=MAX_APPLE_TAPS_PER_PHASE):
     """Continuously tap one Lucky Apple phase until its disabled state.
@@ -856,6 +965,10 @@ def _apple_phase(bot, active: str, finished: str,
         state, button = _apple_button_state(bot, screen, active, finished)
         if state == "done":
             return ClaimReport(attempted, attempted), True
+        if (attempted > 0 and
+                active == "DwarfsLuckyApple/button_red_wish_x10" and
+                _apple_red_x10_post_tap_done(bot, screen)):
+            return ClaimReport(attempted, attempted), True
         if state != "active" or button is None:
             missing_frames += 1
             bot.record(f"Gift Claims: Dwarf's Lucky Apple chưa đọc được trạng "
@@ -881,8 +994,57 @@ def _apple_phase(bot, active: str, finished: str,
     return ClaimReport(attempted, 0), False
 
 
+def _probe_optional_apple_phase(bot, active: str, finished: str,
+                                label: str, *, attempts=3):
+    """Read an optional x100/x10 phase without confusing absence with DONE.
+
+    The Lucky Apple layout changes by account: some accounts expose x100,
+    x10 and Once while others expose only x10 + Once or Once.  A bounded
+    probe tells the caller whether this phase is present.  Once is deliberately
+    *not* checked here, because it may coexist with an actionable x100/x10.
+    """
+    for attempt in range(attempts):
+        bot.check()
+        screen = bot.screenshot()
+        if _apple_congratulations_hit(bot, screen) is not None:
+            _close_apple_congratulations(bot, attempts=1)
+            bot.sleep(UI_SETTLE_SECONDS)
+            continue
+        state, _button = _apple_button_state(bot, screen, active, finished)
+        if state is not None:
+            bot.record("Gift Claims: Dwarf's Lucky Apple "
+                       f"{label} xuất hiện ({state.upper()})")
+            return state
+        if attempt + 1 < attempts:
+            bot.sleep(UI_SETTLE_SECONDS)
+    bot.record("Gift Claims: Dwarf's Lucky Apple "
+               f"không có {label} sau {attempts} lần kiểm tra")
+    return None
+
+
+def _run_optional_apple_phase(bot, active: str, finished: str, label: str):
+    """Finish a visible x phase, or skip it only when it is truly absent."""
+    state = _probe_optional_apple_phase(bot, active, finished, label)
+    if state is None:
+        return ClaimReport(), True, False
+    if state == "done":
+        return ClaimReport(), True, True
+    report, done = _apple_phase(bot, active, finished)
+    return report, done, True
+
+
 def _handle_dwarfs_lucky_apple(bot):
-    """Complete green x100/x10, then red x10; final disabled red is DONE."""
+    """Finish every visible multiplier before using Once as a transition."""
+    deadline = getattr(bot, "_deadline", None)
+    if isinstance(deadline, (int, float)):
+        remaining = max(0, round(deadline - time.monotonic()))
+        bot.record("Gift Claims: Dwarf's Lucky Apple thuộc Event Center/"
+                   f"Activities; deadline worker còn {remaining}s, hết giờ sẽ "
+                   "nhường Join Monster War")
+    else:
+        bot.record("Gift Claims: Dwarf's Lucky Apple thuộc Event Center/"
+                   "Activities; lượt này không có deadline 120s (Join Boss "
+                   "không hoạt động hoặc đang chờ thể lực)")
     # The page artwork and buttons fade in after the title is already visible.
     # Always begin from the green tab.  Never probe the red DONE template on
     # the initial/default page: a grey green-x10 state has nearly identical
@@ -899,21 +1061,36 @@ def _handle_dwarfs_lucky_apple(bot):
         return ClaimReport(), False
     bot.tap(*green, delay=UI_SETTLE_SECONDS)
 
-    first, first_done = _apple_phase(
+    first, first_done, first_present = _run_optional_apple_phase(
         bot, "DwarfsLuckyApple/button_green_wish_x100",
-        "DwarfsLuckyApple/status_green_wish_x100_done")
+        "DwarfsLuckyApple/status_green_wish_x100_done", "xanh x100")
     if not first_done:
         return first, False
-    bot.record("Gift Claims: Dwarf's Lucky Apple xanh x100 DONE; "
-               "chuyển sang xanh x10")
-    second, second_done = _apple_phase(
+
+    second, second_done, second_present = _run_optional_apple_phase(
         bot, "DwarfsLuckyApple/button_green_wish_x10",
-        "DwarfsLuckyApple/status_green_wish_x10_done")
+        "DwarfsLuckyApple/status_green_wish_x10_done", "xanh x10")
+    if not second_done:
+        total = ClaimReport(first.attempted + second.attempted,
+                            first.verified + second.verified)
+        return total, False
     total = ClaimReport(first.attempted + second.attempted,
                         first.verified + second.verified)
-    if not second_done:
+    green_once = _wait_apple_special_state(
+        bot, APPLE_GREEN_ONCE_STATES,
+        "Wish Once táo xanh sau khi xử lý hết x100/x10", attempts=3)
+    if green_once is None:
+        bot.record("Gift Claims: Dwarf's Lucky Apple chưa thấy Wish Once táo "
+                   "xanh sau khi kiểm tra x100/x10; giữ nguyên trang để lượt "
+                   "sau kiểm tra lại")
         return total, False
-    bot.record("Gift Claims: Dwarf's Lucky Apple xanh x10 DONE; "
+    visible = []
+    if first_present:
+        visible.append("x100")
+    if second_present:
+        visible.append("x10")
+    bot.record("Gift Claims: Dwarf's Lucky Apple nhánh xanh đã xử lý xong "
+               f"{', '.join(visible) if visible else 'chỉ có Once'}; "
                "chuyển sang táo đỏ")
 
     red = _wait_for_any(
@@ -928,15 +1105,30 @@ def _handle_dwarfs_lucky_apple(bot):
     bot.record("Gift Claims: Dwarf's Lucky Apple bấm tab táo đỏ; chỉ từ "
                "thời điểm này mới được xét DONE toàn nhiệm vụ")
     bot.tap(*red, delay=UI_SETTLE_SECONDS)
-    third, third_done = _apple_phase(
+    third, third_done, third_present = _run_optional_apple_phase(
         bot, "DwarfsLuckyApple/button_red_wish_x10",
-        "DwarfsLuckyApple/status_red_wish_x10_done")
+        "DwarfsLuckyApple/status_red_wish_x10_done", "đỏ x10")
     final = ClaimReport(total.attempted + third.attempted,
                         total.verified + third.verified)
-    if third_done:
+    if third_present and third_done:
         bot.record("Gift Claims: Dwarf's Lucky Apple đỏ x10 đã hiện trạng "
                    "thái DONE; hoàn thành toàn bộ nhiệm vụ")
-    return final, third_done
+        return final, True
+    if not third_done:
+        return final, False
+
+    # Red x10 is genuinely absent.  Only now may Once (active or grey) finish
+    # the task; checking it earlier would incorrectly skip an actionable x10.
+    red_once = _wait_apple_special_state(
+        bot, APPLE_RED_ONCE_STATES,
+        "Wish Once táo đỏ khi không có x10; DONE toàn nhiệm vụ", attempts=3)
+    if red_once is not None:
+        bot.record("Gift Claims: Dwarf's Lucky Apple táo đỏ chỉ có Wish Once "
+                   "(màu vàng hoặc xám); DONE toàn nhiệm vụ")
+        return ClaimReport(final.attempted, max(1, final.verified)), True
+    bot.record("Gift Claims: Dwarf's Lucky Apple không thấy đỏ x10 hoặc Wish "
+               "Once sau 3 lần; giữ PENDING để tránh kết luận nhầm")
+    return final, False
 
 
 def _eagle_active_claims(bot, screen):
@@ -1191,6 +1383,7 @@ def _handle_legion_hunting(bot):
 
 
 EXACT_HANDLERS = {
+    GiftScreen.DRAGON_BATTLE: _handle_dragon_battle,
     GiftScreen.PRECIOUS_BLAZON_EXCHANGE: _handle_precious,
     GiftScreen.POSEIDONS_DAY: _handle_poseidon,
     GiftScreen.HYPNOS_DREAM: _handle_hypnos,

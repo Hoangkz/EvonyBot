@@ -35,6 +35,10 @@ PRICE_BOX = (90, 22)          # rộng, cao khung xét màu
 PRICE_MIN_SATURATION = 100
 ITEM_THRESHOLD = 0.86
 LOCKED_ITEM_THRESHOLD = 0.90  # ngưỡng cao; so viền/góc, bỏ vùng ổ khóa giữa icon
+# Ba Truce dùng cùng hình con chim, chỉ khác màu nền. Sau khi khớp
+# hình phải phân loại thêm histogram Hue: 8h=tím, 24h=cam, 3d=vàng.
+TRUCE_COLOR_SATURATION_MIN = 80
+TRUCE_COLOR_VALUE_MIN = 50
 # Popup mua: tìm dấu +, bấm đầu thanh bên trái nó để chọn MAX rồi xác nhận ảnh thanh MAX.
 PLUS = f"{FOLDER_PATH}/popup_plus.png"
 MAX_SLIDER = f"{FOLDER_PATH}/popup_max_slider.png"
@@ -53,8 +57,7 @@ SCROLLS = 32                  # trần an toàn lớn; dừng sớm chỉ khi x�
 SWIPE = (50, 68, 50, 46)      # % màn hình: cuộn Alliance Shop xuống (~155 px mỗi lần; vuốt dài / nhanh thì shop trôi quá, lỡ sách)
 SWIPE_DURATION = 1.0          # vuốt 1s + dừng quét 1s = tối đa 2s mỗi bước
 SCAN_SETTLE = 1.0
-BOTTOM_CONFIRMATIONS = 3      # phải đứng yên 3 lần liên tiếp sau khi đã thấy Weekly Sale
-BOTTOM_SIGNATURE_DISTANCE = 10  # dHash vùng nội dung <= ngưỡng này coi như không dịch chuyển
+WEEKLY_EXTRA_SWIPES = 2       # thấy Weekly Sale thì lướt thêm đúng 2 lần để tới cuối
 TOP_SWIPE = (50, 25, 50, 85)  # đưa carousel dọc về đầu trước mỗi lượt tìm ưu tiên
 TOP_SWIPES = 6
 TOP_SWIPE_DURATION = 0.35
