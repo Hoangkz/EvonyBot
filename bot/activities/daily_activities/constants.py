@@ -46,7 +46,10 @@ ROW_SETTLE_WAIT = 1
 # y 621): tiêu đề thấp hơn ROW_TITLE_MAX_Y thì coi như chưa thấy, cuộn tiếp (LIST_SWIPE thực tế ~130-190 px) để
 # cả dòng lên trên thanh.
 ROW_TITLE_MAX_Y = 580
-LIST_SWIPE = (70, 73, 55, 53)        # % màn hình: ngón tay kéo lên = cuộn danh sách xuống (ngón tay 141 px, đo thật máy 21913 với 1,2 giây: dịch 128-186 px, TB ~166; trước (70, 70, 55, 55) ~105 px, người dùng thấy ngắn)
+# % màn hình: ngón tay kéo lên = cuộn danh sách xuống (đo thật máy 21913 với 1,2 giây: dịch 128-186 px, TB ~166).
+# Vuốt thẳng đứng trong khe tối x ~61-74% giữa ô vật phẩm và nút Go: vuốt chéo cũ (70 -> 55) dừng trên ô vật phẩm
+# thứ 4 -> game hiện tooltip vật phẩm (VD "1K General EXP") thay vì chỉ cuộn.
+LIST_SWIPE = (67, 73, 67, 53)
 LIST_SWIPE_DURATION = 1.2            # giây mỗi cú cuộn (trước 0.8: danh sách trôi thêm do quán tính, mỗi cú dịch 150-206 px không đều)
 LIST_MAX_SCROLLS = 25
 # Lướt hết danh sách không thấy nhiệm vụ: Back (đóng bảng Activity) rồi mở lại từ đầu, tìm thêm

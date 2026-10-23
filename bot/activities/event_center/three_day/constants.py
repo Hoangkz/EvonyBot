@@ -87,11 +87,14 @@ CLAIM_SAME_MAX = 6   # bấm Claim cùng chỗ quá số lần này mà nút v�
 
 # Cuộn danh sách nhiệm vụ / quà (ngón tay kéo lên = xuống cuối danh sách; mỗi lần ~280 px < cao 1
 # cửa sổ 400 px nên không sót dòng). Màn không đổi sau khi cuộn = hết danh sách.
-SWIPE = (50, 78, 50, 52)       # ~183 px (trước 141 px, người dùng thấy ngắn): dài / nhanh hơn nhiều thì danh sách trôi lố (máy thật: bỏ sót dòng)
-SWIPE_BACK = (50, 55, 50, 75)
+# Vuốt ở x = SWIPE_X: khe tối ngay bên trái nút Go / Redeem (đo ảnh nhiệm vụ / đổi quà: vật phẩm tới x ~44%, nút từ ~76%);
+# vuốt giữa màn có thể dừng trên ô vật phẩm -> game hiện tooltip thay vì chỉ cuộn.
+SWIPE_X = 70
+SWIPE = (SWIPE_X, 78, SWIPE_X, 52)       # ~183 px (trước 141 px, người dùng thấy ngắn): dài / nhanh hơn nhiều thì danh sách trôi lố (máy thật: bỏ sót dòng)
+SWIPE_BACK = (SWIPE_X, 55, SWIPE_X, 75)
 # Đã thấy dòng của nhiệm vụ: cuộn bước nhỏ để có màn thấy đủ 3 dòng cùng nhiệm vụ (cửa sổ chỉ rộng ~145 px mà bước
 # cuộn thường thực trôi ~185 px nên 3 dòng Claimed cứ bị cắt đầu / cuối: máy 21943).
-SWIPE_FINE = (50, 71, 50, 54)   # ~120 px vuốt (trước 92 px)
+SWIPE_FINE = (SWIPE_X, 71, SWIPE_X, 54)   # ~120 px vuốt (trước 92 px)
 SWIPE_DURATION = 0.8
 SWIPE_WAIT = 1.5
 SAME_DIFF = 2.0         # độ lệch điểm ảnh trung bình < mức này = màn không đổi

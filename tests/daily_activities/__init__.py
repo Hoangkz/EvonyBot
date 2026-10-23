@@ -10,10 +10,10 @@ danh sách Activity (Claim All bấm trước) -> cuộn tìm tiêu đề dòng 
 from pathlib import Path
 
 from bot.activities.daily_activities.common import open_task, task_cards, task_done_cards, task_titles
-from bot.activities.daily_activities.constants import ACTIVITY_TAB, CLAIM_ALL, MAIN_MORE, OLD_MENU_ACTIVITY, QUESTS_BUTTON
+from bot.activities.daily_activities.constants import ACTIVITY_TAB, CLAIM_ALL, LIST_SWIPE, MAIN_MORE, OLD_MENU_ACTIVITY, QUESTS_BUTTON
 from tests.flow import Step, back, end, swipe, tap, tap_at
 
-SCROLL = swipe(70, 70, 55, 55)   # constants.LIST_SWIPE: cuộn danh sách Activity xuống
+SCROLL = swipe(*LIST_SWIPE)   # cuộn danh sách Activity xuống
 # Màn chính -> nút Quests -> popup Quests (đang ở Chapter Quests) -> tab Activity.
 TO_ACTIVITY = [
     Step("01_main.png", tap(QUESTS_BUTTON)),
