@@ -4,4 +4,3 @@
 - [ ] Đội về sớm hơn giờ đã lưu (mỏ ít, bị gọi về): đọc danh sách March để biết đội nào đang rảnh.
 - [ ] Mỏ đã có đội mình đang tới: thử cấp khác (hạ 1 cấp) thay vì bỏ đội 10 phút?
 - [ ] Chụp màn mỏ đã có người chiếm (menu tròn khác) nếu gặp.
-- [ ] Đo `rss_stone.png` trên ảnh mỏ đá nằm giữa màn sau Search.

@@ -13,19 +13,16 @@ import time
 
 from ...common import delay, go_home
 from ...common.go_home import EXIT_DIALOG, EXIT_THRESHOLD
-from ...context.templates import TEMPLATE_DIR
 from ...ocr.read_march_time import run as read_march_time
 from ...ocr.read_number import run as read_number
 from ..result import save_errors
-from .constants import (BUTTON_THRESHOLD, CENTER, CITY_MENU, FAIL_WAIT, FREE_MARGIN, FREE_PREFIX, GATHER_TIME, KEY,
-                        LEVEL_BOX, LEVEL_FIX_TRIES, LEVEL_RESET_TAPS, LEVEL_TAP_WAIT, MARCH_BAR, MARCH_BUTTON, MARCH_TIME,
-                        MARCH_FULL, MARCH_FULL_WAIT, MARCH_TITLE, MENU, MENU_SETTLE, MINUS, NO_TARGET, NO_TARGET_THRESHOLD,
-                        NO_TROOP_WAIT, NO_TROOPS, OCCUPY, TARGET_TAKEN,
-                        PANEL, PLUS, RSS_THRESHOLD, RSS_TILE,
-                        SEARCH_BUTTON, SEARCH_ICON, SEARCH_SETTLE, SEARCH_TRIES, SEND_TRIES, SQUADS_KEY, MAX_TROOP, THRESHOLD, TO_WORLD_TAP,
-                        TO_WORLD_TRIES, TYPE_ICON_UP, TYPE_LABEL, TYPE_ROW, TYPE_SWIPE_TIME, TYPE_SWIPE_TO_END,
-                        TYPE_SWIPE_TO_START, TYPE_SWIPES_END, TYPE_SWIPES_START, TYPE_THRESHOLD, UNCHECKED, WAIT_INTERVAL,
-                        WAIT_TRIES)
+from .constants import (AFTER_OCCUPY_TRIES, AFTER_OCCUPY_WAIT, BUTTON_THRESHOLD, CITY_MENU, FAIL_WAIT, FREE_MARGIN, FREE_PREFIX, GATHER_TIME, KEY, LEVEL_BOX,
+                        LEVEL_MAX_TAPS, LEVEL_READ_TRIES, LEVEL_STUCK, LEVEL_TAP_WAIT, MARCH_BAR, MARCH_BUTTON, MARCH_FULL,
+                        MARCH_FULL_WAIT, MARCH_TIME, MARCH_TITLE, MAX_TROOP, MENU, MENU_SETTLE, MINUS, NO_TARGET,
+                        NO_TARGET_THRESHOLD, NO_TROOP_WAIT, NO_TROOPS, OCCUPY, OCCUPY_TRIES, PANEL, PLUS, RESOURCES, SEARCH_BUTTON,
+                        SEARCH_ICON, SEARCH_TRIES, SEND_TRIES, SQUADS_KEY, TARGET_TAKEN, THRESHOLD, TO_WORLD_TAP, TO_WORLD_TRIES,
+                        TYPE_FLING_TIME, TYPE_FLING_TO_START, TYPE_FLINGS, TYPE_ICON_UP, TYPE_LABEL, TYPE_MAX_STEPS, TYPE_ROW,
+                        TYPE_SWIPE_TIME, TYPE_SWIPE_TO_END, TYPE_SWIPE_TO_START, TYPE_THRESHOLD, UNCHECKED, WAIT_INTERVAL, WAIT_TRIES)
 
 
 class _Stop(Exception):
@@ -102,7 +99,8 @@ def _send(bot, resource: str, level: int) -> int | None:
     for _ in range(SEND_TRIES):
         if not _open_search(bot) or not _pick_type(bot, resource):
             return None
-        _set_level(bot, level)
+        if not _set_level(bot, level):
+            return None
         box = bot.find(UNCHECKED, threshold=0.9, region=PANEL)
         if box is not None:
             bot.tap(*box)
@@ -155,47 +153,75 @@ def _open_search(bot) -> bool:
 
 
 def _pick_type(bot, resource: str) -> bool:
-    """Bấm loại mỏ ở hàng chọn. Hàng cuộn được (Summon, Monster, ..., Farm, Sawmill, Quarry, Iron Mine, ..., quái): không thấy chữ
-    thì vuốt chậm từng nấc về đầu hàng, rồi về cuối hàng."""
-    label = TYPE_LABEL.format(resource=resource)
-    swipes = [None] + [TYPE_SWIPE_TO_START] * TYPE_SWIPES_START + [TYPE_SWIPE_TO_END] * TYPE_SWIPES_END
-    for swipe in swipes:
-        if swipe is not None:
-            bot.swipe_percent(*swipe, duration=TYPE_SWIPE_TIME)
-            delay(bot, 1)
-        pos = bot.find(label, threshold=TYPE_THRESHOLD, region=TYPE_ROW)
-        if pos is not None:
+    """Bấm loại mỏ ở hàng chọn (Summon, Monster, Terminator, Farm, Sawmill, Quarry, Iron Mine, Gems Mine, quái...). Mỗi bước chụp
+    một ảnh: thấy loại cần tìm thì bấm. Thấy loại mỏ khác thì so thứ tự lúa, gỗ, đá, sắt, gem: cần loại nằm trước (VD thấy sắt, cần
+    lúa) thì kéo chậm sang trái, nằm sau (VD thấy lúa, cần gem) thì kéo chậm sang phải. Không thấy loại mỏ nào (đang ở nhóm quái
+    cuối hàng) thì kéo dài một cú về đầu hàng."""
+    order = [r for r, _ in RESOURCES]
+    target = order.index(resource)
+    for _ in range(TYPE_MAX_STEPS + 1):
+        screen = bot.screenshot()
+        seen = [i for i, r in enumerate(order)
+                if bot.find(TYPE_LABEL.format(resource=r), threshold=TYPE_THRESHOLD, screen=screen, region=TYPE_ROW) is not None]
+        if target in seen:
+            pos = bot.find(TYPE_LABEL.format(resource=resource), threshold=TYPE_THRESHOLD, screen=screen, region=TYPE_ROW)
             height = bot.window_size()[1]
             bot.tap(pos[0], pos[1] - int(height * TYPE_ICON_UP / 100))
             delay(bot, 1.5)
             return True
+        if not seen:
+            _fling_to_start(bot)
+        elif target < min(seen):
+            bot.swipe_percent(*TYPE_SWIPE_TO_START, duration=TYPE_SWIPE_TIME)
+            delay(bot, 1)
+        else:      # nằm sau các loại đang thấy (hoặc giữa: chữ bị cắt ở mép) -> sang phải
+            bot.swipe_percent(*TYPE_SWIPE_TO_END, duration=TYPE_SWIPE_TIME)
+            delay(bot, 1)
     bot.log(f"Gather Resources: không thấy loại {resource} ở bảng Search")
     return False
 
 
-def _set_level(bot, level: int):
-    """Đổi loại mỏ thì cấp về 1. Đọc ô số cấp bên phải nút "+", bấm "+" / "−" đúng chênh lệch rồi đọc lại (game có lúc lỡ một
-    lần bấm). Không đọc được ô số thì bấm "−" LEVEL_RESET_TAPS lần cho về 1 rồi "+" (cấp − 1) lần."""
+def _fling_to_start(bot):
+    """Kéo nhanh hàng loại về đầu hàng (Summon .. Farm)."""
+    for _ in range(TYPE_FLINGS):
+        bot.swipe_percent(*TYPE_FLING_TO_START, duration=TYPE_FLING_TIME)
+        delay(bot, 1)
+
+
+def _set_level(bot, level: int) -> bool:
+    """Chỉnh cấp bằng OCR ô số bên phải nút "+": mỗi lần bấm "+" / "−" MỘT cái rồi chụp đọc lại, đúng cấp thì dừng (không bấm mù
+    nhiều cái liền). Đọc không ra (LEVEL_READ_TRIES lần), số không đổi sau LEVEL_STUCK lần bấm, hoặc quá LEVEL_MAX_TAPS lần bấm thì
+    bỏ: False."""
     level = max(1, level)
     screen = bot.screenshot()
     plus = bot.find(PLUS, threshold=THRESHOLD, screen=screen, region=PANEL)
     minus = bot.find(MINUS, threshold=THRESHOLD, screen=screen, region=PANEL)
     if plus is None or minus is None:
-        return
-    for _ in range(LEVEL_FIX_TRIES):
+        bot.log("Gather Resources: không thấy nút +/− cấp")
+        return False
+    last, stuck = None, 0
+    for _ in range(LEVEL_MAX_TAPS + 1):
         shown = _read_level(screen)
-        if shown == level:
-            return
+        for _ in range(LEVEL_READ_TRIES - 1):
+            if shown is not None:
+                break
+            bot.sleep(WAIT_INTERVAL)
+            screen = bot.screenshot()
+            shown = _read_level(screen)
         if shown is None:
-            bot.log("Gather Resources: không đọc được ô cấp, bấm − về 1 rồi + lên")
-            for _ in range(LEVEL_RESET_TAPS):
-                bot.tap(*minus, delay=LEVEL_TAP_WAIT)
-            shown = 1
-        for _ in range(abs(shown - level)):
-            bot.tap(*(plus if shown < level else minus), delay=LEVEL_TAP_WAIT)
-        delay(bot, 0.5)
+            bot.log("Gather Resources: không đọc được ô cấp")
+            return False
+        if shown == level:
+            return True
+        stuck = stuck + 1 if shown == last else 0
+        if stuck >= LEVEL_STUCK:
+            bot.log(f"Gather Resources: bấm mà ô cấp vẫn {shown}, cần {level}")
+            return False
+        last = shown
+        bot.tap(*(plus if shown < level else minus), delay=LEVEL_TAP_WAIT)
         screen = bot.screenshot()
-    bot.log(f"Gather Resources: ô cấp hiện {_read_level(screen)}, cần {level}")
+    bot.log(f"Gather Resources: bấm {LEVEL_MAX_TAPS} lần mà ô cấp chưa tới {level}")
+    return False
 
 
 def _read_level(screen) -> int | None:
@@ -207,44 +233,44 @@ MARCH, NOT_FOUND, FAILED = "march", "not_found", "failed"   # kết quả của 
 
 
 def _occupy(bot, resource: str) -> str:
-    """Bấm Search; mỏ tìm được kéo vào giữa và menu tròn mở -> Occupy. Menu chưa mở thì bấm vào mỏ (ảnh mỏ ở giữa màn) rồi tìm
-    Occupy lại; không thấy ảnh mỏ thì không bấm mù (giữa màn có thể là quái / thành người khác). MARCH khi đã sang màn March,
-    NOT_FOUND khi game báo "No matching targets", FAILED nếu không được."""
-    tile = RSS_TILE.format(resource=resource)
-    has_tile = (TEMPLATE_DIR / tile).exists()
+    """Bấm Search; mỏ tìm được kéo vào giữa và menu tròn tự mở -> Occupy. Sau khi bấm Search: cứ 1 giây chụp một lần, tối đa
+    OCCUPY_TRIES lần, chờ Occupy (hoặc "No matching targets"); không ra thì bấm Search lại (tối đa SEARCH_TRIES lượt). MARCH khi đã
+    sang màn March, NOT_FOUND khi không có mỏ / mỏ trùng, FAILED nếu không được."""
     for _ in range(SEARCH_TRIES):
         search = bot.find(SEARCH_BUTTON, threshold=THRESHOLD, region=PANEL)
         if search is None:
             return FAILED      # bảng Search đã đóng (bấm nhầm ra chỗ khác)
         bot.tap(*search)
-        delay(bot, SEARCH_SETTLE)   # menu / mỏ cũ còn trên màn ngay sau khi bấm: đừng nhận nhầm
-        found = _wait_any(bot, [(OCCUPY, THRESHOLD, MENU), (NO_TARGET, NO_TARGET_THRESHOLD, None)])
-        if found is not None and found[0] == NO_TARGET:
-            bot.log(f"Gather Resources: không có mỏ {resource} phù hợp gần thành")
-            return NOT_FOUND
+        # Chờ trước rồi mới chụp (menu / mỏ cũ còn trên màn ngay sau khi bấm): mỗi 1 giây, tối đa OCCUPY_TRIES lần.
+        found = None
+        for _ in range(OCCUPY_TRIES):
+            bot.sleep(WAIT_INTERVAL)
+            screen = bot.screenshot()
+            if bot.find(NO_TARGET, threshold=NO_TARGET_THRESHOLD, screen=screen) is not None:
+                bot.log(f"Gather Resources: không có mỏ {resource} phù hợp gần thành")
+                return NOT_FOUND
+            found = bot.find(OCCUPY, threshold=THRESHOLD, screen=screen, region=MENU)
+            if found is not None:
+                break
         if found is None:
-            # Menu tròn không tự mở: bấm vào mỏ ở giữa màn (chỉ khi thấy ảnh mỏ; bấm mỏ lúc menu đang tự mở thì menu đóng lại).
-            pos = bot.find(tile, threshold=RSS_THRESHOLD, region=CENTER) if has_tile else None
-            if pos is None:
-                continue
-            bot.tap(*pos)
-            if _wait_for(bot, OCCUPY) is None:
-                continue
+            continue          # Occupy không ra: bấm Search lại
         delay(bot, MENU_SETTLE)   # menu còn đang trượt ra: chờ đứng yên rồi tìm lại vị trí Occupy
         pos = bot.find(OCCUPY, threshold=THRESHOLD, region=MENU)
         if pos is None:
             continue
         bot.tap(*pos)
-        found = _wait_any(bot, [(MARCH_TITLE, THRESHOLD, None), (MARCH_FULL, NO_TARGET_THRESHOLD, None),
-                                (TARGET_TAKEN, NO_TARGET_THRESHOLD, None)])
-        if found is None:
-            continue
-        if found[0] == MARCH_FULL:
-            raise _Stop("hết đường march", MARCH_FULL_WAIT)
-        if found[0] == TARGET_TAKEN:      # Search lại vẫn ra đúng mỏ này: bỏ đội này lượt này
-            bot.log(f"Gather Resources: mỏ {resource} tìm được đã có đội mình đang tới")
-            return NOT_FOUND
-        return MARCH
+        # Sau Occupy: chờ AFTER_OCCUPY_WAIT rồi mới chụp (thông báo chỉ hiện ~1 giây), tối đa AFTER_OCCUPY_TRIES lần.
+        for _ in range(AFTER_OCCUPY_TRIES):
+            bot.sleep(AFTER_OCCUPY_WAIT)
+            screen = bot.screenshot()
+            if bot.find(MARCH_FULL, threshold=NO_TARGET_THRESHOLD, screen=screen) is not None:
+                raise _Stop("hết đường march", MARCH_FULL_WAIT)
+            if bot.find(TARGET_TAKEN, threshold=NO_TARGET_THRESHOLD, screen=screen) is not None:
+                bot.log(f"Gather Resources: mỏ {resource} tìm được đã có đội mình đang tới")     # Search lại vẫn ra mỏ này
+                return NOT_FOUND
+            if bot.find(MARCH_TITLE, threshold=THRESHOLD, screen=screen) is not None:
+                return MARCH
+        # Không thấy gì: bấm Search lại (vòng ngoài)
     return FAILED
 
 
@@ -277,19 +303,6 @@ def _march(bot) -> int | None:
 def _wait_for(bot, template: str):
     """bot.wait_for: xem lại mỗi WAIT_INTERVAL giây, tối đa WAIT_TRIES lần."""
     return bot.wait_for(template, timeout=WAIT_TRIES * WAIT_INTERVAL, threshold=THRESHOLD, interval=WAIT_INTERVAL)
-
-
-def _wait_any(bot, targets: list[tuple]) -> tuple[str, tuple] | None:
-    """Như _wait_for nhưng chờ ảnh đầu tiên hiện trong `targets` [(ảnh, ngưỡng, vùng)]: (ảnh, vị trí) hoặc None."""
-    for attempt in range(WAIT_TRIES):
-        screen = bot.screenshot()
-        for template, threshold, region in targets:
-            pos = bot.find(template, threshold=threshold, screen=screen, region=region)
-            if pos is not None:
-                return template, pos
-        if attempt < WAIT_TRIES - 1:
-            bot.sleep(WAIT_INTERVAL)
-    return None
 
 
 def _wait_gone(bot, template: str) -> bool:

@@ -24,13 +24,15 @@ flowchart TD
     A --> W{_to_world}
     W -- không ra được --> Z
     W --> S[mỗi đội: kính lúp -> bảng Search]
-    S --> T[_pick_type: chữ loại mỏ, không thấy thì vuốt chậm về đầu / cuối hàng]
-    T --> L[_set_level: đọc ô số, bấm + / − đúng chênh lệch, đọc lại]
+    S --> T[_pick_type: thấy loại cần tìm thì bấm; thấy loại khác thì so thứ tự lúa, gỗ, đá, sắt, gem để kéo trái / phải; không thấy loại nào thì kéo dài về đầu hàng]
+    T --> L[_set_level: OCR ô số, bấm + / − MỘT lần, chụp đọc lại, tới đúng cấp thì dừng]
+    L -- đọc không ra / số không đổi / quá 40 lần bấm --> F
     L --> C[ô Only search ... full resources chưa tích thì tích]
     C --> Q[Search]
     Q -- No matching targets --> F[đội chờ FAIL_WAIT 10 phút, sang đội kế]
-    Q -- menu tròn mở --> O[chờ menu đứng yên, Occupy]
-    Q -- menu chưa mở, thấy ảnh mỏ ở giữa --> M[bấm mỏ] --> O
+    Q -- Occupy hiện trong 5 lần chụp, mỗi 1 giây --> O[chờ menu đứng yên, Occupy]
+    Q -- 5 lần không ra Occupy --> Q2[bấm Search lại, tối đa 3 lượt] --> Q
+    O -. chờ 0.8 giây rồi chụp, tối đa 10 lần; không thấy gì .-> Q2
     O -- "You cannot send more troops." --> MF[hết đường march: mọi đội đến hạn chờ 10 phút, return] --> Z
     O -- "You can only send one army to the target..." --> F
     O -- không sang màn March --> S2[làm lại cả lượt, tối đa SEND_TRIES = 2] --> F
@@ -44,9 +46,12 @@ flowchart TD
 - `_to_world`: thấy kính lúp / bảng Search = đang ở thế giới. Màn March còn mở (lượt trước bị ngắt) thì Back. Màn thành sạch ("•••", không
   hộp "thoát game") thì bấm quả địa cầu (92 %, 93 %). Màn khác: `go_home` (Back popup, Cancel hộp thoát game, mở game). Tối đa 8 bước.
   **Không bấm mù góc dưới phải** như `find_boss.to_world`: ở màn March đó là nút March (gửi quân nhầm), ở popup là vật phẩm.
-- Chờ màn hình: `bot.wait_for` / `_wait_any` / `_wait_gone`, xem lại mỗi 1 giây, tối đa 8 lần (`WAIT_INTERVAL`, `WAIT_TRIES`).
-- Sau khi bấm Search: chờ `SEARCH_SETTLE` 1 giây (menu / mỏ cũ còn trên màn), rồi chỉ chờ Occupy hoặc "No matching". Chờ đủ 8 lần mà
-  menu không mở mới bấm vào ảnh mỏ ở giữa: bấm mỏ lúc menu đang tự mở thì menu đóng lại và Occupy trượt (đã gặp với Gems).
+- Chờ màn hình: `bot.wait_for` / `_wait_gone` (mở bảng Search, ra thế giới, chờ màn March đóng): mỗi 1 giây, tối đa 8 lần (`WAIT_INTERVAL`, `WAIT_TRIES`).
+- Sau khi bấm Search: cứ chờ 1 giây rồi chụp, tối đa 5 lần (`OCCUPY_TRIES`), tìm Occupy hoặc "No matching" (chờ trước rồi mới chụp
+  vì menu / mỏ cũ còn trên màn ngay sau khi bấm). 5 lần không ra Occupy thì bấm Search lại. Không bấm vào mỏ: bấm mỏ lúc menu đang tự
+  mở thì menu đóng lại và Occupy trượt (đã gặp với Gems).
+- Sau khi bấm Occupy: chờ 0,8 giây rồi chụp (`AFTER_OCCUPY_WAIT`), tối đa 10 lần (`AFTER_OCCUPY_TRIES`), tìm màn March / "You cannot
+  send more troops." / "You can only send one army...". Không thấy gì thì bấm Search lại.
 - Thông báo "No matching targets" chỉ hiện ~1,2 giây; lỡ thì Search lại (SEARCH_TRIES), kết quả cuối cùng như nhau (đội chờ 10 phút).
 
 ## Thứ tự nhận diện (Images/Gather/)
@@ -63,7 +68,7 @@ flowchart TD
 | `noTarget.png` | "No matching targets..." | cả màn / 0.8 | màn khác ≤ 0.44 |
 | `marchFull.png` | "You cannot send more troops." (sau Occupy) | cả màn / 0.8 | hết đường march (số đường tuỳ tài khoản); màn khác ≤ 0.55 |
 | `targetTaken.png` | "You can only send one army to the target at a time." (sau Occupy) | cả màn / 0.8 | Search ra mỏ đội mình đang tới; màn khác ≤ 0.50 |
-| `rss_<loại>.png` | ảnh mỏ ở giữa màn | CENTER (25,35,75,62) / 0.7 | chỉ khi menu tròn chưa mở; không thấy thì không bấm mù |
+| `rss_<loại>.png` | ảnh mỏ (Food, Wood, Stone, Iron, Gems) | — | **hiện không dùng** (đã bỏ nhánh bấm vào mỏ); giữ ảnh để so sau |
 | `marchTitle.png` | tiêu đề màn March | cả màn / 0.85 | |
 | `noTroops.png` / `marchButton.png` | nút March xám / vàng | MARCH_BAR (55,90,100,98) / 0.95 | hai nút khớp chéo 0.85 |
 
@@ -87,8 +92,17 @@ giờ thu thập (100,608)–(190,630), giờ đi (280,676)–(340,694). Không 
 
 - Bấm Search: camera kéo mỏ vào giữa và **menu tròn tự mở** (Occupy, Add Bookmark, Detail, Share); ô mỏ nhấp nháy xanh.
 - Đổi loại mỏ thì cấp về **Lv 1** và ô "full resources" **bỏ tích**; mở lại bảng thì nhớ loại / cấp lần trước.
-- Thanh cấp **lên quá 15** (đã thấy Lv 17) nên không dùng "bấm + tới 15 rồi trừ"; game có lúc lỡ một lần bấm → đọc ô số rồi bấm bù.
-- Vuốt nhanh hàng loại mỏ thì văng tới nhóm quái cuối hàng (Ymir, Knight Bayard...); vuốt chậm 1 giây thì đúng nấc.
+- Thanh cấp **lên quá 15** (đã thấy Lv 17) nên không dùng "bấm + tới 15 rồi trừ"; game có lúc lỡ một lần bấm → **không bấm mù**: mỗi lần bấm một cái rồi OCR ô số (`read_number`, font Number) đọc lại.
+  Đọc không ra 3 lần liền, bấm 3 lần mà số không đổi, hoặc quá 40 lần bấm thì bỏ đội đó (chờ 10 phút).
+- Hàng loại: Summon, Monster, Terminator, **Farm**, Sawmill, Quarry, Iron Mine, Gems Mine, Cerberus, Ymir, ... (quái). Bảng nhớ vị trí
+  cuộn lần trước. Ngón tay kéo dài sang phải 10 % → 200 % (ra ngoài màn, game vẫn nhận) trong 1 giây, 1 lần là hàng về đầu (Summon .. Farm);
+  10 % → 90 % trong 1 giây chỉ dịch ~4 ô. Ngón tay kéo chậm sang
+  trái (1 giây, 70 % → 20 %) mỗi nấc dịch ~3 ô: Farm .. Iron Mine, rồi Iron Mine .. Ymir — không bỏ sót loại nào.
+- `_pick_type`: mỗi bước chụp một ảnh, xem đang thấy những loại mỏ nào. Thấy loại cần tìm thì bấm icon phía trên chữ. Thấy loại khác
+  thì so thứ tự trên hàng **lúa, gỗ, đá, sắt, gem**: cần loại nằm trước (VD thấy sắt, cần lúa) thì kéo chậm sang trái (ngón tay
+  20 % → 70 %), nằm sau (VD thấy lúa, cần gem) thì kéo chậm sang phải (ngón tay 70 % → 20 %). Không thấy loại mỏ nào (đang ở nhóm
+  quái cuối hàng) thì kéo dài 10 % → 200 % về đầu hàng. Tối đa 6 lần kéo. Đo thật: từ cuối hàng ra Gems 12 giây (1 cú dài + 2 nấc);
+  đổi loại sau đó chỉ cần 0–1 nấc (Gems → Food, Food → Gems, Gems → Wood: 1 nấc; Wood → Stone: bấm luôn).
 - Back khi bảng Search mở: đóng bảng (menu tròn còn). Back khi menu tròn mở: hộp "thoát game" (như menu công trình).
 - Hết lính: màn March hiện 0 / 207,500 và nút March xám → dừng, chờ 30 phút.
 - Hết đường march (alt 21913 có 5 đường, alt khác tới 8; bot không đếm số đường mà dựa vào thông báo): bấm Occupy không vào màn March, chữ "You cannot send more troops." hiện ~1 giây → dừng, chờ 10 phút
@@ -108,4 +122,3 @@ flow chính (Food Lv 10, Troop 1), hết lính, hết đường march, mỏ đã
 - Giờ thu thập trên màn March là giờ để đầy sức chở; mỏ ít hơn thì đội về sớm hơn giờ đã lưu (đội rảnh mà bot chưa gửi lại tới giờ).
 - Không chọn preset: số lính mỗi đội do game quyết định (có khi gửi toàn bộ lính còn trong thành cho một đội).
 - Không tìm thấy mỏ ở cấp đã chọn: chưa tự hạ cấp.
-- `rss_stone.png` cắt từ ảnh có mỏ không ở đúng giữa màn (khớp 1.00 trên ảnh đó, chưa đo ở CENTER).
