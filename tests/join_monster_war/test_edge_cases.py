@@ -346,6 +346,21 @@ class JoinBossEdgeCaseTests(unittest.TestCase):
         self.assertIn("không mở được màn Select a General", bot.record.call_args.args[0])
         self.assertIsNone(boss.memory.status((500, 600)))
 
+    def test_general_list_loading_late_is_waited_for(self):
+        # Màn Select a General mở rồi nhưng ~3 s sau tướng mới hiện: không được kết luận "không có tướng".
+        bot = fake_bot()
+        bot.find.side_effect = lambda template, **_kwargs: {
+            SELECT_GENERAL: (65, 390), FAVORITE_ON: (300, 120), GENERAL_SEARCH: (348, 388)}.get(template)
+        loading = iter([[], [], [], [], [], [(330, 250)]])   # 6 lần kiểm tra x 0,5 s = 3 s
+        bot.find_all.side_effect = lambda template, **_kwargs: (
+            next(loading, [(330, 250)]) if template == run_module.SELECT else [])
+        boss = _Boss(bot, {"select_general": True})
+
+        with mock.patch.object(run_module, "_is_green_button", return_value=True):
+            self.assertTrue(boss._choose_general(MAIN_GENERAL))
+        bot.tap.assert_any_call(330, 250)
+        bot.back.assert_not_called()
+
     def test_joined_memory_is_written_after_returning_to_war_list(self):
         bot = fake_bot()
 

@@ -199,7 +199,8 @@ Chi tiết triển khai nằm ở [boss_board.py](../../worker/boss_board.py) v�
 - Ô không có dấu "+" (`selectGeneral.png`) thì coi là đã có tướng, trả True nếu thấy kính lúp trong ô.
 - Bấm "+", chờ màn "Select a General". Màn này được nhận bằng trái tim lọc (`favoriteOn.png` / `favoriteOff.png`), vì khi không có tướng yêu thích ("No favorite General") thì không có nút Select nào.
 - Tab tích **"Development General"**: bấm tab Development (cái búa `chooseDevelopment.png`, vùng hàng tab). Không thấy cái búa thì coi như tab đang chọn sẵn (tab đang chọn hiện chữ "Development").
-- Không còn nút Select xanh nào (không có tướng yêu thích, hoặc chỉ còn tướng chính): nhấn Back về màn March, bỏ qua phần chọn tướng, trả False.
+- Danh sách tướng load chậm (~3 giây sau khi màn mở / đổi bộ lọc): chờ nút Select xanh, kiểm tra mỗi 0,5 giây, tối đa 5 giây (`GENERAL_LIST_WAIT`); thấy là bấm ngay.
+- Hết 5 giây vẫn không có nút Select xanh nào (không có tướng yêu thích, hoặc chỉ còn tướng chính): nhấn Back về màn March, bỏ qua phần chọn tướng, trả False.
 - Trái tim lọc tướng yêu thích chưa tích (`favoriteOff.png`, không thấy `favoriteOn.png`) thì bấm tích.
 - Bấm nút "Select" **màu xanh** trên cùng. Tướng đang là tướng chính có nút Select xám (không chọn được làm tướng phụ) và bị bỏ qua, dù nút xám vẫn khớp ảnh mẫu tới 0,88.
 - Chờ về màn March, thấy kính lúp trong ô thì đã chọn xong.

@@ -16,7 +16,7 @@ from .boss_memory import JOINED as MEMORY_JOINED
 from .boss_memory import BossMemory
 from .constants import (ALLIANCE_ICON, ASSISTANT_GENERAL, BACK, BOSS_MONSTER, CHOOSE_DEVELOPMENT,
                         FAVORITE_OFF, FAVORITE_ON,
-                        GENERAL_SEARCH, IDLE, JB, MONSTER_TICKED_REGION, MONSTER_TICKED_THRESHOLD,
+                        GENERAL_LIST_INTERVAL, GENERAL_LIST_WAIT, GENERAL_SEARCH, IDLE, JB, MONSTER_TICKED_REGION, MONSTER_TICKED_THRESHOLD,
                         MONSTER_TICK_TRIES, MONSTER_WAR_TAP, JOIN, JOIN_LIST, JOIN_MAX_Y, JOIN_MIN_Y, MAIN_GENERAL,
                         JOIN_THRESHOLD, JOINED, JOINED_BUTTON, JOINED_OVERLAP, LEAVE_ALLIANCE_POPUP,
                         LIST_END_MAX_LIGHT, LIST_END_REGION, LISTBOSS, LOCATION, MARCH, MARCH_SCREEN,
@@ -638,9 +638,14 @@ class _Boss:
                 )
 
         # Chỉ nút Select màu xanh: tướng đang là tướng chính có nút xám (không chọn được làm
-        # tướng phụ), nút xám vẫn khớp ảnh mẫu tới 0,88.
-        buttons = sorted((p for p in bot.find_all(SELECT, screen=screen, region=REGIONS[SELECT])
-                          if _is_green_button(screen, p)), key=lambda p: p[1])
+        # tướng phụ), nút xám vẫn khớp ảnh mẫu tới 0,88. Danh sách tướng load chậm (~3 s sau khi
+        # màn mở / đổi bộ lọc): chờ tới khi có nút, tối đa GENERAL_LIST_WAIT giây.
+        _, buttons = self._poll_screen(
+            f"general_list_{name}",
+            lambda image: sorted((p for p in bot.find_all(SELECT, screen=image, region=REGIONS[SELECT])
+                                  if _is_green_button(image, p)), key=lambda p: p[1]),
+            timeout=GENERAL_LIST_WAIT, interval=GENERAL_LIST_INTERVAL,
+        )
         if not buttons:
             # Không có tướng yêu thích nào ("No favorite General"), hoặc chỉ còn tướng đang là
             # tướng chính (nút xám) -> quay về màn March
