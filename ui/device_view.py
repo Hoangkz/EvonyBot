@@ -18,6 +18,7 @@ from .flow_layout import FlowLayout
 from .tabs import (
     AllianceCapacityTab,
     BlackMarketTab,
+    CraftTab,
     DailyActivitiesTab,
     EventTab,
     FindBossTab,
@@ -86,7 +87,8 @@ class DeviceView(QWidget):
                 ("Black Market", "black_market_tab", BlackMarketTab),
                 # Recruit General: đứng ngay trên tab Logs.
                 ("Recruit General", "recruit_general_tab", RecruitGeneralTab),
-                ("Find Boss", "find_boss_tab", FindBossTab)):
+                ("Find Boss", "find_boss_tab", FindBossTab),
+                ("Craft", "craft_tab", CraftTab)):
             self._lazy[title] = (attr, factory)
             self._add_tab_button(title, self.tabs.addTab(QWidget(), title))
         # Logs không có cấu hình: thêm thẳng, không nối Apply ALL / settings.

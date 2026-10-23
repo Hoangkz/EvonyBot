@@ -64,6 +64,7 @@ from ..activities.event_center.crazy_eggs.run import JOB as crazy_eggs
 from ..activities.event_center.three_day.run import JOB as three_day_event
 from ..activities.open_gift_box.run import run as open_gift_box
 from ..activities.find_boss import JOB as find_boss_job
+from ..activities.craft import JOB as craft_job
 from ..activities import gift_claims, join_monster_war
 
 DATA ={
@@ -383,6 +384,16 @@ DATA ={
             "priority": 700,
             "idle_only": True,   # chỉ làm khi không còn nhiệm vụ nào khác
             "note": "CHỈ khi rảnh (hết mọi nhiệm vụ khác): quét xong thì về toạ độ của mình rồi quét tiếp; chia sẻ boss đang tích vào liên minh",
+        }
+    ],
+    "Craft": [
+        {
+            "key": "craft",
+            "run": craft_job,
+            "label": "Craft: chế tạo trang bị",
+            "priority": 0,   # thấp nhất: chỉ tới khi mọi nhiệm vụ khác đã làm xong
+            "once": True,    # chỉ làm 1 lần (mỗi lần Start): xong thì không làm lại khi sang ngày mới
+            "note": "Chế tạo các trang bị đã tích ở tab Craft; một lần duy nhất sau khi hết mọi nhiệm vụ khác",
         }
     ],
     "Black Market": [

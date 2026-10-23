@@ -10,6 +10,7 @@ Activities và Event không có hàm run của cả activity).
 """
 from . import alliance_capacity
 from . import black_market
+from . import craft
 from . import find_boss
 from . import join_monster_war
 from . import open_gift_box
@@ -23,4 +24,5 @@ ACTIVITIES = {
     "Black Market": black_market.run,
     "Recruit General": recruit_general.run,
     "Find Boss": find_boss.run,
+    "Craft": craft.run,
 }
