@@ -57,6 +57,8 @@ TAB_COLUMNS = {
     "Event": "event",
     "Recruit General": "recruit_general",
     "Find Boss": "find_boss",
+    "Craft": "craft",
+    "Gather Resources": "gather_resources",
 }
 # Khoá daily_done của tab Event (nhiệm vụ gather_troops / kings_path / three_day, mốc reset event, đăng nhập, Voyage);
 # mọi khoá khác thuộc Daily Activities.

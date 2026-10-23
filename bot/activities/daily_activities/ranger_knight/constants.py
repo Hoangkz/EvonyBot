@@ -14,7 +14,8 @@ FOLDER_PATH = f"{ROOT}/{FOLDER}"
 #   - không còn Claim -> bấm Quick Dispatch (góc dưới phải), chờ 1 giây / lần tối đa DISPATCH_WAIT giây tới bảng
 #     "Quick Dispatch" -> bấm Send (xanh) -> xong hôm nay; Send xám (hết tướng) -> không bấm, cũng xong hôm nay -> Back BACKS_AFTER lần liên tục.
 # Ảnh cắt từ ảnh chụp giả lập 396x704 (2026-10-16). Card.png: thẻ bản cũ (icon số 4 trong lưới).
-TITLE = f"{FOLDER_PATH}/Title.png"                  # tiêu đề màn "Ranger Knight Order" (bảng Quick Dispatch mở vẫn thấy: 0,99)
+# Title.png là tiêu đề DÒNG trong danh sách Activity (common.open_task dùng) -> màn sau Go cần ảnh riêng.
+TITLE = f"{FOLDER_PATH}/ScreenTitle.png"            # tiêu đề màn "Ranger Knight Order" (cắt 2026-10-24, 1,00)
 CLAIM = f"{FOLDER_PATH}/Claim.png"                  # nút Claim xanh (khác nền <= 0,46)
 QUICK_DISPATCH = f"{FOLDER_PATH}/QuickDispatch.png"   # nút Quick Dispatch góc dưới phải (bảng mở vẫn thấy: 0,99)
 DISPATCH_TITLE = f"{FOLDER_PATH}/DispatchTitle.png"   # tiêu đề bảng Quick Dispatch (màn thường <= 0,35)

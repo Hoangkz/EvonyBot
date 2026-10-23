@@ -5,6 +5,9 @@ import unittest
 from types import SimpleNamespace
 from unittest import mock
 
+from pathlib import Path
+
+import cv2
 import numpy as np
 
 from bot.activities.join_monster_war.boss_memory import BossMemory, JOINED
@@ -29,6 +32,7 @@ from bot.activities.join_monster_war.run import (MAX_MAP_COORD, POLL_INTERVAL, S
 
 run_module = importlib.import_module("bot.activities.join_monster_war.run")
 SCREEN = np.zeros((704, 396, 3), dtype=np.uint8)
+SCREENS = Path(__file__).parent / "screens"
 
 
 def fake_bot():
@@ -303,6 +307,22 @@ class JoinBossEdgeCaseTests(unittest.TestCase):
 
         self.assertIn("Bỏ tọa độ OCR không hợp lệ", bot.log.call_args.args[0])
 
+    def test_slow_use_item_screen_is_not_mistaken_for_no_items(self):
+        # Bấm Confirm xong ~3 s màn Use Item mới mở: không được kết luận hết vật phẩm (nghỉ 20 phút).
+        bot = fake_bot()
+        opening = iter([[], [], [], [(290, 360)]])      # 3 lần kiểm tra (mỗi 1 s) chưa có nút Use
+        bot.find_all.side_effect = lambda template, **_kwargs: (
+            next(opening, [(290, 360)]) if template == run_module.STAMINA_ITEM_USE else [])
+        boss = _Boss(bot, {"use_stamina": "100"})
+        boss._stamina_empty = mock.Mock()
+
+        boss._use_stamina()
+
+        boss._stamina_empty.assert_not_called()
+        bot.tap.assert_any_call(290, 360)
+        self.assertLessEqual(run_module.STAMINA_ITEMS_OPEN_INTERVAL, 1)
+        self.assertGreaterEqual(run_module.STAMINA_ITEMS_OPEN_WAIT, 8)
+
     def test_missing_stamina_quantity_popup_does_not_remember_boss(self):
         bot = fake_bot()
         bot.find_all.return_value = [(290, 360)]
@@ -338,9 +358,53 @@ class JoinBossEdgeCaseTests(unittest.TestCase):
         boss = _Boss(bot, {"select_general": True})
 
         self.assertFalse(boss._choose_general(MAIN_GENERAL))
-        self.assertEqual(bot.screenshot.call_count, int(STEP_TIMEOUT / POLL_INTERVAL))
+        # Chờ màn mở tối đa GENERAL_OPEN_WAIT; không thấy nút March (đã rời màn March) -> Back rồi chờ về March
+        self.assertEqual(bot.screenshot.call_count,
+                         int(run_module.GENERAL_OPEN_WAIT / run_module.GENERAL_OPEN_INTERVAL)
+                         + int(STEP_TIMEOUT / POLL_INTERVAL))
+        bot.back.assert_called_once()
         self.assertIn("không mở được màn Select a General", bot.record.call_args.args[0])
         self.assertIsNone(boss.memory.status((500, 600)))
+
+    def test_general_list_loading_late_is_waited_for(self):
+        # Màn Select a General mở rồi nhưng ~3 s sau tướng mới hiện: không được kết luận "không có tướng".
+        bot = fake_bot()
+        bot.find.side_effect = lambda template, **_kwargs: {
+            SELECT_GENERAL: (65, 390), FAVORITE_ON: (300, 120), GENERAL_SEARCH: (348, 388)}.get(template)
+        loading = iter([[], [], [], [], [], [(330, 250)]])   # 6 lần kiểm tra x 0,5 s = 3 s
+        bot.find_all.side_effect = lambda template, **_kwargs: (
+            next(loading, [(330, 250)]) if template == run_module.SELECT else [])
+        boss = _Boss(bot, {"select_general": True})
+
+        with mock.patch.object(run_module, "_is_green_button", return_value=True):
+            self.assertTrue(boss._choose_general(MAIN_GENERAL))
+        bot.tap.assert_any_call(330, 250)
+        bot.back.assert_not_called()
+
+    def test_general_list_real_screens_wait_past_gray_main_general(self):
+        # Ảnh thật: lúc đầu chỉ có tướng chính (nút Select xám), vài giây sau mới có tướng nút xanh.
+        from threading import Event
+        from bot.context import BotContext
+        ctx = BotContext(SimpleNamespace(serial="x"), Event(), None, lambda _: None)
+        loading = cv2.imread(str(SCREENS / "select_general_loading_only_main.png"))
+        loaded = cv2.imread(str(SCREENS / "select_general_loaded_green.png"))
+        shots = iter([loading] * 8 + [loaded])   # 8 x 0,5 s = 4 s mới load xong
+        ctx.screenshot = lambda: next(shots, loaded)
+        ctx.tap = mock.Mock()
+        ctx.back = mock.Mock()
+        ctx.log = ctx.record = mock.Mock()
+        ctx.boss_memory = BossMemory()
+        boss = _Boss(ctx, {"select_general": True})
+
+        self.assertEqual(run_module._green_selects(ctx, loading), [])   # chỉ có nút xám -> chờ tiếp
+        _, buttons = boss._poll_screen(
+            "general_list", lambda image: run_module._green_selects(ctx, image),
+            timeout=run_module.GENERAL_LIST_WAIT, interval=run_module.GENERAL_LIST_INTERVAL)
+
+        self.assertEqual(buttons, [(329, 627)])   # nút xanh của Cleopatra, không phải nút xám (331, 374)
+        # Tướng phụ chỉ lấy nút Select có y > 80 % màn hình (thẻ đầu là tướng chính, nút ở y 53 %)
+        self.assertEqual(run_module._green_selects(ctx, loaded, run_module.ASSISTANT_SELECT_MIN_Y), [(329, 627)])
+        self.assertEqual(run_module._green_selects(ctx, loading, run_module.ASSISTANT_SELECT_MIN_Y), [])
 
     def test_joined_memory_is_written_after_returning_to_war_list(self):
         bot = fake_bot()
@@ -431,6 +495,66 @@ class JoinBossEdgeCaseTests(unittest.TestCase):
         taps = [boss._tick_monster_war(SCREEN) for _ in range(run_module.MONSTER_TICK_TRIES + 2)]
 
         self.assertEqual(taps, [True] * run_module.MONSTER_TICK_TRIES + [False] * 2)
+
+    def test_preset_ring_marks_only_the_selected_troop(self):
+        # Ảnh thật: ô I có vòng sáng cam, ô II-IV mở nhưng không chọn, V-VIII khoá.
+        for name, selected in (("march_no_main_general.png", 1), ("march_ready.png", 2)):
+            screen = cv2.imread(str(SCREENS / name))
+            self.assertEqual([t for t in range(1, 9) if run_module._preset_active(screen, t)],
+                             [selected], name)
+
+    def test_stamina_item_type_is_the_best_matching_icon(self):
+        # 10 và 25 cùng khung xanh lá (khớp chéo 0,951): phải lấy mẫu khớp cao nhất.
+        from threading import Event
+        from bot.context import BotContext
+        ctx = BotContext(SimpleNamespace(serial="x"), Event(), None, lambda _: None)
+        for amount in (10, 25, 50, 100):
+            screen = cv2.imread(str(SCREENS / f"stamina_popup_item_{amount}.png"))
+            self.assertEqual(run_module._item_stamina(ctx, screen), amount)
+        self.assertIsNone(run_module._item_stamina(ctx, cv2.imread(str(SCREENS / "stamina_use_item_list.png"))))
+
+    def test_use_item_buttons_include_long_counts_and_top_row(self):
+        # 21913: banner khuyến mãi đẩy nút đầu lên y 242; "Use ( 1,128 )" có chữ "Use" nhỏ hơn.
+        from threading import Event
+        from bot.context import BotContext
+        ctx = BotContext(SimpleNamespace(serial="x"), Event(), None, lambda _: None)
+        screen = cv2.imread(str(SCREENS / "stamina_use_item_list_big_count.png"))
+        self.assertEqual([y for _, y in run_module._item_use_buttons(ctx, screen)], [242, 361, 480, 599])
+        # Hết vật phẩm: chỉ còn nút kim cương -> không có nút Use
+        self.assertEqual(run_module._item_use_buttons(ctx, cv2.imread(str(SCREENS / "stamina_no_items.png"))), [])
+
+    def test_locked_presets_are_all_counted(self):
+        # Ổ khoá khớp chỉ 0,877-0,9 ở vài ô: ngưỡng mặc định 0,9 đếm thiếu (3 thay vì 4, 5 thay vì 6).
+        from threading import Event
+        from bot.context import BotContext
+        ctx = BotContext(SimpleNamespace(serial="x"), Event(), None, lambda _: None)
+        for name, locked in (("new_join_boss_flow/07_march_before_action.png", 4),
+                             ("march_not_enough_stamina.png", 6)):
+            screen = cv2.imread(str(SCREENS / name))
+            found = ctx.find_all(run_module.PRESET_LOCKED, threshold=run_module.PRESET_LOCKED_THRESHOLD,
+                                 screen=screen, region=run_module.REGIONS[run_module.PRESET_LOCKED])
+            self.assertEqual(len(found), locked, name)
+
+    def test_troop_is_judged_only_after_its_preset_lights_up(self):
+        # Đội 1 bấm mà không sáng (game chưa đổi đội): không xét kính lúp của đội cũ, thử đội 2.
+        bot = fake_bot()
+        boss = _Boss(bot, {"troop": ["Troop 1", "Troop 2"]})
+        results = iter([(SCREEN, False), (SCREEN, True), (SCREEN, (348, 388))])
+        boss._poll_screen = mock.Mock(side_effect=lambda *_a, **_k: next(results))
+
+        self.assertEqual(boss._pick_troop(SCREEN), 2)
+        steps = [c.args[0] for c in boss._poll_screen.call_args_list]
+        self.assertEqual(steps, ["activate_troop_1", "activate_troop_2", "select_troop_2"])
+        self.assertEqual(boss._poll_screen.call_args_list[0].kwargs,
+                         {"timeout": run_module.PRESET_ACTIVE_WAIT, "interval": 1})
+
+    def test_no_preset_lights_up_leaves_no_troop_to_march_with(self):
+        bot = fake_bot()
+        boss = _Boss(bot, {"troop": ["Troop 1", "Troop 2"]})
+        boss._poll_screen = mock.Mock(return_value=(SCREEN, False))
+
+        self.assertIsNone(boss._pick_troop(SCREEN))
+        self.assertIsNone(boss.last_troop)   # _march sẽ Back, không March
 
 
 if __name__ == "__main__":

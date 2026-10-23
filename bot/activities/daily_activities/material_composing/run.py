@@ -2,8 +2,8 @@
 run.py — Daily Activities "Material Composing": phần sau Go (màn Items -> chọn vật phẩm có mũi tên xanh -> Compose, 3 lần).
 Mở Quests -> Activity, tìm dòng, bấm Go: ../common.py open_task_or_finish. Ảnh / hằng số: constants.py.
 
-Sau Go ra màn Items. Tìm vật phẩm có mũi tên xanh hướng lên (nhận bằng màu), chọn cái gần nhất (y nhỏ nhất, rồi x nhỏ nhất);
-không có thì cuộn tối đa SCROLLS lần, vẫn không có thì báo xong hôm nay. Chọn ô -> nút Compose nhỏ -> màn Compose -> bấm Compose
+Sau Go ra màn Items. Tìm vật phẩm có mũi tên xanh hướng lên (nhận bằng màu) phía trên LIST_BOTTOM % màn hình, chọn cái gần
+nhất (y nhỏ nhất, rồi x nhỏ nhất); không có thì cuộn (~2 hàng, giống Open Gift Box) tối đa SCROLLS lần, vẫn không có thì báo xong hôm nay. Chọn ô -> nút Compose nhỏ -> màn Compose -> bấm Compose
 đủ COMPOSE_GOAL lần -> báo xong hôm nay. Nút Compose xám -> Back 2 lần, chọn vật phẩm khác, chỉ bấm nốt số lần còn thiếu
 (số đã bấm chỉ giữ trong bộ nhớ, không lưu DB).
 """
@@ -22,7 +22,6 @@ from .constants import (
     COMPOSE_GOAL,
     COMPOSE_MIN_SATURATION,
     COMPOSE_SMALL,
-    COMPOSE_SMALL_REGION,
     COMPOSE_TITLE,
     COMPOSE_WAIT,
     FOLDER,
@@ -30,8 +29,10 @@ from .constants import (
     ITEM_TAP_OFFSET,
     KEY,
     LABEL,
-    LIST_REGION_Y,
+    LIST_BOTTOM,
     LIST_SWIPE,
+    LIST_SWIPE_DURATION,
+    LIST_TOP,
     MAX_ROUNDS,
     ROW_HEIGHT,
     SCREEN_WAIT,
@@ -75,12 +76,13 @@ def _finish(bot) -> bool:
 
 
 def _arrows(screen) -> list[tuple[int, int]]:
-    """Tâm các mũi tên xanh hướng lên trong lưới vật phẩm, theo thứ tự: hàng trên trước, cùng hàng thì trái trước."""
+    """Tâm các mũi tên xanh hướng lên trong lưới vật phẩm, từ LIST_TOP tới LIST_BOTTOM % màn hình, theo thứ tự: hàng trên
+    trước, cùng hàng thì trái trước."""
     (h0, h1), s_min, v_min = ARROW_HSV
     hsv = cv2.cvtColor(screen, cv2.COLOR_BGR2HSV)
     mask = ((hsv[..., 0] >= h0) & (hsv[..., 0] <= h1) & (hsv[..., 1] > s_min) & (hsv[..., 2] > v_min)).astype(np.uint8)
-    mask[:LIST_REGION_Y[0]] = 0
-    mask[LIST_REGION_Y[1]:] = 0
+    mask[:LIST_TOP] = 0
+    mask[screen.shape[0] * LIST_BOTTOM // 100:] = 0
     _, _, stats, centers = cv2.connectedComponentsWithStats(mask)
     w0, w1, h_min, h_max = ARROW_SIZE
     found = [(int(cx), int(cy)) for (x, y, w, h, area), (cx, cy) in zip(stats[1:], centers[1:])
@@ -104,7 +106,7 @@ def _pick_item(bot) -> str:
         if not arrows:
             if scrolls >= SCROLLS:
                 return "none"
-            bot.swipe_percent(*LIST_SWIPE, duration=0.6, delay=1)
+            bot.swipe_percent(*LIST_SWIPE, duration=LIST_SWIPE_DURATION, delay=1)
             scrolls += 1
             tried.clear()
             continue
@@ -116,7 +118,7 @@ def _pick_item(bot) -> str:
         bot.tap(*tap)
         for _ in range(1 + SELECT_WAITS):
             bot.sleep(1)
-            button = bot.find(COMPOSE_SMALL, region=COMPOSE_SMALL_REGION)
+            button = bot.find(COMPOSE_SMALL)
             if button is not None:
                 bot.tap(*button, delay=1)
                 if bot.wait_for(COMPOSE_TITLE, timeout=SCREEN_WAIT) is not None:

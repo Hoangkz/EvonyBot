@@ -147,6 +147,12 @@ class MainWindow(QMainWindow):
         self._register_timer = QTimer(self)
         self._register_timer.setInterval(0)
         self._register_timer.timeout.connect(self._register_next_device)
+        # Start All: mỗi máy chưa dựng phải dựng DeviceView + đủ tab (~3 s) mới lấy được cấu hình; dựng liền 30 máy
+        # trong một lần bấm làm app "Not Responding". Nên xếp hàng, mỗi lượt event loop chỉ start một máy.
+        self._start_queue: list[str] = []
+        self._start_timer = QTimer(self)
+        self._start_timer.setInterval(0)
+        self._start_timer.timeout.connect(self._start_next_queued)
 
         # Tab Event hiện thời gian còn lại của event ở tiêu đề group: đọc mốc reset bot đã lưu trong DB (daily_done) mỗi phút.
         self._event_timer = QTimer(self)
@@ -189,6 +195,7 @@ class MainWindow(QMainWindow):
         self.bots.civilization_found.connect(self._on_civilization_found)
         self.bots.city_map_found.connect(self.db.set_city_map)
         self.bots.bubble_disabled.connect(self._on_bubble_disabled)
+        self.bots.craft_done.connect(self._on_craft_done)
         self.bots.log_message.connect(self._on_log_message)
         self.bots.history.connect(self._on_history)
         # Sub-tab index kept across devices, so switching device stays on
@@ -490,6 +497,7 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event):
         self._register_timer.stop()
+        self._start_timer.stop()
         self._license_timer.stop()
         if self._license_worker is not None:
             self._license_worker.wait()
@@ -506,16 +514,32 @@ class MainWindow(QMainWindow):
 
     def _on_start_all_requested(self):
         """Start All (màn Home): chạy những thiết bị chưa hoạt động;
-        thiết bị đang chạy được giữ nguyên."""
-        for device_id in list(self._device_ids):
-            if self._active.get(device_id, True) and not self.bots.is_running(device_id):
-                if self.bots.at_limit():
-                    self.bots.start(device_id, [], {})   # chỉ để ghi log báo đã đạt giới hạn
-                    break
-                self._start_bot(device_id)
+        thiết bị đang chạy được giữ nguyên. Máy được start lần lượt qua _start_timer để giao diện không đơ."""
+        for device_id in self._device_ids:
+            if device_id not in self._start_queue:
+                self._start_queue.append(device_id)
+        self._start_timer.start()
+
+    def _start_next_queued(self):
+        """Start một máy trong hàng đợi Start All (bỏ qua máy đã chạy / không Active)."""
+        while self._start_queue:
+            device_id = self._start_queue.pop(0)
+            if device_id not in self._device_ids or not self._active.get(device_id, True) \
+                    or self.bots.is_running(device_id):
+                continue
+            if self.bots.at_limit():
+                self.bots.start(device_id, [], {})   # chỉ để ghi log báo đã đạt giới hạn
+                self._start_queue.clear()
+                break
+            self._start_bot(device_id)
+            break
+        if not self._start_queue:
+            self._start_timer.stop()
 
     def _on_stop_all_requested(self):
-        """Stop All (màn Home và tab Initialization): dừng mọi bot đang chạy."""
+        """Stop All (màn Home và tab Initialization): dừng mọi bot đang chạy và bỏ các máy Start All chưa kịp start."""
+        self._start_queue.clear()
+        self._start_timer.stop()
         self.bots.stop_all()
 
     def _on_reset_time_changed(self, server_time: str):
@@ -617,6 +641,12 @@ class MainWindow(QMainWindow):
         view = self.device_views.get(device_id)
         if view is not None:
             view.initialization_tab.set_settings({"bubble": False})
+
+    def _on_craft_done(self, device_id: str, item_id: str):
+        """Bot vừa chế tạo xong một trang bị: tab Craft trừ 1 số lượng (về 0 thì bỏ tích) rồi lưu cấu hình mới vào DB, lần Start sau không làm lại."""
+        view = self.device_views.get(device_id)
+        if view is not None:
+            self.db.save_settings(device_id, {"Craft": view.apply_craft_done(item_id)})
 
     def _on_log_message(self, device_id: str, message: str):
         """Dòng log của bot -> tab Logs của thiết bị đó."""

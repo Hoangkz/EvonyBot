@@ -18,6 +18,8 @@ from .flow_layout import FlowLayout
 from .tabs import (
     AllianceCapacityTab,
     BlackMarketTab,
+    CraftTab,
+    GatherResourcesTab,
     DailyActivitiesTab,
     EventTab,
     FindBossTab,
@@ -86,7 +88,9 @@ class DeviceView(QWidget):
                 ("Black Market", "black_market_tab", BlackMarketTab),
                 # Recruit General: đứng ngay trên tab Logs.
                 ("Recruit General", "recruit_general_tab", RecruitGeneralTab),
-                ("Find Boss", "find_boss_tab", FindBossTab)):
+                ("Find Boss", "find_boss_tab", FindBossTab),
+                ("Craft", "craft_tab", CraftTab),
+                ("Gather Resources", "gather_resources_tab", GatherResourcesTab)):
             self._lazy[title] = (attr, factory)
             self._add_tab_button(title, self.tabs.addTab(QWidget(), title))
         # Logs không có cấu hình: thêm thẳng, không nối Apply ALL / settings.
@@ -186,6 +190,20 @@ class DeviceView(QWidget):
             widget.auto_clicked.connect(lambda: self.auto_angles_requested.emit(self.device_id))
         elif title == "Recruit General":
             widget.generals.start_background_build()
+
+    def apply_craft_done(self, item_id: str) -> dict:
+        """Một trang bị vừa chế tạo xong: trừ 1 số lượng ở tab Craft (về 0 thì bỏ tích). Trả cấu hình mới của tab để lưu DB; tab chưa dựng thì sửa cấu hình đang chờ."""
+        if "Craft" in self._lazy:
+            data = self._pending_settings.setdefault("Craft", {})
+            items = data.setdefault("items", {})
+            if item_id in items:
+                if items[item_id] > 1:
+                    items[item_id] -= 1
+                else:
+                    items.pop(item_id)
+            return data
+        self.craft_tab.craft_done(item_id)
+        return self.craft_tab.get_settings()
 
     def set_event_times(self, daily_done: dict):
         """Tiêu đề group của tab Event (thời gian còn lại); tab chưa dựng thì áp khi dựng xong."""
