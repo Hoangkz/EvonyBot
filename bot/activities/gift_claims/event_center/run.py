@@ -60,6 +60,10 @@ APPLE_ACTIVE_COLOR_RATIO_MIN = 0.35
 APPLE_DONE_SATURATION_MAX = 65.0
 APPLE_DONE_COLOR_RATIO_MAX = 0.20
 APPLE_COLOR_SATURATION_CUTOFF = 100
+# Sau khi chính nút đỏ x10 vừa được nhận diện ACTIVE và được bấm, layout đổi
+# làm template DONE chỉ còn khoảng 0.50 (log thực tế 0.507). Khi đồng thời thấy
+# Once đỏ và dải tại vị trí x10 đã xám, ngưỡng định vị thấp này là an toàn.
+APPLE_RED_POST_TAP_GRAY_LOCATE_THRESHOLD = 0.45
 MAX_APPLE_TAPS_PER_PHASE = 100
 APPLE_STATE_MISS_RETRIES = 3
 # MEmu can become noticeably slower when the worker controls many devices at
@@ -820,6 +824,37 @@ def _apple_button_state(bot, screen, active: str, finished: str,
     return None, None
 
 
+def _apple_red_x10_post_tap_done(bot, screen) -> bool:
+    """Recognize the live red-x10 grey layout after a verified active tap.
+
+    On that layout the yellow Once control wins the ACTIVE-template search,
+    while the real grey x10 only scores about 0.50 against the older DONE
+    crop.  This fallback is called only after this run positively recognized
+    and tapped red x10; it additionally requires an exact red Once state and
+    a grey colour band at the weak x10 match.
+    """
+    finished = "DwarfsLuckyApple/status_red_wish_x10_done"
+    done_template = _scaled_template(bot, finished, screen)
+    done_score, done_pos = bot.best_match(
+        done_template, screen=screen, region=(0, 15, 100, 98))
+    if (done_pos is None or
+            done_score < APPLE_RED_POST_TAP_GRAY_LOCATE_THRESHOLD):
+        return False
+    saturation, color_ratio = _apple_button_color_band(screen, done_pos)
+    if (saturation > APPLE_DONE_SATURATION_MAX or
+            color_ratio > APPLE_DONE_COLOR_RATIO_MAX):
+        return False
+    red_once = _apple_special_state(
+        bot, screen, APPLE_RED_ONCE_STATES,
+        "Wish Once táo đỏ bên cạnh x10 đã xám")
+    if red_once is None:
+        return False
+    bot.record("Gift Claims: Dwarf's Lucky Apple đỏ x10 sau tap đã xám "
+               f"(score={done_score:.3f}, S={saturation:.1f}, tỷ lệ màu="
+               f"{color_ratio:.2f}) và còn Wish Once; xác nhận DONE")
+    return True
+
+
 def _apple_congratulations_hit(bot, screen):
     """Return a Lucky Apple popup match without taking a second screenshot."""
     for template in (CONGRATULATIONS,
@@ -909,6 +944,10 @@ def _apple_phase(bot, active: str, finished: str,
             continue
         state, button = _apple_button_state(bot, screen, active, finished)
         if state == "done":
+            return ClaimReport(attempted, attempted), True
+        if (attempted > 0 and
+                active == "DwarfsLuckyApple/button_red_wish_x10" and
+                _apple_red_x10_post_tap_done(bot, screen)):
             return ClaimReport(attempted, attempted), True
         if state != "active" or button is None:
             missing_frames += 1

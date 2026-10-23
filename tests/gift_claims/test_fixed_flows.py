@@ -1297,6 +1297,57 @@ class FixedGiftFlowTests(unittest.TestCase):
 
         self.assertEqual("done", state)
 
+    def test_lucky_apple_red_post_tap_gray_accepts_live_low_score_layout(self):
+        bot = mock.Mock()
+        screen = np.zeros((704, 396, 3), dtype=np.uint8)
+        bot.best_match.return_value = (0.507, (250, 520))
+        with (mock.patch.object(event_center, "_scaled_template",
+                                return_value=np.zeros((38, 151, 3),
+                                                      dtype=np.uint8)),
+              mock.patch.object(event_center, "_apple_button_color_band",
+                                return_value=(21.3, 0.05)),
+              mock.patch.object(event_center, "_apple_special_state",
+                                return_value=("red-once", (250, 620)))):
+            done = event_center._apple_red_x10_post_tap_done(bot, screen)
+
+        self.assertTrue(done)
+
+    def test_lucky_apple_red_post_tap_gray_still_requires_red_once(self):
+        bot = mock.Mock()
+        screen = np.zeros((704, 396, 3), dtype=np.uint8)
+        bot.best_match.return_value = (0.507, (250, 520))
+        with (mock.patch.object(event_center, "_scaled_template",
+                                return_value=np.zeros((38, 151, 3),
+                                                      dtype=np.uint8)),
+              mock.patch.object(event_center, "_apple_button_color_band",
+                                return_value=(21.3, 0.05)),
+              mock.patch.object(event_center, "_apple_special_state",
+                                return_value=None)):
+            done = event_center._apple_red_x10_post_tap_done(bot, screen)
+
+        self.assertFalse(done)
+
+    def test_lucky_apple_red_phase_uses_gray_fallback_only_after_tap(self):
+        bot = mock.Mock()
+        bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
+        with (mock.patch.object(event_center, "_apple_congratulations_hit",
+                                return_value=None),
+              mock.patch.object(event_center, "_apple_button_state",
+                                side_effect=(("active", (250, 520)),
+                                             (None, None))),
+              mock.patch.object(event_center,
+                                "_apple_red_x10_post_tap_done",
+                                return_value=True) as gray_done,
+              mock.patch.object(event_center, "_close_apple_congratulations",
+                                return_value=True)):
+            report, done = event_center._apple_phase(
+                bot, "DwarfsLuckyApple/button_red_wish_x10",
+                "DwarfsLuckyApple/status_red_wish_x10_done")
+
+        self.assertTrue(done)
+        self.assertEqual(common.ClaimReport(1, 1), report)
+        gray_done.assert_called_once()
+
     def test_lucky_apple_done_is_rejected_without_both_ornaments(self):
         bot = mock.Mock()
         screen = np.zeros((704, 396, 3), dtype=np.uint8)

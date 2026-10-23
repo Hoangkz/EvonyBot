@@ -34,6 +34,12 @@
    tỷ lệ pixel màu không quá `20%`. Điểm template chỉ dùng để định vị; nếu ảnh
    DONE khớp cao nhưng dải vẫn vàng thì phải tiếp tục bấm, không được chuyển
    pha. DONE chỉ hợp lệ khi đồng thời đủ dải xám và hai viền hoa văn.
+   Riêng layout thật sau khi vừa bấm đỏ x10 có thể làm ảnh DONE cũ chỉ đạt
+   khoảng `0.507`: nếu chính lượt này đã nhận diện và bấm đỏ x10 ACTIVE, vị
+   trí khớp yếu của x10 đã có dải xám (`S <= 65`, tỷ lệ màu `<= 20%`) và đồng
+   thời nhận diện chính xác `status_red_wish_once` hoặc
+   `status_red_wish_once_gray`, thì xác nhận đỏ x10 DONE. Điều kiện kết hợp
+   này không được dùng trước khi bot đã bấm một nút đỏ x10 ACTIVE.
 8. Nếu ảnh nút đang chuyển sáng làm nhận dạng mơ hồ, bot ở nguyên trong nhiệm
    vụ và chụp lại mỗi 1 giây; ba lần không đọc được không được chuyển PENDING
    hoặc Back ra danh sách. Chỉ bộ đếm 120 giây của worker mới được ngắt để quay
