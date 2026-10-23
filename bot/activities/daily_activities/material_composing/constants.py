@@ -18,11 +18,12 @@ FOLDER_PATH = f"{ROOT}/{FOLDER}"
 #    (độ bão hoà màu 204 so với 9). Bấm đủ COMPOSE_GOAL lần thì xong; xám -> Back 2 lần, chọn vật phẩm khác, bấm nốt phần còn thiếu.
 ITEMS_TITLE = f"{FOLDER_PATH}/ItemsTitle.png"
 COMPOSE_TITLE = f"{FOLDER_PATH}/ComposeTitle.png"
-COMPOSE_SMALL = f"{FOLDER_PATH}/ComposeSmall.png"
+COMPOSE_SMALL = f"{FOLDER_PATH}/ComposeSmall.png"   # tìm cả màn (như nút Open / Use của Open Gift Box): panel lên xuống theo hàng
 COMPOSE_BIG = f"{FOLDER_PATH}/ComposeBig.png"
-COMPOSE_SMALL_REGION = (55, 56, 100, 70)   # % màn hình: nút Compose nhỏ của panel mô tả
 COMPOSE_BIG_REGION = (0, 90, 50, 100)      # % màn hình: nút Compose lớn dưới trái màn Compose
-LIST_REGION_Y = (215, 690)                 # px: vùng lưới vật phẩm (bỏ banner + thanh tab, đáy)
+LIST_TOP = 215                             # px: mép trên lưới vật phẩm (bỏ banner + thanh tab)
+LIST_BOTTOM = 70                           # % màn hình: chỉ lấy mũi tên phía trên mức này (như Open Gift Box BOX_BOTTOM),
+                                           # bấm ô thấp hơn thì panel bị đẩy ra ngoài màn -> cuộn xuống rồi tìm tiếp
 ARROW_HSV = ((30, 50), 150, 130)           # (khoảng H, S tối thiểu, V tối thiểu) của mũi tên xanh
 ARROW_SIZE = (12, 17, 12, 16)              # (rộng min, rộng max, cao min, cao max)
 ARROW_AREA = (90, 160)                     # diện tích khối màu
@@ -30,8 +31,9 @@ ROW_HEIGHT = 20                            # px: các mũi tên cách nhau < ch�
 ITEM_TAP_OFFSET = (21, -30)                # từ mũi tên tới tâm ô vật phẩm
 SELECT_WAITS = 3                           # sau khi bấm ô: chờ 1 giây, chưa thấy Compose nhỏ thì chờ thêm tối đa chừng này lần
 SELECT_TRIES = 3                           # số vật phẩm khác nhau thử chọn tối đa
-SCROLLS = 3                                # số lần cuộn tối đa khi không có mũi tên xanh (thường không cần cuộn)
-LIST_SWIPE = (50, 85, 50, 45)              # % màn hình: cuộn lưới vật phẩm xuống
+SCROLLS = 6                                # số lần cuộn tối đa khi không có mũi tên xanh trên LIST_BOTTOM
+LIST_SWIPE = (50, 62, 50, 36)              # % màn hình: cuộn lưới vật phẩm xuống ~2 hàng (giống Open Gift Box)
+LIST_SWIPE_DURATION = 1.0                  # giây mỗi cú cuộn (giống Open Gift Box)
 COMPOSE_GOAL = 3                           # số lần bấm Compose để xong nhiệm vụ
 COMPOSE_BOX = (30, 655, 158, 42)           # px (x, y, rộng, cao): khung nút Compose lớn để xét xanh / xám
 COMPOSE_MIN_SATURATION = 100               # độ bão hoà HSV trung bình dưới mức này = nút xám

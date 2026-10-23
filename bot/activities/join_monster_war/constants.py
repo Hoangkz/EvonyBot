@@ -23,6 +23,9 @@ NOT_ENOUGH_STAMINA = f"{JB}/hettheluc.png"
 # Màn "Use Item" sau khi bấm Confirm: chữ "Use (" của nút "Use ( N )" ở mỗi vật phẩm thể lực
 # (chỉ tìm ở cột nút bên phải: chữ "Use it to gain..." ở cột mô tả cũng khớp).
 STAMINA_ITEM_USE = f"{JB}/staminaItemUse.png"
+# Số lượng lớn ("Use ( 1,128 )") làm chữ "Use" nhỏ lại (~0,94 lần): ảnh trên chỉ khớp 0,806 -> thêm ảnh
+# chữ nhỏ cắt từ nút "Use ( 1,128 )" (khớp 1,00; nút số nhỏ ~0,8). Nút kim cương (hết vật phẩm) chỉ khớp <= 0,42.
+STAMINA_ITEM_USE_SMALL = f"{JB}/staminaItemUseSmall.png"
 # Nút "Use" lớn của popup chọn số lượng.
 STAMINA_USE = f"{JB}/staminaUse.png"
 # Chữ "Total Troops" của màn chi tiết đội (hiện khi cú vuốt cuộn bị game coi là tap vào thẻ rally):
@@ -61,7 +64,7 @@ REGIONS = {
     CHOOSE_DEVELOPMENT: (45, 5, 75, 28),  # đo: búa (219, 77) màn Select a General / (219, 161) màn Generals
     WAR_TICKED: (44, 12, 58, 21),         # đo: ô War x48-54 y15-18 (ô Monster War ở x9-19: ngoài vùng)
     PRESET_LOCKED: (0, 7, 100, 16),       # hàng preset, đo: y 9-13
-    STAMINA_ITEM_USE: (65, 40, 95, 100),  # cột nút Use, đo: (292, 360), (296, 479), (288, 598)
+    STAMINA_ITEM_USE: (65, 25, 95, 100),  # cột nút Use, đo: (292, 360), (296, 479), (288, 598); có banner khuyến mãi (21913) nút đầu ở y 242
     STAMINA_USE: (45, 65, 95, 78),        # đo: (281, 502)
     GENERAL_SEARCH: (80, 50, 97, 60),     # ô Main General, đo: (348, 388); kính lúp tướng phụ ở y 502: ngoài vùng
 }
@@ -81,17 +84,26 @@ MONSTER_TICK_TRIES = 3             # số lần bấm tối đa mỗi lượt ch
 # Hàng preset trên màn March (% màn hình): ô i (1-8) có tâm x = PRESET_X0 + (i - 1) * PRESET_DX,
 # y = PRESET_Y. Đo trên 396x704: tâm x 41, 86, 130, 175, 220, 265, 310, 354; y 77.
 PRESET_COUNT = 8
+# Ổ khoá ô preset khớp 0,877-0,98 tuỳ ô (máy 21913: ô 6 = 0,895, ô 7 = 0,877), ô mở chỉ ~0,2-0,25:
+# ngưỡng mặc định 0,9 đếm thiếu khoá -> tưởng ô khoá là ô mở.
+PRESET_LOCKED_THRESHOLD = 0.8
+# Ô preset đang chọn có vòng sáng cam quanh biểu tượng: vành bán kính 18-22 px quanh tâm ô
+# (trên chiều rộng 396 -> 4,5-5,6 %). Đo: ô đang chọn 138 điểm cam (R > 150, R - B > 90), ô khác 0.
+PRESET_RING_R = (4.5, 5.6)            # % chiều rộng màn hình
+PRESET_ACTIVE_MIN_PIXELS = 30
+PRESET_ACTIVE_WAIT = 5                # giây tối đa chờ ô vừa bấm sáng lên (kiểm tra mỗi 1 giây)
 
 # Popup dùng vật phẩm thể lực: điểm gần cuối thanh trượt số lượng (% màn hình; đo thanh
 # x 90-300, y 370 trên 396x704) -> dùng hết (use_stamina = ALL).
 STAMINA_SLIDER_END = (74.7, 52.6)
 # Dùng vật phẩm thể lực mốc 200 / 300 / 400 / 500: popup số lượng mở sẵn ở mốc 100 thể lực nên bấm
 # nút + thêm (mốc - 100) / thể lực mỗi vật phẩm lần (VD vật phẩm 10, mốc 200: 10 lần; vật phẩm
-# 50, mốc 500: 8 lần). Loại vật phẩm nhận theo số vàng trên biểu tượng;
-# thứ tự từ lớn xuống nhỏ vì "10" nằm trong "100".
+# 50, mốc 500: 8 lần). Loại vật phẩm nhận theo cả biểu tượng (khung + thịt + số, 72x72, cắt ở
+# popup x 50-122, y 225-297): chọn mẫu khớp cao nhất. Khớp chéo đo trên 21913: 10 <-> 25 = 0,951
+# (cùng khung xanh lá), các cặp khác <= 0,87, đúng loại = 1,00 -> không lấy mẫu đầu tiên vượt ngưỡng.
 STAMINA_ITEMS = {100: f"{JB}/staminaItem100.png", 50: f"{JB}/staminaItem50.png",
                  25: f"{JB}/staminaItem25.png", 10: f"{JB}/staminaItem10.png"}
-STAMINA_ITEM_MIN_SCORE = 0.995
+STAMINA_ITEM_MIN_SCORE = 0.9
 STAMINA_ITEM_REGION = (8, 30, 34, 44)    # % màn hình: biểu tượng vật phẩm ở góc trái popup (x 40-130, y 220-300)
 STAMINA_PLUS = f"{JB}/staminaPlus.png"
 STAMINA_BAR_REGION = (0, 48, 100, 58)    # % màn hình: dải chứa nút − và nút + (y 370 / 704 = 52,6)
@@ -99,6 +111,15 @@ STAMINA_BASE = 100                       # thể lực popup mở sẵn
 STAMINA_PLUS_DELAY = 0                       # giây sau mỗi lần bấm +: mỗi tap ADB đã mất ~0,5 giây
 STAMINA_ADDED_WAIT = 1                   # giây chờ sau khi bấm + xong, trước khi bấm Use
 TROOP_BACK_WAIT = 1   # giây chờ sau khi Back khỏi màn chi tiết đội
+# Tướng phụ: thẻ đầu danh sách là tướng chính (nút Select xám) -> chỉ lấy nút Select có y > 80 %
+# màn hình (thẻ thứ hai, nút ở y 627 / 704 = 89 %; nút thẻ đầu ở y 373 = 53 %).
+ASSISTANT_SELECT_MIN_Y = 80
+GENERAL_OPEN_WAIT = 8                # giây tối đa chờ màn Select a General mở sau khi bấm "+" (đo MEmu: 2,2-2,9 s)
+GENERAL_OPEN_INTERVAL = 1            # giây giữa các lần kiểm tra màn Select a General đã mở chưa
+GENERAL_LIST_WAIT = 8                # giây tối đa chờ danh sách tướng load (vài giây; lúc đầu chỉ hiện tướng chính nút xám) ở màn Select a General
+GENERAL_LIST_INTERVAL = 0.5          # giây giữa các lần kiểm tra danh sách tướng
+STAMINA_ITEMS_OPEN_WAIT = 8          # giây tối đa chờ màn Use Item (nút "Use ( N )") sau khi bấm Confirm ở popup thiếu thể lực
+STAMINA_ITEMS_OPEN_INTERVAL = 1      # giây giữa các lần kiểm tra màn Use Item
 STAMINA_REFILL_WAIT = 2             # giây chờ sau khi bấm Use (game tự đóng popup) rồi mới Back
 PRESET_X0, PRESET_DX, PRESET_Y = 10.4, 11.3, 11
 
@@ -107,7 +128,7 @@ PRESET_X0, PRESET_DX, PRESET_Y = 10.4, 11.3, 11
 # sáng tới ~250. Đo trên 6 ảnh 396x704 (y 605-640).
 LIST_END_REGION = (5, 86, 95, 91)
 LIST_END_MAX_LIGHT = 80
-JOIN_MIN_Y, JOIN_MAX_Y = 262, 615   # "Join" buttons outside this band are ignored
+JOIN_MIN_Y, JOIN_MAX_Y = 37.25, 87.35   # % chiều cao màn hình (y 262-615 / 704): nút Join ngoài dải này bị bỏ qua
 # Nút "Join" thật khớp 0,96-1,00; nút "Joined" (chữ chứa "Join") khớp tới 0,80 -> ngưỡng
 # 0,9, và bỏ luôn điểm Join nằm đè lên một nút Joined (JOINED_OVERLAP px).
 JOIN_THRESHOLD = 0.9

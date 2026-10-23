@@ -7,26 +7,26 @@ from ..theme import COLORS
 
 # ---- Tab Initialization: bố cục (rebuild 1:1 từ Form3_Designer.cs) ----
 DESIGNER_DATA = {
-    "ButtonJoinMonsterWar": {"loc": [85, 53], "size": [230, 40], "text": "Join Monster War", "type": "Button"},
-    "ButtonOpenGiftBox": {"loc": [85, 117], "size": [230, 40], "text": "Open Gift Box", "type": "Button"},
-    "buttonEvent": {"loc": [740, 53], "size": [230, 40], "text": "Event", "type": "Button"},
+    "ButtonJoinMonsterWar": {"loc": [35, 53], "size": [230, 40], "text": "Join Monster War", "type": "Button"},
+    "ButtonOpenGiftBox": {"loc": [797, 53], "size": [230, 40], "text": "Open Gift Box", "type": "Button"},
+    "buttonEvent": {"loc": [543, 53], "size": [230, 40], "text": "Event", "type": "Button"},
     # button9 (Start All) nằm cạnh buttonStopAll (Stop All) dưới GroupBox; 2 nút
     # 125x40 (nhỏ lại so với 140x50 gốc) căn phải theo mép phải GroupBox (x=1075).
-    "button9": {"loc": [815, 473], "size": [125, 40], "text": "Start All", "type": "Button"},
-    "buttonStopAll": {"loc": [950, 473], "size": [125, 40], "text": "Stop All", "type": "Button"},
-    "buttonAllianceCapacity": {"loc": [409, 117], "size": [230, 40], "text": "Alliance Capacity", "type": "Button"},
-    "buttonBlackMarket": {"loc": [740, 117], "size": [230, 40], "text": "Black Market", "type": "Button"},
-    "buttonRecruitGeneral": {"loc": [85, 181], "size": [230, 40], "text": "Recruit General", "type": "Button"},
-    "buttonFindBoss": {"loc": [409, 181], "size": [230, 40], "text": "Find Boss", "type": "Button"},
-    "buttonCraft": {"loc": [740, 181], "size": [230, 40], "text": "Craft", "type": "Button"},
-    "buttonGatherResources": {"loc": [85, 245], "size": [230, 40], "text": "Gather Resources", "type": "Button"},
-    "buttonDailyActivities": {"loc": [409, 53], "size": [230, 40], "text": "Daily Activities", "type": "Button"},
+    "button9": {"loc": [815, 405], "size": [125, 40], "text": "Start All", "type": "Button"},
+    "buttonStopAll": {"loc": [950, 405], "size": [125, 40], "text": "Stop All", "type": "Button"},
+    "buttonAllianceCapacity": {"loc": [35, 117], "size": [230, 40], "text": "Alliance Capacity", "type": "Button"},
+    "buttonBlackMarket": {"loc": [289, 117], "size": [230, 40], "text": "Black Market", "type": "Button"},
+    "buttonRecruitGeneral": {"loc": [543, 117], "size": [230, 40], "text": "Recruit General", "type": "Button"},
+    "buttonFindBoss": {"loc": [797, 117], "size": [230, 40], "text": "Find Boss", "type": "Button"},
+    "buttonCraft": {"loc": [35, 181], "size": [230, 40], "text": "Craft", "type": "Button"},
+    "buttonGatherResources": {"loc": [289, 181], "size": [230, 40], "text": "Gather Resources", "type": "Button"},
+    "buttonDailyActivities": {"loc": [289, 53], "size": [230, 40], "text": "Daily Activities", "type": "Button"},
     "buttonInitializationApplyAll": {"loc": [935, 16], "size": [132, 43], "text": "Apply ALL", "type": "Button"},
-    "buttonStart": {"loc": [449, 499], "size": [217, 51], "text": "Start", "type": "Button"},
+    "buttonStart": {"loc": [449, 400], "size": [217, 51], "text": "Start", "type": "Button"},
     "groupBox2": {
         "children": ["ButtonJoinMonsterWar", "buttonDailyActivities", "buttonEvent", "ButtonOpenGiftBox",
                       "buttonAllianceCapacity", "buttonBlackMarket", "buttonRecruitGeneral", "buttonFindBoss", "buttonCraft", "buttonGatherResources"],
-        "loc": [13, 150], "size": [1062, 305], "text": "Select Activity", "type": "GroupBox",
+        "loc": [13, 150], "size": [1062, 240], "text": "Select Activity", "type": "GroupBox",
     },
     "checkBoxBubble": {"loc": [13, 62], "size": [75, 28], "text": "Bubble", "type": "CheckBox"},
     "comboBoxBubbleType": {"loc": [90, 62], "size": [60, 28], "type": "ComboBox"},
@@ -42,7 +42,7 @@ DESIGNER_DATA = {
                      "labelServer", "textBoxServer", "checkBoxBubble", "labelBubbleTime",
                      "comboBoxBubbleType", "labelCivilization", "comboBoxCivilization",
                      "groupBox2"],
-        "loc": [4, 31], "size": [1088, 609], "text": "Initialization", "type": "TabPage",
+        "loc": [4, 31], "size": [1088, 465], "text": "Initialization", "type": "TabPage",
     },
 }
 # Loại bubble (khiên) có thể dùng.
@@ -53,7 +53,8 @@ CIVILIZATIONS = ["Europe", "China", "Japan", "Korea", "America", "Russia", "Arab
 CIVILIZATION_UNKNOWN = "(auto)"
 COMBO_ITEMS = {"comboBoxBubbleType": BUBBLE_TYPES,
                "comboBoxCivilization": [CIVILIZATION_UNKNOWN, *CIVILIZATIONS]}
-PAGE_SIZE = (1088, 609)
+# Vừa đủ hàng Start / Start All / Stop All dưới group (không thừa chỗ trống gây thanh cuộn).
+PAGE_SIZE = (1088, 465)
 # Hàng hồ sơ (dưới Bubble, trên Select Activity): nhãn + các nút hồ sơ sát nhau + nút "+".
 PROFILE_ROW_POS = (13, 104)
 PROFILE_BUTTON_HEIGHT = 34

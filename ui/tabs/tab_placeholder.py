@@ -57,6 +57,9 @@ class DesignerTab(QWidget):
         scroll = QScrollArea()
         scroll.setWidgetResizable(False)
         scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        # Trang cố định nhỏ hơn cửa sổ thì phần thừa của vùng cuộn cũng trắng như trang (không hở nền xám):
+        # nền đặt bằng stylesheet lên QScrollArea là nền viewport.
+        scroll.setProperty("tabPage", True)
 
         self.page, self.controls = _designer.build_tab(
             root_name, designer_data, combo_items, page_size
