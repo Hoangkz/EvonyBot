@@ -119,7 +119,7 @@ flowchart TD
 Chi tiết bộ lọc:
 
 - Tìm JOIN với threshold 0,8 trong `REGIONS[JOIN]`, lấy góc trên trái nút.
-- Chỉ giữ nút có `262 < y < 615`.
+- Chỉ giữ nút có y trong dải `37,25% – 87,35%` chiều cao màn hình (`JOIN_MIN_Y`, `JOIN_MAX_Y`; trên 396×704 là `262 < y < 615`).
 - Loại nút gần một vị trí trong `screen_blacklist`: chênh lệch cả x và y đều nhỏ hơn 10 pixel.
 - Crop thẻ boss tại `(x - 90, y - 150)` với kích thước `160 × 190`.
 - Nếu tìm được LOCATION, OCR vùng `80 × 15` ngay bên phải icon để lấy tọa độ.
@@ -182,10 +182,12 @@ Chi tiết triển khai nằm ở [boss_board.py](../../worker/boss_board.py) v�
 
 1. Kiểm tra chữ "Boss Monster" (`bossMonsterText.png`) trong vùng quy định. Không thấy thì Back và trả về vòng chính. (Trước đây dùng lá cờ xanh `bossMonster.png`, nhưng rally đang "Attacking" thì chỗ đó là hai thanh kiếm, nên bot sẽ Back nhầm.)
 2. Chọn đội quân bằng `_pick_troop()`:
-   - Đếm ổ khoá (`presetLocked.png`) ở hàng 8 ô preset trên cùng; số ô mở = 8 − số khoá (các ô mở luôn là các ô đầu).
+   - Đếm ổ khoá (`presetLocked.png`, ngưỡng 0,8 `PRESET_LOCKED_THRESHOLD`) ở hàng 8 ô preset trên cùng; số ô mở = 8 − số khoá (các ô mở luôn là các ô đầu). Ổ khoá chỉ khớp 0,877–0,98 tuỳ ô, ô mở ~0,2; ngưỡng mặc định 0,9 đếm thiếu khoá (máy 21913: 4 thay vì 6).
    - Đội dùng được = đội người dùng chọn ở tab (`troop`, tăng dần) có số ≤ số ô mở. VD chọn cả 8 mà chỉ mở 2 thì dùng {1, 2}; chọn {2, 3} mà mở 3 thì dùng {2, 3}.
    - Lần nào cũng thử lần lượt từ đội nhỏ nhất, không xoay vòng. VD chọn 1, 2, 3 thì luôn thử 1 → 2 → 3.
-   - Bấm ô preset (tâm x = 10,4% + (i − 1) × 11,3%, y = 11%), polling mỗi 0,2 giây, tối đa 2 giây. Thấy kính lúp (`generalSearch.png`) ở ô Main General (có tướng chính) thì đội đạt.
+   - Bấm ô preset (tâm x = 10,4% + (i − 1) × 11,3%, y = 11%), rồi **xác nhận đã chọn đội đó**: ô vừa bấm phải có vòng sáng cam (`_preset_active`: vành bán kính 4,5–5,6% chiều rộng quanh tâm ô, ≥ 30 điểm R > 150, R − B > 90). Kiểm tra mỗi 1 giây, tối đa 5 giây (`PRESET_ACTIVE_WAIT`); không sáng thì bỏ đội này, thử đội kế tiếp. Lý do: ảnh chụp ngay sau cú bấm có thể vẫn là đội cũ, kính lúp của tướng cũ làm bot tưởng đội vừa bấm có tướng rồi March luôn.
+   - Ô đã sáng: polling mỗi 0,2 giây, tối đa 2 giây. Thấy kính lúp (`generalSearch.png`) ở ô Main General (có tướng chính) thì đội đạt.
+   - Không đội nào sáng được: không có đội để March, Back (boss được thử lại sau).
 3. Không đội nào đạt: **vẫn tham gia boss** với đội vừa thử cuối cùng.
    - Tab tích **"Select General"**: gọi `_choose_general(MAIN_GENERAL)` để chọn tướng chính cho đội đó trước. Chọn **không được** (không có tướng yêu thích...) thì vẫn March.
    - Không tích: log rồi March luôn.
@@ -231,7 +233,7 @@ Hàm không trả cờ thành công/thất bại. Khi nó trả về, `_march()`
 2. **Popup số lượng** (nút Use lớn `staminaUse.png`):
    - `100`: bấm Use luôn (số lượng mặc định);
    - `ALL`: bấm gần cuối thanh trượt (`STAMINA_SLIDER_END`, dùng hết), rồi bấm Use.
-   - `200` / `300` / `400` / `500` (`_add_stamina`): popup mở sẵn ở mốc 100 thể lực. Nhận loại vật phẩm (10 / 25 / 50 / 100) theo số vàng trên biểu tượng popup (`staminaItem<N>.png`, thử từ lớn xuống nhỏ, ngưỡng 0,995 vì "10" nằm trong "100"), tìm nút + (`staminaPlus.png`), bấm + (mốc − 100) / N lần (VD vật phẩm 10 mốc 200: 10 lần; vật phẩm 50 mốc 500: 8 lần) không delay giữa các lần, xong chờ 1 giây rồi bấm Use. Không nhận ra vật phẩm hoặc không thấy nút + thì ghi log, dùng mốc 100. Không OCR. Đo thật máy 21923 (vật phẩm 25, mở ở 3/15): mốc 200 → bấm 4 lần, 31 → 206; mốc 400 → bấm 12 lần, 32 → 407.
+   - `200` / `300` / `400` / `500` (`_add_stamina`): popup mở sẵn ở mốc 100 thể lực. Nhận loại vật phẩm (10 / 25 / 50 / 100) theo cả biểu tượng popup (`staminaItem<N>.png`, 72×72 gồm khung + thịt + số, cắt ở x 50–122, y 225–297): lấy mẫu khớp **cao nhất**, cần ≥ 0,9. Không lấy mẫu đầu tiên vượt ngưỡng vì 10 và 25 cùng khung xanh lá, khớp chéo 0,951 (các cặp khác ≤ 0,87, đúng loại 1,00), tìm nút + (`staminaPlus.png`), bấm + (mốc − 100) / N lần (VD vật phẩm 10 mốc 200: 10 lần; vật phẩm 50 mốc 500: 8 lần) không delay giữa các lần, xong chờ 1 giây rồi bấm Use. Không nhận ra vật phẩm hoặc không thấy nút + thì ghi log, dùng mốc 100. Không OCR. Đo thật máy 21923 (vật phẩm 25, mở ở 3/15): mốc 200 → bấm 4 lần, 31 → 206; mốc 400 → bấm 12 lần, 32 → 407.
 3. Chờ 2 giây (game tự đóng popup sau khi bấm Use), Back một lần rồi chờ màn dùng thể lực (popup số lượng và danh sách Use Item) đóng: kiểm tra mỗi 1 giây, tối đa 10 lần; chưa đóng thì Back thêm một lần rồi chờ tiếp 10 lần; tổng 20 giây vẫn chưa đóng thì Back 2 lần, coi như đã dùng thể lực xong và quay về vòng chính tiếp tục các bước Join Boss theo màn hình hiện tại (không bấm March ngay). Khi đã đóng: **bấm March lại** nếu thấy nút March trên ảnh đó (không thấy thì để vòng chính nhận diện) (`_press_march`) với tọa độ `self.march_coords` đã đọc ở lần March trước; không OCR lại, không chọn đội / tướng lại (đội đã chọn vẫn giữ nguyên). Không có `pending`. Chỉ khi thấy hàng `Joined` đúng tọa độ thì boss mới được nhớ là đã tham gia.
 
 Hết thể lực luôn đánh dấu rảnh (trả `IDLE`, worker chuyển sang làm nhiệm vụ): `use_stamina = No` -> Back 3 lần ngay khi gặp popup; hết vật phẩm -> Back 3 lần. Mọi trường hợp hết thể lực đều lưu mốc "bây giờ + 20 phút" vào DB (`stamina_wait.save`); worker làm nhiệm vụ tới mốc đó rồi mới Join Boss lại.

@@ -3,6 +3,8 @@ run.py — Activity "Join Monster War" (Optimized for Multi-threading & Low CPU)
 """
 import time
 
+import numpy as np
+
 from ...common import click_images, delay, exit_images, find_first, go_home, wait_gone
 from ...context import TEMPLATE_DIR
 from ...ocr import read_boss_name, read_coords
@@ -18,8 +20,8 @@ from .constants import (ALLIANCE_ICON, ASSISTANT_GENERAL, BACK, BOSS_MONSTER, CH
                         MONSTER_TICK_TRIES, MONSTER_WAR_TAP, JOIN, JOIN_LIST, JOIN_MAX_Y, JOIN_MIN_Y, MAIN_GENERAL,
                         JOIN_THRESHOLD, JOINED, JOINED_BUTTON, JOINED_OVERLAP, LEAVE_ALLIANCE_POPUP,
                         LIST_END_MAX_LIGHT, LIST_END_REGION, LISTBOSS, LOCATION, MARCH, MARCH_SCREEN,
-                        NO_BOSS, NOT_ENOUGH_STAMINA, OUT_OF_STAMINA, PRESET_COUNT, PRESET_DX,
-                        PRESET_LOCKED, PRESET_X0, PRESET_Y, PVP_WAR, REGIONS, SAME_SPOT, SCROLL, SELECT,
+                        NO_BOSS, NOT_ENOUGH_STAMINA, OUT_OF_STAMINA, PRESET_ACTIVE_MIN_PIXELS, PRESET_ACTIVE_WAIT,
+                        PRESET_COUNT, PRESET_DX, PRESET_RING_R, PRESET_LOCKED, PRESET_LOCKED_THRESHOLD, PRESET_X0, PRESET_Y, PVP_WAR, REGIONS, SAME_SPOT, SCROLL, SELECT,
                         SELECT_GENERAL, STAMINA_ITEM_USE, STAMINA_REFILL_WAIT, STAMINA_SLIDER_END,
                         STAMINA_ADDED_WAIT, STAMINA_BASE, STAMINA_BAR_REGION, STAMINA_ITEM_MIN_SCORE, STAMINA_ITEM_REGION, STAMINA_ITEMS,
                         STAMINA_PLUS, STAMINA_PLUS_DELAY,
@@ -517,7 +519,7 @@ class _Boss:
         """Danh sách War có hàng Joined mang đúng tọa độ mục tiêu vừa hành quân."""
         points = self.bot.find_all(JOINED_BUTTON, screen=screen, center=False,
                                    region=REGIONS[JOINED_BUTTON])
-        return any(JOIN_MIN_Y < y < JOIN_MAX_Y
+        return any(_in_join_band(screen, y)
                    and self._read_card_coords(screen, x, y) == coords for x, y in points)
 
     def _read_march_target_coords(self, screen):
@@ -561,14 +563,25 @@ class _Boss:
         - Một đội đạt khi chọn xong thấy kính lúp ở ô Main General (có tướng chính)."""
         bot = self.bot
         self.last_troop = None
-        locked = len(bot.find_all(PRESET_LOCKED, screen=screen, region=REGIONS[PRESET_LOCKED]))
+        locked = len(bot.find_all(PRESET_LOCKED, threshold=PRESET_LOCKED_THRESHOLD, screen=screen,
+                                  region=REGIONS[PRESET_LOCKED]))
         usable = [t for t in self.troops if t <= PRESET_COUNT - locked]
         if not usable:
             bot.record(f"Join Monster War: đội quân đã chọn {self.troops} đều đang khoá ({locked} ô khoá)")
             return None
         for troop in usable:
-            self.last_troop = troop   # đội đang được chọn trên màn March (nếu cần chọn tướng cho nó)
+            # Chỉ xét tướng khi ô đội vừa bấm đã sáng (game đã đổi sang đội này): ảnh chụp ngay sau
+            # cú bấm có thể vẫn là đội cũ, kính lúp của tướng cũ làm bot tưởng đội này có tướng.
             bot.tap_percent(PRESET_X0 + (troop - 1) * PRESET_DX, PRESET_Y)
+            _, active = self._poll_screen(
+                f"activate_troop_{troop}",
+                lambda image: _preset_active(image, troop),
+                timeout=PRESET_ACTIVE_WAIT, interval=1,
+            )
+            if not active:
+                bot.log(f"Đội quân {troop}: bấm mà ô không sáng sau {PRESET_ACTIVE_WAIT} giây, thử đội khác")
+                continue
+            self.last_troop = troop   # đội đang được chọn trên màn March (nếu cần chọn tướng cho nó)
             _, found = self._poll_screen(
                 f"select_troop_{troop}",
                 lambda image: bot.find(GENERAL_SEARCH, screen=image,
@@ -739,7 +752,7 @@ class _Boss:
         bot = self.bot
         points = [p for p in bot.find_all(JOIN, threshold=JOIN_THRESHOLD, screen=screen,
                                           center=False, region=REGIONS[JOIN])
-                  if JOIN_MIN_Y < p[1] < JOIN_MAX_Y]
+                  if _in_join_band(screen, p[1])]
         joined = bot.find_all(JOINED_BUTTON, screen=screen, center=False,
                               region=REGIONS[JOINED_BUTTON])
         points = [p for p in points
@@ -919,13 +932,12 @@ def _coords_after_server(image) -> tuple[int, int] | None:
 
 
 def _item_stamina(bot, screen) -> int | None:
-    """Thể lực mỗi vật phẩm (10 / 25 / 50 / 100) của popup số lượng đang mở, nhận theo số vàng
-    trên biểu tượng. Thử từ lớn xuống nhỏ vì số "10" nằm trong số "100" (khớp 0,99)."""
-    for amount, template in STAMINA_ITEMS.items():
-        if bot.find(template, threshold=STAMINA_ITEM_MIN_SCORE, screen=screen,
-                    region=STAMINA_ITEM_REGION):
-            return amount
-    return None
+    """Thể lực mỗi vật phẩm (10 / 25 / 50 / 100) của popup số lượng đang mở, nhận theo cả biểu
+    tượng: lấy mẫu khớp cao nhất (10 và 25 cùng khung xanh lá, khớp chéo 0,951)."""
+    scores = {amount: bot.best_match(template, screen=screen, region=STAMINA_ITEM_REGION)[0]
+              for amount, template in STAMINA_ITEMS.items()}
+    amount = max(scores, key=scores.get)
+    return amount if scores[amount] >= STAMINA_ITEM_MIN_SCORE else None
 
 
 def _is_green_button(screen, center) -> bool:
@@ -935,6 +947,27 @@ def _is_green_button(screen, center) -> bool:
     patch = screen[max(y - 8, 0):y + 8, max(x - 40, 0):x + 40].astype(int)
     b, g, r = (patch[..., i].mean() for i in range(3))
     return g - r > 15 and g - b > 15
+
+
+def _preset_active(screen, troop) -> bool:
+    """Ô preset `troop` (1-8) có vòng sáng cam (đang được chọn)."""
+    h, w = screen.shape[:2]
+    cx, cy = w * (PRESET_X0 + (troop - 1) * PRESET_DX) / 100, h * PRESET_Y / 100
+    r0, r1 = (w * r / 100 for r in PRESET_RING_R)
+    x0, x1 = max(int(cx - r1), 0), int(cx + r1) + 1
+    y0, y1 = max(int(cy - r1), 0), int(cy + r1) + 1
+    patch = screen[y0:y1, x0:x1].astype(int)
+    yy, xx = np.mgrid[y0:y0 + patch.shape[0], x0:x0 + patch.shape[1]]
+    d = np.hypot(xx - cx, yy - cy)
+    ring = patch[(d >= r0) & (d <= r1)]
+    b, r = ring[:, 0], ring[:, 2]
+    return int(((r > 150) & (r - b > 90)).sum()) >= PRESET_ACTIVE_MIN_PIXELS
+
+
+def _in_join_band(screen, y) -> bool:
+    """y (px) nằm trong dải hợp lệ của nút Join (JOIN_MIN_Y-JOIN_MAX_Y, % chiều cao màn hình)."""
+    h = screen.shape[0]
+    return h * JOIN_MIN_Y / 100 < y < h * JOIN_MAX_Y / 100
 
 
 def _near(point, points) -> bool:

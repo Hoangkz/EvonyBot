@@ -5,6 +5,9 @@ import unittest
 from types import SimpleNamespace
 from unittest import mock
 
+from pathlib import Path
+
+import cv2
 import numpy as np
 
 from bot.activities.join_monster_war.boss_memory import BossMemory, JOINED
@@ -29,6 +32,7 @@ from bot.activities.join_monster_war.run import (MAX_MAP_COORD, POLL_INTERVAL, S
 
 run_module = importlib.import_module("bot.activities.join_monster_war.run")
 SCREEN = np.zeros((704, 396, 3), dtype=np.uint8)
+SCREENS = Path(__file__).parent / "screens"
 
 
 def fake_bot():
@@ -431,6 +435,56 @@ class JoinBossEdgeCaseTests(unittest.TestCase):
         taps = [boss._tick_monster_war(SCREEN) for _ in range(run_module.MONSTER_TICK_TRIES + 2)]
 
         self.assertEqual(taps, [True] * run_module.MONSTER_TICK_TRIES + [False] * 2)
+
+    def test_preset_ring_marks_only_the_selected_troop(self):
+        # Ảnh thật: ô I có vòng sáng cam, ô II-IV mở nhưng không chọn, V-VIII khoá.
+        for name, selected in (("march_no_main_general.png", 1), ("march_ready.png", 2)):
+            screen = cv2.imread(str(SCREENS / name))
+            self.assertEqual([t for t in range(1, 9) if run_module._preset_active(screen, t)],
+                             [selected], name)
+
+    def test_stamina_item_type_is_the_best_matching_icon(self):
+        # 10 và 25 cùng khung xanh lá (khớp chéo 0,951): phải lấy mẫu khớp cao nhất.
+        from threading import Event
+        from bot.context import BotContext
+        ctx = BotContext(SimpleNamespace(serial="x"), Event(), None, lambda _: None)
+        for amount in (10, 25, 50, 100):
+            screen = cv2.imread(str(SCREENS / f"stamina_popup_item_{amount}.png"))
+            self.assertEqual(run_module._item_stamina(ctx, screen), amount)
+        self.assertIsNone(run_module._item_stamina(ctx, cv2.imread(str(SCREENS / "stamina_use_item_list.png"))))
+
+    def test_locked_presets_are_all_counted(self):
+        # Ổ khoá khớp chỉ 0,877-0,9 ở vài ô: ngưỡng mặc định 0,9 đếm thiếu (3 thay vì 4, 5 thay vì 6).
+        from threading import Event
+        from bot.context import BotContext
+        ctx = BotContext(SimpleNamespace(serial="x"), Event(), None, lambda _: None)
+        for name, locked in (("new_join_boss_flow/07_march_before_action.png", 4),
+                             ("march_not_enough_stamina.png", 6)):
+            screen = cv2.imread(str(SCREENS / name))
+            found = ctx.find_all(run_module.PRESET_LOCKED, threshold=run_module.PRESET_LOCKED_THRESHOLD,
+                                 screen=screen, region=run_module.REGIONS[run_module.PRESET_LOCKED])
+            self.assertEqual(len(found), locked, name)
+
+    def test_troop_is_judged_only_after_its_preset_lights_up(self):
+        # Đội 1 bấm mà không sáng (game chưa đổi đội): không xét kính lúp của đội cũ, thử đội 2.
+        bot = fake_bot()
+        boss = _Boss(bot, {"troop": ["Troop 1", "Troop 2"]})
+        results = iter([(SCREEN, False), (SCREEN, True), (SCREEN, (348, 388))])
+        boss._poll_screen = mock.Mock(side_effect=lambda *_a, **_k: next(results))
+
+        self.assertEqual(boss._pick_troop(SCREEN), 2)
+        steps = [c.args[0] for c in boss._poll_screen.call_args_list]
+        self.assertEqual(steps, ["activate_troop_1", "activate_troop_2", "select_troop_2"])
+        self.assertEqual(boss._poll_screen.call_args_list[0].kwargs,
+                         {"timeout": run_module.PRESET_ACTIVE_WAIT, "interval": 1})
+
+    def test_no_preset_lights_up_leaves_no_troop_to_march_with(self):
+        bot = fake_bot()
+        boss = _Boss(bot, {"troop": ["Troop 1", "Troop 2"]})
+        boss._poll_screen = mock.Mock(return_value=(SCREEN, False))
+
+        self.assertIsNone(boss._pick_troop(SCREEN))
+        self.assertIsNone(boss.last_troop)   # _march sẽ Back, không March
 
 
 if __name__ == "__main__":
