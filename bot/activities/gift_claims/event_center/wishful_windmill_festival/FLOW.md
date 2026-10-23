@@ -12,7 +12,11 @@
    `(195, 20)` trên màn 396x704 rồi tiếp tục ngay trong panel; không Back và
    không mở lại rương giữa các Claim.
 5. Khi khung hiện tại hết Claim, lướt chậm bên trong vùng xanh. Hai lần lướt
-   liên tiếp không di chuyển và không còn Claim là DONE 1.
+   liên tiếp không di chuyển và không còn Claim là DONE 1. Ngoài ra, ngay sau
+   khi bấm một Claim ở pha này, nếu thấy
+   `status_done_one_claim_limit` (Screenshot `073771`, dòng
+   `Claim failed. The limit has been...`) thì kết luận DONE 1 ngay và chuyển
+   sang kiểm tra DONE 2; không tiếp tục lướt hoặc bấm Claim của DONE 1.
 6. Sau khi DONE 1 mới đóng panel một lần, mở `Wind Power Storage`, rồi bấm
    `Challenge Quest`. Phải thấy lại title Wind Blessings trước khi nhận.
 7. Phần Challenge Quest dùng cùng cơ chế: ở nguyên panel, nhận/lướt vùng xanh

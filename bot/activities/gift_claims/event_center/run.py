@@ -79,6 +79,8 @@ MAX_WISHFUL_CONTENT_SWIPES = 12
 MAX_WISHFUL_CLAIMS = 30
 MAX_WISHFUL_TAPS_PER_CLAIM = 3
 WISHFUL_EDGE_CONFIRMATIONS = 2
+WISHFUL_DONE_ONE_LIMIT = (
+    "WishfulWindmillFestival/status_done_one_claim_limit", 0.84)
 EMPTY_POSITION_CHECKS = 2
 APPLE_GREEN_ONCE_STATES = (
     ("DwarfsLuckyApple/status_green_wish_once", 0.84),
@@ -500,6 +502,13 @@ def _wishful_claims(bot, screen):
                     threshold=0.74, region=WISHFUL_CLAIM_REGION)
 
 
+def _wishful_done_one_limit(bot, screen) -> bool:
+    """The claim-limit toast finishes Wind Blessings DONE 1 only."""
+    template, threshold = WISHFUL_DONE_ONE_LIMIT
+    return find(bot, template, screen, threshold=threshold,
+                region=(0, 5, 100, 95)) is not None
+
+
 def _close_wishful_congratulations(bot) -> bool:
     """Dismiss Congratulations by the user's fixed tap, never with Back."""
     for attempt in range(3):
@@ -521,12 +530,21 @@ def _close_wishful_congratulations(bot) -> bool:
     return False
 
 
-def _tap_wishful_claim(bot, claim: tuple[int, int], phase: str) -> tuple[int, bool]:
-    """Retry one still-active Claim in place before allowing the scan onward."""
+def _tap_wishful_claim(bot, claim: tuple[int, int],
+                       phase: str) -> tuple[int, bool, bool]:
+    """Retry one Claim; third result is the special DONE-1 limit toast."""
     for tap_number in range(1, MAX_WISHFUL_TAPS_PER_CLAIM + 1):
         bot.record(f"Gift Claims: Wishful Windmill {phase} tap Claim "
                    f"lần {tap_number}/{MAX_WISHFUL_TAPS_PER_CLAIM} tại {claim}")
         bot.tap(*claim, delay=WISHFUL_SETTLE_SECONDS)
+        # Screenshot_20261023-073771 is a short-lived toast.  Read the first
+        # post-tap frame before waiting for/dismissing Congratulations.
+        immediate = bot.screenshot()
+        if phase == "DONE 1" and _wishful_done_one_limit(bot, immediate):
+            bot.record("Gift Claims: Wishful Windmill DONE 1 thấy 'Claim "
+                       "failed. The limit has been...'; DONE 1 ngay và chuyển "
+                       "sang kiểm tra DONE 2")
+            return tap_number, True, True
         popup_closed = _close_wishful_congratulations(bot)
         bot.sleep(WISHFUL_CONFIRMATION_DELAY_SECONDS)
         after = bot.screenshot()
@@ -537,12 +555,12 @@ def _tap_wishful_claim(bot, claim: tuple[int, int], phase: str) -> tuple[int, bo
             None,
         )
         if popup_closed or nearby is None:
-            return tap_number, True
+            return tap_number, True, False
         claim = nearby
         if tap_number < MAX_WISHFUL_TAPS_PER_CLAIM:
             bot.record(f"Gift Claims: Wishful Windmill {phase} Claim vẫn còn; "
                        "chờ rồi bấm lại ngay trong panel")
-    return MAX_WISHFUL_TAPS_PER_CLAIM, False
+    return MAX_WISHFUL_TAPS_PER_CLAIM, False, False
 
 
 def _claim_wishful_panel(bot, phase: str) -> tuple[ClaimReport, bool]:
@@ -577,8 +595,12 @@ def _claim_wishful_panel(bot, phase: str) -> tuple[ClaimReport, bool]:
                 break
 
             empty_checks = 0
-            taps, claim_verified = _tap_wishful_claim(bot, claim, phase)
+            taps, claim_verified, done_one_limit = _tap_wishful_claim(
+                bot, claim, phase)
             attempted += taps
+            if done_one_limit:
+                verified += 1
+                return ClaimReport(attempted, verified), True
             if claim_verified:
                 verified += 1
                 bot.record(f"Gift Claims: Wishful Windmill {phase} đã nhận "

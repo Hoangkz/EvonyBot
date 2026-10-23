@@ -1067,8 +1067,58 @@ class FixedGiftFlowTests(unittest.TestCase):
         title = cv2.imread(str(
             IMAGES / "GiftClaims" / "WishfulWindmillFestival" /
             "title_wind_blessings_text.png"))
+        limit = cv2.imread(str(
+            IMAGES / "GiftClaims" / "WishfulWindmillFestival" /
+            "status_done_one_claim_limit.png"))
         self.assertEqual((32, 39), chest.shape[:2])
         self.assertEqual((18, 131), title.shape[:2])
+        self.assertEqual((20, 233), limit.shape[:2])
+
+    def test_wishful_claim_limit_toast_finishes_done_one_immediately(self):
+        bot = mock.Mock()
+        bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
+        with (mock.patch.object(event_center, "_wishful_done_one_limit",
+                                return_value=True),
+              mock.patch.object(event_center,
+                                "_close_wishful_congratulations") as close):
+            result = event_center._tap_wishful_claim(
+                bot, (330, 245), "DONE 1")
+
+        self.assertEqual((1, True, True), result)
+        close.assert_not_called()
+        bot.tap.assert_called_once_with(
+            330, 245, delay=event_center.WISHFUL_SETTLE_SECONDS)
+
+    def test_wishful_claim_limit_is_not_done_for_challenge_quest(self):
+        bot = mock.Mock()
+        bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
+        with (mock.patch.object(event_center, "_wishful_done_one_limit",
+                                return_value=True) as limit,
+              mock.patch.object(event_center, "_wishful_claims",
+                                return_value=[]),
+              mock.patch.object(event_center,
+                                "_close_wishful_congratulations",
+                                return_value=True)):
+            result = event_center._tap_wishful_claim(
+                bot, (330, 245), "Challenge Quest")
+
+        self.assertEqual((1, True, False), result)
+        limit.assert_not_called()
+
+    def test_wishful_panel_stops_scrolling_on_done_one_limit(self):
+        bot = mock.Mock()
+        bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
+        with (mock.patch.object(event_center, "_wishful_panel_open",
+                                return_value=True),
+              mock.patch.object(event_center, "_wishful_claims",
+                                return_value=[(330, 245)]),
+              mock.patch.object(event_center, "_tap_wishful_claim",
+                                return_value=(1, True, True))):
+            report, done = event_center._claim_wishful_panel(bot, "DONE 1")
+
+        self.assertTrue(done)
+        self.assertEqual(common.ClaimReport(1, 1), report)
+        bot.swipe_percent.assert_not_called()
 
     def test_wishful_panel_claims_without_back_or_reopening(self):
         bot = mock.Mock()
@@ -1083,6 +1133,8 @@ class FixedGiftFlowTests(unittest.TestCase):
                                 return_value=True),
               mock.patch.object(event_center, "_wishful_claims",
                                 side_effect=claims),
+              mock.patch.object(event_center, "_wishful_done_one_limit",
+                                return_value=False),
               mock.patch.object(event_center,
                                 "_close_wishful_congratulations",
                                 return_value=True)):
