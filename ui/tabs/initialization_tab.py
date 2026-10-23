@@ -176,10 +176,11 @@ class InitializationTab(DesignerTab):
         # "Start All(10)" vẫn vừa vẹn, không bị cắt.
         for key in ("button9", "buttonStopAll"):
             c[key].setStyleSheet("padding: 6px 8px;")
-        # Nút Active/Inactive của máy (cạnh Start All).
+        # Nút Active/Inactive của máy: cùng hàng, ngay bên trái Start All (cách 10px như Start All - Stop All).
         self._active = True
         self.active_button = QPushButton(self.page)
-        self.active_button.setGeometry(680, 421, 125, 40)
+        x, y = DESIGNER_DATA["button9"]["loc"]
+        self.active_button.setGeometry(x - 135, y, 125, 40)
         self.active_button.setStyleSheet("padding: 6px 8px;")
         self.active_button.clicked.connect(lambda: self.active_clicked.emit(not self._active))
         self.set_active(True)
