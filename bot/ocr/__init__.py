@@ -16,6 +16,7 @@ per reader, each exposing `run(image)`:
 - read_milestone: tiến độ rương mốc "Progress:12 / 70" (Gather Troops) -> 12
 - read_bubble_time: thời gian bubble còn lại "06:55:22" -> số giây
 - read_march_time: giờ ở màn March (thu thập / đi) "00:48:57" -> số giây
+- read_level: số cấp mỏ ở bảng Search của bản đồ thế giới "13" -> 13
 - read_train_count: số lính tối đa một lần train (ô bên phải nút "+") -> 20812
 - read_heal_count: số lính bị thương của một dòng ở màn Hospital "0 / 8,147" -> 8147
 - read_offer_cost: số kim cương ô "Cost" của popup Offer Gems "126,175" -> 126175
@@ -30,6 +31,7 @@ from .read_camera import run as read_camera
 from .read_coords import run as read_coords
 from .read_general_name import run as read_general_name
 from .read_heal_count import run as read_heal_count
+from .read_level import run as read_level
 from .read_march_time import run as read_march_time
 from .read_milestone import run as read_milestone
 from .read_number import run as read_number
@@ -40,5 +42,5 @@ from .read_server import run as read_server
 from .read_tax_count import run as read_tax_count
 from .read_train_count import run as read_train_count
 
-__all__ = ["read_balance", "read_boss_count", "read_boss_name", "read_bubble_time", "read_camera", "read_coords", "read_general_name", "read_heal_count", "read_march_time", "read_milestone", "read_number", "read_offer_cost", "read_power", "read_progress",
+__all__ = ["read_balance", "read_boss_count", "read_boss_name", "read_bubble_time", "read_camera", "read_coords", "read_general_name", "read_heal_count", "read_level", "read_march_time", "read_milestone", "read_number", "read_offer_cost", "read_power", "read_progress",
            "read_server", "read_tax_count", "read_train_count"]

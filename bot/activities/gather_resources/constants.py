@@ -10,7 +10,7 @@ RESOURCES = [
     ("gems", "Gems"),
 ]
 DEFAULT_RESOURCE = "food"
-MAX_LEVEL = 15       # cấp cao nhất ở ô chọn của tab (liệt kê từ MAX_LEVEL về 1); thanh cấp trong game còn lên quá 15
+MAX_LEVEL = 18       # cấp mỏ cao nhất của game (mọi loại); ô chọn của tab liệt kê từ MAX_LEVEL về 1
 DEFAULT_LEVEL = 10
 MAX_TROOP = 6        # số dòng (đội) tối đa ở tab; đội n = dòng thứ n, ở màn March bấm March luôn (không chọn preset)
 SQUADS_KEY = "squads"   # settings: {"squads": [{"resource": "food", "level": 10}, ...]}
@@ -67,7 +67,7 @@ TYPE_MAX_STEPS = 6         # số lần kéo tối đa khi dò loại mỏ (Farm
 TO_WORLD_TAP = (92, 93)   # nút quả địa cầu góc dưới phải ở màn thành
 GATHER_TIME = (100, 608, 190, 630)                   # px: giờ thu thập cạnh đồng hồ cát (x0, y0, x1, y1)
 MARCH_TIME = (280, 676, 340, 694)                    # px: giờ đi dưới nút March
-LEVEL_BOX = (305, 568, 375, 592)                     # px: ô số cấp bên phải nút "+" (read_number)
+LEVEL_BOX = (305, 568, 375, 592)                     # px: ô số cấp bên phải nút "+" (ocr/read_level, font GatherLevel)
 
 # ---- giới hạn / thời gian ----
 LEVEL_TAP_WAIT = 0.3       # giây chờ sau mỗi lần bấm +/− rồi mới chụp đọc lại ô số
@@ -80,5 +80,6 @@ SEND_TRIES = 2            # Occupy không sang màn March: làm lại cả lư�
 WAIT_TRIES, WAIT_INTERVAL = 8, 1   # chờ màn hình đổi: xem lại mỗi 1 giây, tối đa 8 lần
 FREE_MARGIN = 30          # giây cộng thêm vào giờ đội về
 NO_TROOP_WAIT = 30 * 60   # hết lính: mọi đội chờ 30 phút rồi thử lại
+NO_TROOP_BACKS = 3        # hết lính: bấm Back 3 lần (đóng màn March, bảng Search, menu tròn)
 MARCH_FULL_WAIT = 10 * 60  # hết đường march: mọi đội chờ 10 phút (đường trống lại khi một đội bất kỳ về)
 FAIL_WAIT = 10 * 60       # không gửi được đội (không tìm thấy mỏ, mỏ trùng...): đội đó chờ 10 phút

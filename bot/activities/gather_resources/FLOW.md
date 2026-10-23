@@ -1,7 +1,7 @@
 # Gather Resources (thu thập tài nguyên)
 
 Tab **Gather Resources** (ui/tabs/gather_resources_tab.py): nút **+ Add troop** thêm một dòng (tối đa `MAX_TROOP` = 6), mỗi dòng là
-một đội ("Troop n" = dòng thứ n), chọn loại mỏ (Food, Wood, Stone, Iron, Gems) và cấp mỏ (Lv 15 → 1, mặc định 10). **Không chọn preset**:
+một đội ("Troop n" = dòng thứ n), chọn loại mỏ (Food, Wood, Stone, Iron, Gems) và cấp mỏ (Lv 18 → 1, mặc định 10; mọi loại mỏ tối đa Lv 18). **Không chọn preset**:
 ở màn March bấm March luôn với quân / tướng game chọn sẵn. Cấu hình (cột `gather_resources` của DB):
 `{"squads": [{"resource": "food", "level": 10}, ...]}`.
 
@@ -62,7 +62,7 @@ flowchart TD
 | `OpenBox/Setup/chucnang.png` | nút "•••" màn thành | cả màn / 0.85 | vẫn khớp 0.98 khi hộp thoát game phủ mờ: kiểm tra hộp trước |
 | `searchButton.png` | nút Search của bảng | PANEL (0,78,100,100) / 0.85 | thấy = bảng Search đang mở |
 | `type_<loại>.png` | chữ Farm / Sawmill / Quarry / Iron Mine / Gems Mine | TYPE_ROW (0,70,100,78) / 0.8 | bấm icon phía trên chữ 5 % |
-| `plus.png`, `minus.png` | nút cấp | PANEL / 0.85 | ô số cấp đọc bằng `read_number` (px 305,568–375,592) |
+| `plus.png`, `minus.png` | nút cấp | PANEL / 0.85 | ô số cấp đọc bằng `ocr/read_level` (font GatherLevel, px 305,568–375,592) |
 | `unchecked.png` | ô "full resources" chưa tích | PANEL / 0.9 | đã tích chỉ khớp 0.73 |
 | `occupy.png` | Occupy ở menu tròn | MENU (0,25,70,70) / 0.85 | menu ô đất trống cũng có Occupy: chỉ bấm ngay sau Search |
 | `noTarget.png` | "No matching targets..." | cả màn / 0.8 | màn khác ≤ 0.44 |
@@ -92,7 +92,7 @@ giờ thu thập (100,608)–(190,630), giờ đi (280,676)–(340,694). Không 
 
 - Bấm Search: camera kéo mỏ vào giữa và **menu tròn tự mở** (Occupy, Add Bookmark, Detail, Share); ô mỏ nhấp nháy xanh.
 - Đổi loại mỏ thì cấp về **Lv 1** và ô "full resources" **bỏ tích**; mở lại bảng thì nhớ loại / cấp lần trước.
-- Thanh cấp **lên quá 15** (đã thấy Lv 17) nên không dùng "bấm + tới 15 rồi trừ"; game có lúc lỡ một lần bấm → **không bấm mù**: mỗi lần bấm một cái rồi OCR ô số (`read_number`, font Number) đọc lại.
+- Thanh cấp tối đa **Lv 18** (mọi loại mỏ); game có lúc lỡ một lần bấm → **không bấm mù**: mỗi lần bấm một cái rồi OCR ô số (`ocr/read_level`, font riêng `GatherLevel`: font chung `Number` đọc 3, 6 thành 8) đọc lại.
   Đọc không ra 3 lần liền, bấm 3 lần mà số không đổi, hoặc quá 40 lần bấm thì bỏ đội đó (chờ 10 phút).
 - Hàng loại: Summon, Monster, Terminator, **Farm**, Sawmill, Quarry, Iron Mine, Gems Mine, Cerberus, Ymir, ... (quái). Bảng nhớ vị trí
   cuộn lần trước. Ngón tay kéo dài sang phải 10 % → 200 % (ra ngoài màn, game vẫn nhận) trong 1 giây, 1 lần là hàng về đầu (Summon .. Farm);

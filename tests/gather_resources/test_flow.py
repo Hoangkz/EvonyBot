@@ -40,9 +40,9 @@ class GatherResourcesFlow(unittest.TestCase):
         self.assertEqual(len(keys), 1, device.daily_done)
 
     def test_no_troops(self):
-        """Màn March nút xám (hết lính): Back rồi dừng, đội chờ NO_TROOP_WAIT."""
+        """Màn March nút xám (hết lính): Back 3 lần rồi dừng, đội chờ NO_TROOP_WAIT."""
         flow = TO_MARCH + [
-            Step("05_march_no_troops.png", back()),
+            Step("05_march_no_troops.png", back(3)),
             Step("01_world.png", end()),
         ]
         device = run_flow(self, run, SCREENS, flow, _squad())

@@ -14,12 +14,12 @@ import time
 from ...common import delay, go_home
 from ...common.go_home import EXIT_DIALOG, EXIT_THRESHOLD
 from ...ocr.read_march_time import run as read_march_time
-from ...ocr.read_number import run as read_number
+from ...ocr.read_level import run as read_level
 from ..result import save_errors
 from .constants import (AFTER_OCCUPY_TRIES, AFTER_OCCUPY_WAIT, BUTTON_THRESHOLD, CITY_MENU, FAIL_WAIT, FREE_MARGIN, FREE_PREFIX, GATHER_TIME, KEY, LEVEL_BOX,
                         LEVEL_MAX_TAPS, LEVEL_READ_TRIES, LEVEL_STUCK, LEVEL_TAP_WAIT, MARCH_BAR, MARCH_BUTTON, MARCH_FULL,
                         MARCH_FULL_WAIT, MARCH_TIME, MARCH_TITLE, MAX_TROOP, MENU, MENU_SETTLE, MINUS, NO_TARGET,
-                        NO_TARGET_THRESHOLD, NO_TROOP_WAIT, NO_TROOPS, OCCUPY, OCCUPY_TRIES, PANEL, PLUS, RESOURCES, SEARCH_BUTTON,
+                        NO_TARGET_THRESHOLD, NO_TROOP_BACKS, NO_TROOP_WAIT, NO_TROOPS, OCCUPY, OCCUPY_TRIES, PANEL, PLUS, RESOURCES, SEARCH_BUTTON,
                         SEARCH_ICON, SEARCH_TRIES, SEND_TRIES, SQUADS_KEY, TARGET_TAKEN, THRESHOLD, TO_WORLD_TAP, TO_WORLD_TRIES,
                         TYPE_FLING_TIME, TYPE_FLING_TO_START, TYPE_FLINGS, TYPE_ICON_UP, TYPE_LABEL, TYPE_MAX_STEPS, TYPE_ROW,
                         TYPE_SWIPE_TIME, TYPE_SWIPE_TO_END, TYPE_SWIPE_TO_START, TYPE_THRESHOLD, UNCHECKED, WAIT_INTERVAL, WAIT_TRIES)
@@ -78,7 +78,7 @@ def run(bot, settings: dict):
     for squad in pending:
         troop = squad["troop"]
         try:
-            seconds = _send(bot, squad["resource"], int(squad.get("level") or 1))
+            seconds = _send(bot, squad["resource"], int(squad.get("level") or 1), troop)
         except _Stop as stop:
             bot.record(f"Gather Resources: {stop.reason}, chờ {stop.wait // 60} phút")
             for s in squads(settings):
@@ -89,12 +89,11 @@ def run(bot, settings: dict):
             bot.record(f"Gather Resources: không gửi được Troop {troop}, thử lại sau {FAIL_WAIT // 60} phút")
             set_free_at(bot, troop, time.time() + FAIL_WAIT)
             continue
-        set_free_at(bot, troop, time.time() + seconds + FREE_MARGIN)
         bot.record(f"Gather Resources: Troop {troop} đi thu thập {squad['resource']} Lv {squad.get('level')}, "
                    f"về sau {seconds // 60} phút")
 
 
-def _send(bot, resource: str, level: int) -> int | None:
+def _send(bot, resource: str, level: int, troop: int) -> int | None:
     """Gửi một đội. Trả số giây tới lúc đội về, None nếu không gửi được; ném _Stop khi hết lính / hết đường march."""
     for _ in range(SEND_TRIES):
         if not _open_search(bot) or not _pick_type(bot, resource):
@@ -107,7 +106,7 @@ def _send(bot, resource: str, level: int) -> int | None:
             delay(bot, 1)
         result = _occupy(bot, resource)
         if result == MARCH:
-            return _march(bot)
+            return _march(bot, troop)
         if result == NOT_FOUND:
             return None
     return None      # Occupy mà không sang màn March (bấm trượt khi menu còn trượt...): đã thử lại cả lượt
@@ -225,8 +224,8 @@ def _set_level(bot, level: int) -> bool:
 
 
 def _read_level(screen) -> int | None:
-    shown = read_number(_crop(screen, LEVEL_BOX))
-    return shown if shown > 0 else None
+    shown = read_level(_crop(screen, LEVEL_BOX))
+    return shown if shown else None
 
 
 MARCH, NOT_FOUND, FAILED = "march", "not_found", "failed"   # kết quả của _occupy
@@ -274,12 +273,14 @@ def _occupy(bot, resource: str) -> str:
     return FAILED
 
 
-def _march(bot) -> int | None:
-    """Màn March: đọc giờ, bấm March luôn (không chọn preset). Số giây tới lúc đội về; None nếu không March được."""
+def _march(bot, troop: int) -> int | None:
+    """Màn March: đọc giờ, bấm March luôn (không chọn preset). Số giây tới lúc đội về; None nếu không March được. Giờ đội về được
+    lưu vào DB NGAY TRƯỚC khi bấm March: bị ngắt sau khi bấm (việc khác tới lượt, Stop...) thì vẫn biết đội đã đi, không gửi thêm."""
     screen = bot.screenshot()
     if _no_troops(bot, screen):
-        bot.back()
-        delay(bot, 2)
+        for _ in range(NO_TROOP_BACKS):      # đóng màn March, bảng Search, menu tròn
+            bot.back()
+            delay(bot, 1)
         raise _out_of_troops()
     gather = read_march_time(_crop(screen, GATHER_TIME))
     march = read_march_time(_crop(screen, MARCH_TIME))
@@ -288,16 +289,19 @@ def _march(bot) -> int | None:
         bot.back()
         delay(bot, 2)
         return None
+    if gather is None or march is None:
+        bot.log(f"Gather Resources: không đọc được giờ (thu thập {gather}, đi {march}), coi như 1 giờ")
+        seconds = 3600
+    else:
+        seconds = gather + 2 * march
+    set_free_at(bot, troop, time.time() + seconds + FREE_MARGIN)
     bot.tap(*button)
     if not _wait_gone(bot, MARCH_TITLE):     # vẫn ở màn March: không March được
         bot.log("Gather Resources: bấm March mà vẫn ở màn March")
         bot.back()
         delay(bot, 2)
         return None
-    if gather is None or march is None:
-        bot.log(f"Gather Resources: không đọc được giờ (thu thập {gather}, đi {march}), coi như 1 giờ")
-        return 3600
-    return gather + 2 * march
+    return seconds
 
 
 def _wait_for(bot, template: str):
