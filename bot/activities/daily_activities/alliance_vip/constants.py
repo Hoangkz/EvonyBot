@@ -35,6 +35,12 @@ PRICE_BOX = (90, 22)          # rộng, cao khung xét màu
 PRICE_MIN_SATURATION = 100
 ITEM_THRESHOLD = 0.86
 LOCKED_ITEM_THRESHOLD = 0.90  # ngưỡng cao; so viền/góc, bỏ vùng ổ khóa giữa icon
+# Ba Truce dùng cùng hình con chim, chỉ khác màu nền. Sau khi khớp
+# hình phải phân loại thêm histogram Hue: 8h=tím, 24h=cam, 3d=vàng.
+TRUCE_COLOR_SATURATION_MIN = 80
+TRUCE_COLOR_VALUE_MIN = 50
+TRUCE_COLOR_MAX_DISTANCE = 0.45
+TRUCE_COLOR_MIN_MARGIN = 0.08
 # Popup mua: tìm dấu +, bấm đầu thanh bên trái nó để chọn MAX rồi xác nhận ảnh thanh MAX.
 PLUS = f"{FOLDER_PATH}/popup_plus.png"
 MAX_SLIDER = f"{FOLDER_PATH}/popup_max_slider.png"

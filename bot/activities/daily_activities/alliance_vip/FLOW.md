@@ -30,6 +30,11 @@ flowchart TD
   và "Weekly Sale" (`WeeklySale.png`, ở cuối trang, ngay dưới sách Daily). Tiêu đề nào ra khỏi màn thì dùng tiêu đề còn lại.
 - **Nút giá**: xanh (độ bão hoà màu >= 100) = mua được; xám (VD chưa có thẻ tháng, độ bão hoà ~35) = coi như đã mua, đánh dấu xong
   luôn. Bấm **nút giá** mới hiện popup mua (bấm vào sách thì không).
+- **Ba Truce Agreement** dùng cùng hình con chim nên không chỉ dựa vào
+  điểm template. Sau khi khớp hình, bot so thêm histogram HSV của nền:
+  `8h` tím, `24h` cam, `3d` vàng. Chỉ mua khi màu gần đúng loại
+  nhất và có khoảng cách an toàn với màu kế tiếp; trường hợp
+  nhập nhằng giữ PENDING để không mua nhầm thời hạn.
 - **Popup mua**: bấm giá xong chờ 1 giây, chưa có popup (tìm nút "+") thì chờ thêm tối đa 5 lần (1 giây / lần); sau 5 lần vẫn không có
   popup thì vẫn lưu xong. Có popup: bấm "+" 5 lần rồi bấm nút mua (dưới thanh số lượng) -> hiện hộp xác nhận -> bấm **Confirm** mới là mua thật, SAU ĐÓ mới lưu DB. Chờ Confirm tối đa 5 giây; không có Confirm mà popup mua còn mở, hoặc sau Confirm hộp vẫn còn thì Back, không lưu.
 - **Cuộn**: vừa vào shop đưa danh sách về đầu để ưu tiên Tribute và 100 VIP

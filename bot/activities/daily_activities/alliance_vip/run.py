@@ -54,11 +54,67 @@ from .constants import (
     TOP_SWIPES,
     TRIBUTE_DAY_KEY,
     TRIBUTE_MONTH_KEY,
+    TRUCE_COLOR_MAX_DISTANCE,
+    TRUCE_COLOR_MIN_MARGIN,
+    TRUCE_COLOR_SATURATION_MIN,
+    TRUCE_COLOR_VALUE_MIN,
     WEEKLY_HEADER,
 )
 
 _ON_SHOP, _TAP, _BACK, _SCROLL, _OUT, _OPEN = "on_shop", "tap", "back", "scroll", "out_alliance", "open_alliance"
 _ALLIANCE_BUTTON, _ALLIANCE_SCROLL, _OUT_ALLIANCE = ALLIANCE_NAV
+_TRUCE_ITEMS = tuple(item for item in ITEMS
+                     if item.key.startswith("truce_agreement_"))
+
+
+def _hue_histogram(image) -> np.ndarray | None:
+    """Histogram màu nền, bỏ pixel xám/trắng của chim và ổ khóa."""
+    if image is None or image.size == 0:
+        return None
+    hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+    mask = ((hsv[..., 1] >= TRUCE_COLOR_SATURATION_MIN) &
+            (hsv[..., 2] >= TRUCE_COLOR_VALUE_MIN)).astype(np.uint8) * 255
+    if cv2.countNonZero(mask) < max(20, image.shape[0] * image.shape[1] // 20):
+        return None
+    histogram = cv2.calcHist([hsv], [0], mask, [36], [0, 180])
+    return cv2.normalize(histogram, None, alpha=1.0,
+                         norm_type=cv2.NORM_L1)
+
+
+def _truce_color_matches(bot, screen, center, template: str) -> bool:
+    """Xác nhận 8h/24h/3d bằng dải Hue sau khi đã khớp hình."""
+    expected = next((item for item in _TRUCE_ITEMS
+                     if item.template == template), None)
+    if expected is None:
+        return True
+    tpl = bot._template(template)
+    height, width = tpl.shape[:2]
+    candidate = bot.crop(screen, center[0] - width // 2,
+                         center[1] - height // 2, width, height)
+    candidate_hist = _hue_histogram(candidate)
+    if candidate_hist is None:
+        bot.record(f"{LABEL}: {expected.label} không đủ pixel màu; "
+                   "không mua để tránh nhầm")
+        return False
+
+    distances = []
+    for item in _TRUCE_ITEMS:
+        reference_hist = _hue_histogram(bot._template(item.template))
+        distance = (1.0 if reference_hist is None else
+                    float(cv2.compareHist(candidate_hist, reference_hist,
+                                          cv2.HISTCMP_BHATTACHARYYA)))
+        distances.append((distance, item))
+    distances.sort(key=lambda pair: pair[0])
+    best_distance, best_item = distances[0]
+    runner_up = distances[1][0]
+    margin = runner_up - best_distance
+    accepted = (best_item.key == expected.key and
+                best_distance <= TRUCE_COLOR_MAX_DISTANCE and
+                margin >= TRUCE_COLOR_MIN_MARGIN)
+    bot.record(f"{LABEL}: dải màu Truce nhận {best_item.label}, "
+               f"yêu cầu {expected.label}, khoảng cách {best_distance:.3f}, "
+               f"chênh {margin:.3f} -> {'đúng' if accepted else 'loại'}")
+    return accepted
 
 
 def _open_shop(bot) -> bool:
@@ -176,7 +232,9 @@ def _find_item(bot, screen, template: str,
     normal = cv2.matchTemplate(area, tpl, cv2.TM_CCOEFF_NORMED)
     _, score, _, (normal_x, normal_y) = cv2.minMaxLoc(normal)
     if score >= ITEM_THRESHOLD:
-        return (normal_x + w // 2, normal_y + top + h // 2), float(score), False
+        center = (normal_x + w // 2, normal_y + top + h // 2)
+        if _truce_color_matches(bot, screen, center, template):
+            return center, float(score), False
     mask = np.full((h, w), 255, dtype=np.uint8)
     mask[int(h * .22):int(h * .78), int(w * .22):int(w * .78)] = 0
     result = cv2.matchTemplate(area, tpl, cv2.TM_CCORR_NORMED, mask=mask)
@@ -184,7 +242,10 @@ def _find_item(bot, screen, template: str,
     _, masked_score, _, (x, y) = cv2.minMaxLoc(result)
     if masked_score < LOCKED_ITEM_THRESHOLD:
         return None, max(float(score), float(masked_score)), True
-    return (x + w // 2, y + top + h // 2), float(masked_score), True
+    center = (x + w // 2, y + top + h // 2)
+    if not _truce_color_matches(bot, screen, center, template):
+        return None, max(float(score), float(masked_score)), True
+    return center, float(masked_score), True
 
 
 def _select_max(bot, plus: tuple[int, int]) -> bool:
