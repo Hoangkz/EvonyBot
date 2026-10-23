@@ -20,3 +20,5 @@ flowchart TD
 
 - Ảnh mẫu cắt từ ảnh chụp giả lập 396x704 (2026-10-16) vào `Images/DailyActivites/ActivitiesRangerKnight/`.
 - `Card.png`: thẻ bản cũ (icon số 4 trong lưới Activity).
+- `ScreenTitle.png`: tiêu đề màn "Ranger Knight Order" sau Go (cắt 2026-10-24). Không dùng `Title.png` — đó là tiêu
+  đề dòng trong danh sách Activity của phần mở nhiệm vụ chung.
