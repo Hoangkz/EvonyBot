@@ -486,7 +486,7 @@ def _drag(bot, delta: float):
         sign = 1 if delta > 0 else -1
         y1 = c.DRAG_MID + sign * step / 2 / c.SCREEN_H * 100
         y2 = c.DRAG_MID - sign * step / 2 / c.SCREEN_H * 100
-        bot.swipe_percent(c.SWIPE_X, y1, c.SWIPE_X, y2, duration=c.DRAG_DURATION, delay=c.SWIPE_WAIT)
+        bot.swipe_percent(50, y1, 50, y2, duration=c.DRAG_DURATION, delay=c.SWIPE_WAIT)
         delta -= sign * step
 
 
