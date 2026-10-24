@@ -34,9 +34,18 @@ DONT_SHOW = f"{FOLDER_PATH}/DontShow.png"
 CONFIRM = f"{FOLDER_PATH}/Confirm.png"
 UNLOCK_BUTTON = f"{FOLDER_PATH}/Unlock.png"   # nút "Unlock" dưới cùng màn: mỹ nữ này chưa mở khoá
 UNLOCK_THRESHOLD = 0.85
-GREET_FULL = f"{FOLDER_PATH}/GreetFull.png"   # chữ "10/10" của nút Greet: đủ lượt thì nút đen, bấm chỉ hiện "Purchase the Champion Monthly Card
-#                                             to unlock the privilege of Greet x10!". Khớp 1,00; "0/10" 0,68, "2/10" <= 0,63 -> ngưỡng riêng
-GREET_FULL_THRESHOLD = 0.9
+# Chữ vàng "10/10" cạnh "Greet" = đủ lượt. Chữ đè trong suốt lên nền mỹ nữ nên so MÀU đổi theo nền (mẫu cắt trên Esmeralda: Helen
+# 10/10 chỉ 0,70 -> không nhận ra, chờ tới hết 600 s, không lưu xong). So HÌNH chữ: chỉ lấy điểm vàng (HSV GREET_FULL_HSV) của mẫu
+# và của vùng GREET_FULL_REGION rồi so hai mặt nạ. Đo: Esmeralda 10/10 1,00 (có toast 0,96), Helen 10/10 0,875; Helen 2/10 0,60.
+GREET_FULL = f"{FOLDER_PATH}/GreetFull.png"
+GREET_FULL_REGION = (30, 500, 100, 535)   # px (x0, y0, x1, y1): dòng chữ "Greet n/10" dưới nút Greet
+GREET_FULL_HSV = ((18, 120, 150), (35, 255, 255))   # khoảng HSV của chữ vàng
+GREET_FULL_THRESHOLD = 0.78
+# Thông báo giữa màn "You cannot Empower anymore for today!" (bấm giữa = vào mỹ nữ, hết lượt Empower hôm nay). KHÔNG có nghĩa
+# Greet đã 10/10 (21913: hiện cả lúc Greet 2/10 đang chờ hồi) -> chỉ thôi bấm giữa khi Greet khoá, chờ LOCKED_WAIT rồi xét lại.
+# Cắt dòng đầu "You cannot Empower anymore for"; khớp 1,00, 1012 ảnh test khác <= 0,37.
+EMPOWER_LIMIT = f"{FOLDER_PATH}/EmpowerLimit.png"
+LOCKED_WAIT = 1          # giây chờ giữa hai lần xét khi Greet khoá mà đã hết Empower (không bấm giữa)
 MIDDLE_TAPS = 10         # sau mỗi lần Greet: bấm giữa chừng này lần liên tiếp, không delay
 ARROW_RIGHT = (94, 50)   # % màn hình: tâm mũi tên phải / trái đổi mỹ nữ
 ARROW_LEFT = (5, 50)

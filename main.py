@@ -32,8 +32,9 @@ from bot.common import GAME_PACKAGE
 from bot.worker import BotManager
 
 import licensing
-from database import DEFAULT_PROFILE, Database, is_event_key
+from database import DEFAULT_PROFILE, TAB_COLUMNS, Database, is_event_key
 from ui import DeviceView, HomeView, Sidebar
+from ui.device_view import subtract_craft_item
 from ui import theme
 from ui.activation_dialog import ActivationDialog
 from ui.workers import LicenseWorker
@@ -209,6 +210,7 @@ class MainWindow(QMainWindow):
         self.home_view.start_all_requested.connect(self._on_start_all_requested)
         self.home_view.stop_all_requested.connect(self._on_stop_all_requested)
         self.home_view.exit_all_requested.connect(self._on_exit_all_requested)
+        self.home_view.active_all_requested.connect(self._on_active_all_requested)
 
     def _check_license(self):
         self._license_timer.start(next_license_check_ms())   # next check at a new random gap
@@ -300,6 +302,22 @@ class MainWindow(QMainWindow):
         if not want:
             self.bots.stop(serial)
         self._refresh_run_counts()
+
+    def _on_active_all_requested(self):
+        """Nút Active All ở Home: kích hoạt các máy đang Inactive (theo thứ tự danh sách), máy đã Active giữ nguyên;
+        không vượt số tối đa của giấy phép, còn máy chưa bật được thì báo một lần."""
+        limit = self.bots.max_running
+        skipped = 0
+        for serial in list(self._active):   # đủ máy vừa Load Devices, kể cả máy chưa kịp đăng ký
+            if self._active[serial]:
+                continue
+            if limit is not None and sum(self._active.values()) >= limit:
+                skipped += 1
+                continue
+            self._on_active_toggled(serial, True)
+        if skipped:
+            QMessageBox.warning(self, "Cannot activate all devices",
+                                f"Device limit reached ({limit}): {skipped} device(s) left inactive.")
 
     def _register_next_device(self):
         if self._pending_devices:
@@ -399,6 +417,8 @@ class MainWindow(QMainWindow):
             view.set_settings(self.db.load_settings(device_id))
         self._refresh_profiles(device_id, view)
         view.set_active(self._active.get(device_id, True))
+        # Start All có thể đã chạy bot từ DB trước khi dựng giao diện.
+        view.set_running(self.bots.is_running(device_id))
         # Tab Logs chỉ hiện log trong SHOW_SECONDS gần nhất; DB vẫn giữ đủ.
         since = (datetime.now() - timedelta(seconds=SHOW_SECONDS)).isoformat(timespec="seconds")
         for created_at, message in self.db.load_logs(device_id, since):
@@ -565,17 +585,29 @@ class MainWindow(QMainWindow):
             view.set_run_counts(*counts)
 
     def _start_bot(self, device_id: str):
+        # Đây là dữ liệu riêng của thiết bị trong DB, không phải cấu hình Apply ALL.
+        saved = self.db.load_settings(device_id)
+        if device_id not in self.device_views and all(tab in saved for tab in TAB_COLUMNS):
+            # Chưa dựng giao diện nhưng DB đã đủ cấu hình mọi tab (tab nào dựng xong cũng tự lưu): start thẳng từ DB,
+            # khỏi dựng DeviceView + 10 tab (~3 s chặn giao diện mỗi máy, Start All lần đầu 30 máy mất ~2 phút).
+            self.bots.start(
+                device_id,
+                saved["Initialization"].get("activities", []),
+                saved,
+                daily_done=self.db.daily_done(device_id),
+            )
+            return
         view = self._ensure_view(device_id)
         if view is None:
             return
         settings = view.get_settings()
-        # Đây là dữ liệu riêng của thiết bị trong DB, không phải cấu hình Apply ALL.
-        saved = self.db.load_settings(device_id)
         init = settings.setdefault("Initialization", {})
         # Bubble còn hạn trong DB thì bot không cần vào game kiểm tra lại.
         init["bubble_until"] = saved.get("Initialization", {}).get("bubble_until") or ""
         # Nền văn minh bot đã tự xếp (ảnh công trình học chung theo nền văn minh).
         init["civilization"] = saved.get("Initialization", {}).get("civilization")
+        # Bản đồ thành bot đã quét (route công trình): không có thì mỗi lần Start lại quét từ đầu.
+        init["city_map"] = saved.get("Initialization", {}).get("city_map") or {}
         self.bots.start(
             device_id,
             view.initialization_tab.selected_activities(),
@@ -641,12 +673,19 @@ class MainWindow(QMainWindow):
         view = self.device_views.get(device_id)
         if view is not None:
             view.initialization_tab.set_settings({"bubble": False})
+        else:   # bot start từ DB, chưa dựng giao diện: sửa thẳng DB
+            init = self.db.load_settings(device_id).get("Initialization", {})
+            self.db.save_settings(device_id, {"Initialization": {**init, "bubble": False}})
 
     def _on_craft_done(self, device_id: str, item_id: str):
         """Bot vừa chế tạo xong một trang bị: tab Craft trừ 1 số lượng (về 0 thì bỏ tích) rồi lưu cấu hình mới vào DB, lần Start sau không làm lại."""
         view = self.device_views.get(device_id)
         if view is not None:
             self.db.save_settings(device_id, {"Craft": view.apply_craft_done(item_id)})
+        else:   # bot start từ DB, chưa dựng giao diện: trừ thẳng trong DB
+            craft = self.db.load_settings(device_id).get("Craft", {})
+            subtract_craft_item(craft, item_id)
+            self.db.save_settings(device_id, {"Craft": craft})
 
     def _on_log_message(self, device_id: str, message: str):
         """Dòng log của bot -> tab Logs của thiết bị đó."""

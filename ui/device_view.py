@@ -31,6 +31,16 @@ from .tabs import (
 )
 
 
+def subtract_craft_item(data: dict, item_id: str):
+    """Trừ 1 số lượng trang bị `item_id` trong cấu hình tab Craft (`data`, sửa tại chỗ); về 0 thì bỏ hẳn."""
+    items = data.setdefault("items", {})
+    if item_id in items:
+        if items[item_id] > 1:
+            items[item_id] -= 1
+        else:
+            items.pop(item_id)
+
+
 class DeviceView(QWidget):
     start_requested = pyqtSignal(str)       # device_id
     start_all_requested = pyqtSignal()
@@ -195,12 +205,7 @@ class DeviceView(QWidget):
         """Một trang bị vừa chế tạo xong: trừ 1 số lượng ở tab Craft (về 0 thì bỏ tích). Trả cấu hình mới của tab để lưu DB; tab chưa dựng thì sửa cấu hình đang chờ."""
         if "Craft" in self._lazy:
             data = self._pending_settings.setdefault("Craft", {})
-            items = data.setdefault("items", {})
-            if item_id in items:
-                if items[item_id] > 1:
-                    items[item_id] -= 1
-                else:
-                    items.pop(item_id)
+            subtract_craft_item(data, item_id)
             return data
         self.craft_tab.craft_done(item_id)
         return self.craft_tab.get_settings()

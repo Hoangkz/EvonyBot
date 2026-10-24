@@ -17,7 +17,7 @@ import numpy as np
 
 from bot.activities import join_monster_war
 from bot.activities.join_monster_war.boss_memory import JOINED, SKIPPED, BossMemory
-from bot.activities.join_monster_war.constants import (CHOOSE_DEVELOPMENT, FAVORITE_OFF, IDLE, JOIN, JOINED_BUTTON, LISTBOSS, MARCH,
+from bot.activities.join_monster_war.constants import (CHOOSE_DEVELOPMENT, FAVORITE_OFF, GENERAL_DETAIL_CLOSE, IDLE, JOIN, JOINED_BUTTON, LISTBOSS, MARCH,
                                                      NOT_ENOUGH_STAMINA, PRESET_DX, PRESET_X0, PRESET_Y,
                                                      REGIONS, SELECT_GENERAL, STAMINA_PLUS, STAMINA_SLIDER_END,
                                                      STAMINA_USE, WAR_TICKED)
@@ -71,14 +71,13 @@ def unknown(screen):
 
 def run_join(testcase, flow, settings, **kwargs):
     # Bộ ảnh legacy ghép màn danh sách và March từ các lượt chơi khác nhau nên tọa độ
-    # không trùng. Cho March dùng tọa độ vừa báo và coi ảnh Joined là đã xác nhận;
-    # kiểm tra OCR/Joined thật nằm trong test_current_code_flow và test_edge_cases.
+    # không trùng. Cho March dùng tọa độ vừa báo; kiểm tra OCR thật nằm trong
+    # test_current_code_flow và test_edge_cases.
     def reported_target(boss, _screen):
         reported = boss.bot.device.reported
         return reported[-1] if reported else PERYTON
 
-    with mock.patch.object(_Boss, "_read_march_target_coords", reported_target), \
-            mock.patch.object(_Boss, "_joined_target_visible", return_value=True):
+    with mock.patch.object(_Boss, "_read_march_target_coords", reported_target):
         return run_flow(testcase, join_monster_war.run, SCREENS, flow, settings,
                         variants={"war_off": war_off, "unknown": unknown}, **kwargs)
 
@@ -403,6 +402,12 @@ def refill(slider_step):
 
 # Hết vật phẩm thể lực: màn Use Item không còn nút Use -> Back 3 lần -> không dừng (thể lực
 # tự hồi): nhớ boss là đã tham gia và coi như rảnh (trả IDLE khi còn activity khác).
+GENERAL_DETAIL_OPENED = [
+    # Lỡ bấm vào tướng trên màn March -> popup "Detail" (ảnh chụp thật): bấm X đỏ, về màn March làm tiếp.
+    Step("march_general_detail.png", tap(GENERAL_DETAIL_CLOSE)),
+    Step(MARCH_SCREEN, preset(1)),
+    Step(MARCH_SCREEN, tap(MARCH)),
+]
 OUT_OF_STAMINA_ITEMS = [
     Step(W("02_war_list_join.png"), tap(JOIN)),
     Step(MARCH_SCREEN, preset(1)),
@@ -619,6 +624,10 @@ class JoinMonsterWarFlow(unittest.TestCase):
 
     def test_swipe_opening_troop_detail_backs_once(self):
         run_join(self, SWIPE_OPENED_TROOP_DETAIL, {**ALL_TROOPS})
+
+    def test_general_detail_popup_closes_with_x_then_marches(self):
+        device = run_join(self, GENERAL_DETAIL_OPENED, {**ALL_TROOPS})
+        self.assertIn("Join Monster War: lỡ mở popup Detail của tướng -> bấm X", device.logs)
 
     def test_out_of_stamina_items_does_not_mark_joined(self):
         device = run_join(self, OUT_OF_STAMINA_ITEMS, {**ALL_TROOPS, "use_stamina": "ALL"})

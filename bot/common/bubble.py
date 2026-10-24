@@ -57,7 +57,7 @@ TAP = "tap"
 BACK = "back"
 MAX_ROUNDS = 40       # số vòng tối đa trước khi bỏ cuộc (worker thử lại sau)
 MAX_CONFIRMS = 3      # bình thường tối đa 2 popup; hơn nữa là có gì đó lạ
-READ_RETRIES = 3      # số lần đọc lại thời gian sau khi dùng
+READ_RETRIES = 3      # số lần đọc lại thời gian (City Buff / sau khi dùng)
 
 # Icon buff khớp ~0.91, vị trí khác <= 0.56. Icon Truce khớp 0.90 với icon
 # 8h ở Use Item; "3 Day" / "7 Day" khớp chéo nhau ~0.90 -> ngưỡng 0.95.
@@ -116,6 +116,7 @@ def keep_bubble(bot, bubble_type: str, renew_before: int) -> int | None:
     renewing = False        # City Buff đã quyết định phải dùng bubble mới
     confirms = 0
     reads = 0
+    buff_reads = 0          # số lần đọc hỏng ở City Buff
     known = None            # thời gian đọc được gần nhất
     screen = bot.screenshot()
     for _ in range(MAX_ROUNDS):
@@ -162,9 +163,15 @@ def keep_bubble(bot, bubble_type: str, renew_before: int) -> int | None:
         elif action == CITY_BUFF:
             remaining = _city_buff_time(bot, screen, pos)
             if remaining is None:
-                bot.record("Bubble: không đọc được thời gian ở City Buff")
-                _leave(bot, 1)
-                return None
+                buff_reads += 1
+                if buff_reads >= READ_RETRIES:
+                    bot.record("Bubble: không đọc được thời gian ở City Buff")
+                    _leave(bot, 1)
+                    return None
+                # Màn có thể chưa hiện xong: chụp lại rồi đọc lần nữa.
+                delay(bot, 1)
+                screen = bot.screenshot()
+                continue
             known = remaining
             if remaining > renew_before and not confirms:
                 bot.log(f"Bubble: còn {remaining} giây, chưa cần dùng")

@@ -15,11 +15,11 @@ from . import boss_names, stamina_wait
 from .boss_memory import JOINED as MEMORY_JOINED
 from .boss_memory import BossMemory
 from .constants import (ALLIANCE_ICON, ASSISTANT_GENERAL, ASSISTANT_SELECT_MIN_Y, BACK, BOSS_MONSTER, CHOOSE_DEVELOPMENT,
-                        FAVORITE_OFF, FAVORITE_ON,
+                        FAVORITE_OFF, FAVORITE_ON, GENERAL_DETAIL, GENERAL_DETAIL_CLOSE, GENERAL_DETAIL_SEEN,
                         GENERAL_LIST_INTERVAL, GENERAL_LIST_WAIT, GENERAL_OPEN_INTERVAL, GENERAL_OPEN_WAIT, GENERAL_SEARCH, IDLE, JB, MONSTER_TICKED_REGION, MONSTER_TICKED_THRESHOLD,
                         MONSTER_TICK_TRIES, MONSTER_WAR_TAP, JOIN, JOIN_LIST, JOIN_MAX_Y, JOIN_MIN_Y, MAIN_GENERAL,
                         JOIN_THRESHOLD, JOINED, JOINED_BUTTON, JOINED_OVERLAP, LEAVE_ALLIANCE_POPUP,
-                        LIST_END_MAX_LIGHT, LIST_END_REGION, LISTBOSS, LOCATION, MARCH, MARCH_SCREEN,
+                        LIST_END_MAX_LIGHT, LIST_END_REGION, LISTBOSS, LOCATION, MARCH, MARCH_RESULT_WAIT, MARCH_SCREEN, MARCH_TO_CITY,
                         NO_BOSS, NOT_ENOUGH_STAMINA, OUT_OF_STAMINA, PRESET_ACTIVE_MIN_PIXELS, PRESET_ACTIVE_WAIT,
                         PRESET_COUNT, PRESET_DX, PRESET_RING_R, PRESET_LOCKED, PRESET_LOCKED_THRESHOLD, PRESET_X0, PRESET_Y, PVP_WAR, REGIONS, SAME_SPOT, SCROLL, SELECT,
                         SELECT_GENERAL, STAMINA_ITEM_USE, STAMINA_ITEM_USE_SMALL, STAMINA_ITEMS_OPEN_INTERVAL, STAMINA_ITEMS_OPEN_WAIT, STAMINA_REFILL_WAIT, STAMINA_SLIDER_END,
@@ -216,6 +216,11 @@ class _Boss:
                 bot.back(delay=TROOP_BACK_WAIT)
                 continue
 
+            elif action == GENERAL_DETAIL_SEEN:
+                # Lỡ bấm vào tướng trên màn March -> bấm X, vòng sau nhận lại màn March và làm tiếp
+                self._close_general_detail(screen)
+                continue
+
             elif action == LEAVE_ALLIANCE_POPUP:
                 bot.tap(pos[0] + 40, pos[1] + 40)
                 self._wait_gone(targets, action, pos, "close_leave_alliance_popup")
@@ -333,8 +338,8 @@ class _Boss:
         return strip.size > 0 and int(strip.max()) < LIST_END_MAX_LIGHT
 
     def _stamina_empty(self):
-        """Hết thể lực: đánh dấu rảnh và lưu mốc "bây giờ + 20 phút" vào DB; worker làm nhiệm vụ tới mốc đó rồi mới gọi
-        Join Boss lại (stamina_wait.py)."""
+        """Hết thể lực: đánh dấu rảnh và đặt mốc "bây giờ + 20 phút" (chỉ trong lượt chạy này, không lưu DB); worker làm nhiệm
+        vụ tới mốc đó rồi mới gọi Join Boss lại (stamina_wait.py)."""
         self.idle_scrolls = IDLE_SCROLLS
         until = stamina_wait.save(self.bot)
         self.bot.record(f"Join Monster War: hết thể lực, làm nhiệm vụ tới {until:%H:%M:%S} rồi Join Boss lại")
@@ -465,10 +470,11 @@ class _Boss:
         self._press_march(coords, march_pos, screen)
 
     def _press_march(self, coords, march_pos=None, screen=None):
-        """Bấm March và ghi JOINED khi game quay lại danh sách War.
-
-        Popup hết thể lực được kiểm tra trước và không được tính là thành công. Sau khi dùng
-        thể lực, `_use_stamina()` gọi lại hàm này với `self.march_coords` nên lần March mới được kiểm tra bình thường.
+        """Bấm March rồi xét màn hiện ra (chờ tối đa MARCH_RESULT_WAIT giây, thấy là quyết định ngay):
+        - popup hết thể lực -> như cũ (vòng chính xử lý OUT_OF_STAMINA), không tính là thành công. Sau khi dùng thể lực,
+          `_use_stamina()` gọi lại hàm này với `self.march_coords` nên lần March mới được xét bình thường;
+        - về danh sách boss (tab PvP War) -> coi như đã Join thành công, ghi nhớ boss (không cần thấy thẻ "Joined");
+        - về màn thành chính (lỗi game) -> chưa Join, không ghi nhớ, vòng chính tự vào lại danh sách.
         """
         bot = self.bot
         screen = screen if screen is not None else bot.screenshot()
@@ -486,41 +492,40 @@ class _Boss:
             if bot.find(NOT_ENOUGH_STAMINA, screen=shot) is not None:
                 return OUT_OF_STAMINA
 
-            # Chỉ coi thành công khi về danh sách War và thấy hàng Joined đúng tọa độ
-            # mục tiêu thật đã đọc trên March. Thấy mỗi tab PvP War là chưa đủ.
+            # Về danh sách War (thấy tab PvP War) sau khi bấm March = đã Join, ghi nhớ boss. Không tìm thẻ "Joined" đúng tọa độ
+            # nữa: danh sách đổi chậm / thẻ cuộn khỏi dải -> không ghi nhớ, bot bấm Join lại mãi boss mà đội đã đi.
             if bot.find(PVP_WAR, screen=shot, region=REGIONS[PVP_WAR]) is not None:
-                if coords is not None and self._joined_target_visible(shot, coords):
-                    return JOINED
+                return JOINED
+            # Về thẳng màn thành chính (lỗi game): March không thành
+            if (bot.find(ALLIANCE_ICON, screen=shot) is not None
+                    or bot.find(LISTBOSS, screen=shot, region=REGIONS[LISTBOSS]) is not None):
+                return MARCH_TO_CITY
             return None
 
-        last_shot, result = self._poll_screen("march_to_result", march_result)
+        last_shot, result = self._poll_screen("march_to_result", march_result, timeout=MARCH_RESULT_WAIT)
         if result == OUT_OF_STAMINA:
             self.next_screen = last_shot
             return
+        if result == MARCH_TO_CITY:
+            self.next_screen = last_shot
+            bot.record(f"Join Monster War: bấm March xong về màn thành chính (lỗi game), chưa Join boss {coords}; không ghi nhớ")
+            return
         if result == JOINED:
             self.next_screen = last_shot
+            if coords is None:
+                bot.record("Join Monster War: đã hành quân (không có tọa độ boss, không ghi nhớ)")
+                return
             self.memory.mark(coords, MEMORY_JOINED)
             bot.record(f"Join Monster War: đã hành quân tới boss {coords}")
             return
 
         # Chỉ Back khi vẫn còn ở màn March. Nếu chuyển sang màn khác nhưng chưa về danh sách
         # War, giữ ảnh hiện tại cho vòng chính tự nhận diện và không ghi nhớ tọa độ.
-        if (last_shot is not None
-                and bot.find(PVP_WAR, screen=last_shot, region=REGIONS[PVP_WAR]) is not None):
-            self.next_screen = last_shot
-            bot.record(f"Join Monster War: đã về danh sách nhưng chưa thấy Joined đúng boss {coords}; không ghi nhớ")
-        elif last_shot is not None and bot.find(MARCH, screen=last_shot, region=REGIONS[MARCH]) is not None:
+        if last_shot is not None and bot.find(MARCH, screen=last_shot, region=REGIONS[MARCH]) is not None:
             bot.back()
         else:
             self.next_screen = last_shot
             bot.record(f"Join Monster War: chưa quay lại danh sách War cho boss {coords}; không ghi nhớ")
-
-    def _joined_target_visible(self, screen, coords) -> bool:
-        """Danh sách War có hàng Joined mang đúng tọa độ mục tiêu vừa hành quân."""
-        points = self.bot.find_all(JOINED_BUTTON, screen=screen, center=False,
-                                   region=REGIONS[JOINED_BUTTON])
-        return any(_in_join_band(screen, y)
-                   and self._read_card_coords(screen, x, y) == coords for x, y in points)
 
     def _read_march_target_coords(self, screen):
         """Đọc tọa độ mục tiêu bên phải màn March (bên trái là tọa độ người gọi rally)."""
@@ -613,9 +618,14 @@ class _Boss:
         screen, opened = self._poll_screen(
             f"open_{name}",
             lambda image: (bot.find(FAVORITE_ON, screen=image, region=REGIONS[FAVORITE_ON])
-                           or bot.find(FAVORITE_OFF, screen=image, region=REGIONS[FAVORITE_OFF])),
+                           or bot.find(FAVORITE_OFF, screen=image, region=REGIONS[FAVORITE_OFF])
+                           or (GENERAL_DETAIL if bot.find(GENERAL_DETAIL, screen=image, region=REGIONS[GENERAL_DETAIL]) else None)),
             timeout=GENERAL_OPEN_WAIT, interval=GENERAL_OPEN_INTERVAL,
         )
+        if opened == GENERAL_DETAIL:
+            # Bấm "+" đúng lúc tướng của đội vừa load xong -> mở popup Detail của tướng: ô đã có tướng, bấm X rồi làm tiếp
+            self._close_general_detail(screen)
+            return True
         if not opened:
             bot.record(f"Chọn {name}: không mở được màn Select a General")
             # Đã rời màn March (màn chọn tướng mở muộn / đang load): Back về March, không để
@@ -680,6 +690,20 @@ class _Boss:
             return True
         bot.record(f"Chọn {name}: chưa thấy tướng trong ô sau khi Select")
         return False
+
+    def _close_general_detail(self, screen):
+        """Popup "Detail" của tướng đang mở trên màn March: bấm X đỏ (không thấy X thì Back) rồi chờ popup đóng."""
+        bot = self.bot
+        bot.record("Join Monster War: lỡ mở popup Detail của tướng -> bấm X")
+        close = bot.find(GENERAL_DETAIL_CLOSE, screen=screen, region=REGIONS[GENERAL_DETAIL_CLOSE])
+        if close is not None:
+            bot.tap(*close)
+        else:
+            bot.back()
+        self._poll_screen(
+            "close_general_detail",
+            lambda image: bot.find(GENERAL_DETAIL, screen=image, region=REGIONS[GENERAL_DETAIL]) is None,
+        )
 
     def _join(self, screen) -> bool:
         """Tap nút Join của boss đầu tiên cần tham gia; True nếu đã tap."""
@@ -1023,6 +1047,7 @@ def _targets() -> list[tuple[str, str]]:
     return [
         ("click/lencap.png", TAP),
         (NOT_ENOUGH_STAMINA, OUT_OF_STAMINA),
+        (GENERAL_DETAIL, GENERAL_DETAIL_SEEN),   # trước MARCH: nút March vẫn hiện (tối) dưới popup
         (MARCH, MARCH_SCREEN),
         (JOIN, JOIN_LIST),
         (JOINED_BUTTON, JOINED),

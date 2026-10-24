@@ -31,6 +31,11 @@ STAMINA_USE = f"{JB}/staminaUse.png"
 # Chữ "Total Troops" của màn chi tiết đội (hiện khi cú vuốt cuộn bị game coi là tap vào thẻ rally):
 # không khớp màn nào khác -> Back một lần về danh sách War.
 TROOP_DETAIL = f"{JB}/totalTroops.png"
+# Popup "Detail" của tướng trên màn March (lỡ bấm vào ô đã có tướng, VD bấm "+" đúng lúc tướng của đội vừa load xong):
+# nhận bằng chữ "Detail" ở tiêu đề (khớp 1,00; 1009 ảnh test khác <= 0,50), đóng bằng nút X đỏ bên phải tiêu đề
+# (X giống X của nhiều popup khác, tới 0,89 -> chỉ bấm khi đã thấy chữ "Detail").
+GENERAL_DETAIL = f"{JB}/generalDetail.png"
+GENERAL_DETAIL_CLOSE = f"{JB}/generalDetailClose.png"
 JOINED_BUTTON = f"{JB}/Joined.png"
 PVP_WAR = f"{JB}/PvPWar.png"
 WAR_TAB = f"{JB}/checkChienTranh.png"
@@ -54,6 +59,8 @@ REGIONS = {
     JOINED_BUTTON: (70, 35, 100, 90),     # đo: x77-91, y47-50 / y80-83
     MARCH: (60, 90, 100, 100),            # đo: x68-83 y94-97
     TROOP_DETAIL: (3, 38, 45, 46),        # đo: x22-138, y288-308
+    GENERAL_DETAIL: (35, 12, 65, 22),     # đo: chữ "Detail" x172-226, y104-128
+    GENERAL_DETAIL_CLOSE: (82, 11, 100, 22),  # đo: X đỏ (367, 116)
     PVP_WAR: (5, 6, 45, 15),              # đo: x11-37 y9-12
     WAR_TAB: (5, 88, 50, 100),            # đo: x15-41 y94-97
     LISTBOSS: (80, 20, 100, 90),          # cột icon bên phải (đo: x86-97 y57-60, vị trí dọc có thể đổi)
@@ -138,6 +145,9 @@ SAME_SPOT = 10                      # px: two positions closer than this are the
 # What to do when each image is seen.
 OUT_OF_STAMINA = "out_of_stamina"
 TROOP_DETAIL_SEEN = "troop_detail_seen"   # thấy màn chi tiết đội -> Back rồi chờ TROOP_BACK_WAIT
+GENERAL_DETAIL_SEEN = "general_detail_seen"   # thấy popup Detail của tướng -> bấm X rồi làm tiếp
+MARCH_TO_CITY = "march_to_city"   # bấm March xong về màn thành chính (lỗi game): chưa Join, không ghi nhớ
+MARCH_RESULT_WAIT = 5             # giây tối đa chờ màn sau khi bấm March (hết thể lực / danh sách boss / màn thành), thấy là đi tiếp
 MARCH_SCREEN = "march_screen"
 JOIN_LIST = "join_list"
 SCROLL = "scroll"

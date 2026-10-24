@@ -16,6 +16,7 @@ from ...event.city_building import KEEP
 from ...event.kings_path.building import open_menu
 from ....city.city_map import reach_building
 from ....common import to_city
+from ....context.templates import TEMPLATE_DIR, read_image
 from ...result import save_errors
 from ..common import Task, mark_task_done
 from ..constants import MAIN_MORE
@@ -30,6 +31,7 @@ from .constants import (
     CHAMPION_TITLE,
     CONFIRM,
     DONT_SHOW,
+    EMPOWER_LIMIT,
     FOLDER,
     GREET_FULL,
     GREET_MAX,
@@ -37,11 +39,14 @@ from .constants import (
     MORE_KEY,
     MORE_LABEL,
     greet_key,
+    GREET_FULL_HSV,
+    GREET_FULL_REGION,
     GREET_FULL_THRESHOLD,
     GREET_MIDDLE,
     GREET_BUTTON,
     GREET_THRESHOLD,
     HEART,
+    LOCKED_WAIT,
     KEY,
     LABEL,
     MENU_CHAMPION,
@@ -111,6 +116,7 @@ def _greet_loop(bot, on_greet=None) -> str:
     end = start + TASK_MAX_SECONDS
     direction = ARROW_RIGHT   # đã bấm hết mũi tên phải thì sang trái
     entered = False
+    empower_limit = False     # đã thấy "You cannot Empower anymore for today!": Greet khoá thì không bấm giữa nữa
     while time.monotonic() < end:
         screen = bot.screenshot()
         confirm = bot.find(CONFIRM, screen=screen)
@@ -127,9 +133,14 @@ def _greet_loop(bot, on_greet=None) -> str:
             _leave(bot)
             return LOST
         entered = True
-        if bot.find(GREET_FULL, screen=screen, threshold=GREET_FULL_THRESHOLD) is not None:
+        if greet_full(screen):
             bot.record(f"{LABEL}: Greet 10/10")
             return FULL
+        if not empower_limit and bot.find(EMPOWER_LIMIT, screen=screen) is not None:
+            # "You cannot Empower anymore for today!": bấm giữa (vào mỹ nữ) không còn tác dụng -> thôi bấm giữa khi Greet khoá.
+            # KHÔNG phải Greet 10/10 (đo trên 21913: thông báo hiện cả lúc Greet 2/10 đang chờ hồi).
+            bot.log(f"{LABEL}: cannot Empower anymore today, stop tapping the middle")
+            empower_limit = True
         if bot.find(UNLOCK_BUTTON, screen=screen, threshold=UNLOCK_THRESHOLD) is not None:
             direction = _next_champion(bot, screen, direction)
             if direction is None:
@@ -137,8 +148,11 @@ def _greet_loop(bot, on_greet=None) -> str:
                 return NONE_LEFT
             continue
         button = bot.find(GREET_BUTTON, screen=screen, threshold=GREET_THRESHOLD)
-        if button is None:   # Greet đang khoá: chỉ bấm giữa
-            bot.tap_percent(*GREET_MIDDLE, delay=0)
+        if button is None:   # Greet đang khoá (chờ hồi): bấm giữa; hết Empower thì chỉ chờ
+            if empower_limit:
+                bot.sleep(LOCKED_WAIT)
+            else:
+                bot.tap_percent(*GREET_MIDDLE, delay=0)
             continue
         bot.tap(*button, delay=0)
         for _ in range(MIDDLE_TAPS):
@@ -175,6 +189,20 @@ def _open_champion(bot) -> bool:
     return True
 
 
+def greet_full(screen) -> bool:
+    """Nút Greet đã 10/10: so hình chữ vàng "10/10" (mặt nạ điểm vàng, không phụ thuộc nền mỹ nữ) trong GREET_FULL_REGION."""
+    x0, y0, x1, y1 = GREET_FULL_REGION
+    template = _yellow(read_image(TEMPLATE_DIR / GREET_FULL))
+    score = cv2.minMaxLoc(cv2.matchTemplate(_yellow(screen[y0:y1, x0:x1]), template, cv2.TM_CCORR_NORMED))[1]
+    return score >= GREET_FULL_THRESHOLD
+
+
+def _yellow(image):
+    """Mặt nạ 0/255 các điểm màu chữ vàng (GREET_FULL_HSV)."""
+    low, high = GREET_FULL_HSV
+    return cv2.inRange(cv2.cvtColor(image, cv2.COLOR_BGR2HSV), low, high)
+
+
 def _arrow_active(screen, box) -> bool:
     """Mũi tên còn bấm được (vàng) hay đã xám: độ bão hoà trung bình của các điểm sáng trong hình thoi."""
     x0, y0, x1, y1 = box
@@ -184,21 +212,17 @@ def _arrow_active(screen, box) -> bool:
 
 
 def _leave(bot):
-    """Về màn thành sạch (thấy nút "•••"), không chờ: Back một lần rồi xét ảnh liên tục tới khi màn đổi. Màn thành
-    sạch thì không Back (sẽ hỏi thoát game)."""
+    """Về màn thành sạch (thấy nút "•••"): Back một lần rồi xét ảnh liên tục tới khi thấy "•••" (tối đa SCREEN_WAIT), chưa thấy
+    mới Back tiếp. Không Back ngay khi màn Champion vừa biến mất: màn thành chưa vẽ xong nút "•••", Back thêm ở màn thành sạch
+    sẽ hỏi thoát game."""
     for _ in range(BACKS_AFTER):
-        screen = bot.screenshot()
-        if bot.find(MAIN_MORE, screen=screen) is not None:
+        if bot.find(MAIN_MORE, screen=bot.screenshot()) is not None:
             return
-        on_champion = bot.find(CHAMPION_TITLE, screen=screen) is not None
         bot.back(delay=0)
         end = time.monotonic() + SCREEN_WAIT
-        while time.monotonic() < end:   # chờ màn đổi bằng cách xét ảnh, không ngủ
-            screen = bot.screenshot()
-            if bot.find(MAIN_MORE, screen=screen) is not None:
+        while time.monotonic() < end:   # chờ màn thành hiện bằng cách xét ảnh, không ngủ
+            if bot.find(MAIN_MORE, screen=bot.screenshot()) is not None:
                 return
-            if (bot.find(CHAMPION_TITLE, screen=screen) is not None) != on_champion:
-                break
 
 
 TASK = Task(LABEL, FOLDER, key=KEY)

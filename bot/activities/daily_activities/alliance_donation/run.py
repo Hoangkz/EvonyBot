@@ -9,7 +9,9 @@ Flow (donate_free):
    donate lại (lượt free hồi theo thời gian). Việc này không có "xong hôm nay": mỗi N giờ lại donate.
 4. Ra danh sách nhiệm vụ Activity nhận thưởng (collect_activity_rewards: Claim All + rương điểm). KHÔNG tìm dòng nhiệm vụ
    rồi bấm Go, cũng không mở bảng để kiểm tra dòng đã xong chưa.
-Không tới được Alliance Science hoặc hết lượt free ngay: Back, không nhận thưởng; chờ tới giờ kế tiếp (giờ lưu bởi
+Xong phần donate (donate được hay không): Back LEAVE_BACKS (2) lần — Alliance Science rồi màn Liên minh — về thành. Trước đây
+chỉ Back 1 lần, bỏ lại game ở màn Liên minh: Join Boss chạy sau không nhận ra màn, phải go_home từng lớp (~4 s mỗi lớp).
+Không tới được Alliance Science hoặc hết lượt free ngay: không nhận thưởng; chờ tới giờ kế tiếp (giờ lưu bởi
 common.hourly_job). Lỗi thì lưu `<key>_error` vào DB (xem ../../result.py save_errors).
 """
 from ...event.kings_path.donate.alliance import _open_science
@@ -17,7 +19,7 @@ from ...event.kings_path.donate.constants import DONATE_WAIT, MAX_MISSES
 from ...event.kings_path.donate.donating import read_screen
 from ...result import NOT_DONE, TaskResult
 from ..common import Task, collect_activity_rewards
-from .constants import FOLDER, KEY, LABEL, MAX_FREE_DONATIONS, TRIED_KEY
+from .constants import FOLDER, KEY, LABEL, LEAVE_BACKS, MAX_FREE_DONATIONS, TRIED_KEY
 
 
 # TASK chỉ để hourly_job biết nhãn / key của việc (nhãn là ô chọn giờ ở tab và key "xong" trong daily_done).
@@ -30,7 +32,8 @@ def donate_free(bot) -> TaskResult:
     if not _open_science(bot):
         return NOT_DONE
     donated = _donate_free_times(bot)
-    bot.back(delay=1)   # đóng Alliance Science
+    for _ in range(LEAVE_BACKS):   # đóng Alliance Science rồi màn Liên minh: về thành, không bỏ lại game ở màn Liên minh
+        bot.back(delay=1)
     if not donated:
         bot.log(f"{LABEL}: no free donations now, try later")
         return NOT_DONE
