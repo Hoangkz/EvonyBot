@@ -1,6 +1,10 @@
 # Wishful Windmill Festival
 
 1. Mở đúng hàng `Wishful Windmill Festival` trong Limited.
+2. Mở rương Wind Blessings và chỉ xử lý các nút `Claim` trong khung xanh.
+3. Nếu mọi nút trong khung đã là `status_claimed` thì phần đó DONE.
+4. Sau khi bấm `Claim`, nếu đúng dòng đổi thành `status_claimed` thì phần đó DONE ngay.
+5. Không nhầm chữ `Claim` nằm bên trong `Claimed`; hoàn tất phần rương trước rồi mới sang Challenge Quest.
 2. Vào `Wind Blessings` bằng icon thường, rương cũ `button_reward_chest`, hoặc
    rương có nhãn Wind mới `button_reward_chest_wind` (ngưỡng cao `0.86`).
    Không có bước dừng 2 giây chờ trang/rương ổn định: tìm và bấm

@@ -408,7 +408,8 @@ def open_event(bot, icon: str) -> str:
 def claim_login_reward(bot, screen) -> bool:
     """Rương Login Rewards hôm nay (xem constants.py): mỗi ngày kiểm 1 lần. True nếu vừa bấm nhận
     (màn hình đã đổi)."""
-    if bot.is_daily_done(LOGIN_REWARD_KEY):
+    key = LOGIN_REWARD_KEY
+    if bot.is_daily_done(key):
         return False
     tip = bot.find(PROGRESS_TIP, threshold=PROGRESS_TIP_THRESHOLD, screen=screen,
                    region=PROGRESS_TIP_REGION)
@@ -419,26 +420,29 @@ def claim_login_reward(bot, screen) -> bool:
     area = bot.crop(screen, tip[0] + dx, tip[1] + dy, w, h)
     if bot.find(CHEST_OPENED, threshold=CHEST_OPENED_THRESHOLD, screen=area) is not None:
         bot.log("Event: login reward already opened")
-        bot.mark_daily_done(LOGIN_REWARD_KEY)
+        bot.mark_daily_done(key)
         return False
     bot.record(f"Event: claim login reward at progress bar {tip}")
     bot.tap(tip[0] + CHEST_TAP[0], tip[1] + CHEST_TAP[1], delay=CHEST_WAIT)
-    bot.mark_daily_done(LOGIN_REWARD_KEY)
+    bot.mark_daily_done(key)
     return True
 
 
 def open_voyage(bot, screen) -> bool:
-    """Voyage to Civilizations (xem constants.py): hôm nay chưa vào và thấy icon trên `screen` ->
-    vào và lưu VOYAGE_KEY ngay (mỗi ngày chỉ vào 1 lần, có Free hay không), tích Skip animation, có
-    Free thì bấm Voyage Once, Back về danh sách. True nếu đã vào (màn hình đã đổi)."""
-    if bot.is_daily_done(VOYAGE_KEY):
+    """Voyage to Civilizations (xem constants.py): tích Skip animation và nhận Free.
+
+    Chỉ ghi DONE khi không còn Free; lỗi mở trang/cú bấm chưa ăn thì giữ chưa
+    DONE. True nếu đã vào (màn hình đã đổi).
+    """
+    key = VOYAGE_KEY
+    if bot.is_daily_done(key):
         return False
     pos = bot.find(VOYAGE_ICON, threshold=VOYAGE_THRESHOLD, screen=screen)
     if pos is None:
         return False
-    bot.log("Event: open Voyage to Civilizations")
+    scope = "Voyage"
+    bot.log(f"Event: open {scope} to Civilizations")
     bot.tap(*pos, delay=VOYAGE_WAIT)
-    bot.mark_daily_done(VOYAGE_KEY)
     if bot.wait_for(VOYAGE_TITLE, timeout=VOYAGE_SCREEN_WAIT) is None:
         bot.record("Event: Voyage to Civilizations screen not shown")
         _back_to_event_list(bot)
@@ -455,8 +459,17 @@ def open_voyage(bot, screen) -> bool:
     if free is not None:
         bot.record("Event: Voyage: free Voyage Once")
         bot.tap(free[0], free[1] + VOYAGE_ONCE_DY, delay=VOYAGE_WAIT)
+        # DONE chỉ khi nút Free đã biến mất. Popup Congratulations cũng che nút Free, nên đây là
+        # dấu xác nhận cú bấm đã được game nhận; nếu nút vẫn còn thì lượt sau sẽ thử lại.
+        screen = bot.screenshot()
+        if bot.find(VOYAGE_FREE, screen=screen, region=VOYAGE_FREE_REGION) is not None:
+            bot.record(f"Event: {scope} Free vẫn còn sau khi bấm; chưa DONE")
+            _back_to_event_list(bot)
+            return True
     else:
         bot.log("Event: Voyage: no Free today")
+    bot.mark_daily_done(key)
+    bot.record(f"Event: {scope} DONE")
     _back_to_event_list(bot)
     return True
 
@@ -480,7 +493,8 @@ def event_list_titles() -> list[str]:
     dẫn dưới Images/) và ảnh bot tự thêm (LEARNED_TITLES_DIR, đường dẫn tuyệt đối)."""
     learned = constants.LEARNED_TITLES_DIR
     added = sorted(learned.glob("*.png")) if learned.is_dir() else []
-    return [EVENT_LIST_TITLE, *images_in(EVENT_LIST_TITLES_DIR), *(str(p) for p in added)]
+    return [EVENT_LIST_TITLE, *images_in(EVENT_LIST_TITLES_DIR),
+            *(str(p) for p in added)]
 
 
 def find_event_list_title(bot, screen=None):

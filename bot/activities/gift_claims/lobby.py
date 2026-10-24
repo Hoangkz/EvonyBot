@@ -3,7 +3,7 @@ import cv2
 import numpy as np
 
 from .common import (REFERENCE_WIDTH, find, find_all, find_valuable_event,
-                     return_home)
+                     return_home, swipe_around)
 from .screens import GiftScreen, identify
 
 BOTTOM = "bottom"
@@ -16,6 +16,7 @@ REGIONS = {
 }
 MAX_OPENS_PER_BOUNDARY = 16
 OPEN_WAIT_ATTEMPTS = 6
+VALUABLE_LAUNCH_ATTEMPTS = 3
 IGNORED_RIGHT_LAUNCHERS = ("FollowUs/facebook_icon",)
 EVENT_CENTER_LAUNCHERS = ("EventCenter/launcher_side", "EventCenter/launcher")
 FIXED_PARENT_LAUNCHERS = {
@@ -240,13 +241,68 @@ def open_named(bot, expected):
     """Open a named parent through image recognition, never a fixed position."""
     if not return_home(bot):
         return False
-    screen = bot.screenshot()
-    if identify(bot, screen) == expected:
-        return True
     launcher = None
     if expected == GiftScreen.VALUABLE_EVENT:
-        launcher = find_valuable_event(bot, screen)
+        # The launcher moves with the city and its glow/badge is animated.
+        # Check fresh frames and re-centre the city between misses instead of
+        # turning one unlucky screenshot into another 120-second retry.
+        for attempt in range(VALUABLE_LAUNCH_ATTEMPTS):
+            screen = bot.screenshot()
+            if identify(bot, screen) == expected:
+                return True
+            launcher = find_valuable_event(bot, screen)
+            if launcher is not None:
+                break
+            if attempt + 1 < VALUABLE_LAUNCH_ATTEMPTS:
+                bot.log(
+                    "Gift Claims: chưa thấy launcher ValuableEvent; "
+                    f"điều chỉnh màn thành ({attempt + 1}/"
+                    f"{VALUABLE_LAUNCH_ATTEMPTS - 1})")
+                swipe_around(bot)
+        if launcher is None:
+            # Approved city-layout fallback for the 396x704 reference screen.
+            # Verify the inner title after tapping; a coordinate tap alone is
+            # never accepted as proof that the correct page opened.
+            scale = screen.shape[1] / REFERENCE_WIDTH
+            fixed_target = (round(255 * scale), round(566 * scale))
+            bot.record(
+                "Gift Claims: không thấy launcher ValuableEvent; "
+                "bấm fallback x=255 y=566")
+            bot.tap(*fixed_target, delay=1)
+            for attempt in range(OPEN_WAIT_ATTEMPTS):
+                if identify(bot, bot.screenshot()) == expected:
+                    return True
+                if attempt + 1 < OPEN_WAIT_ATTEMPTS:
+                    bot.sleep(1)
+            bot.record(
+                "Gift Claims: fallback x=255 y=566 không mở được "
+                "ValuableEvent")
+
+            # Some city layouts expose only the Super Value Return launcher,
+            # although Valuable Event is still another tab in the same upper
+            # carousel.  Use the launcher that is actually visible, then move
+            # to a known Valuable Event tab instead of waiting 120 seconds for
+            # a city launcher which may never be present.
+            bot.record(
+                "Gift Claims: không thấy launcher ValuableEvent; "
+                "thử mở qua SuperValueReturn")
+            if open_named(bot, GiftScreen.SUPER_VALUE_RETURN):
+                if _switch_parent_carousel(bot, expected):
+                    bot.record(
+                        "Gift Claims: đã chuyển SuperValueReturn -> ValuableEvent")
+                    return True
+                bot.record(
+                    "Gift Claims: đã mở SuperValueReturn nhưng không chuyển "
+                    "được sang ValuableEvent")
+            else:
+                bot.record(
+                    "Gift Claims: không mở được SuperValueReturn để đi vòng "
+                    "sang ValuableEvent")
+            return_home(bot)
     else:
+        screen = bot.screenshot()
+        if identify(bot, screen) == expected:
+            return True
         launcher_spec = FIXED_PARENT_LAUNCHERS.get(expected)
         if launcher_spec is not None:
             templates, region = launcher_spec

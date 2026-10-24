@@ -1,6 +1,16 @@
 # Dwarf's Lucky Apple
 
-1. Mở Event Center, chọn Activities bằng ảnh chữ và tìm đúng dòng Dwarf's Lucky Apple.
+1. Mở Event Center và chọn Activities bằng ảnh chữ. Riêng danh sách này không
+   dùng nhịp chờ chung 1,5–2 giây của Limited:
+   - vuốt về đỉnh, mỗi cú vuốt chờ `0,8 giây`; hai cú liên tiếp không làm danh
+     sách đổi mới xác nhận đã tới đỉnh;
+   - từ đỉnh, chụp và tìm đúng `DwarfsLuckyApple/list_row`, rồi vuốt xuống từng
+     bước; sau mỗi bước chờ `0,8 giây` mới chụp và tìm tiếp;
+   - hai cú vuốt liên tiếp không đổi ảnh mới xác nhận đã tới đáy;
+   - chưa thấy thì đảo chiều, tiếp tục quét từ đáy lên đỉnh với cùng nhịp
+     `0,8 giây`;
+   - chỉ bấm khi vừa tìm lại được đúng ảnh dòng Dwarf's Lucky Apple. Không còn
+     bước đứng yên chờ thêm `1,5 giây` rồi quét trùng cùng một vị trí.
 2. Xác nhận title, chọn táo xanh bằng một trong hai ảnh
    `tab_green_apple` hoặc `tab_green_apple_1`; cả hai dùng chính tâm ảnh tìm
    được làm vị trí bấm.

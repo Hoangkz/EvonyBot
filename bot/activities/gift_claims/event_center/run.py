@@ -75,6 +75,13 @@ SWIPE_DURATION_SECONDS = 1.0
 # ADB has finished the swipe.  List navigation therefore gets a longer pause
 # than ordinary taps, and every list position is sampled twice before moving.
 LIST_SCROLL_SETTLE_SECONDS = 2.0
+# Activities currently owns one supported row: Dwarf's Lucky Apple.  Its
+# title is static, so the list can be scanned safely at the faster cadence the
+# user requested instead of inheriting the conservative multi-device delay of
+# the animated Limited list.
+APPLE_LIST_SETTLE_SECONDS = 0.8
+APPLE_LIST_MAX_SWIPES = 12
+APPLE_LIST_EDGE_CONFIRMATIONS = 2
 WISHFUL_SETTLE_SECONDS = 1.0
 WISHFUL_CONFIRMATION_DELAY_SECONDS = 1.0
 WISHFUL_CONTENT_REGION = (3, 26, 97, 88)
@@ -411,7 +418,14 @@ def _handle_dwarf(bot):
 
 
 def _handle_dragon_battle(bot):
-    """Tap the exact Dragon chest; only Congratulations is DONE."""
+    """Tap the exact Dragon chest; Congratulations or the claimed chest is DONE."""
+    already_done = _wait_for(
+        bot, "DragonBattle/status_reward_claimed", attempts=2, threshold=0.82,
+        region=(0, 15, 100, 95), delay=UI_SETTLE_SECONDS)
+    if already_done is not None:
+        bot.record("Gift Claims: Dragon Battle đã thấy rương trạng thái "
+                   "Screenshot_20261025-012404; DONE")
+        return ClaimReport(0, 1), True
     reward = _wait_for(
         bot, "DragonBattle/reward_230317", attempts=4, threshold=0.80,
         region=(0, 15, 100, 95), delay=UI_SETTLE_SECONDS)
@@ -424,6 +438,13 @@ def _handle_dragon_battle(bot):
     bot.tap(*reward, delay=UI_SETTLE_SECONDS)
     if close_congratulations(bot, attempts=5):
         bot.record("Gift Claims: Dragon Battle đã hiện Congratulations; DONE")
+        return ClaimReport(1, 1), True
+    claimed = _wait_for(
+        bot, "DragonBattle/status_reward_claimed", attempts=3, threshold=0.82,
+        region=(0, 15, 100, 95), delay=UI_SETTLE_SECONDS)
+    if claimed is not None:
+        bot.record("Gift Claims: Dragon Battle rương đã đổi sang trạng thái "
+                   "Screenshot_20261025-012404; DONE")
         return ClaimReport(1, 1), True
     bot.record("Gift Claims: Dragon Battle bấm rương nhưng chưa thấy "
                "Congratulations; giữ PENDING")
@@ -522,8 +543,23 @@ def _wishful_content_moved(before, after) -> bool:
 
 
 def _wishful_claims(bot, screen):
-    return find_all(bot, "WishfulWindmillFestival/button_claim", screen,
-                    threshold=0.74, region=WISHFUL_CLAIM_REGION)
+    """Claim thật, loại chữ Claim khớp lồng bên trong trạng thái Claimed."""
+    claimed = _wishful_claimed(bot, screen)
+    return [pos for pos in find_all(
+        bot, "WishfulWindmillFestival/button_claim", screen,
+        threshold=0.74, region=WISHFUL_CLAIM_REGION)
+        if all(abs(pos[0] - done[0]) > 50 or abs(pos[1] - done[1]) > 22
+               for done in claimed)]
+
+
+def _wishful_claimed(bot, screen):
+    return find_all(bot, "WishfulWindmillFestival/status_claimed", screen,
+                    threshold=0.82, region=WISHFUL_CLAIM_REGION)
+
+
+def _wishful_claimed_near(bot, screen, claim) -> bool:
+    return any(abs(pos[0] - claim[0]) <= 50 and abs(pos[1] - claim[1]) <= 30
+               for pos in _wishful_claimed(bot, screen))
 
 
 def _wishful_done_one_limit(bot, screen) -> bool:
@@ -569,9 +605,17 @@ def _tap_wishful_claim(bot, claim: tuple[int, int],
                        "failed. The limit has been...'; DONE 1 ngay và chuyển "
                        "sang kiểm tra DONE 2")
             return tap_number, True, True
+        if _wishful_claimed_near(bot, immediate, claim):
+            bot.record(f"Gift Claims: Wishful Windmill {phase} Claim đã đổi "
+                       "thành Claimed; DONE")
+            return tap_number, True, True
         popup_closed = _close_wishful_congratulations(bot)
         bot.sleep(WISHFUL_CONFIRMATION_DELAY_SECONDS)
         after = bot.screenshot()
+        if _wishful_claimed_near(bot, after, claim):
+            bot.record(f"Gift Claims: Wishful Windmill {phase} xác nhận dòng "
+                       "Claimed sau khi bấm; DONE")
+            return tap_number, True, True
         nearby = next(
             (pos for pos in _wishful_claims(bot, after)
              if abs(pos[0] - claim[0]) <= 35 and
@@ -616,6 +660,10 @@ def _claim_wishful_panel(bot, phase: str) -> tuple[ClaimReport, bool]:
                 if empty_checks < EMPTY_POSITION_CHECKS:
                     bot.sleep(WISHFUL_CONFIRMATION_DELAY_SECONDS)
                     continue
+                if _wishful_claimed(bot, screen):
+                    bot.record(f"Gift Claims: Wishful Windmill {phase} toàn bộ "
+                               "nút trong khung hiện tại đã là Claimed; DONE")
+                    return ClaimReport(attempted, max(verified, 1)), True
                 break
 
             empty_checks = 0
@@ -667,7 +715,7 @@ def _claim_wishful_panel(bot, phase: str) -> tuple[ClaimReport, bool]:
     return ClaimReport(attempted, verified), False
 
 
-def _wait_event_row_open(bot, expected_screen=None):
+def _wait_event_row_open(bot, expected_screen=None, *, delay=UI_SETTLE_SECONDS):
     """Wait through Event Center transition frames after selecting one row.
 
     ``identify`` legitimately returns ``None`` while the new page is painting;
@@ -688,7 +736,7 @@ def _wait_event_row_open(bot, expected_screen=None):
                                    expected_screen)):
             return actual
         if attempt < 4:
-            bot.sleep(UI_SETTLE_SECONDS)
+            bot.sleep(delay)
     return actual
 
 
@@ -1840,16 +1888,18 @@ def _select_category(bot, name: str, x_percent: int) -> bool:
                          else "EventCenter/tab_limited")
     category_pos = find(bot, category_template, screen, threshold=0.72,
                         region=(0, 5, 80, 18))
+    settle = (APPLE_LIST_SETTLE_SECONDS
+              if name == "activities" else UI_SETTLE_SECONDS)
     if category_pos is not None:
-        bot.tap(*category_pos, delay=UI_SETTLE_SECONDS)
+        bot.tap(*category_pos, delay=settle)
     else:
-        bot.tap_percent(x_percent, 11, delay=UI_SETTLE_SECONDS)
+        bot.tap_percent(x_percent, 11, delay=settle)
     for _ in range(4):
         screen = bot.screenshot()
         if find(bot, PAGE, screen, threshold=0.72,
                 region=(0, 0, 100, 13)) is not None:
             return True
-        bot.sleep(UI_SETTLE_SECONDS)
+        bot.sleep(settle)
     return False
 
 
@@ -1883,6 +1933,57 @@ def _return_list_to_top(bot, category: str) -> None:
                    f"({step + 1}/{MAX_SCROLLS})")
         if _same_list_position(before, after):
             break
+
+
+def _find_dwarfs_lucky_apple_row(bot) -> bool:
+    """Scan Activities from top to bottom, then bottom to top at 0.8 s.
+
+    Both edges require two consecutive no-movement swipes.  The reverse pass
+    matters because a title can be hidden by a still-moving frame on the first
+    descent.  This helper only locates the row; the caller re-finds the exact
+    template before tapping it.
+    """
+    template = "DwarfsLuckyApple/list_row"
+
+    def swipe(start_y, end_y, direction, *, search: bool) -> bool | None:
+        unchanged = 0
+        for step in range(1, APPLE_LIST_MAX_SWIPES + 1):
+            bot.check()
+            screen = bot.screenshot()
+            if (search and find(bot, template, screen, threshold=0.90,
+                                region=(10, 15, 75, 98)) is not None):
+                bot.record("Gift Claims: Activities tìm thấy dòng Dwarf's "
+                           f"Lucky Apple khi quét {direction}")
+                return True
+            before = _list_signature(screen)
+            bot.swipe_percent(50, start_y, 50, end_y,
+                              duration=SWIPE_DURATION_SECONDS,
+                              delay=APPLE_LIST_SETTLE_SECONDS)
+            after = _list_signature(bot.screenshot())
+            same = _same_list_position(before, after)
+            unchanged = unchanged + 1 if same else 0
+            bot.record("Gift Claims: Activities lướt " + direction +
+                       f", chờ {APPLE_LIST_SETTLE_SECONDS:.1f}s rồi quét "
+                       f"({step}/{APPLE_LIST_MAX_SWIPES})")
+            if unchanged >= APPLE_LIST_EDGE_CONFIRMATIONS:
+                bot.record(f"Gift Claims: Activities đã xác nhận tới {direction}")
+                return False
+        bot.record(f"Gift Claims: Activities chạm giới hạn lướt {direction}")
+        return None
+
+    # First establish the real top.  Do not waste a 1.5 s duplicate probe at
+    # each position: every swipe already settles for 0.8 s before the frame is
+    # sampled.
+    swipe(32, 86, "đỉnh", search=False)
+    if swipe(86, 32, "xuống đáy", search=True):
+        return True
+    if swipe(32, 86, "lên đỉnh", search=True):
+        return True
+
+    # Scan the final top frame too: the second edge-confirming swipe may have
+    # exposed the row only after the previous screenshot.
+    return find(bot, template, bot.screenshot(), threshold=0.90,
+                region=(10, 15, 75, 98)) is not None
 
 
 def _record_missing_event_policies(bot, seen_policy_keys: set[str],
@@ -1950,15 +2051,26 @@ def _scan_category(bot, category: str, visited: set[bytes]) -> bool:
     pending_this_run = getattr(bot, PENDING_THIS_RUN_ATTR, None)
     if not isinstance(pending_this_run, set):
         pending_this_run = set()
-    # Evony remembers a separate vertical position for each category. Always
-    # establish the top boundary first; otherwise opening Activities after a
-    # prior run can start below Dwarf's Lucky Apple and only scan downward.
-    _return_list_to_top(bot, category)
-    for scroll in range(MAX_SCROLLS + 1):
+    # Activities has a dedicated bidirectional 0.8-second scan.  Limited keeps
+    # the conservative top-down cadence because it owns many animated rows.
+    if category == "activities":
+        if not _find_dwarfs_lucky_apple_row(bot):
+            _record_missing_event_policies(bot, seen_policy_keys, category)
+            bot.record("Gift Claims: Activities đã quét từ đỉnh xuống đáy rồi "
+                       "từ đáy lên đỉnh nhưng chưa thấy Dwarf's Lucky Apple")
+            return True
+        scan_limit = 0
+        list_settle = APPLE_LIST_SETTLE_SECONDS
+    else:
+        # Evony remembers a separate vertical position for each category.
+        _return_list_to_top(bot, category)
+        scan_limit = MAX_SCROLLS
+        list_settle = LIST_SCROLL_SETTLE_SECONDS
+    for scroll in range(scan_limit + 1):
         bot.check()
         empty_checks = 0
         bot.record(f"Gift Claims: Event Center/{category} quét vị trí danh sách "
-                   f"{scroll + 1}/{MAX_SCROLLS + 1}")
+                   f"{scroll + 1}/{scan_limit + 1}")
         pending_labels = [
             policy.label for policy in EVENT_POLICIES
             if policy.key is not None
@@ -2018,7 +2130,7 @@ def _scan_category(bot, category: str, visited: set[bytes]) -> bool:
                                        "lên giữa màn hình trước khi bấm")
                             bot.swipe_percent(50, 82, 50, 52,
                                               duration=SWIPE_DURATION_SECONDS,
-                                              delay=LIST_SCROLL_SETTLE_SECONDS)
+                                              delay=list_settle)
                             candidate = "recenter"
                             break
                         # The title sits near the top edge of a list row. Tap
@@ -2065,7 +2177,12 @@ def _scan_category(bot, category: str, visited: set[bytes]) -> bool:
                 continue
             if candidate is None:
                 empty_checks += 1
-                if empty_checks < EMPTY_POSITION_CHECKS:
+                # The dedicated Activities traversal has already waited 0.8 s
+                # and inspected each stable position.  Do not add the old
+                # extra 1.5-second duplicate check before moving on.
+                required_checks = (1 if category == "activities"
+                                   else EMPTY_POSITION_CHECKS)
+                if empty_checks < required_checks:
                     bot.record(f"Gift Claims: Event Center/{category} chưa thấy "
                                "nhiệm vụ ở khung hiện tại; chờ "
                                f"{UI_SETTLE_SECONDS:g}s rồi quét lại")
@@ -2074,8 +2191,11 @@ def _scan_category(bot, category: str, visited: set[bytes]) -> bool:
                 break
             empty_checks = 0
             x, y, key, expected_screen, event_label, forced_policy_key = candidate
-            bot.tap(x, y, delay=UI_SETTLE_SECONDS)
-            actual_screen = _wait_event_row_open(bot, expected_screen)
+            tap_settle = (APPLE_LIST_SETTLE_SECONDS
+                          if category == "activities" else UI_SETTLE_SECONDS)
+            bot.tap(x, y, delay=tap_settle)
+            actual_screen = _wait_event_row_open(
+                bot, expected_screen, delay=tap_settle)
             if (actual_screen == GiftScreen.EVENT_CENTER
                     and expected_screen is not None):
                 # The first tap can be swallowed while the scrolling list is
@@ -2092,8 +2212,9 @@ def _scan_category(bot, category: str, visited: set[bytes]) -> bool:
                     bot.record(f"Gift Claims: {event_label} vẫn ở danh sách sau "
                                "cú tap đầu; tìm lại đúng hàng và tap lần 2")
                     bot.tap(refreshed[0], retry_y,
-                            delay=UI_SETTLE_SECONDS)
-                    actual_screen = _wait_event_row_open(bot, expected_screen)
+                            delay=tap_settle)
+                    actual_screen = _wait_event_row_open(
+                        bot, expected_screen, delay=tap_settle)
             if actual_screen == GiftScreen.EVENT_CENTER:
                 bot.log("Gift Claims: bấm hàng nhưng vẫn ở Event Center; bỏ vị trí "
                         "này trong lượt quét và không kết luận event vắng mặt")
@@ -2138,13 +2259,13 @@ def _scan_category(bot, category: str, visited: set[bytes]) -> bool:
             if not _back_to_list(bot):
                 bot.log(f"Gift Claims: Event Center/{category} không quay lại được danh sách")
                 return False
-        if scroll < MAX_SCROLLS:
+        if scroll < scan_limit:
             before = _list_signature(bot.screenshot())
             bot.swipe_percent(50, 86, 50, 32,
                               duration=SWIPE_DURATION_SECONDS,
-                              delay=LIST_SCROLL_SETTLE_SECONDS)
+                              delay=list_settle)
             bot.record(f"Gift Claims: Event Center/{category} đã dừng "
-                       f"{LIST_SCROLL_SETTLE_SECONDS:.0f}s sau lướt; bắt đầu quét")
+                       f"{list_settle:g}s sau lướt; bắt đầu quét")
             if _same_list_position(before, _list_signature(bot.screenshot())):
                 bot.log(f"Gift Claims: Event Center/{category} đã tới cuối danh sách")
                 break

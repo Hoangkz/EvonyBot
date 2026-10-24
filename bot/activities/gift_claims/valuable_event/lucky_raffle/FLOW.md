@@ -1,6 +1,6 @@
 # Flow: Lucky Raffle
 
-1. Mở Super Value Return, chọn Lucky Raffle có badge đỏ.
+1. Mở Super Value Return và tìm/chọn đúng tab Lucky Raffle bằng ảnh tên.
 2. Tìm đúng nút Claimable ở vùng quà.
 3. Bấm Claimable và kiểm tra lại màn hình.
 4. DONE khi xuất hiện `Congratulations!` **hoặc** thấy đúng ảnh rương đã mở

@@ -9,7 +9,7 @@ from . import (
     runestone_consumption_sprint,
     speedup_sprint, strategic_stockpile,
     successive_purchase_benefits, sulis_wishing, super_blazon_sale,
-    super_value_weekly_card, tomb_expedition,
+    super_value_weekly_card, tomb_expedition, wheel_of_dragon_war,
 )
 from .run import run_opened as run_valuable_opened
 
@@ -23,6 +23,7 @@ TASKS = (
     sulis_wishing.TASK, super_value_weekly_card.TASK,
     successive_purchase_benefits.TASK, optional_package.TASK,
     active_monthly_card.TASK, tomb_expedition.TASK,
+    wheel_of_dragon_war.TASK,
 )
 
 

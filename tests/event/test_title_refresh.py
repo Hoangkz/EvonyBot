@@ -15,7 +15,11 @@ import cv2
 import numpy as np
 
 from bot.activities.event import common, constants
-from bot.activities.event.constants import EVENT_LIST_TITLE, EVENT_LIST_TITLE_BOX, KINGS_PATH_TITLE
+from bot.activities.event.constants import (
+    EVENT_LIST_TITLE,
+    EVENT_LIST_TITLE_BOX,
+    KINGS_PATH_TITLE,
+)
 from bot.context import TEMPLATE_DIR
 from bot.context.screen import ScreenMixin
 

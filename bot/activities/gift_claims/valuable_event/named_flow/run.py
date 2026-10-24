@@ -5,6 +5,7 @@ searched below y=125, so a decorative chest in the tab strip can never be
 mistaken for a claim button.
 """
 from dataclasses import dataclass
+from typing import Callable
 
 import cv2
 
@@ -40,16 +41,25 @@ class ExactFlow:
     """Stable controls and terminal markers for one rotating event."""
 
     navigation: tuple[str, ...] = ()
+    # Optional per-template tap offsets for navigation anchors. This lets a
+    # text-only crop point at the control immediately above or beside it.
+    navigation_offsets: tuple[tuple[int, int], ...] = ()
+    navigation_first_match: bool = False
     claims: tuple[str, ...] = ()
     done: tuple[str, ...] = ()
     opened: tuple[str, ...] = ()
     congratulations_done: bool = False
     absence_done: bool = False
     claim_offset: tuple[int, int] = (0, 0)
+    # Full-button captures can share most of their frame with adjacent paid
+    # offers. Individual flows may require a stricter score before tapping.
+    claim_threshold: float = 0.72
     fallback_tap: tuple[int, int] | None = None
     navigation_threshold: float = 0.72
     scroll_claims: bool = False
     skip: bool = False
+    # Optional page-specific setup which must be verified before claims.
+    prepare: Callable[[object], bool] | None = None
 
 
 def find_any(bot, templates: tuple[str, ...], screen=None, *,
@@ -83,14 +93,22 @@ def _done(bot, flow: ExactFlow) -> bool:
 def _tap_navigation(bot, flow: ExactFlow) -> bool:
     """Open each supplied lower-page subview, using the one approved fallback."""
     acted = False
-    for template in flow.navigation:
+    for index, template in enumerate(flow.navigation):
         hit = _wait_any(bot, (template,), attempts=4,
                         threshold=flow.navigation_threshold)
         if hit is None:
             continue
         bot.record(f"Gift Claims: tap navigation {hit[0]}")
-        bot.tap(*hit[1], delay=STEP_DELAY)
+        offset = (flow.navigation_offsets[index]
+                  if index < len(flow.navigation_offsets) else (0, 0))
+        screen = bot.screenshot()
+        scale = screen.shape[1] / 396
+        target = (round(hit[1][0] + offset[0] * scale),
+                  round(hit[1][1] + offset[1] * scale))
+        bot.tap(*target, delay=STEP_DELAY)
         acted = True
+        if flow.navigation_first_match:
+            break
     if not acted and flow.fallback_tap is not None:
         bot.record("Gift Claims: không thấy nút Scores; dùng fallback được cấu hình x=45 y=190")
         bot.tap(*flow.fallback_tap, delay=STEP_DELAY)
@@ -104,12 +122,17 @@ def process_exact(bot, flow: ExactFlow) -> bool:
         bot.record("Gift Claims: sự kiện được cấu hình bỏ qua; DONE hôm nay")
         return True
 
-    if flow.opened and _wait_any(bot, flow.opened, attempts=4) is None:
+    opened_missing = bool(flow.opened and
+                          _wait_any(bot, flow.opened, attempts=4) is None)
+    if opened_missing:
         bot.log("Gift Claims: tab đã tap nhưng chưa thấy dấu hiệu trang con")
+
+    if flow.prepare is not None and not flow.prepare(bot):
+        return False
 
     if _done(bot, flow):
         return True
-    _tap_navigation(bot, flow)
+    navigated = _tap_navigation(bot, flow)
     if _done(bot, flow):
         return True
 
@@ -120,7 +143,8 @@ def process_exact(bot, flow: ExactFlow) -> bool:
         while True:
             bot.check()
             screen = bot.screenshot()
-            hit = find_any(bot, flow.claims, screen)
+            hit = find_any(bot, flow.claims, screen,
+                           threshold=flow.claim_threshold)
             if hit is None:
                 break
             name, pos = hit
@@ -157,7 +181,9 @@ def process_exact(bot, flow: ExactFlow) -> bool:
 
     if _done(bot, flow):
         return True
-    if flow.absence_done and _wait_any(bot, flow.claims, attempts=2) is None:
+    if (flow.absence_done
+            and _wait_any(bot, flow.claims, attempts=2,
+                          threshold=flow.claim_threshold) is None):
         bot.record("Gift Claims: không còn nút nhận trong vùng y>125; DONE")
         return True
     if flow.scroll_claims and saw_claim:
@@ -167,6 +193,12 @@ def process_exact(bot, flow: ExactFlow) -> bool:
                           duration=SLOW_SWIPE_DURATION, delay=STEP_DELAY)
         if _done(bot, flow):
             return True
+    if navigated or opened_missing:
+        # Đã đi vào một lớp con nhưng không nhận diện được trạng thái kết thúc: chỉ Back đúng một
+        # lần về trang event cha. Không gọi return_home ở đây, để vòng carousel tiếp tục xử lý các
+        # nhiệm vụ còn lại mà không thoát ra ngoài thành rồi mở lại.
+        bot.record("Gift Claims: không nhận diện được trạng thái nhiệm vụ; Back một lần về trang event")
+        bot.back(delay=STEP_DELAY)
     return False
 
 
@@ -176,10 +208,14 @@ def run_carousel_exact(bot, screen_name, page: str, tab: str,
     if not open_named(bot, screen_name):
         return False
     if not select_carousel_tab(bot, page, tab):
-        return_home(bot)
+        bot.record("Gift Claims: không nhận diện được tab nhiệm vụ; Back đúng một lần")
+        bot.back(delay=STEP_DELAY)
         return False
     completed = process_exact(bot, flow)
-    return_home(bot)
+    # Khi PENDING, process_exact đã Back một lớp nếu có trang con. Không return_home rồi mở lại,
+    # tránh bật tắt Valuable Event liên tục. Chỉ nhiệm vụ đã DONE mới kết thúc entry độc lập ở home.
+    if completed:
+        return_home(bot)
     return completed
 
 

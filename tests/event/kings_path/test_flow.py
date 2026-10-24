@@ -79,7 +79,7 @@ class LoginRewardFlow(unittest.TestCase):
 
 class VoyageFlow(unittest.TestCase):
     """Voyage to Civilizations ở danh sách event (event/common.py open_voyage): hôm nay chưa bấm Free
-    -> vào, tích Skip animation, có Free thì bấm và lưu VOYAGE_KEY, Back về danh sách."""
+    -> vào, tích Skip animation, có Free thì bấm; xác nhận hết Free rồi lưu VOYAGE_KEY và Back."""
 
     def _run(self, flow, **kw):
         with mock.patch.object(event_common, "open_voyage", OPEN_VOYAGE):
@@ -104,8 +104,7 @@ class VoyageFlow(unittest.TestCase):
         self.assertIn(VOYAGE_KEY, device.daily_done)
 
     def test_no_free(self):
-        """Đã tích Skip animation, không thấy Free: không bấm gì, Back. VOYAGE_KEY lưu ngay khi vào (mỗi ngày
-        chỉ vào Voyage 1 lần, có Free hay không)."""
+        """Đã tích Skip animation, không thấy Free: ghi DONE và Back; hôm nay không vào lại."""
         flow = [
             Step("03_main.png?main_claimed", tap_at(*EVENT_BUTTON)),
             Step("event_list_voyage_dot.png", tap(VOYAGE_ICON)),

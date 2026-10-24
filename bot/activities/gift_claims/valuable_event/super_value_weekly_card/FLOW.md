@@ -1,6 +1,6 @@
 # Flow: Super Value Weekly Card
 
-1. Mở Valuable Event và chọn Super Value Weekly Card có badge đỏ.
+1. Mở Valuable Event và tìm/chọn đúng tab Super Value Weekly Card bằng ảnh tên.
 2. Tìm toàn bộ hộp quà phát sáng `Common/button_reward_chest` ở ngưỡng `0.80`;
    không thấy mới tap fallback `(45, 190)`.
 3. Chỉ bấm Claim/Free/Claimable sau khi phần thưởng miễn phí đã hiện.

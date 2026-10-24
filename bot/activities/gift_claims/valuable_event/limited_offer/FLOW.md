@@ -1,6 +1,6 @@
 # Flow: Limited Offer
 
-1. Mở Valuable Event và chọn Limited Offer có badge đỏ.
+1. Mở Valuable Event và tìm/chọn đúng tab Limited Offer bằng ảnh tên.
 2. Kiểm tra nút Free, Claim, Claim Free hoặc Claimable trong vùng nội dung.
 3. Xác minh quà, rồi quay về màn thành.
 

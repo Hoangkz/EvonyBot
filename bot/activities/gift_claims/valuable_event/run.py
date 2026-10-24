@@ -12,6 +12,7 @@ from . import (
     runestone_consumption_sprint,
     speedup_sprint, strategic_stockpile, successive_purchase_benefits,
     sulis_wishing, super_blazon_sale, super_value_weekly_card, tomb_expedition,
+    wheel_of_dragon_war,
 )
 from ..common import (TEXT_CLAIM_CONTROLS, back_if_close_x, find,
                       mark_task_done)
@@ -23,7 +24,6 @@ PAGE = "ValuableEvent/title"
 MAX_SWIPES = 12
 MAX_PARENT_PASSES = 2
 COMMON_LOWER_CLAIMS = TEXT_CLAIM_CONTROLS
-REWARD_DOT = "ValuableEvent/notification_dot"
 
 
 @dataclass(frozen=True)
@@ -57,15 +57,17 @@ SPECS = (
     ValuableSpec(general_vault.TASK, "GeneralVault/tab_current",
                  general_vault.FLOW),
     # Older rotations remain named and use only their known safe controls.
-    ValuableSpec(ancient_dynasty_treasury.TASK, "AncientDynastyTreasury/tab", ExactFlow(
-        navigation=("AncientDynastyTreasury/button_daily_free",),
-        claims=TEXT_CLAIM_CONTROLS, absence_done=True)),
+    ValuableSpec(ancient_dynasty_treasury.TASK,
+                 "AncientDynastyTreasury/tab",
+                 ancient_dynasty_treasury.FLOW),
     ValuableSpec(refining_stone_sprint.TASK, "RefiningStoneSprint/tab", ExactFlow(
         navigation=("SpeedupSprint/subtab_package",),
-        claims=("SpeedupSprint/button_free",), absence_done=True)),
-    ValuableSpec(speedup_sprint.TASK, "SpeedupSprint/tab", ExactFlow(
-        navigation=("SpeedupSprint/subtab_package",),
-        claims=("SpeedupSprint/button_free",), absence_done=True)),
+        claims=("SpeedupSprint/button_free",), claim_threshold=0.95,
+        absence_done=True)),
+    ValuableSpec(speedup_sprint.TASK, "SpeedupSprint/tab",
+                 speedup_sprint.FLOW),
+    ValuableSpec(wheel_of_dragon_war.TASK, "WheelOfDragonWar/tab",
+                 wheel_of_dragon_war.FLOW),
     ValuableSpec(strategic_stockpile.TASK, "StrategicStockpile/tab_current",
                  strategic_stockpile.FLOW),
     ValuableSpec(sulis_wishing.TASK, "SulisWishing/tab", ExactFlow(skip=True)),
@@ -88,7 +90,6 @@ def run_opened(bot, due_keys: set[str], *, handled: set[str] | None = None
     handled = handled if handled is not None else set()
     pending = set(due_keys) - handled
     attempted_this_sweep: set[str] = set()
-    saw_reward_dot = False
     # Inspect while moving toward the first edge, then reverse and inspect the
     # entire strip.  The rewind phase deliberately performs every bounded
     # swipe: animated artwork made carousel_moved() occasionally report a
@@ -102,9 +103,6 @@ def run_opened(bot, due_keys: set[str], *, handled: set[str] | None = None
         for step in range(MAX_SWIPES + 1):
             bot.check()
             screen = bot.screenshot()
-            if find(bot, REWARD_DOT, screen, threshold=0.70,
-                    region=TOP_CAROUSEL) is not None:
-                saw_reward_dot = True
             if back_if_close_x(bot, screen):
                 screen = bot.screenshot()
             visible = [(spec, pos) for spec in SPECS
@@ -154,13 +152,8 @@ def run_opened(bot, due_keys: set[str], *, handled: set[str] | None = None
                 else:
                     stagnant_swipes = 0
 
-    if not saw_reward_dot:
-        bot.record("Gift Claims: Valuable Event đã lướt trọn một lượt và "
-                   "không thấy chấm đỏ; ghi nhận một lượt không thấy cho "
-                   "các nhiệm vụ còn lại, chưa DONE sớm")
-    else:
-        bot.record("Gift Claims: Valuable Event đã lướt hết vùng trên; "
-                   "label không xuất hiện được tính là một lượt không có hôm nay")
+    bot.record("Gift Claims: Valuable Event đã lướt hết vùng trên; "
+               "tìm từng nhiệm vụ bằng ảnh tên, không dùng dấu đỏ")
     return results, True
 
 

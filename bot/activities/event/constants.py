@@ -134,12 +134,15 @@ CHEST_FROM_TIP = (-40, -70, 70, 50)   # (dx, dy, w, h) ô tìm rương so với 
 CHEST_TAP = (0, -35)                  # bấm (đầu thanh x, đầu thanh y - 35): lên rương hôm nay
 CHEST_WAIT = 2   # sau khi bấm rương (mọi bước chờ 2-3 s)
 # ---- Voyage to Civilizations trong danh sách event (open_voyage trong common.py) -----------
-# Mỗi ngày vào 1 lần (daily_done VOYAGE_KEY, tới lần reset server; không xét chấm đỏ): hôm nay đã
-# vào thì không vào nữa. Chưa vào: thấy icon Voyage (phần dưới trái icon con tàu, bỏ góc chấm đỏ: 1,00
+# Mỗi ngày hoàn tất 1 lần (daily_done VOYAGE_KEY, tới lần reset server; không xét chấm đỏ):
+# hôm nay DONE thì không vào nữa. Chưa DONE: thấy icon Voyage
+# (phần dưới trái icon con tàu, bỏ góc chấm đỏ: 1,00
 # trên mọi màn danh sách có Voyage, có hay không chấm đỏ; icon event khác <= 0,56; các màn Voyage
-# <= 0,49) -> bấm vào, lưu VOYAGE_KEY ngay (có Free hay không) -> màn Voyage to Civilizations:
+# <= 0,49) -> bấm vào -> màn Voyage to Civilizations:
 # 1. Ô "Skip animation" (281, 622) chưa tích -> bấm tích.
-# 2. Nút "Voyage Once" có chữ "Free" -> bấm 1 lần (mỗi ngày 1 lượt miễn phí); không có thì thôi.
+# 2. Nút "Voyage Once" có chữ "Free" -> bấm 1 lần (mỗi ngày 1 lượt miễn phí). Chỉ ghi DONE khi
+#    Free biến mất sau cú bấm, hoặc ngay từ đầu đã không còn Free. Không mở được trang / Free vẫn còn
+#    thì không ghi DB để lượt sau thử lại.
 # 3. Back về danh sách event (tối đa VOYAGE_BACKS lần, tới khi thấy tiêu đề danh sách hoặc icon
 #    Voyage — tiêu đề đổi theo đợt lễ hội). Sau khi bấm Free: popup "Congratulations"
 #    (voyage_congrats.png) -> Back 1 đóng popup, về màn Voyage hết Free (voyage_no_free.png) -> Back 2

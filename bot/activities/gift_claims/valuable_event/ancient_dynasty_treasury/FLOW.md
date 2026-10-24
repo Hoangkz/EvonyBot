@@ -1,7 +1,8 @@
 # Flow: Ancient Dynasty Treasury
 
 1. Mở Valuable Event và chọn đúng tab Ancient Dynasty Treasury.
-2. Bấm nút Daily Free cố định ở cạnh phải để mở phần quà miễn phí.
-3. Quét toàn bộ Claim/Daily Free/Free đã biết trước khi dò lấp lánh.
-4. Sau mỗi lần dò lấp lánh, quay lại quét nút cố định.
-5. Bốn vòng liên tiếp không có quà được xác minh thì coi phần còn lại là trả phí, đánh dấu mục đã xét xong.
+2. Ưu tiên tìm chữ `Daily Free` từ ảnh `Screenshot_20261025-032840`, rồi bấm
+   cao hơn tâm chữ 24 px để trúng rương. Nếu không thấy chữ riêng, dùng lại ảnh
+   cũ chứa cả rương và chữ làm dự phòng.
+3. Kiểm tra ảnh rương đã mở `status_done` (ảnh `Screenshot_20261025-013041`).
+4. Chỉ đánh dấu DONE khi nhìn thấy đúng ảnh rương đã mở này; nếu không thấy thì giữ PENDING.

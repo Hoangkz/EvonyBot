@@ -1,7 +1,7 @@
-"""Open Sulis Wishing Pool when its header dot is present.
+"""Open Sulis Wishing Pool when its named carousel tab is present.
 
-Some rotations clear the dot without showing a claim control. Opening the tab is
-therefore the only safe action; the runner deliberately never taps Make a Wish.
+The runner finds the task by its tab image and deliberately never taps Make a
+Wish.
 """
 from ...common import GiftTask, return_home, select_carousel_tab
 from ...lobby import open_named
