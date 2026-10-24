@@ -296,10 +296,9 @@ Các nhánh quan trọng và test chịu trách nhiệm trực tiếp:
 | --- | --- |
 | March dùng tọa độ OCR trên chính màn March làm nguồn sự thật | `test_march_target_flow.py::test_march_screen_coordinate_is_the_source_of_truth` |
 | Không đọc được tọa độ March: Back, không chọn quân, không March | `test_march_target_flow.py::test_unreadable_march_coordinate_backs_out_before_troop_or_march` |
-| PvP War xuất hiện nhưng không có Joined đúng tọa độ: không ghi nhớ | `test_march_target_flow.py::test_pvp_war_without_matching_joined_row_is_not_success` |
-| Không có tọa độ đích: không xác nhận thành công dù đã về PvP War | `test_march_target_flow.py::test_pvp_war_without_a_readable_target_is_not_success` |
-| Chỉ Joined đúng tọa độ mục tiêu mới ghi `BossMemory.JOINED` | `test_march_target_flow.py::test_matching_joined_row_marks_actual_march_coordinate` |
-| Nhiều hàng Joined: duyệt tọa độ từng hàng; hàng sai không được xác nhận | `test_march_target_flow.py::test_joined_confirmation_checks_every_visible_joined_row_by_coordinate`, `test_wrong_joined_coordinates_do_not_confirm_success` |
+| Bấm March rồi về danh sách War (PvP War) = đã Join: ghi `BossMemory.JOINED` tọa độ đọc trên March, không tìm thẻ "Joined" (danh sách đổi chậm làm bot không ghi nhớ, bấm Join lại mãi boss đội đã đi) | `test_march_target_flow.py::test_back_on_war_list_after_march_marks_the_march_coordinate`, `test_edge_cases.py::test_back_on_war_list_is_remembered_without_joined_row` |
+| Bấm March rồi về màn thành chính (lỗi game): chưa Join, không ghi nhớ, không Back. Chờ kết quả tối đa `MARCH_RESULT_WAIT` = 5 s, thấy màn là quyết định ngay | `test_march_target_flow.py::test_back_on_city_screen_after_march_is_not_joined` |
+| Không có tọa độ đích: về PvP War nhưng không ghi nhớ | `test_march_target_flow.py::test_back_on_war_list_without_a_readable_target_is_not_remembered` |
 | Hồi thể lực: quay lại March, bấm March lại với tọa độ cũ, không OCR / chọn đội lại | `test_march_target_flow.py::test_stamina_refill_presses_march_again_without_ocr_or_troop_pick` |
 | Runtime không còn trạng thái `pending` | `test_march_target_flow.py::test_runtime_has_no_pending_target_state` |
 | OCR tọa độ card lỗi: blacklist card để vòng lặp không kẹt | `test_edge_cases.py::test_unreadable_card_coordinates_are_blacklisted_for_current_screen` |

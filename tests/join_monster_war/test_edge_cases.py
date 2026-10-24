@@ -128,12 +128,10 @@ class JoinBossEdgeCaseTests(unittest.TestCase):
 
         bot.find.side_effect = find
         boss = _Boss(bot, {})
-        boss._joined_target_visible = mock.Mock(return_value=True)
 
         boss._press_march((500, 600), (300, 680), SCREEN)
 
         self.assertEqual(boss.memory.status((500, 600)), JOINED)
-        boss._joined_target_visible.assert_called_with(SCREEN, (500, 600))
         self.assertIn("đã hành quân tới boss", bot.record.call_args.args[0])
 
     def test_stamina_popup_does_not_mark_joined_or_check_war_list(self):
@@ -277,7 +275,8 @@ class JoinBossEdgeCaseTests(unittest.TestCase):
 
         bot.crop.assert_called_once_with(SCREEN, 288, 266, 140, 18)
 
-    def test_pvp_war_without_matching_joined_row_is_not_remembered(self):
+    def test_back_on_war_list_is_remembered_without_joined_row(self):
+        # Không thấy thẻ "Joined" (danh sách đổi chậm) vẫn coi là đã Join: về danh sách War là đủ, không Back.
         bot = fake_bot()
 
         def find(template, **_kwargs):
@@ -289,13 +288,11 @@ class JoinBossEdgeCaseTests(unittest.TestCase):
 
         bot.find.side_effect = find
         boss = _Boss(bot, {})
-        boss._joined_target_visible = mock.Mock(return_value=False)
 
         boss._press_march((500, 600), (300, 680), SCREEN)
 
-        self.assertIsNone(boss.memory.status((500, 600)))
+        self.assertEqual(boss.memory.status((500, 600)), JOINED)
         bot.back.assert_not_called()
-        self.assertIn("chưa thấy Joined đúng boss", bot.record.call_args.args[0])
 
     def test_invalid_ocr_coordinates_are_rejected_and_logged(self):
         bot = fake_bot()
@@ -418,7 +415,6 @@ class JoinBossEdgeCaseTests(unittest.TestCase):
 
         bot.find.side_effect = find
         boss = _Boss(bot, {})
-        boss._joined_target_visible = mock.Mock(return_value=True)
 
         boss._press_march((500, 600), (300, 680), SCREEN)
 
