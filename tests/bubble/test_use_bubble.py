@@ -9,6 +9,7 @@ SCREENS = Path(__file__).parent / "screens"
 CITY_BUFF_TIME = 6 * 3600 + 55 * 60 + 22    # city_buff_time.png: 06:55:22
 AFTER_USE = 7 * 3600 + 57 * 60 + 10         # use_item_after.png: 07:57:10
 CITY_BUFF_DAYS = 2 * 86400 + 23 * 3600 + 38 * 60   # city_buff_days.png: 2d 23:38
+CITY_BUFF_DAYS_2 = 2 * 86400 + 7 * 3600 + 14 * 60  # city_buff_days_2.png: 2d 07:14
 
 
 def run(ctx, settings):
@@ -28,6 +29,14 @@ class KeepBubbleFlowTests(unittest.TestCase):
         flow = [
             Step("home.png", tap(BUFF_ICON)),
             Step("city_buff_days.png", back(), end(CITY_BUFF_DAYS)),
+        ]
+        run_flow(self, run, SCREENS, flow, {"type": "3d", "renew": 3600})
+
+    def test_days_format_with_resource_buff(self):
+        # Chữ "d" ở ảnh này từng không khớp mẫu (log "không đọc được thời gian ở City Buff").
+        flow = [
+            Step("home.png", tap(BUFF_ICON)),
+            Step("city_buff_days_2.png", back(), end(CITY_BUFF_DAYS_2)),
         ]
         run_flow(self, run, SCREENS, flow, {"type": "3d", "renew": 3600})
 

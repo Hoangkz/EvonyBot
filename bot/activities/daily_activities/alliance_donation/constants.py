@@ -13,4 +13,5 @@ INTERVAL_KEY = LABEL                 # settings["Alliance Donation"] = số gi�
 INTERVAL_CHOICES = (0, 1, 2, 3, 4)   # giờ
 INTERVAL_DEFAULT = 4
 TRIED_KEY = f"{KEY}_tried"           # daily_done: lúc thử donate gần nhất (tính giờ chờ lần sau)
+LEAVE_BACKS = 2                      # xong donate: Back đóng Alliance Science rồi màn Liên minh -> về thành
 MAX_FREE_DONATIONS = 50              # chặn vòng lặp (lượt free mỗi lần hồi ít hơn nhiều)
