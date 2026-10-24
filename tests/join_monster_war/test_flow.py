@@ -17,7 +17,7 @@ import numpy as np
 
 from bot.activities import join_monster_war
 from bot.activities.join_monster_war.boss_memory import JOINED, SKIPPED, BossMemory
-from bot.activities.join_monster_war.constants import (CHOOSE_DEVELOPMENT, FAVORITE_OFF, IDLE, JOIN, JOINED_BUTTON, LISTBOSS, MARCH,
+from bot.activities.join_monster_war.constants import (CHOOSE_DEVELOPMENT, FAVORITE_OFF, GENERAL_DETAIL_CLOSE, IDLE, JOIN, JOINED_BUTTON, LISTBOSS, MARCH,
                                                      NOT_ENOUGH_STAMINA, PRESET_DX, PRESET_X0, PRESET_Y,
                                                      REGIONS, SELECT_GENERAL, STAMINA_PLUS, STAMINA_SLIDER_END,
                                                      STAMINA_USE, WAR_TICKED)
@@ -403,6 +403,12 @@ def refill(slider_step):
 
 # Hết vật phẩm thể lực: màn Use Item không còn nút Use -> Back 3 lần -> không dừng (thể lực
 # tự hồi): nhớ boss là đã tham gia và coi như rảnh (trả IDLE khi còn activity khác).
+GENERAL_DETAIL_OPENED = [
+    # Lỡ bấm vào tướng trên màn March -> popup "Detail" (ảnh chụp thật): bấm X đỏ, về màn March làm tiếp.
+    Step("march_general_detail.png", tap(GENERAL_DETAIL_CLOSE)),
+    Step(MARCH_SCREEN, preset(1)),
+    Step(MARCH_SCREEN, tap(MARCH)),
+]
 OUT_OF_STAMINA_ITEMS = [
     Step(W("02_war_list_join.png"), tap(JOIN)),
     Step(MARCH_SCREEN, preset(1)),
@@ -619,6 +625,10 @@ class JoinMonsterWarFlow(unittest.TestCase):
 
     def test_swipe_opening_troop_detail_backs_once(self):
         run_join(self, SWIPE_OPENED_TROOP_DETAIL, {**ALL_TROOPS})
+
+    def test_general_detail_popup_closes_with_x_then_marches(self):
+        device = run_join(self, GENERAL_DETAIL_OPENED, {**ALL_TROOPS})
+        self.assertIn("Join Monster War: lỡ mở popup Detail của tướng -> bấm X", device.logs)
 
     def test_out_of_stamina_items_does_not_mark_joined(self):
         device = run_join(self, OUT_OF_STAMINA_ITEMS, {**ALL_TROOPS, "use_stamina": "ALL"})

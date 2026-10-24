@@ -15,7 +15,7 @@ from . import boss_names, stamina_wait
 from .boss_memory import JOINED as MEMORY_JOINED
 from .boss_memory import BossMemory
 from .constants import (ALLIANCE_ICON, ASSISTANT_GENERAL, ASSISTANT_SELECT_MIN_Y, BACK, BOSS_MONSTER, CHOOSE_DEVELOPMENT,
-                        FAVORITE_OFF, FAVORITE_ON,
+                        FAVORITE_OFF, FAVORITE_ON, GENERAL_DETAIL, GENERAL_DETAIL_CLOSE, GENERAL_DETAIL_SEEN,
                         GENERAL_LIST_INTERVAL, GENERAL_LIST_WAIT, GENERAL_OPEN_INTERVAL, GENERAL_OPEN_WAIT, GENERAL_SEARCH, IDLE, JB, MONSTER_TICKED_REGION, MONSTER_TICKED_THRESHOLD,
                         MONSTER_TICK_TRIES, MONSTER_WAR_TAP, JOIN, JOIN_LIST, JOIN_MAX_Y, JOIN_MIN_Y, MAIN_GENERAL,
                         JOIN_THRESHOLD, JOINED, JOINED_BUTTON, JOINED_OVERLAP, LEAVE_ALLIANCE_POPUP,
@@ -214,6 +214,11 @@ class _Boss:
                 # Cú vuốt bị tính là tap vào thẻ -> Back một lần rồi chờ 1 s cho danh sách hiện lại
                 bot.record("Join Monster War: cuộn nhầm vào màn chi tiết đội -> Back")
                 bot.back(delay=TROOP_BACK_WAIT)
+                continue
+
+            elif action == GENERAL_DETAIL_SEEN:
+                # Lỡ bấm vào tướng trên màn March -> bấm X, vòng sau nhận lại màn March và làm tiếp
+                self._close_general_detail(screen)
                 continue
 
             elif action == LEAVE_ALLIANCE_POPUP:
@@ -613,9 +618,14 @@ class _Boss:
         screen, opened = self._poll_screen(
             f"open_{name}",
             lambda image: (bot.find(FAVORITE_ON, screen=image, region=REGIONS[FAVORITE_ON])
-                           or bot.find(FAVORITE_OFF, screen=image, region=REGIONS[FAVORITE_OFF])),
+                           or bot.find(FAVORITE_OFF, screen=image, region=REGIONS[FAVORITE_OFF])
+                           or (GENERAL_DETAIL if bot.find(GENERAL_DETAIL, screen=image, region=REGIONS[GENERAL_DETAIL]) else None)),
             timeout=GENERAL_OPEN_WAIT, interval=GENERAL_OPEN_INTERVAL,
         )
+        if opened == GENERAL_DETAIL:
+            # Bấm "+" đúng lúc tướng của đội vừa load xong -> mở popup Detail của tướng: ô đã có tướng, bấm X rồi làm tiếp
+            self._close_general_detail(screen)
+            return True
         if not opened:
             bot.record(f"Chọn {name}: không mở được màn Select a General")
             # Đã rời màn March (màn chọn tướng mở muộn / đang load): Back về March, không để
@@ -680,6 +690,20 @@ class _Boss:
             return True
         bot.record(f"Chọn {name}: chưa thấy tướng trong ô sau khi Select")
         return False
+
+    def _close_general_detail(self, screen):
+        """Popup "Detail" của tướng đang mở trên màn March: bấm X đỏ (không thấy X thì Back) rồi chờ popup đóng."""
+        bot = self.bot
+        bot.record("Join Monster War: lỡ mở popup Detail của tướng -> bấm X")
+        close = bot.find(GENERAL_DETAIL_CLOSE, screen=screen, region=REGIONS[GENERAL_DETAIL_CLOSE])
+        if close is not None:
+            bot.tap(*close)
+        else:
+            bot.back()
+        self._poll_screen(
+            "close_general_detail",
+            lambda image: bot.find(GENERAL_DETAIL, screen=image, region=REGIONS[GENERAL_DETAIL]) is None,
+        )
 
     def _join(self, screen) -> bool:
         """Tap nút Join của boss đầu tiên cần tham gia; True nếu đã tap."""
@@ -1023,6 +1047,7 @@ def _targets() -> list[tuple[str, str]]:
     return [
         ("click/lencap.png", TAP),
         (NOT_ENOUGH_STAMINA, OUT_OF_STAMINA),
+        (GENERAL_DETAIL, GENERAL_DETAIL_SEEN),   # trước MARCH: nút March vẫn hiện (tối) dưới popup
         (MARCH, MARCH_SCREEN),
         (JOIN, JOIN_LIST),
         (JOINED_BUTTON, JOINED),
