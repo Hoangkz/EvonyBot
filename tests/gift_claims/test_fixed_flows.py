@@ -282,22 +282,159 @@ class FixedGiftFlowTests(unittest.TestCase):
             "đã chuyển SuperValueReturn -> ValuableEvent" in call.args[0]
             for call in bot.record.call_args_list))
 
-    def test_valuable_zone_always_opens_parent_to_check_inner_tasks(self):
+    @staticmethod
+    def _daily_bot():
+        done = {}
+        bot = mock.Mock()
+        bot.is_daily_done.side_effect = done.__contains__
+        bot.mark_daily_done.side_effect = lambda key: done.__setitem__(key, "now")
+        bot.done_at.side_effect = done.get
+        bot.forget_daily.side_effect = lambda key: done.pop(key, None)
+        return bot, done
+
+    @staticmethod
+    def _passes_seeing(*per_pass):
+        """search_pass giả: lượt thứ i coi như thấy (bấm vào) các event per_pass[i]."""
+        passes = iter(per_pass)
+
+        def search(_bot, _pending, attempted):
+            attempted.update(next(passes, ()))
+            return True
+        return search
+
+    def test_valuable_zone_new_event_resets_pass_count(self):
+        # Lượt 1 không thấy gì; lượt 2 thấy A (mới) -> lượt 2 tính lại là lượt 1; thêm 2 lượt trống nữa mới đủ 3.
+        bot, done = self._daily_bot()
+        with (mock.patch.object(valuable_event_zone, "search_pass",
+                                side_effect=self._passes_seeing((), ("A",), (), ())) as search,
+              mock.patch.object(valuable_event_zone, "return_home", return_value=True)):
+            self.assertTrue(valuable_event_zone.run(bot))
+        self.assertEqual(4, search.call_count)
+        self.assertIn(valuable_event_zone.KEY, done)
+
+    def test_valuable_zone_same_event_every_pass_resets_only_once(self):
+        # A lượt nào cũng thấy mà chưa DONE: chỉ reset lần đầu thấy, không lặp mãi.
+        bot, done = self._daily_bot()
+        with (mock.patch.object(valuable_event_zone, "search_pass",
+                                side_effect=self._passes_seeing(("A",), ("A",), ("A",))) as search,
+              mock.patch.object(valuable_event_zone, "return_home", return_value=True)):
+            self.assertTrue(valuable_event_zone.run(bot))
+        self.assertEqual(3, search.call_count)
+
+    def test_valuable_zone_three_passes_then_marks_every_event_done(self):
+        bot, done = self._daily_bot()
+        with (mock.patch.object(valuable_event_zone, "search_pass", return_value=True) as search,
+              mock.patch.object(valuable_event_zone, "return_home", return_value=True)):
+            self.assertTrue(valuable_event_zone.run(bot))
+
+        self.assertEqual(3, search.call_count)
+        self.assertEqual(3, bot.back.call_count)          # Back sau mỗi lượt rồi làm lại từ màn chính
+        for number in (1, 2, 3):
+            self.assertIn(f"gift_valuable_event_pass_{number}", done)
+        for task in valuable_event_zone.TASKS:
+            self.assertIn(task.key, done)
+        self.assertIn(valuable_event_zone.KEY, done)
+
+    def test_valuable_zone_continues_counting_passes_from_db(self):
+        bot, done = self._daily_bot()
+        done.update({"gift_valuable_event_pass_1": "x", "gift_valuable_event_pass_2": "x"})
+        with (mock.patch.object(valuable_event_zone, "search_pass", return_value=True) as search,
+              mock.patch.object(valuable_event_zone, "return_home", return_value=True)):
+            self.assertTrue(valuable_event_zone.run(bot))
+        self.assertEqual(1, search.call_count)
+
+    def test_valuable_zone_unfinished_pass_is_not_counted(self):
+        bot, done = self._daily_bot()
+        with (mock.patch.object(valuable_event_zone, "search_pass", return_value=False),
+              mock.patch.object(valuable_event_zone, "return_home", return_value=True)):
+            self.assertFalse(valuable_event_zone.run(bot))
+        self.assertNotIn("gift_valuable_event_pass_1", done)
+        self.assertNotIn(valuable_event_zone.KEY, done)
+
+    def test_search_pass_order_visible_then_long_swipe_then_short_scan(self):
+        bot = mock.Mock()
+        calls = []
+        with (mock.patch.object(valuable_event_zone, "open_valuable_event",
+                                side_effect=lambda b: calls.append("open") or True),
+              mock.patch.object(valuable_event_zone, "do_visible",
+                                side_effect=lambda *a: calls.append("visible")),
+              mock.patch.object(valuable_event_zone, "swipe_to_left_edge",
+                                side_effect=lambda b: calls.append("long") or True),
+              mock.patch.object(valuable_event_zone, "scan_to_right_edge",
+                                side_effect=lambda *a: calls.append("short") or True)):
+            self.assertTrue(valuable_event_zone.search_pass(bot, {"gift_limited_offer"}, set()))
+        self.assertEqual(["open", "visible", "long", "visible", "short"], calls)
+
+    def test_scan_to_right_edge_stops_only_when_leftmost_icon_stays_in_place(self):
+        # Cú 1: hàng tab khác hẳn (icon mất) -> kéo tiếp; cú 2: chỉ dịch 10 px (icon còn thấy nhưng ĐỔI CHỖ) -> chưa phải giới
+        # hạn, kéo tiếp; cú 3: đứng nguyên chỗ -> chạm bên phải.
+        rng = np.random.default_rng(3)
+        frame_a = rng.integers(0, 255, (704, 396, 3), dtype=np.uint8)
+        frame_b = rng.integers(0, 255, (704, 396, 3), dtype=np.uint8)
+        frame_c = np.roll(frame_b, 10, axis=1)
+        bot = mock.Mock()
+        bot.screenshot.side_effect = (frame_a, frame_b, frame_b, frame_c, frame_c, frame_c)
+        with mock.patch.object(valuable_event_zone, "do_visible") as visible:
+            self.assertTrue(valuable_event_zone.scan_to_right_edge(bot, set(), set()))
+        self.assertEqual(3, bot.swipe_percent.call_count)
+        bot.swipe_percent.assert_called_with(
+            60, 12, 5, 12, duration=valuable_event_zone.SLOW_SWIPE_DURATION)
+        self.assertEqual(4, visible.call_count)            # trước mỗi cú + một lần ở biên phải
+
+    def test_open_valuable_event_taps_found_caption_and_waits_for_title(self):
         bot = mock.Mock()
         bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
-        task = valuable_event_zone.TASKS[0]
-        with (mock.patch.object(valuable_event_zone, "identify",
-                                return_value=GiftScreen.UNKNOWN),
-              mock.patch.object(valuable_event_zone, "return_home",
-                                return_value=True),
-              mock.patch.object(valuable_event_zone, "open_named",
-                                return_value=True) as opened,
-              mock.patch.object(valuable_event_zone, "run_valuable_opened",
-                                return_value=({task.key: "not_present"}, True))):
-            inspected = valuable_event_zone._sweep(bot, [task.key])
+        with (mock.patch.object(valuable_event_zone, "on_main", return_value=True),
+              mock.patch.object(valuable_event_zone, "find_valuable_event",
+                                return_value=(260, 590)),
+              mock.patch.object(valuable_event_zone, "identify",
+                                side_effect=(None, None, GiftScreen.VALUABLE_EVENT))):
+            self.assertTrue(valuable_event_zone.open_valuable_event(bot))
 
-        opened.assert_called_once_with(bot, GiftScreen.VALUABLE_EVENT)
-        self.assertEqual({task.key}, inspected)
+        bot.tap.assert_called_once_with(260, 560)
+        self.assertEqual(3, bot.sleep.call_count)
+        bot.swipe_percent.assert_not_called()              # kéo dài nằm trong search_pass, sau khi làm event đang thấy
+
+    def test_swipe_to_left_edge_stops_when_cut_icon_is_still_visible(self):
+        # Cú 1 -> khung A; cú 2 -> hàng tab khác hẳn (icon cắt từ A mất): kéo tiếp; cú 3 -> hàng tab chỉ dịch 10 px (icon cắt
+        # từ B vẫn thấy, lệch chỗ cũng được) = giới hạn.
+        rng = np.random.default_rng(1)
+        frame_a = rng.integers(0, 255, (704, 396, 3), dtype=np.uint8)
+        frame_b = rng.integers(0, 255, (704, 396, 3), dtype=np.uint8)
+        bot = mock.Mock()
+        bot.screenshot.side_effect = (frame_a, frame_b, np.roll(frame_b, 10, axis=1))
+        self.assertTrue(valuable_event_zone.swipe_to_left_edge(bot))
+        duration = valuable_event_zone.SLOW_SWIPE_DURATION
+        # Cú đầu kéo dài 5% -> 1000%, từ cú thứ 2 kéo ngắn 5% -> 95%.
+        self.assertEqual([mock.call(5, 12, 1000, 12, duration=duration),
+                          mock.call(5, 12, 95, 12, duration=duration),
+                          mock.call(5, 12, 95, 12, duration=duration)],
+                         bot.swipe_percent.call_args_list)
+        # Mỗi cú kéo nghỉ 1s rồi mới chụp cắt / kiểm tra icon.
+        self.assertEqual([mock.call(1.0)] * 3, bot.sleep.call_args_list)
+
+    def test_swipe_to_left_edge_gives_up_after_eight_swipes(self):
+        rng = np.random.default_rng(2)
+        bot = mock.Mock()
+        bot.screenshot.side_effect = [rng.integers(0, 255, (704, 396, 3), dtype=np.uint8) for _ in range(8)]
+        self.assertFalse(valuable_event_zone.swipe_to_left_edge(bot))
+        self.assertEqual(8, bot.swipe_percent.call_count)
+
+    def test_open_valuable_event_gives_up_for_this_run_after_three_tries(self):
+        bot = mock.Mock(spec=["screenshot", "tap", "sleep", "check", "record", "is_daily_done"])
+        bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
+        bot.is_daily_done.return_value = False
+        with (mock.patch.object(valuable_event_zone, "on_main", return_value=True),
+              mock.patch.object(valuable_event_zone, "find_valuable_event",
+                                return_value=(260, 590)),
+              mock.patch.object(valuable_event_zone, "identify", return_value=None)):
+            self.assertFalse(valuable_event_zone.open_valuable_event(bot))
+
+        self.assertEqual(3, bot.tap.call_count)
+        self.assertEqual(3 * 8, bot.sleep.call_count)
+        self.assertTrue(common.skipped_for_run(bot, valuable_event_zone.KEY))
+        job = gift_claims.job(gift_claims.valuable_event)
+        self.assertTrue(job["done"](bot, {}))
 
     def test_empire_depot_uses_approved_fixed_fallback_and_verifies_title(self):
         bot = mock.Mock()

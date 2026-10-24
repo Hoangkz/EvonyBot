@@ -101,6 +101,23 @@ def mark_task_done(bot, key: str) -> None:
         bot.record(f"Gift Claims: DB DONE {key}")
 
 
+SKIPPED_ATTR = "_gift_claims_skipped_for_run"
+
+
+def skip_for_run(bot, key: str) -> None:
+    """Bỏ hoạt động `key` trong lần chạy này: ghi trên context (tạo mới mỗi lần Start), không ghi DB."""
+    skipped = getattr(bot, SKIPPED_ATTR, None)
+    if not isinstance(skipped, set):
+        skipped = set()
+        setattr(bot, SKIPPED_ATTR, skipped)
+    skipped.add(key)
+
+
+def skipped_for_run(bot, key: str) -> bool:
+    skipped = getattr(bot, SKIPPED_ATTR, None)
+    return isinstance(skipped, set) and key in skipped
+
+
 def path(name: str) -> str:
     return f"{ROOT}/{name}.png"
 

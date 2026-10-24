@@ -1,7 +1,21 @@
-"""Hoạt động Valuable Event độc lập (không gồm Super Value Return)."""
-from .. import scan
-from ..common import return_home
-from ..lobby import open_named
+"""Hoạt động Valuable Event độc lập (không gồm Super Value Return).
+
+Một LƯỢT TÌM (tối đa PASSES lượt mỗi ngày, số lượt đã xong lưu DB key ``gift_valuable_event_pass_1..3``):
+
+1. Từ màn chính bấm vào Valuable Event (open_valuable_event).
+2. Làm các event cần làm đang thấy ở hàng tab: bấm icon tab rồi chạy flow riêng của event đó (do_visible).
+3. Kéo dài về giới hạn bên trái (swipe_to_left_edge), một lần mỗi lượt; làm tiếp các event cần làm vừa hiện ra.
+4. Kéo ngắn từ phải sang trái từng cú, mỗi chỗ làm các event cần làm đang thấy; trước mỗi cú cắt icon ngoài cùng bên trái, kéo
+   xong vẫn thấy icon đó = đã chạm bên phải (scan_to_right_edge).
+5. Chạm bên phải: lưu DB đã xong lượt tìm N hôm nay, bấm Back, làm lại từ bước 1.
+
+Lượt thấy event mới thì đếm lại từ lượt 1. Đủ PASSES lượt (hoặc mọi event đã xong): đánh dấu mọi event của hoạt động và key tổng là xong hôm nay.
+"""
+import cv2
+
+from ....common import to_city
+from ....ocr.find_valuable_event import find_valuable_event
+from ..common import REFERENCE_WIDTH, back_if_close_x, mark_task_done, on_main, return_home, skip_for_run
 from ..screens import GiftScreen, identify
 from . import (
     active_monthly_card, ancient_dynasty_treasury, general_vault, limited_offer,
@@ -11,9 +25,30 @@ from . import (
     successive_purchase_benefits, sulis_wishing, super_blazon_sale,
     super_value_weekly_card, tomb_expedition, wheel_of_dragon_war,
 )
-from .run import run_opened as run_valuable_opened
+from .named_flow import SLOW_SWIPE_DURATION, STEP_DELAY, process_exact
+from .run import SPECS, _tab
 
 KEY = "gift_valuable_event"
+PASSES = 3              # số lượt tìm mỗi ngày; đủ thì mọi event của hoạt động coi là xong hôm nay
+OPEN_ATTEMPTS = 3       # số lần về màn chính tìm nút + bấm; hết mà chưa vào thì bỏ hoạt động trong lần chạy này
+OPEN_WAITS = 8          # sau khi bấm: chụp kiểm tra màn Valuable Event tối đa chừng này lần, mỗi lần chờ 1s
+ICON_ABOVE = 30         # px (màn rộng 396): find_valuable_event trả về tâm chữ "Event", bấm lên icon phía trên
+# % màn: kéo dài hàng tab từ trái sang phải, x 5% -> 1000% (điểm cuối ra ngoài mép phải): đưa hàng tab về đầu
+# (500% chưa đủ khi màn mở ở tab cuối).
+FIRST_SWIPE = (5, 12, 1000, 12)
+EDGE_BACK_SWIPE = (5, 12, 95, 12)   # % màn: swipe_to_left_edge từ cú thứ 2 kéo ngắn trái sang phải
+EDGE_SWIPES = 8                  # swipe_to_left_edge: tối đa chừng này cú kéo (cú đầu dài, các cú sau ngắn)
+EDGE_ICON = (36, 7.5, 52, 13.5)  # % màn: ô cắt một icon ở hàng tab (icon tab thứ hai) sau mỗi cú kéo
+EDGE_SEARCH = (0, 5, 100, 17)    # % màn: vùng tìm lại icon đã cắt sau cú kéo kế tiếp (cả hàng tab)
+EDGE_SAME = 0.8                  # icon vẫn thấy (khớp từ mức này) ...
+EDGE_SETTLE = 1.0                # giây nghỉ sau mỗi cú kéo, rồi mới chụp để cắt / kiểm tra icon
+SHORT_SWIPE = (60, 12, 5, 12)    # % màn: kéo ngắn từ phải sang trái tìm tiếp, xong nghỉ 1s (95 -> 5 dịch ~4 tab một cú: sót tab)
+SHORT_SWIPES = 30                # scan_to_right_edge: tối đa chừng này cú kéo ngắn
+LEFT_ICON = (8, 7.5, 26, 13.5)   # % màn: ô cắt icon ngoài cùng bên trái trước mỗi cú kéo ngắn (kéo ngắn đẩy nó ra khỏi màn)
+# ... VÀ lệch không quá chừng này px (màn rộng 396) mới là chạm biên. Icon tab đều có khung cánh vàng giống nhau nên icon cắt ra hay
+# khớp nhầm sang tab bên cạnh (0.6-0.8+); ở biên thật hàng tab đứng yên.
+LEFT_SAME_PX = 20                # swipe_to_left_edge: VD x 10 -> 20 vẫn là giới hạn trái
+SHORT_SAME_PX = 2                # scan_to_right_edge (kéo ngắn): icon đổi chỗ thì KHÔNG phải giới hạn, phải đứng nguyên chỗ
 
 TASKS = (
     resource_consumption_sprint.TASK, runestone_consumption_sprint.TASK,
@@ -27,31 +62,184 @@ TASKS = (
 )
 
 
-def _sweep(bot, pending: list[str]) -> set[str]:
-    inspected: set[str] = set()
-    todo = [task for task in TASKS if task.key in pending]
-    if not todo:
-        return inspected
-    screen = bot.screenshot()
-    if identify(bot, screen) != GiftScreen.VALUABLE_EVENT:
-        return_home(bot)
-        if not open_named(bot, GiftScreen.VALUABLE_EVENT):
-            bot.record("Gift Claims: không mở được ValuableEvent; "
-                       "chưa tính là không thấy")
-            return inspected
-    results, scanned_all = run_valuable_opened(bot, {task.key for task in todo})
-    if scanned_all:
-        # Only truly absent labels accrue miss 1/3..3/3. A label that was
-        # opened but failed its terminal condition stays pending without being
-        # misclassified as absent.
-        inspected.update(key for key, state in results.items()
-                         if state == "not_present")
-    return inspected
+def _box(screen, region):
+    height, width = screen.shape[:2]
+    x0, y0, x1, y1 = region
+    return int(width * x0 / 100), int(height * y0 / 100), int(width * x1 / 100), int(height * y1 / 100)
+
+
+def _cut(screen, region):
+    left, top, right, bottom = _box(screen, region)
+    return screen[top:bottom, left:right].copy()
+
+
+def _find_icon(screen, icon) -> tuple[float, int]:
+    """(độ khớp, x) chỗ giống icon đã cắt nhất trong hàng tab."""
+    left, top, right, bottom = _box(screen, EDGE_SEARCH)
+    _, score, _, (x, _) = cv2.minMaxLoc(cv2.matchTemplate(screen[top:bottom, left:right], icon, cv2.TM_CCOEFF_NORMED))
+    return score, left + x
+
+
+def _at_edge(screen, icon, cut_x: int, same_px: float) -> bool:
+    """Icon đã cắt ở `cut_x` vẫn thấy (>= EDGE_SAME) và lệch không quá `same_px` = hàng tab không dịch nữa (đã chạm biên)."""
+    score, x = _find_icon(screen, icon)
+    return score >= EDGE_SAME and abs(x - cut_x) <= same_px * screen.shape[1] / REFERENCE_WIDTH
+
+
+def _settled_screenshot(bot):
+    bot.sleep(EDGE_SETTLE)
+    return bot.screenshot()
+
+
+def swipe_to_left_edge(bot) -> bool:
+    """Kéo hàng tab về giới hạn bên trái, tối đa EDGE_SWIPES cú: cú đầu kéo dài FIRST_SWIPE (5% -> 1000%), từ cú thứ 2 kéo ngắn
+    EDGE_BACK_SWIPE (5% -> 95%). Sau mỗi cú nghỉ 1s, cắt một icon (EDGE_ICON); sau cú kế tiếp icon đó vẫn thấy, lệch không quá
+    LEFT_SAME_PX = đã tới giới hạn, dừng. Icon mất thì kéo tiếp. True khi thấy đã tới giới hạn."""
+    icon = None
+    cut_x = 0
+    for swipe in range(1, EDGE_SWIPES + 1):
+        bot.swipe_percent(*(FIRST_SWIPE if swipe == 1 else EDGE_BACK_SWIPE), duration=SLOW_SWIPE_DURATION)
+        screen = _settled_screenshot(bot)
+        if icon is not None and _at_edge(screen, icon, cut_x, LEFT_SAME_PX):
+            bot.record(f"Gift Claims: hàng tab Valuable Event đã tới giới hạn bên trái sau {swipe} cú kéo")
+            return True
+        icon = _cut(screen, EDGE_ICON)
+        cut_x = _box(screen, EDGE_ICON)[0]
+    bot.record(f"Gift Claims: kéo hàng tab Valuable Event {EDGE_SWIPES} cú vẫn chưa thấy giới hạn bên trái")
+    return False
+
+
+def do_visible(bot, pending: set[str], attempted: set[str]) -> None:
+    """Làm các event cần làm (`pending`, chưa thử trong lượt này) đang thấy ở hàng tab: mỗi lần chụp lại, bấm tab bên trái nhất
+    rồi chạy flow riêng của nó; xong thì đánh dấu DONE và bỏ khỏi `pending`, chưa xong thì giữ PENDING (không thử lại trong lượt)."""
+    while True:
+        bot.check()
+        screen = bot.screenshot()
+        if back_if_close_x(bot, screen):
+            screen = bot.screenshot()
+        visible = [(spec, pos) for spec in SPECS
+                   if spec.task.key in pending and spec.task.key not in attempted
+                   and (pos := _tab(bot, spec, screen)) is not None]
+        if not visible:
+            return
+        spec, pos = min(visible, key=lambda item: item[1][0])
+        key = spec.task.key
+        bot.record(f"Gift Claims: Valuable Event mở {spec.task.label}")
+        bot.tap(*pos, delay=STEP_DELAY)
+        attempted.add(key)
+        if process_exact(bot, spec.flow):
+            mark_task_done(bot, key)
+            pending.discard(key)
+        else:
+            bot.record(f"Gift Claims: {spec.task.label} chưa đạt điều kiện DONE; giữ PENDING")
+        bot.sleep(STEP_DELAY)
+
+
+def scan_to_right_edge(bot, pending: set[str], attempted: set[str]) -> bool:
+    """Kéo ngắn SHORT_SWIPE (phải sang trái) tối đa SHORT_SWIPES cú, mỗi chỗ làm các event cần làm đang thấy. Trước mỗi cú cắt
+    icon ngoài cùng bên trái (LEFT_ICON); kéo xong (nghỉ 1s) icon đó vẫn đứng nguyên chỗ (lệch <= SHORT_SAME_PX; đổi chỗ thì chưa phải) = đã chạm bên phải.
+    True khi chạm bên phải."""
+    for _ in range(SHORT_SWIPES):
+        do_visible(bot, pending, attempted)
+        before = bot.screenshot()
+        icon = _cut(before, LEFT_ICON)
+        bot.swipe_percent(*SHORT_SWIPE, duration=SLOW_SWIPE_DURATION)
+        if _at_edge(_settled_screenshot(bot), icon, _box(before, LEFT_ICON)[0], SHORT_SAME_PX):
+            bot.record("Gift Claims: hàng tab Valuable Event đã chạm bên phải")
+            do_visible(bot, pending, attempted)
+            return True
+    bot.record(f"Gift Claims: kéo ngắn {SHORT_SWIPES} cú vẫn chưa chạm bên phải hàng tab Valuable Event")
+    return False
+
+
+def open_valuable_event(bot) -> bool:
+    """Từ màn chính (có nút •••; đang ở bản đồ thế giới thì to_city vào thành trước) tìm nút Valuable Event bằng find_valuable_event (mẫu chữ "Event" rồi OCR), bấm, chờ màn
+    Valuable Event (tiêu đề ValuableEvent/title) tối đa OPEN_WAITS lần x 1s. Chưa vào thì về màn chính làm lại, tối đa
+    OPEN_ATTEMPTS lần; vẫn không vào thì bỏ hoạt động này trong lần chạy này (Start lại thì chạy bình thường)."""
+    for attempt in range(1, OPEN_ATTEMPTS + 1):
+        bot.check()
+        screen = bot.screenshot()
+        if not on_main(bot, screen):
+            return_home(bot)
+        if to_city(bot):      # hoạt động này phải làm trong thành: đang ở bản đồ thế giới thì bấm nút toà thành
+            bot.record("Gift Claims: đang ở bản đồ thế giới; đã chuyển vào thành")
+        screen = bot.screenshot()
+        pos = find_valuable_event(screen) if on_main(bot, screen) else None
+        if pos is None:
+            bot.record(f"Gift Claims: không thấy nút Valuable Event ở màn chính (lần {attempt}/{OPEN_ATTEMPTS})")
+            continue
+        above = round(ICON_ABOVE * screen.shape[1] / REFERENCE_WIDTH)
+        bot.record(f"Gift Claims: bấm nút Valuable Event tại {pos} (lần {attempt}/{OPEN_ATTEMPTS})")
+        bot.tap(pos[0], max(0, pos[1] - above))
+        for _ in range(OPEN_WAITS):
+            bot.sleep(1)
+            if identify(bot, bot.screenshot()) == GiftScreen.VALUABLE_EVENT:
+                bot.record("Gift Claims: đã vào Valuable Event")
+                return True
+        bot.record(f"Gift Claims: bấm rồi mà chưa vào màn Valuable Event sau {OPEN_WAITS}s "
+                   f"(lần {attempt}/{OPEN_ATTEMPTS})")
+    bot.record(f"Gift Claims: {OPEN_ATTEMPTS} lần không vào được Valuable Event; bỏ hoạt động này trong lần chạy này")
+    skip_for_run(bot, KEY)
+    return False
+
+
+def search_pass(bot, pending: set[str], attempted: set[str]) -> bool:
+    """Một lượt tìm (bước 1-4 ở đầu file); `attempted` (rỗng khi gọi) nhận các event đã thấy và bấm vào trong lượt. True khi đã đi
+    hết hàng tab (chạm bên phải) hoặc mọi event cần làm đã xong."""
+    if not open_valuable_event(bot):
+        return False
+    do_visible(bot, pending, attempted)
+    if not pending:
+        return True
+    bot.record("Gift Claims: kéo dài hàng tab Valuable Event về giới hạn bên trái")
+    swipe_to_left_edge(bot)
+    do_visible(bot, pending, attempted)
+    if not pending:
+        return True
+    return scan_to_right_edge(bot, pending, attempted)
+
+
+def _pass_key(number: int) -> str:
+    return f"{KEY}_pass_{number}"
+
+
+def passes_done(bot) -> int:
+    """Số lượt tìm đã xong hôm nay (key DB tự hết hạn theo mốc reset server)."""
+    return sum(1 for number in range(1, PASSES + 1) if bot.is_daily_done(_pass_key(number)))
+
+
+def _reset_passes(bot) -> None:
+    for number in range(1, PASSES + 1):
+        if bot.done_at(_pass_key(number)) is not None:
+            bot.forget_daily(_pass_key(number))
 
 
 def run(bot) -> bool:
-    """Chạy hoạt động Valuable Event; True khi mọi nhiệm vụ của nó đã xong hôm nay."""
-    completed = scan.run_zone(
-        bot, KEY, [(task.key, task.label) for task in TASKS], _sweep)
+    """Chạy hoạt động Valuable Event; True khi mọi nhiệm vụ của nó đã xong hôm nay. Lượt nào thấy event MỚI (chưa thấy ở các lượt
+    trước của lần chạy này) thì đếm lại: lượt đó tính là lượt 1. Event lượt nào cũng thấy mà chưa DONE không reset lại nữa, để
+    không lặp mãi."""
+    if bot.is_daily_done(KEY):
+        return True
+    seen: set[str] = set()
+    while passes_done(bot) < PASSES:
+        pending = {task.key for task in TASKS if not bot.is_daily_done(task.key)}
+        if not pending:
+            break
+        attempted: set[str] = set()
+        if not search_pass(bot, pending, attempted):
+            return_home(bot)
+            return False      # không mở được / chưa đi hết hàng tab: lần chạy sau làm tiếp lượt này
+        if attempted - seen:
+            bot.record("Gift Claims: lượt này thấy event mới; đếm lại lượt tìm từ 1")
+            _reset_passes(bot)
+        seen |= attempted
+        number = passes_done(bot) + 1
+        bot.mark_daily_done(_pass_key(number))
+        bot.record(f"Gift Claims: Valuable Event xong lượt tìm {number}/{PASSES} hôm nay")
+        bot.back(delay=STEP_DELAY)
+    for task in TASKS:
+        mark_task_done(bot, task.key)
+    bot.mark_daily_done(KEY)
+    bot.record(f"Gift Claims: Valuable Event đủ {PASSES} lượt tìm; mọi event của hoạt động xong hôm nay")
     return_home(bot)
-    return completed
+    return True

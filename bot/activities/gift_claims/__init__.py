@@ -20,7 +20,7 @@ limited_offer = import_module(f"{__name__}.valuable_event.limited_offer.run")
 login_gifts = import_module(f"{__name__}.valuable_event.login_gifts.run")
 from .common import (TEXT_CLAIM_CONTROLS, back_if_close_x,
                      claim_fixed_controls, claim_sparkles, mark_task_done,
-                     return_home)
+                     return_home, skipped_for_run)
 from .screens import GiftScreen
 
 RETRY_WINDOW_SECONDS = 120.0
@@ -52,7 +52,7 @@ def job(zone) -> dict:
         return completed
 
     def done(ctx, _settings):
-        if ctx.is_daily_done(zone.KEY):
+        if ctx.is_daily_done(zone.KEY) or skipped_for_run(ctx, zone.KEY):
             return True
         return time.monotonic() < _retry_after(ctx).get(zone.KEY, 0.0)
 

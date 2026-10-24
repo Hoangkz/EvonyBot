@@ -67,6 +67,34 @@ vùng dưới, chốt DONE/PENDING, nghỉ 1 giây, chụp lại rồi mới lư
 Không tái sử dụng tọa độ của các tab còn lại từ ảnh cũ. Carousel lướt trong 1
 giây và chờ 1 giây để các máy chạy đồng thời có thời gian ổn định giao diện.
 
+## Valuable Event (`valuable_event/zone.py`)
+
+Không dùng `scan.run_zone` / đếm "không thấy" từng event: đếm theo LƯỢT TÌM, tối đa 3 lượt mỗi ngày (key DB
+`gift_valuable_event_pass_1..3`, hết hạn theo mốc reset; Start lại vẫn đếm tiếp).
+
+Một lượt tìm (`search_pass`):
+
+1. Mở từ màn chính (`open_valuable_event`): ở màn chính (có nút •••; không ở đó thì `return_home`) truyền ảnh vào
+   `bot/ocr/find_valuable_event.py` `find_valuable_event` (so mẫu chữ "Event" trong `Images/GiftClaims/ValuableEvent/event_text/`,
+   không khớp thì OCR). Thấy thì bấm icon (cao hơn tâm chữ "Event" 30 px), cứ 1 giây chụp kiểm tra tiêu đề `ValuableEvent/title`,
+   tối đa 8 lần. Không thấy nút / 8 lần chưa vào: làm lại, tối đa 3 lần; vẫn chưa vào thì bỏ Valuable Event trong lần chạy này
+   (`skip_for_run`, ghi trên context, không ghi DB; `job.done` coi là xong), Start lại thì chạy bình thường.
+2. `do_visible`: làm các event cần làm đang thấy ở hàng tab (ảnh tab trong `run.py` `SPECS`): bấm tab bên trái nhất, chạy flow riêng
+   (`process_exact`), xong thì DONE, chưa xong thì giữ PENDING và không thử lại trong lượt; chụp lại, lặp tới khi không còn.
+3. `swipe_to_left_edge` (một lần mỗi lượt), tối đa 8 cú: cú đầu kéo dài x 5% -> 1000%, từ cú thứ 2 kéo ngắn x 5% -> 95%, y 12%;
+   sau mỗi cú nghỉ 1s rồi cắt một icon ở hàng tab; sau cú kế tiếp icon đó vẫn thấy (khớp >= 0.8) và lệch <= 20 px = đã tới giới
+   hạn bên trái. Rồi `do_visible`.
+4. `scan_to_right_edge`: kéo ngắn x 60% -> 5%, y 12% (phải sang trái), tối đa 30 cú, mỗi chỗ `do_visible`; trước mỗi cú cắt icon
+   ngoài cùng bên trái, kéo xong nghỉ 1s icon đó vẫn đứng nguyên chỗ (khớp >= 0.8, lệch <= 2 px; đổi chỗ thì chưa phải) = đã chạm bên phải. 95% -> 5% dịch ~4 tab một
+   cú nên sót tab; 60% -> 5% đi hết 12 cú, mọi tab đều hiện đủ (thử trên 21913). Icon tab có khung cánh vàng giống nhau nên phải
+   xét cả độ lệch, không chỉ "còn thấy".
+5. Chạm bên phải (hoặc mọi event cần làm đã xong): ghi `gift_valuable_event_pass_N`, bấm Back, lượt mới làm lại từ bước 1.
+   Lượt nào thấy event MỚI (chưa thấy ở các lượt trước của lần chạy này) thì đếm lại: xoá các key lượt, lượt đó tính là lượt 1
+   (VD lượt 1 không thấy A, lượt 2 thấy A -> lượt 2 là lượt 1). Event lượt nào cũng thấy mà chưa DONE chỉ reset lần đầu, không lặp mãi.
+   Lượt chưa đi hết (không mở được / 30 cú chưa chạm phải) không được tính; lần chạy sau làm lại.
+
+Đủ 3 lượt (hoặc mọi event đã xong): ghi DONE mọi event của hoạt động và key tổng `gift_valuable_event`.
+
 ## Trong từng trang con
 
 1. Bấm nút điều hướng/phần thưởng cố định như Rewards, Star Trail Gift, Sprint Package, Stockpile hoặc Scores.
