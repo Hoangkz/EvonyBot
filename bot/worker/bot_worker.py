@@ -49,7 +49,7 @@ from ..activities.join_monster_war import stamina_wait
 from ..activities.join_monster_war.constants import LISTBOSS
 from ..ocr.read_boss_count import crop as boss_count_crop, run as read_boss_count
 from ..common import get_server, no_alliance
-from ..daily_reset import done_today, last_reset
+from ..daily_reset import done_today, future_keys, last_reset
 from ..context import BotContext, BotInterrupted, TimedOut
 from ..context.errors import BossAvailable, StopRequested, YieldToBoss, YieldToTask
 from .guards import Guards
@@ -244,6 +244,7 @@ class BotWorker(QThread):
         scan_tried = False  # đã thử quét bản đồ thành trong lượt Start này (rảnh mới quét, xem nhánh `not pending` bên dưới)
         stamina_wait_on = False   # vòng trước đang chờ thể lực (đổi trạng thái thì ghi log)
         while not self._stop.is_set():
+            self._clear_future_done()
             # Hết thể lực: Join Boss đặt mốc "+20 phút" trên ctx (chỉ trong lượt chạy này); chưa tới mốc thì làm nhiệm vụ (không gọi Join Boss, boss mới cũng
             # không ngắt), qua mốc thì Join Boss lại.
             was_waiting = boss and stamina_wait_on
@@ -482,6 +483,15 @@ class BotWorker(QThread):
     def _forget_daily(self, task: str):
         self.daily_done.pop(task, None)
         self.daily_task_cleared.emit(self.serial, task)
+
+    def _clear_future_done(self):
+        """Xoá khỏi DB các dấu daily_done có ngày lớn hơn bây giờ hơn 1 ngày (đồng hồ máy từng nhảy tới tương lai)."""
+        keys = future_keys(self.daily_done)
+        if not keys:
+            return
+        self.record(f"Xoá dấu có ngày ở tương lai (đồng hồ máy từng sai): {', '.join(keys)}")
+        for key in keys:
+            self._forget_daily(key)
 
     def _mark_daily_done(self, task: str):
         self.daily_done[task] = datetime.now().isoformat(timespec="seconds")

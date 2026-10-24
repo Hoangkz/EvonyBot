@@ -11,7 +11,7 @@ from datetime import datetime
 from pathlib import Path
 
 import database
-from bot.daily_reset import DEFAULT_RESET_TIME, done_today, last_reset, reset_clock
+from bot.daily_reset import DEFAULT_RESET_TIME, done_today, future_keys, last_reset, reset_clock
 from bot.worker.bot_worker import BotWorker
 from bot.worker.server_clock import ServerClock
 
@@ -36,6 +36,25 @@ class ResetTimeTests(unittest.TestCase):
         self.assertTrue(done_today("2026-10-03T14:05:00", "14:00", now))
         self.assertFalse(done_today("2026-10-03T13:55:00", "14:00", now))
         self.assertFalse(done_today(None, "14:00", now))
+
+    def test_future_keys(self):
+        now = datetime(2026, 10, 24, 21, 0)
+        done = {"crazy_eggs_tried": "2026-11-01T00:38:17",    # đồng hồ máy từng nhảy tới 01/11
+                "daily_patrol": "2026-10-24T15:08:28",
+                "almost": "2026-10-25T20:59:00",              # chưa quá 1 ngày: giữ
+                "bad": "known"}
+        self.assertEqual(future_keys(done, now), ["crazy_eggs_tried"])
+
+    def test_worker_clears_future_keys(self):
+        worker = BotWorker("b", ["x"], {}, daily_done={"crazy_eggs_done": "2999-01-01T00:00:00",
+                                                       "daily_patrol": "2026-10-24T15:08:28"})
+        cleared, history = [], []
+        worker.daily_task_cleared.connect(lambda serial, key: cleared.append(key))
+        worker.history.connect(lambda serial, event: history.append(event))
+        worker._clear_future_done()
+        self.assertEqual(cleared, ["crazy_eggs_done"])
+        self.assertEqual(list(worker.daily_done), ["daily_patrol"])
+        self.assertEqual(len(history), 1)
 
     def test_server_clock(self):
         clock = ServerClock()
