@@ -3,7 +3,7 @@ home_view.py — landing screen: scans ADB ports and lists devices.
 """
 from pathlib import Path
 
-from PyQt5.QtCore import QThread, Qt, QTime, QTimer, pyqtSignal
+from PyQt5.QtCore import QThread, Qt, QTime, pyqtSignal
 from PyQt5.QtWidgets import (
     QAbstractItemView,
     QComboBox,
@@ -150,9 +150,6 @@ class HomeView(QWidget):
         )
         layout.addWidget(self.table, 1)
 
-        # Mở app xong tự kiểm tra bản mới (sau khi cửa sổ đã hiện).
-        QTimer.singleShot(1500, lambda: self._check_update(silent=True))
-
     # ------------------------------------------------------------------
     def _load_devices(self):
         if self._worker is not None and self._worker.isRunning():
@@ -178,6 +175,10 @@ class HomeView(QWidget):
         self.load_button.setText("Load Devices")
 
     # ---- update ------------------------------------------------------
+    def check_update_silently(self):
+        """Kiểm tra bản mới lúc mở app (MainWindow gọi sau khi kiểm tra giấy phép xong)."""
+        self._check_update(silent=True)
+
     def _check_update(self, silent: bool = False):
         """silent=True (kiểm tra lúc mở app): chỉ hiện popup khi có bản mới, im lặng nếu lỗi/đã mới nhất."""
         if not isinstance(silent, bool):  # clicked(bool) từ nút bấm
