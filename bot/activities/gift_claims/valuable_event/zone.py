@@ -14,6 +14,7 @@ Lượt thấy event mới thì đếm lại từ lượt 1. Đủ PASSES lượ
 import cv2
 
 from ....common import to_city
+from ....daily_reset import last_reset
 from ....ocr.find_valuable_event import find_valuable_event
 from ..common import REFERENCE_WIDTH, back_if_close_x, mark_task_done, on_main, return_home, skip_for_run
 from ..screens import GiftScreen, identify
@@ -30,9 +31,19 @@ from .run import SPECS, _tab
 
 KEY = "gift_valuable_event"
 PASSES = 3              # số lượt tìm mỗi ngày; đủ thì mọi event của hoạt động coi là xong hôm nay
+SEEN_ATTR = "_valuable_event_seen"   # thuộc tính trên context: (mốc reset, event đã thấy) — xem seen_today
 OPEN_ATTEMPTS = 3       # số lần về màn chính tìm nút + bấm; hết mà chưa vào thì bỏ hoạt động trong lần chạy này
 OPEN_WAITS = 8          # sau khi bấm: chụp kiểm tra màn Valuable Event tối đa chừng này lần, mỗi lần chờ 1s
 ICON_ABOVE = 30         # px (màn rộng 396): find_valuable_event trả về tâm chữ "Event", bấm lên icon phía trên
+AFTER_TAB_TAP = (50, 5)  # % màn: bấm tab event xong bấm luôn chỗ này, rồi mới chạy flow của event
+PAGE_PROBE = (2, 20, 30, 30)   # % màn: ô cắt trước khi bấm tab (dưới hàng tab, góc trái: banner trang event) để biết đã sang event chưa
+PAGE_SAME = 0.9                # ô đó còn khớp từ mức này = chưa sang trang event mới
+TAB_WAITS = 5                  # sau mỗi lần bấm tab: kiểm tra tối đa chừng này lần, mỗi lần chờ 1s
+TAB_TAPS = 2                   # số lần bấm tab (bấm lại 1 lần); vẫn chưa sang thì bỏ qua event trong lượt này
+# Tab đang chọn có nền xanh sáng hơn: dải ngay dưới chữ tên tab (y 116-120 trên màn 704) sáng ~89-90 (V của HSV), tab thường ~33.
+SELECTED_BAND_Y = (16.4, 17.1)   # % màn
+SELECTED_HALF_W = 35             # px (màn rộng 396): lấy dải này trong khoảng tâm tab +- chừng này
+SELECTED_V = 60                  # độ sáng trung bình từ mức này = tab đang chọn
 # % màn: kéo dài hàng tab từ trái sang phải, x 5% -> 1000% (điểm cuối ra ngoài mép phải): đưa hàng tab về đầu
 # (500% chưa đủ khi màn mở ở tab cuối).
 FIRST_SWIPE = (5, 12, 1000, 12)
@@ -109,9 +120,46 @@ def swipe_to_left_edge(bot) -> bool:
     return False
 
 
+def _page_changed(screen, probe, box) -> bool:
+    """Ô PAGE_PROBE đã khác ảnh cắt trước khi bấm (so đúng chỗ đó) = đã sang trang event khác."""
+    left, top, right, bottom = box
+    return float(cv2.matchTemplate(screen[top:bottom, left:right], probe, cv2.TM_CCOEFF_NORMED).max()) < PAGE_SAME
+
+
+def tab_selected(screen, pos) -> bool:
+    """Tab có tâm `pos` đang được chọn (nền sáng hơn): dải SELECTED_BAND_Y dưới chữ tên tab, trong khoảng tâm +- SELECTED_HALF_W."""
+    height, width = screen.shape[:2]
+    half = SELECTED_HALF_W * width / REFERENCE_WIDTH
+    top, bottom = int(height * SELECTED_BAND_Y[0] / 100), int(height * SELECTED_BAND_Y[1] / 100) + 1
+    left, right = max(0, int(pos[0] - half)), min(width, int(pos[0] + half))
+    band = cv2.cvtColor(screen[top:bottom, left:right], cv2.COLOR_BGR2HSV)[..., 2]
+    return band.size > 0 and float(band.mean()) >= SELECTED_V
+
+
+def open_tab(bot, pos) -> bool:
+    """Bấm tab event tại `pos` (rồi bấm AFTER_TAB_TAP) và chờ sang trang event đó. Tab đã được chọn sẵn (tab_selected) thì đang ở
+    đúng trang: không bấm. Còn lại: trước khi bấm cắt ô PAGE_PROBE (dưới hàng tab, góc trái); sau mỗi 1s kiểm tra ô đó đã đổi chưa,
+    tối đa TAB_WAITS lần; chưa đổi thì bấm lại tab một lần và chờ tiếp như vậy (TAB_TAPS lần bấm). True khi đã sang trang event."""
+    before = bot.screenshot()
+    if tab_selected(before, pos):
+        bot.record("Gift Claims: tab event đang được chọn sẵn; đã ở đúng trang")
+        return True
+    box = _box(before, PAGE_PROBE)
+    probe = before[box[1]:box[3], box[0]:box[2]].copy()
+    for _ in range(TAB_TAPS):
+        bot.tap(*pos)
+        bot.tap_percent(*AFTER_TAB_TAP)
+        for _ in range(TAB_WAITS):
+            bot.sleep(STEP_DELAY)
+            if _page_changed(bot.screenshot(), probe, box):
+                return True
+    return False
+
+
 def do_visible(bot, pending: set[str], attempted: set[str]) -> None:
     """Làm các event cần làm (`pending`, chưa thử trong lượt này) đang thấy ở hàng tab: mỗi lần chụp lại, bấm tab bên trái nhất
-    rồi chạy flow riêng của nó; xong thì đánh dấu DONE và bỏ khỏi `pending`, chưa xong thì giữ PENDING (không thử lại trong lượt)."""
+    (open_tab: chờ sang trang event, không sang thì bỏ qua event trong lượt này) rồi chạy flow riêng của nó; xong thì đánh dấu
+    DONE và bỏ khỏi `pending`, chưa xong thì giữ PENDING (không thử lại trong lượt)."""
     while True:
         bot.check()
         screen = bot.screenshot()
@@ -125,8 +173,10 @@ def do_visible(bot, pending: set[str], attempted: set[str]) -> None:
         spec, pos = min(visible, key=lambda item: item[1][0])
         key = spec.task.key
         bot.record(f"Gift Claims: Valuable Event mở {spec.task.label}")
-        bot.tap(*pos, delay=STEP_DELAY)
         attempted.add(key)
+        if not open_tab(bot, pos):
+            bot.record(f"Gift Claims: bấm {spec.task.label} 2 lần vẫn chưa sang trang event; bỏ qua, lượt sau làm tiếp")
+            continue
         if process_exact(bot, spec.flow):
             mark_task_done(bot, key)
             pending.discard(key)
@@ -214,13 +264,26 @@ def _reset_passes(bot) -> None:
             bot.forget_daily(_pass_key(number))
 
 
+def seen_today(bot) -> set[str]:
+    """Event đã thấy ở các lượt trước hôm nay. Để trên context của bot, không ghi DB: còn qua các lần bị ngắt (Join Boss, hết 120s...)
+    trong lần Start này; Start lại hoặc qua mốc reset server thì làm lại từ rỗng."""
+    server_time = getattr(bot, "server_time", None)
+    value = server_time() if callable(server_time) else ""
+    day = last_reset(value if isinstance(value, str) else "")
+    stored = getattr(bot, SEEN_ATTR, None)
+    if not (isinstance(stored, tuple) and stored[0] == day):
+        stored = (day, set())
+        setattr(bot, SEEN_ATTR, stored)
+    return stored[1]
+
+
 def run(bot) -> bool:
     """Chạy hoạt động Valuable Event; True khi mọi nhiệm vụ của nó đã xong hôm nay. Lượt nào thấy event MỚI (chưa thấy ở các lượt
-    trước của lần chạy này) thì đếm lại: lượt đó tính là lượt 1. Event lượt nào cũng thấy mà chưa DONE không reset lại nữa, để
+    trước hôm nay, seen_today) thì đếm lại: lượt đó tính là lượt 1. Event lượt nào cũng thấy mà chưa DONE không reset lại nữa, để
     không lặp mãi."""
     if bot.is_daily_done(KEY):
         return True
-    seen: set[str] = set()
+    seen = seen_today(bot)
     while passes_done(bot) < PASSES:
         pending = {task.key for task in TASKS if not bot.is_daily_done(task.key)}
         if not pending:

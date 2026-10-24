@@ -312,6 +312,34 @@ class FixedGiftFlowTests(unittest.TestCase):
         self.assertEqual(4, search.call_count)
         self.assertIn(valuable_event_zone.KEY, done)
 
+    def test_valuable_zone_remembers_seen_events_after_interruption(self):
+        # Lần chạy 1: lượt 1 thấy A, lượt 2 trống, lượt 3 dở (bị ngắt). Lần chạy 2 thấy lại A: A đã thấy hôm nay (nhớ trên
+        # context) nên không reset, xong lượt 3 luôn.
+        bot, done = self._daily_bot()
+        bot.server_time.return_value = "14:00"
+        sees = iter([("A",), (), None, ("A",)])
+
+        def search(_bot, _pending, attempted):
+            seen = next(sees)
+            if seen is None:
+                return False
+            attempted.update(seen)
+            return True
+        with (mock.patch.object(valuable_event_zone, "search_pass", side_effect=search) as search_pass,
+              mock.patch.object(valuable_event_zone, "return_home", return_value=True)):
+            self.assertFalse(valuable_event_zone.run(bot))
+            self.assertTrue(valuable_event_zone.run(bot))
+        self.assertEqual(4, search_pass.call_count)
+        self.assertIn(valuable_event_zone.KEY, done)
+
+    def test_seen_today_lives_on_context_and_clears_at_new_reset(self):
+        bot = mock.Mock()
+        bot.server_time.return_value = "14:00"
+        valuable_event_zone.seen_today(bot).add("A")
+        self.assertIn("A", valuable_event_zone.seen_today(bot))
+        with mock.patch.object(valuable_event_zone, "last_reset", return_value="ngày mới"):
+            self.assertEqual(set(), valuable_event_zone.seen_today(bot))
+
     def test_valuable_zone_same_event_every_pass_resets_only_once(self):
         # A lượt nào cũng thấy mà chưa DONE: chỉ reset lần đầu thấy, không lặp mãi.
         bot, done = self._daily_bot()
@@ -350,6 +378,77 @@ class FixedGiftFlowTests(unittest.TestCase):
             self.assertFalse(valuable_event_zone.run(bot))
         self.assertNotIn("gift_valuable_event_pass_1", done)
         self.assertNotIn(valuable_event_zone.KEY, done)
+
+    def _visible_spec_patches(self, spec, opened):
+        return (mock.patch.object(valuable_event_zone, "back_if_close_x", return_value=False),
+                mock.patch.object(valuable_event_zone, "_tab",
+                                  side_effect=lambda _b, s, _screen: (120, 80) if s is spec else None),
+                mock.patch.object(valuable_event_zone, "open_tab", return_value=opened),
+                mock.patch.object(valuable_event_zone, "process_exact", return_value=True))
+
+    def test_do_visible_opens_tab_then_runs_event_flow(self):
+        bot, done = self._daily_bot()
+        bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
+        spec = valuable_event_zone.SPECS[0]
+        back, tab, opened, flow = self._visible_spec_patches(spec, opened=True)
+        with back, tab, opened as open_tab, flow as process:
+            valuable_event_zone.do_visible(bot, {spec.task.key}, set())
+        open_tab.assert_called_once_with(bot, (120, 80))
+        process.assert_called_once_with(bot, spec.flow)
+        self.assertIn(spec.task.key, done)
+
+    def test_do_visible_skips_event_when_tab_never_opens(self):
+        bot, done = self._daily_bot()
+        bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
+        spec = valuable_event_zone.SPECS[0]
+        pending, attempted = {spec.task.key}, set()
+        back, tab, opened, flow = self._visible_spec_patches(spec, opened=False)
+        with back, tab, opened, flow as process:
+            valuable_event_zone.do_visible(bot, pending, attempted)
+        process.assert_not_called()
+        self.assertIn(spec.task.key, pending)       # vẫn PENDING: lượt sau làm tiếp
+        self.assertIn(spec.task.key, attempted)     # không bấm lại trong lượt này
+        self.assertNotIn(spec.task.key, done)
+
+    def test_open_tab_taps_tab_and_top_center_then_waits_for_page_change(self):
+        rng = np.random.default_rng(4)
+        same = rng.integers(0, 255, (704, 396, 3), dtype=np.uint8)
+        changed = same.copy()
+        changed[140:211, 8:118] = rng.integers(0, 255, (71, 110, 3), dtype=np.uint8)   # ô PAGE_PROBE đổi
+        bot = mock.Mock()
+        calls = []
+        bot.tap.side_effect = lambda *a, **k: calls.append(("tap", a))
+        bot.tap_percent.side_effect = lambda *a, **k: calls.append(("tap_percent", a))
+        bot.screenshot.side_effect = (same, same, same, changed)     # trước bấm, 1s, 2s, 3s đã sang
+        self.assertTrue(valuable_event_zone.open_tab(bot, (120, 80)))
+        self.assertEqual([("tap", (120, 80)), ("tap_percent", (50, 5))], calls)
+        self.assertEqual(3, bot.sleep.call_count)
+
+    def test_tab_selected_reads_lighter_background_on_real_screens(self):
+        screens = Path(__file__).parent / "screens"
+        limited = cv2.imread(str(screens / "valuable_event_tab_limited_offer_selected.png"))
+        vault = cv2.imread(str(screens / "valuable_event_tab_general_vault_selected.png"))
+        self.assertTrue(valuable_event_zone.tab_selected(limited, (174, 85)))      # Limited Offer đang chọn
+        self.assertFalse(valuable_event_zone.tab_selected(limited, (72, 94)))      # Speedup Sprint
+        self.assertTrue(valuable_event_zone.tab_selected(vault, (310, 85)))        # General Vault đang chọn
+        self.assertFalse(valuable_event_zone.tab_selected(vault, (210, 85)))       # All-Out Preparation
+
+    def test_open_tab_does_not_tap_already_selected_tab(self):
+        screen = cv2.imread(str(Path(__file__).parent / "screens" /
+                                "valuable_event_tab_limited_offer_selected.png"))
+        bot = mock.Mock()
+        bot.screenshot.return_value = screen
+        self.assertTrue(valuable_event_zone.open_tab(bot, (174, 85)))
+        bot.tap.assert_not_called()
+        bot.sleep.assert_not_called()
+
+    def test_open_tab_retaps_once_then_gives_up(self):
+        same = np.random.default_rng(5).integers(0, 255, (704, 396, 3), dtype=np.uint8)
+        bot = mock.Mock()
+        bot.screenshot.return_value = same
+        self.assertFalse(valuable_event_zone.open_tab(bot, (120, 80)))
+        self.assertEqual(2, bot.tap.call_count)                       # bấm + bấm lại 1 lần
+        self.assertEqual(2 * 5, bot.sleep.call_count)                 # mỗi lần chờ tối đa 5 x 1s
 
     def test_search_pass_order_visible_then_long_swipe_then_short_scan(self):
         bot = mock.Mock()
