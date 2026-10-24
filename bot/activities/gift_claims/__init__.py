@@ -11,13 +11,12 @@ Event Center trước Valuable Event và Super Value Return (``bot/worker/priori
 from importlib import import_module
 import time
 
-from . import event_center, valuable_event
-from .valuable_event import super_value_return
-# Lối tắt cho nơi từng import một luồng quà cụ thể từ ``gift_claims``; phần cài đặt nằm ở ``valuable_event/``.
+from . import event_center, super_value_return, valuable_event
+# Lối tắt cho nơi từng import một luồng quà cụ thể từ ``gift_claims``; phần cài đặt nằm ở ``valuable_event/`` và ``super_value_return/``.
 back_to_territory = import_module(f"{__name__}.back_to_territory.run")
-empire_depot = import_module(f"{__name__}.valuable_event.empire_depot.run")
+empire_depot = import_module(f"{__name__}.super_value_return.empire_depot.run")
 limited_offer = import_module(f"{__name__}.valuable_event.limited_offer.run")
-login_gifts = import_module(f"{__name__}.valuable_event.login_gifts.run")
+login_gifts = import_module(f"{__name__}.super_value_return.login_gifts.run")
 from .common import (TEXT_CLAIM_CONTROLS, back_if_close_x,
                      claim_fixed_controls, claim_sparkles, mark_task_done,
                      return_home, skipped_for_run)

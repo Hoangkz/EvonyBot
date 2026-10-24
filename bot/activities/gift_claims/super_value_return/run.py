@@ -1,11 +1,11 @@
 """Deterministic two-zone runner for Super Value Return / Empire Depot."""
 from dataclasses import dataclass
 
-from .. import (city_growth_plan, empire_depot, login_gifts, lucky_raffle,
+from . import (city_growth_plan, empire_depot, login_gifts, lucky_raffle,
                 refining_weekly_card)
-from ...common import (TEXT_CLAIM_CONTROLS, back_if_close_x, find,
+from ..common import (TEXT_CLAIM_CONTROLS, back_if_close_x, find,
                        mark_task_done)
-from ..named_flow import (ExactFlow, SLOW_SWIPE_DURATION, STEP_DELAY,
+from ..valuable_event.named_flow import (ExactFlow, SLOW_SWIPE_DURATION, STEP_DELAY,
                           TASK_TAB_THRESHOLD, TOP_CAROUSEL, carousel_moved,
                           process_exact)
 

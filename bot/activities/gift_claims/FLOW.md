@@ -27,12 +27,14 @@ bản ghi 21:05 ngày 14/10 là **chưa làm**, 13:59 thì vẫn **đã làm**. 
 gift_claims/
 ├── scan.py                      # vòng kiểm tra 3 lần dùng chung cho cả hai hoạt động
 ├── valuable_event/
-│   ├── zone.py                  # run(bot) của hoạt động Valuable Event
-│   ├── run.py                   # quét carousel (dấu đỏ) dùng bởi từng tab
+│   ├── zone.py                  # run(bot) của hoạt động Valuable Event (3 lượt tìm)
+│   ├── run.py                   # SPECS: ảnh tab + flow của từng event
+│   ├── named_flow/              # ExactFlow / process_exact dùng chung (cả super_value_return)
 │   └── <từng event>/run.py      # TASK = GiftTask(key, nhãn, run)
-├── super_value_return/
-│   ├── zone.py
-│   └── run.py
+├── super_value_return/          # key tổng gift_super_value_return
+│   ├── zone.py                  # run(bot) của hoạt động Super Value Return
+│   ├── run.py                   # quét carousel Super Value Return
+│   └── login_gifts/, empire_depot/, lucky_raffle/, city_growth_plan/, refining_weekly_card/
 ├── back_to_territory/           # Thanh phải ngoài thành, tính vào hoạt động Event Center
 │   └── run.py
 └── event_center/

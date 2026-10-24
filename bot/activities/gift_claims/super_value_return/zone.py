@@ -1,9 +1,9 @@
 """Hoạt động Super Value Return độc lập với Valuable Event."""
-from ... import scan
-from ...common import return_home
-from ...lobby import open_named
-from ...screens import GiftScreen, identify
-from .. import (city_growth_plan, empire_depot, login_gifts, lucky_raffle,
+from .. import scan
+from ..common import return_home
+from ..lobby import open_named
+from ..screens import GiftScreen, identify
+from . import (city_growth_plan, empire_depot, login_gifts, lucky_raffle,
                 refining_weekly_card)
 from .run import run_opened
 

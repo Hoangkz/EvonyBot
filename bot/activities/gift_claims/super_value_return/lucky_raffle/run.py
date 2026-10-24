@@ -1,6 +1,6 @@
 """Claim the free Lucky Raffle chest and verify its opened state."""
 from ...common import GiftTask
-from ..named_flow import ExactFlow, run_carousel_exact
+from ...valuable_event.named_flow import ExactFlow, run_carousel_exact
 from ...screens import GiftScreen
 
 KEY = "gift_lucky_raffle"

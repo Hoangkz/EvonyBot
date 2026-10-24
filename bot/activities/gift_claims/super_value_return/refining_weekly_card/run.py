@@ -10,7 +10,7 @@ from ...common import (GiftTask, close_congratulations, find, return_home,
                        select_carousel_tab)
 from ...lobby import open_named
 from ...screens import GiftScreen
-from ..named_flow import ExactFlow, SLOW_SWIPE_DURATION, STEP_DELAY
+from ...valuable_event.named_flow import ExactFlow, SLOW_SWIPE_DURATION, STEP_DELAY
 
 KEY = "gift_refining_weekly_card"
 PAGE = "SuperValueReturn/title"

@@ -23,9 +23,9 @@ ancient_dynasty_treasury = import_module(
     "bot.activities.gift_claims.valuable_event.ancient_dynasty_treasury.run")
 back_to_territory = import_module(
     "bot.activities.gift_claims.back_to_territory.run")
-empire_depot = import_module("bot.activities.gift_claims.valuable_event.empire_depot.run")
+empire_depot = import_module("bot.activities.gift_claims.super_value_return.empire_depot.run")
 limited_offer = import_module("bot.activities.gift_claims.valuable_event.limited_offer.run")
-login_gifts = import_module("bot.activities.gift_claims.valuable_event.login_gifts.run")
+login_gifts = import_module("bot.activities.gift_claims.super_value_return.login_gifts.run")
 resource_consumption_sprint = import_module(
     "bot.activities.gift_claims.valuable_event.resource_consumption_sprint.run")
 super_blazon_sale = import_module(
@@ -39,11 +39,11 @@ speedup_sprint = import_module(
 wheel_of_dragon_war = import_module(
     "bot.activities.gift_claims.valuable_event.wheel_of_dragon_war.run")
 refining_weekly_card = import_module(
-    "bot.activities.gift_claims.valuable_event.refining_weekly_card.run")
+    "bot.activities.gift_claims.super_value_return.refining_weekly_card.run")
 super_value_return = import_module(
-    "bot.activities.gift_claims.valuable_event.super_value_return.run")
+    "bot.activities.gift_claims.super_value_return.run")
 super_value_zone = import_module(
-    "bot.activities.gift_claims.valuable_event.super_value_return.zone")
+    "bot.activities.gift_claims.super_value_return.zone")
 
 
 ROOT = Path(__file__).parents[2]
