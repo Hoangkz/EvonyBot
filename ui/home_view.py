@@ -33,6 +33,7 @@ class HomeView(QWidget):
     start_all_requested = pyqtSignal()
     stop_all_requested = pyqtSignal()      # dừng mọi bot đang chạy
     exit_all_requested = pyqtSignal()       # đóng game trên mọi thiết bị
+    active_all_requested = pyqtSignal()     # kích hoạt mọi thiết bị đang Inactive
     reset_time_changed = pyqtSignal(str)   # giờ reset server "HH:MM" người dùng vừa chọn
     auto_timeout_changed = pyqtSignal(str)  # số phút "Auto Times Out" người dùng vừa chọn
     active_toggled = pyqtSignal(str, bool)  # (serial, muốn kích hoạt?) người dùng bấm nút Active/Inactive
@@ -97,6 +98,11 @@ class HomeView(QWidget):
         exit_all.setMinimumSize(100, 36)
         exit_all.clicked.connect(self.exit_all_requested.emit)
         toolbar.addWidget(exit_all)
+
+        active_all = QPushButton("Active All")
+        active_all.setMinimumSize(100, 36)
+        active_all.clicked.connect(self.active_all_requested.emit)
+        toolbar.addWidget(active_all)
 
         toolbar.addStretch(1)
 
