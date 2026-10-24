@@ -19,8 +19,8 @@ class ShopItem:
 
 ITEMS = (
     # Hai vật phẩm này luôn đứng đầu, mặc định bật và được tìm trước.
-    ShopItem("tribute", "Tribute", 5, default=True),
     ShopItem("vip_points", "100 VIP Points", 5, default=True),
+    ShopItem("tribute", "Tribute", 5, default=True),
     ShopItem("food_100k", "Food 100K", 200),
     ShopItem("lumber_100k", "Lumber 100K", 200),
     ShopItem("stone_100k", "Stone 100K", 200),

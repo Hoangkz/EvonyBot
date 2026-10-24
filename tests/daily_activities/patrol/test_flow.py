@@ -104,6 +104,7 @@ class PatrolFlow(unittest.TestCase):
                           daily_done=_rounds_done(*range(1, 11), key=KP_KEY))
         self.assertIn(f"{LABEL}: Refresh disabled (out of refreshes), done for today", device.logs)
         self.assertIn(KEY, device.daily_done)
+        self.assertIn(MORE_KEY, device.daily_done)   # hết Refresh: cả việc nối tiếp cũng xong, hôm nay không vào lại
         self.assertNotIn(round_key(1, KEY), device.daily_done)
 
     def test_after_go_not_confirmed(self):

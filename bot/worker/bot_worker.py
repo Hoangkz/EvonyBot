@@ -242,10 +242,15 @@ class BotWorker(QThread):
         attempts = {}      # key -> số lần chạy hết một lượt mà vẫn chưa xong hôm nay (tối đa MAX_ATTEMPTS)
         stalled = 0        # số nhiệm vụ liên tiếp chạy xong một lượt mà vẫn chưa xong
         scan_tried = False  # đã thử quét bản đồ thành trong lượt Start này (rảnh mới quét, xem nhánh `not pending` bên dưới)
+        stamina_wait_on = False   # vòng trước đang chờ thể lực (đổi trạng thái thì ghi log)
         while not self._stop.is_set():
-            # Hết thể lực: Join Boss lưu mốc "+20 phút" vào DB; chưa tới mốc thì làm nhiệm vụ (không gọi Join Boss, boss mới cũng
+            # Hết thể lực: Join Boss đặt mốc "+20 phút" trên ctx (chỉ trong lượt chạy này); chưa tới mốc thì làm nhiệm vụ (không gọi Join Boss, boss mới cũng
             # không ngắt), qua mốc thì Join Boss lại.
-            stamina_wait_on = boss and stamina_wait.waiting(self.ctx.daily_keys())
+            was_waiting = boss and stamina_wait_on
+            stamina_wait_on = boss and stamina_wait.waiting(self.ctx)
+            if stamina_wait_on != was_waiting:   # chờ thể lực thì không gọi Join Boss: ghi ra để biết vì sao không đánh boss
+                self.record(f"Chờ thể lực hồi thêm {stamina_wait.remaining(self.ctx) / 60:.0f} phút, chưa Join Boss"
+                            if stamina_wait_on else "Hết chờ thể lực, Join Boss lại")
             if boss and not stamina_wait_on:
                 self._ensure_server()
                 boss = self._check_boss()

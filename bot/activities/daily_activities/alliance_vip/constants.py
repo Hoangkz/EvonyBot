@@ -14,12 +14,9 @@ from ..constants import ROOT
 LABEL = "Alliance VIP"   # ô tích ở tab Daily Activities (mặc định tích), key trong settings
 FOLDER = "ActivitiesAllianceVip"
 FOLDER_PATH = f"{ROOT}/{FOLDER}"
-# Dấu "xong hôm nay" riêng cho từng loại (daily_done): xong cả hai thì nhiệm vụ xong.
-MONTH_KEY = "Alliance VIP: Monthly"
+# Dấu "xong hôm nay" (daily_done) của VIP / Tribute ở Daily Sale; không mua Monthly (trên tiêu đề Daily Sale).
 DAY_KEY = "Alliance VIP: Daily"
-TRIBUTE_MONTH_KEY = "Alliance VIP: Tribute Monthly"
 TRIBUTE_DAY_KEY = "Alliance VIP: Tribute Daily"
-ALL_DONE_KEY = "Alliance VIP: All selected items"
 
 # Màn Liên minh: dòng "Alliance Shop" (150, 499): 1,00. Màn Alliance Shop: tiêu đề "Alliance Shop" (199, 23): 1,00 (0,72 ở màn Liên minh).
 SHOP_ROW = f"{FOLDER_PATH}/ShopRow.png"
@@ -47,18 +44,23 @@ POPUP_TEMPLATE_THRESHOLD = 0.86
 MAX_CROP_LEFT = 50            # từ tâm dấu + sang trái, bao trọn đầu thanh tại x - 35
 MAX_CROP_HALF_HEIGHT = 18
 MAX_SELECT_TRIES = 3
+MAX_BAR_WIDTH = 240           # từ tâm dấu + sang trái: cả thanh số lượng (so trước / sau khi bấm)
+MAX_BAR_STILL_DIFF = 3        # chênh lệch trung bình < chừng này = thanh không đổi (chỉ còn 1 lượt, VD 100 Chips 1 / 1)
 BUY_DY = 96
 BUY_BUTTON_BOX = (130, 28)   # vùng quanh nút Buy trong popup số lượng
 BUY_MIN_SATURATION = 100     # nút xanh/vàng hoạt động; nút xám không được bấm
-CONFIRM_CHECKS = 5            # bấm mua xong chờ hộp xác nhận (Confirm) tối đa chừng này giây; bấm Confirm mới là mua thật
-BUY_WAIT = 3                  # giây chờ sau khi bấm mua
-POPUP_CHECKS = 5              # bấm giá xong chờ 1 giây, chưa có popup thì chờ thêm tối đa chừng này lần (1 giây / lần); vẫn không có = coi như xong
+BUY_WAIT = 3                  # giây chờ sau khi bấm Confirm (hộp mua tự đóng, không có ảnh để wait_for)
+# Mọi lần chuyển màn đều wait_for ảnh của màn đích: 1 giây kiểm tra một lần, tối đa 6 lần.
+WAIT_INTERVAL = 1
+WAIT_TIMEOUT = 6 * WAIT_INTERVAL
 SCROLLS = 32                  # trần an toàn lớn; dừng sớm chỉ khi xác nhận đáy thật
-SWIPE = (50, 68, 50, 46)      # % màn hình: cuộn Alliance Shop xuống (~155 px mỗi lần; vuốt dài / nhanh thì shop trôi quá, lỡ sách)
+SWIPE = (50, 80, 50, 30)      # % màn hình: cuộn Alliance Shop xuống (50% màn, ~350 px mỗi lần; vuốt dài / nhanh thì shop trôi quá, lỡ sách)
+SWIPE_UP = (50, 30, 50, 80)   # ngược SWIPE: cuộn lên (sau khi cuộn nhanh xuống VIP/Tribute)
 SWIPE_DURATION = 1.0          # vuốt 1s + dừng quét 1s = tối đa 2s mỗi bước
+UNFOCUS_TAP = (50, 3)         # % màn hình: bấm tiêu đề shop trước mỗi lần cuộn (lỡ bấm vật phẩm thì shop không cuộn được)
 SCAN_SETTLE = 1.0
-WEEKLY_EXTRA_SWIPES = 2       # thấy Weekly Sale thì lướt thêm đúng 2 lần để tới cuối
-TOP_SWIPE = (50, 25, 50, 85)  # đưa carousel dọc về đầu trước mỗi lượt tìm ưu tiên
-TOP_SWIPES = 6
-TOP_SWIPE_DURATION = 0.35
-TOP_SETTLE = 1.5
+# Giới hạn cuộn xuống: Truce dưới tiêu đề Weekly Sale (hàng cuối); giới hạn cuộn lên: tiêu đề Daily Sale.
+# Có tích VIP / Tribute: cuộn thật nhanh xuống tới chúng ở Daily Sale. Đo trên 21913: cú thứ 2 đã thấy cả hai ngay trên Weekly Sale.
+FAST_SWIPE = (50, 90, 50, 20)
+FAST_SWIPE_DURATION = 0.1
+FAST_SWIPES = 3

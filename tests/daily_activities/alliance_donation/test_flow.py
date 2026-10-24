@@ -43,7 +43,7 @@ class AllianceDonationFlow(unittest.TestCase):
         flow = [
             *TO_SCIENCE,
             Step("donate_science_21943.png", tap(DONATE_BUTTON_2)),
-            Step("donate_gems.png", back()),
+            Step("donate_gems.png", back(2)),            # đóng Alliance Science rồi màn Liên minh
             Step("alliance_main.png", end(result=False)),
         ]
         device, collect = self.run_with_rewards_mocked(flow)
@@ -56,7 +56,7 @@ class AllianceDonationFlow(unittest.TestCase):
         lượt sau do common.hourly_job lưu)."""
         flow = [
             *TO_SCIENCE,
-            Step("donate_gems.png", back()),
+            Step("donate_gems.png", back(2)),            # đóng Alliance Science rồi màn Liên minh: về thành
             Step("alliance_main.png", end(result=False)),
         ]
         device, collect = self.run_with_rewards_mocked(flow)

@@ -1,12 +1,13 @@
-"""Hợp đồng an toàn của luồng Join -> March -> xác nhận Joined.
+"""Hợp đồng an toàn của luồng Join -> March -> ghi nhớ boss.
 
 File này cố ý gom các quy tắc quan trọng của thiết kế không dùng ``pending`` để
 người sửa code về sau đọc tên test là hiểu hành vi bắt buộc:
 
 * tọa độ đích thật luôn được OCR trên màn March;
 * không đọc được tọa độ thì Back, tuyệt đối không March;
-* PvP War chỉ chứng minh đã về danh sách, chưa chứng minh đã tham gia;
-* chỉ hàng Joined có đúng tọa độ đích mới được ghi vào BossMemory;
+* bấm March rồi về danh sách War (PvP War) = đã tham gia: ghi tọa độ đích vào BossMemory
+  (không tìm thẻ "Joined": danh sách đổi chậm làm bot không ghi nhớ, bấm Join lại mãi);
+* bấm March rồi về màn thành chính (lỗi game) = chưa tham gia: không ghi nhớ;
 * sau khi bổ sung thể lực chỉ bấm March lại với tọa độ đã đọc ở lần March trước:
   không OCR lại, không chọn đội / tướng lại.
 """
@@ -20,8 +21,8 @@ import numpy as np
 
 from bot.activities.join_monster_war.boss_memory import BossMemory, JOINED
 from bot.activities.join_monster_war.constants import (
+    ALLIANCE_ICON,
     BOSS_MONSTER,
-    JOINED_BUTTON,
     MARCH,
     PVP_WAR,
 )
@@ -93,7 +94,8 @@ class MarchTargetContractTests(unittest.TestCase):
         boss._pick_troop.assert_not_called()
         boss._press_march.assert_not_called()
 
-    def test_pvp_war_without_matching_joined_row_is_not_success(self):
+    def test_back_on_war_list_after_march_marks_the_march_coordinate(self):
+        # Về danh sách War (tab PvP War) sau khi bấm March = đã Join: ghi nhớ tọa độ đọc trên màn March, không tìm thẻ "Joined".
         bot = fake_bot()
         bot.find.side_effect = lambda template, **_kwargs: (
             (300, 680) if template == MARCH
@@ -101,65 +103,41 @@ class MarchTargetContractTests(unittest.TestCase):
             else None
         )
         boss = _Boss(bot, {})
-        boss._joined_target_visible = mock.Mock(return_value=False)
-
-        boss._press_march((767, 811), (300, 680), MARCH_SCREEN)
-
-        self.assertIsNone(boss.memory.status((767, 811)))
-        self.assertIn("chưa thấy Joined đúng boss", bot.record.call_args.args[0])
-
-    def test_pvp_war_without_a_readable_target_is_not_success(self):
-        bot = fake_bot()
-        bot.find.side_effect = lambda template, **_kwargs: (
-            (300, 680) if template == MARCH
-            else (200, 118) if template == PVP_WAR
-            else None
-        )
-        boss = _Boss(bot, {})
-        boss._joined_target_visible = mock.Mock(return_value=True)
-
-        boss._press_march(None, (300, 680), MARCH_SCREEN)
-
-        boss._joined_target_visible.assert_not_called()
-        self.assertIn("chưa thấy Joined đúng boss None", bot.record.call_args.args[0])
-
-    def test_matching_joined_row_marks_actual_march_coordinate(self):
-        bot = fake_bot()
-        bot.find.side_effect = lambda template, **_kwargs: (
-            (300, 680) if template == MARCH
-            else (200, 118) if template == PVP_WAR
-            else None
-        )
-        boss = _Boss(bot, {})
-        boss._joined_target_visible = mock.Mock(return_value=True)
 
         boss._press_march((767, 811), (300, 680), MARCH_SCREEN)
 
         self.assertEqual(boss.memory.status((767, 811)), JOINED)
-        boss._joined_target_visible.assert_called_once_with(SCREEN, (767, 811))
+        bot.find_all.assert_not_called()
+        self.assertIn("đã hành quân tới boss (767, 811)", bot.record.call_args.args[0])
 
-    def test_joined_confirmation_checks_every_visible_joined_row_by_coordinate(self):
+    def test_back_on_city_screen_after_march_is_not_joined(self):
+        # Bấm March xong về thẳng màn thành chính (lỗi game): chưa Join, không ghi nhớ, không Back (vòng chính tự vào lại danh sách).
         bot = fake_bot()
-        bot.find_all.return_value = [(319, 300), (319, 420)]
-        boss = _Boss(bot, {})
-        boss._read_card_coords = mock.Mock(side_effect=[(111, 222), (767, 811)])
-
-        self.assertTrue(boss._joined_target_visible(SCREEN, (767, 811)))
-
-        bot.find_all.assert_called_once_with(
-            JOINED_BUTTON,
-            screen=SCREEN,
-            center=False,
-            region=run_module.REGIONS[JOINED_BUTTON],
+        bot.find.side_effect = lambda template, **_kwargs: (
+            (300, 680) if template == MARCH and "screen" not in _kwargs
+            else (40, 600) if template == ALLIANCE_ICON
+            else None
         )
-
-    def test_wrong_joined_coordinates_do_not_confirm_success(self):
-        bot = fake_bot()
-        bot.find_all.return_value = [(319, 300), (319, 420)]
         boss = _Boss(bot, {})
-        boss._read_card_coords = mock.Mock(side_effect=[(111, 222), (333, 444)])
 
-        self.assertFalse(boss._joined_target_visible(SCREEN, (767, 811)))
+        boss._press_march((767, 811), (300, 680), MARCH_SCREEN)
+
+        self.assertIsNone(boss.memory.status((767, 811)))
+        bot.back.assert_not_called()
+        self.assertIn("về màn thành chính (lỗi game), chưa Join boss (767, 811)", bot.record.call_args.args[0])
+
+    def test_back_on_war_list_without_a_readable_target_is_not_remembered(self):
+        bot = fake_bot()
+        bot.find.side_effect = lambda template, **_kwargs: (
+            (300, 680) if template == MARCH
+            else (200, 118) if template == PVP_WAR
+            else None
+        )
+        boss = _Boss(bot, {})
+
+        boss._press_march(None, (300, 680), MARCH_SCREEN)
+
+        self.assertIn("không có tọa độ boss, không ghi nhớ", bot.record.call_args.args[0])
 
     def test_stamina_refill_presses_march_again_without_ocr_or_troop_pick(self):
         bot = fake_bot()

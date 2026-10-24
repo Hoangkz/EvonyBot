@@ -22,7 +22,8 @@ os.environ.setdefault("ADB_MDNS", "0")
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import (
-    QApplication, QDialog, QHBoxLayout, QLabel, QMainWindow, QMessageBox, QStackedWidget, QVBoxLayout, QWidget,
+    QApplication, QDialog, QFrame, QHBoxLayout, QLabel, QMainWindow, QMessageBox, QProgressBar, QStackedWidget,
+    QVBoxLayout, QWidget,
 )
 
 from bot.activities.find_boss.angles import split_angles
@@ -32,8 +33,9 @@ from bot.common import GAME_PACKAGE
 from bot.worker import BotManager
 
 import licensing
-from database import DEFAULT_PROFILE, Database, is_event_key
+from database import DEFAULT_PROFILE, TAB_COLUMNS, Database, is_event_key
 from ui import DeviceView, HomeView, Sidebar
+from ui.device_view import subtract_craft_item
 from ui import theme
 from ui.activation_dialog import ActivationDialog
 from ui.workers import LicenseWorker
@@ -52,29 +54,25 @@ def next_license_check_ms() -> int:
     return random.randint(LICENSE_CHECK_MIN_MS, LICENSE_CHECK_MAX_MS)
 
 
-def ensure_license() -> tuple[bool, str | None]:
-    """(may start, notice). A machine that already has a license starts when the server answers; the notice
-    (revoked, expired...) is shown as a popup and the license file is never deleted. When the server cannot be
-    reached the app offers Retry or Quit. The code dialog only appears when there is no license yet: one
-    machine uses one code, so there is no way to enter another one from the app."""
+def ensure_license() -> bool:
+    """May the app start. A machine that already has a license opens right away; the window then checks it with
+    the server in the background (MainWindow._check_license(startup=True)). The code dialog only appears when there
+    is no license yet: one machine uses one code, so there is no way to enter another one from the app."""
     if licensing.stored_code():
-        while True:
-            try:
-                licensing.verify()
-                return True, None
-            except licensing.LicenseError as e:
-                return True, str(e)
-            except licensing.OfflineError:
-                box = QMessageBox(
-                    QMessageBox.Critical, "Connection error",
-                    "Unable to load information from the server.\nPlease check your internet connection and try again.")
-                retry = box.addButton("Retry", QMessageBox.AcceptRole)
-                box.addButton("Quit", QMessageBox.RejectRole)   # also what the window's X / Esc does
-                box.setDefaultButton(retry)
-                box.exec()
-                if box.clickedButton() is not retry:
-                    return False, None
-    return ActivationDialog().exec() == QDialog.Accepted, None
+        return True
+    return ActivationDialog().exec() == QDialog.Accepted
+
+
+def ask_retry_offline(parent=None) -> bool:
+    """Server không trả lời: hỏi Retry (True) hay Quit (False)."""
+    box = QMessageBox(
+        QMessageBox.Critical, "Connection error",
+        "Unable to load information from the server.\nPlease check your internet connection and try again.", parent=parent)
+    retry = box.addButton("Retry", QMessageBox.AcceptRole)
+    box.addButton("Quit", QMessageBox.RejectRole)   # also what the window's X / Esc does
+    box.setDefaultButton(retry)
+    box.exec()
+    return box.clickedButton() is retry
 
 
 PREBUILD_IDLE_SECONDS = 1.0   # chỉ dựng sẵn giao diện máy khi người dùng đã ngừng thao tác chừng này giây
@@ -111,12 +109,25 @@ class MainWindow(QMainWindow):
         self.license_banner.setStyleSheet("background: #d32f2f; color: white; font-weight: bold; padding: 8px 12px;")
         self.license_banner.hide()
         outer_layout.addWidget(self.license_banner)
-        # Hiện trong lúc đang hỏi server (xem _check_license): giao diện bị khoá cho tới khi có kết quả.
-        self.license_checking = QLabel("Checking license, please wait...")
-        self.license_checking.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.license_checking.setStyleSheet("background: #3a63f2; color: white; font-weight: bold; padding: 8px 12px;")
+        # Khung loading nổi giữa cửa sổ trong lúc đang hỏi server (xem _check_license): giao diện bị khoá cho tới khi
+        # có kết quả. Không nằm trong layout, _place_license_checking đặt nó vào giữa.
+        self.license_checking = QFrame(outer)
+        self.license_checking.setStyleSheet(
+            "QFrame { background: #3a63f2; border-radius: 8px; }"
+            " QLabel { color: white; font-weight: bold; background: transparent; }")
+        checking_layout = QVBoxLayout(self.license_checking)
+        checking_layout.setContentsMargins(24, 16, 24, 16)
+        checking_label = QLabel("Checking license, please wait...")
+        checking_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        checking_layout.addWidget(checking_label)
+        checking_bar = QProgressBar()
+        checking_bar.setRange(0, 0)   # chạy qua lại liên tục (không biết bao lâu)
+        checking_bar.setTextVisible(False)
+        checking_bar.setFixedHeight(8)
+        checking_layout.addWidget(checking_bar)
         self.license_checking.hide()
-        outer_layout.addWidget(self.license_checking)
+        self._startup_check = False    # lần kiểm tra đang chạy là lần lúc mở app
+        self._startup_offline = False  # lần đó không tới được server -> hỏi Retry / Quit
         self.content = QWidget()
         outer_layout.addWidget(self.content, 1)
         root = QHBoxLayout(self.content)
@@ -209,28 +220,66 @@ class MainWindow(QMainWindow):
         self.home_view.start_all_requested.connect(self._on_start_all_requested)
         self.home_view.stop_all_requested.connect(self._on_stop_all_requested)
         self.home_view.exit_all_requested.connect(self._on_exit_all_requested)
+        self.home_view.active_all_requested.connect(self._on_active_all_requested)
 
-    def _check_license(self):
+    def _check_license(self, startup: bool = False):
+        """Hỏi server giấy phép trên thread nền. `startup`: lần lúc mở app (app đã mở sẵn, không chờ) — không tới
+        được server thì hỏi Retry / Quit như trước; các lần định kỳ sau thì dựa vào hạn offline (check_local)."""
         self._license_timer.start(next_license_check_ms())   # next check at a new random gap
         if self._license_worker is not None and self._license_worker.isRunning():
             return
-        self._license_worker = LicenseWorker("verify", parent=self, running=self.bots.running_serials(),
-                                             peak=self.bots.peak_devices())
+        self._startup_check = startup
+        self._startup_offline = False
+        # Lúc mở app chưa có bot nào chạy: không gửi running / peak (như verify() trước đây).
+        self._license_worker = LicenseWorker(
+            "verify", parent=self,
+            running=None if startup else self.bots.running_serials(),
+            peak=None if startup else self.bots.peak_devices())
         # Đang hỏi server: báo cho người dùng và khoá giao diện tới khi có kết quả.
+        self._place_license_checking()
         self.license_checking.show()
+        self.license_checking.raise_()
         self.content.setEnabled(False)
         self._license_worker.finished.connect(self._end_license_check)
         # The server received the report (accepted or refused): start counting the next peak. Offline keeps it.
         self._license_worker.done.connect(lambda: (self.bots.reset_peak(), self.notify_license(None)))
         self._license_worker.refused.connect(lambda msg: (self.bots.reset_peak(), self.notify_license(msg)))
-        # Offline is fine while the last signed answer is inside the grace period.
-        self._license_worker.offline.connect(lambda _m: self.notify_license(licensing.check_local()))
+        self._license_worker.offline.connect(self._on_license_offline)
         self._license_worker.start()
 
+    def _on_license_offline(self, _msg: str):
+        if self._startup_check:
+            self._startup_offline = True   # popup hiện ở _end_license_check, khi thread đã xong hẳn
+        else:
+            # Offline is fine while the last signed answer is inside the grace period.
+            self.notify_license(licensing.check_local())
+
     def _end_license_check(self):
-        """Hỏi server xong (kể cả lỗi bất ngờ): bỏ thông báo "đang kiểm tra"; mở khoá trừ khi giấy phép đang bị khoá."""
+        """Hỏi server xong (kể cả lỗi bất ngờ): bỏ thông báo "đang kiểm tra"; mở khoá trừ khi giấy phép đang bị khoá.
+        Lần lúc mở app mà không tới được server: popup Retry (hỏi lại) / Quit (đóng app); có kết quả rồi thì mới
+        kiểm tra bản mới."""
         self.license_checking.hide()
+        if self._startup_offline:
+            self._startup_offline = False
+            if ask_retry_offline(self):
+                self._check_license(startup=True)
+            else:
+                self.close()
+            return
         self.content.setEnabled(not self.license_banner.isVisible())
+        if self._startup_check:
+            self._startup_check = False
+            self.home_view.check_update_silently()
+
+    def _place_license_checking(self):
+        box, area = self.license_checking, self.centralWidget().rect()
+        box.adjustSize()
+        box.resize(max(box.width(), 320), box.height())
+        box.move(area.center() - box.rect().center())
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._place_license_checking()
 
     def notify_license(self, notice: str | None):
         """License problem (revoked, expired...): stop the bots, lock the whole UI behind a red banner and show a popup
@@ -300,6 +349,22 @@ class MainWindow(QMainWindow):
         if not want:
             self.bots.stop(serial)
         self._refresh_run_counts()
+
+    def _on_active_all_requested(self):
+        """Nút Active All ở Home: kích hoạt các máy đang Inactive (theo thứ tự danh sách), máy đã Active giữ nguyên;
+        không vượt số tối đa của giấy phép, còn máy chưa bật được thì báo một lần."""
+        limit = self.bots.max_running
+        skipped = 0
+        for serial in list(self._active):   # đủ máy vừa Load Devices, kể cả máy chưa kịp đăng ký
+            if self._active[serial]:
+                continue
+            if limit is not None and sum(self._active.values()) >= limit:
+                skipped += 1
+                continue
+            self._on_active_toggled(serial, True)
+        if skipped:
+            QMessageBox.warning(self, "Cannot activate all devices",
+                                f"Device limit reached ({limit}): {skipped} device(s) left inactive.")
 
     def _register_next_device(self):
         if self._pending_devices:
@@ -399,6 +464,8 @@ class MainWindow(QMainWindow):
             view.set_settings(self.db.load_settings(device_id))
         self._refresh_profiles(device_id, view)
         view.set_active(self._active.get(device_id, True))
+        # Start All có thể đã chạy bot từ DB trước khi dựng giao diện.
+        view.set_running(self.bots.is_running(device_id))
         # Tab Logs chỉ hiện log trong SHOW_SECONDS gần nhất; DB vẫn giữ đủ.
         since = (datetime.now() - timedelta(seconds=SHOW_SECONDS)).isoformat(timespec="seconds")
         for created_at, message in self.db.load_logs(device_id, since):
@@ -565,17 +632,29 @@ class MainWindow(QMainWindow):
             view.set_run_counts(*counts)
 
     def _start_bot(self, device_id: str):
+        # Đây là dữ liệu riêng của thiết bị trong DB, không phải cấu hình Apply ALL.
+        saved = self.db.load_settings(device_id)
+        if device_id not in self.device_views and all(tab in saved for tab in TAB_COLUMNS):
+            # Chưa dựng giao diện nhưng DB đã đủ cấu hình mọi tab (tab nào dựng xong cũng tự lưu): start thẳng từ DB,
+            # khỏi dựng DeviceView + 10 tab (~3 s chặn giao diện mỗi máy, Start All lần đầu 30 máy mất ~2 phút).
+            self.bots.start(
+                device_id,
+                saved["Initialization"].get("activities", []),
+                saved,
+                daily_done=self.db.daily_done(device_id),
+            )
+            return
         view = self._ensure_view(device_id)
         if view is None:
             return
         settings = view.get_settings()
-        # Đây là dữ liệu riêng của thiết bị trong DB, không phải cấu hình Apply ALL.
-        saved = self.db.load_settings(device_id)
         init = settings.setdefault("Initialization", {})
         # Bubble còn hạn trong DB thì bot không cần vào game kiểm tra lại.
         init["bubble_until"] = saved.get("Initialization", {}).get("bubble_until") or ""
         # Nền văn minh bot đã tự xếp (ảnh công trình học chung theo nền văn minh).
         init["civilization"] = saved.get("Initialization", {}).get("civilization")
+        # Bản đồ thành bot đã quét (route công trình): không có thì mỗi lần Start lại quét từ đầu.
+        init["city_map"] = saved.get("Initialization", {}).get("city_map") or {}
         self.bots.start(
             device_id,
             view.initialization_tab.selected_activities(),
@@ -641,12 +720,19 @@ class MainWindow(QMainWindow):
         view = self.device_views.get(device_id)
         if view is not None:
             view.initialization_tab.set_settings({"bubble": False})
+        else:   # bot start từ DB, chưa dựng giao diện: sửa thẳng DB
+            init = self.db.load_settings(device_id).get("Initialization", {})
+            self.db.save_settings(device_id, {"Initialization": {**init, "bubble": False}})
 
     def _on_craft_done(self, device_id: str, item_id: str):
         """Bot vừa chế tạo xong một trang bị: tab Craft trừ 1 số lượng (về 0 thì bỏ tích) rồi lưu cấu hình mới vào DB, lần Start sau không làm lại."""
         view = self.device_views.get(device_id)
         if view is not None:
             self.db.save_settings(device_id, {"Craft": view.apply_craft_done(item_id)})
+        else:   # bot start từ DB, chưa dựng giao diện: trừ thẳng trong DB
+            craft = self.db.load_settings(device_id).get("Craft", {})
+            subtract_craft_item(craft, item_id)
+            self.db.save_settings(device_id, {"Craft": craft})
 
     def _on_log_message(self, device_id: str, message: str):
         """Dòng log của bot -> tab Logs của thiết bị đó."""
@@ -696,13 +782,17 @@ def main():
     app = QApplication(sys.argv)
     app.setWindowIcon(QIcon(str(Path(__file__).resolve().parent / "Images" / "icon.ico")))
     theme.apply(app)
-    may_start, notice = ensure_license()
-    if not may_start:
+    had_license = bool(licensing.stored_code())
+    if not ensure_license():
         sys.exit(0)
     window = MainWindow()
     window.show()
-    if notice:   # the app opens normally; the popup comes right after the window shows
-        QTimer.singleShot(0, lambda: window.notify_license(notice))
+    # Máy đã có giấy phép: app mở ngay, hỏi server trên nền (khung loading giữa cửa sổ). Máy vừa kích hoạt xong
+    # thì server vừa trả lời rồi, khỏi hỏi lại.
+    if had_license:
+        QTimer.singleShot(0, lambda: window._check_license(startup=True))   # xong rồi mới kiểm tra bản mới
+    else:
+        QTimer.singleShot(0, window.home_view.check_update_silently)
     sys.exit(app.exec())
 
 

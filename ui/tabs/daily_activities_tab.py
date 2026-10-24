@@ -36,7 +36,7 @@ from .tab_placeholder import BaseTab, confirm_reset
 # text fixes spelling mistakes from the original WinForms form.
 SUPPORTED_TASKS = (
     ("Offering", "Offering"),   # ô chọn số lần (không phải checkbox) -> đặt đầu; thứ tự chạy ở run.py TASKS
-    ("Resource Tax", "Resource Tax"),
+    ("Resource Tax", "City Tax"),
     ("Gold Levy", "Gold Levy"),
     ("Troop Training", "Troop Training"),
     ("Troop Heading", "Troop Healing"),
@@ -52,7 +52,7 @@ SUPPORTED_TASKS = (
     ("Trade Carriage", "Trade Carriage"),
     ("Greet Champion", "Greet Champion"),
     ("Ranger Knight", "Ranger Knight"),   # mặc định tích
-    ("Alliance VIP", "Alliance VIP"),   # mặc định tích
+    ("Alliance VIP", "Alliance Shop"),   # mặc định tích
 )
 
 GENERAL_KEY = "General"
@@ -174,7 +174,7 @@ class DailyActivitiesTab(BaseTab):
 
         # Chỉ dùng checkbox: khi bật, bot luôn chọn MAX trong popup mua.
         # Đặt cạnh City Tax để không chiếm thêm một hàng/nhóm lớn ở cuối tab.
-        alliance_shop = QGroupBox("Alliance VIP Shop (Buy MAX)")
+        alliance_shop = QGroupBox("Alliance Shop")
         alliance_grid = QGridLayout(alliance_shop)
         for index, item in enumerate(ALLIANCE_VIP_ITEMS):
             check = QCheckBox(item.label)
