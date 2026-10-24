@@ -25,9 +25,11 @@ def until_from_keys(keys) -> datetime | None:
 
 
 def waiting(keys, now: datetime | None = None) -> bool:
-    """Còn trong thời gian chờ thể lực hồi (chưa tới mốc đã lưu)."""
+    """Còn trong thời gian chờ thể lực hồi (chưa tới mốc đã lưu). Mốc xa hơn STAMINA_WAIT_MINUTES (đồng hồ máy từng chạy sai)
+    thì bỏ, không thì Join Boss bị bỏ qua mãi."""
     until = until_from_keys(keys)
-    return until is not None and (now or datetime.now()) < until
+    now = now or datetime.now()
+    return until is not None and now < until <= now + timedelta(minutes=STAMINA_WAIT_MINUTES)
 
 
 def save(ctx, now: datetime | None = None) -> datetime:

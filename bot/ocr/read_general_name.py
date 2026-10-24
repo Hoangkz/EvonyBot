@@ -27,7 +27,7 @@ SPACE_GAP = 4           # px of empty columns between two words
 MIN_SCORE = 0.75        # below this a piece reads as "?"
 SPAN_SLACK = 2          # similarity: the matched letters must lie within a stretch of the name at most len(text) + this long
 MIN_MATCHED = 3         # similarity: fewer matched letters than this (or than the whole name if shorter) is no match
-DOT_RATIO = 0.6         # a piece shorter than this x the tallest one is punctuation (. , ' -), dropped
+DOT_RATIO = 0.45        # a piece shorter than this x the tallest one is punctuation (. , ' -), dropped
 
 
 def mask(image: np.ndarray) -> np.ndarray:

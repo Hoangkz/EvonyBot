@@ -576,6 +576,8 @@ class MainWindow(QMainWindow):
         init["bubble_until"] = saved.get("Initialization", {}).get("bubble_until") or ""
         # Nền văn minh bot đã tự xếp (ảnh công trình học chung theo nền văn minh).
         init["civilization"] = saved.get("Initialization", {}).get("civilization")
+        # Bản đồ thành bot đã quét (route công trình): không có thì mỗi lần Start lại quét từ đầu.
+        init["city_map"] = saved.get("Initialization", {}).get("city_map") or {}
         self.bots.start(
             device_id,
             view.initialization_tab.selected_activities(),
