@@ -333,8 +333,8 @@ class _Boss:
         return strip.size > 0 and int(strip.max()) < LIST_END_MAX_LIGHT
 
     def _stamina_empty(self):
-        """Hết thể lực: đánh dấu rảnh và lưu mốc "bây giờ + 20 phút" vào DB; worker làm nhiệm vụ tới mốc đó rồi mới gọi
-        Join Boss lại (stamina_wait.py)."""
+        """Hết thể lực: đánh dấu rảnh và đặt mốc "bây giờ + 20 phút" (chỉ trong lượt chạy này, không lưu DB); worker làm nhiệm
+        vụ tới mốc đó rồi mới gọi Join Boss lại (stamina_wait.py)."""
         self.idle_scrolls = IDLE_SCROLLS
         until = stamina_wait.save(self.bot)
         self.bot.record(f"Join Monster War: hết thể lực, làm nhiệm vụ tới {until:%H:%M:%S} rồi Join Boss lại")

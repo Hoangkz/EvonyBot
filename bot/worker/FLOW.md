@@ -104,8 +104,9 @@ flowchart TD
 - Join Boss trả về khác IDLE (dừng hẳn, ): không gọi lại Join Boss, vẫn chạy các nhiệm vụ.
 - Bản đồ thế giới: worker không tự ép về thành (sau này có activity chạy ngoài thành). Chỉ `common.go_home` (activity gọi khi màn hình không
   nhận ra) bấm nút toà thành (`CityMap/toCity.png`, góc dưới phải) thay vì Back.
-- Hết thể lực: Join Boss báo rảnh và lưu vào DB mốc "bây giờ + 20 phút" (khoá `join_boss_stamina_until_<giờ>` trong `daily_done`, xem
-  [stamina_wait.py](../activities/join_monster_war/stamina_wait.py)). Mỗi vòng worker so mốc với giờ hiện tại: chưa tới mốc thì chỉ làm nhiệm vụ
+- Hết thể lực: Join Boss báo rảnh và đặt mốc "bây giờ + 20 phút" trên `ctx.stamina_until` — chỉ trong lượt chạy này, không lưu DB, đo bằng
+  `time.monotonic()` nên đổi giờ Windows không ảnh hưởng; Stop / Start lại thì mốc mất (xem
+  [stamina_wait.py](../activities/join_monster_war/stamina_wait.py)). Mỗi vòng worker hỏi mốc: chưa tới mốc thì chỉ làm nhiệm vụ
   (không gọi Join Boss, không giới hạn 120 giây, boss mới không ngắt); qua mốc thì Join Boss lại.
 - Trước mỗi nhiệm vụ: `guards.call(None, ctx.check)` — lo bubble trước, rồi xét Stop / boss mới.
 
