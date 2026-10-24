@@ -49,7 +49,7 @@ def target(bot):
     #     return city_vip.claim_vip(bot)
     # if os.environ.get("EVONY_TEST") == "alliance_vip":
     #     from bot.activities.daily_activities import alliance_vip
-    #     return alliance_vip.buy_vip(bot, True, True)
+    #     return alliance_vip.buy_vip(bot)
     # if os.environ.get("EVONY_TEST") == "rewards":
     #     from bot.activities.daily_activities import common
     #     return common.collect_activity_rewards(bot)

@@ -2,8 +2,8 @@
 
 Tribute và 100 VIP Points được tìm trước, sau đó tới tài nguyên, Chips và
 Truce được bật trong UI. Mỗi popup luôn chọn MAX bằng đầu thanh bên trái dấu
-``+``. Một vật phẩm chỉ được ghi DONE sau khi chụp lại và nút giá đã xám;
-khi mọi checkbox đã DONE sẽ ghi thêm ``ALL_DONE_KEY`` theo ngày.
+``+``. Một vật phẩm được ghi DONE khi nút giá xám hoặc vừa mua xong (Confirm);
+việc xong hôm nay khi mọi món đang tích đều có khóa DONE riêng.
 """
 import cv2
 import numpy as np
@@ -14,20 +14,22 @@ from ....context.templates import TEMPLATE_DIR
 from ...result import save_errors
 from .catalog import ITEMS, SETTINGS_KEY, normalized
 from .constants import (
-    ALL_DONE_KEY,
     ALLIANCE_NAV,
     BUY_DY,
     BUY_BUTTON_BOX,
     BUY_MIN_SATURATION,
     BUY_WAIT,
     CONFIRM_BUTTON,
-    CONFIRM_CHECKS,
     DAILY_HEADER,
     DAY_KEY,
+    FAST_SWIPE,
+    FAST_SWIPE_DURATION,
+    FAST_SWIPES,
     LABEL,
     ITEM_THRESHOLD,
     LOCKED_ITEM_THRESHOLD,
-    MONTH_KEY,
+    MAX_BAR_STILL_DIFF,
+    MAX_BAR_WIDTH,
     MAX_CROP_HALF_HEIGHT,
     MAX_CROP_LEFT,
     MAX_SELECTED,
@@ -36,7 +38,6 @@ from .constants import (
     NAV_MAX_STEPS,
     PLUS,
     POPUP_TEMPLATE_THRESHOLD,
-    POPUP_CHECKS,
     PRICE_BOX,
     PRICE_DY,
     PRICE_MIN_SATURATION,
@@ -46,20 +47,21 @@ from .constants import (
     SHOP_TITLE,
     SWIPE,
     SWIPE_DURATION,
-    TOP_SETTLE,
-    TOP_SWIPE,
-    TOP_SWIPE_DURATION,
-    TOP_SWIPES,
+    SWIPE_UP,
     TRIBUTE_DAY_KEY,
-    TRIBUTE_MONTH_KEY,
+    UNFOCUS_TAP,
     TRUCE_COLOR_SATURATION_MIN,
     TRUCE_COLOR_VALUE_MIN,
+    WAIT_INTERVAL,
+    WAIT_TIMEOUT,
     WEEKLY_HEADER,
-    WEEKLY_EXTRA_SWIPES,
 )
 
 _ON_SHOP, _TAP, _BACK, _SCROLL, _OUT, _OPEN = "on_shop", "tap", "back", "scroll", "out_alliance", "open_alliance"
+_ROW = "shop_row"
+_BOUGHT, _NO_POINTS, _PENDING = "bought", "no_points", "pending"   # kết quả _buy
 _ALLIANCE_BUTTON, _ALLIANCE_SCROLL, _OUT_ALLIANCE = ALLIANCE_NAV
+PRIORITY_KEYS = ("tribute", "vip_points")   # có tích một trong hai thì cuộn nhanh xuống Daily Sale
 _TRUCE_ITEMS = tuple(item for item in ITEMS
                      if item.key.startswith("truce_agreement_"))
 
@@ -117,6 +119,13 @@ def _truce_color_matches(bot, screen, center, template: str) -> bool:
     return accepted
 
 
+def _wait(bot, template: str, threshold: float | None = None):
+    """Chờ màn đích sau khi chuyển màn: 1 giây kiểm tra một lần, tối đa 6 lần. Trả tâm ảnh hoặc None."""
+    if threshold is None:
+        return bot.wait_for(template, timeout=WAIT_TIMEOUT, interval=WAIT_INTERVAL)
+    return bot.wait_for(template, timeout=WAIT_TIMEOUT, threshold=threshold, interval=WAIT_INTERVAL)
+
+
 def _open_shop(bot) -> bool:
     """Màn chính -> Liên minh -> Alliance Shop. True nếu tới màn Alliance Shop."""
     targets = [
@@ -124,7 +133,7 @@ def _open_shop(bot) -> bool:
         (PLUS, _BACK),
         (SHOP_TITLE, _ON_SHOP),
         (_OUT_ALLIANCE, _OUT),
-        (SHOP_ROW, _TAP),
+        (SHOP_ROW, _ROW),
         (_ALLIANCE_SCROLL, _SCROLL),
         *[(path, _BACK) for path in exit_images()],
         *[(path, _TAP) for path in click_images()],
@@ -137,7 +146,11 @@ def _open_shop(bot) -> bool:
         action, pos = find_first(bot, screen, targets, top_left={_OUT})
         if action == _ON_SHOP:
             return True
-        if action == _TAP:
+        if action == _ROW:
+            bot.tap(*pos)
+            if _wait(bot, SHOP_TITLE) is not None:
+                return True
+        elif action == _TAP:
             bot.tap(*pos)
             delay(bot, 2)
         elif action == _OPEN:
@@ -172,13 +185,6 @@ def _price_green(bot, screen, icon) -> bool:
     saturation = float(cv2.cvtColor(box, cv2.COLOR_BGR2HSV)[..., 1].mean())
     bot.record(f"{LABEL}: độ bão hòa nút giá {saturation:.0f}")
     return saturation >= PRICE_MIN_SATURATION
-
-
-def _shop_to_top(bot) -> None:
-    """Đưa danh sách về đầu để Tribute/VIP luôn được tìm trước."""
-    for _ in range(TOP_SWIPES):
-        bot.swipe_percent(*TOP_SWIPE, duration=TOP_SWIPE_DURATION, delay=0)
-    bot.sleep(TOP_SETTLE)
 
 
 def _buy_button_active(bot, screen, center) -> bool:
@@ -244,62 +250,63 @@ def _select_max(bot, plus: tuple[int, int]) -> bool:
             bot.record(f"{LABEL}: chưa thấy đầu thanh MAX trong crop (lần {attempt}/{MAX_SELECT_TRIES})")
             bot.sleep(1)
             continue
+        bar = (max(0, plus[0] - MAX_BAR_WIDTH), top, MAX_BAR_WIDTH, MAX_CROP_HALF_HEIGHT * 2)
+        before = bot.crop(screen, *bar)
         bot.tap(left + slider[0], top + slider[1], delay=1)
-        if bot.find(MAX_SELECTED, threshold=POPUP_TEMPLATE_THRESHOLD) is not None:
+        after = bot.screenshot()
+        if bot.find(MAX_SELECTED, threshold=POPUP_TEMPLATE_THRESHOLD, screen=after) is not None:
             bot.record(f"{LABEL}: đã chọn MAX")
+            return True
+        # Chỉ còn 1 lượt (VD 1 / 1): thanh không kéo được, không bao giờ hiện thanh MAX xanh.
+        # Bấm 2 lần mà thanh không đổi chút nào thì coi như số lượng đã tối đa.
+        if attempt >= 2 and cv2.absdiff(before, bot.crop(after, *bar)).mean() < MAX_BAR_STILL_DIFF:
+            bot.record(f"{LABEL}: thanh số lượng không kéo được (chỉ còn 1 lượt); coi như đã MAX")
             return True
         bot.record(f"{LABEL}: chưa xác nhận được MAX; bấm lại ({attempt}/{MAX_SELECT_TRIES})")
     return False
 
 
-def _buy(bot, icon, name: str) -> bool:
+def _buy(bot, icon, name: str) -> str:
     """Mở popup, chọn MAX bằng thanh trượt, mua và xác nhận.
 
-    True chỉ nghĩa là giao dịch đã đóng; DONE vẫn phải chụp lại và thấy nút
-    giá xám. Không thấy popup tuyệt đối không tự đánh dấu DONE.
+    Trả _BOUGHT (đã Confirm: ghi DONE món này), _NO_POINTS (nút Buy xám = không đủ điểm: dừng cả phiên)
+    hoặc _PENDING (không thấy popup / chưa mua được: không đánh dấu, lần sau làm lại).
     """
     bot.tap(icon[0], icon[1] + PRICE_DY)
-    plus = None
-    for _ in range(1 + POPUP_CHECKS):
-        bot.sleep(1)
-        plus = bot.find(PLUS, threshold=POPUP_TEMPLATE_THRESHOLD)
-        if plus is not None:
-            break
+    plus = _wait(bot, PLUS, POPUP_TEMPLATE_THRESHOLD)
     if plus is None:
         bot.record(f"{LABEL}: {name} không hiện popup mua; giữ PENDING")
-        return False
+        return _PENDING
+    # Popup vừa hiện còn đang phóng to: chờ 1 giây rồi tìm lại dấu + (vị trí lúc đang mở bị lệch, bấm thanh MAX hụt).
+    bot.sleep(1)
+    plus = bot.find(PLUS, threshold=POPUP_TEMPLATE_THRESHOLD) or plus
     if not _select_max(bot, plus):
         bot.record(f"{LABEL}: {name} chưa chọn được MAX; giữ PENDING")
         bot.back(delay=1)
-        return False
+        return _PENDING
     buy = (bot.window_size()[0] // 2, plus[1] + BUY_DY)
     if not _buy_button_active(bot, bot.screenshot(), buy):
-        bot.record(f"{LABEL}: {name} Buy button is gray; do not tap")
+        bot.record(f"{LABEL}: {name} nút Buy xám = không đủ Alliance Points; dừng mua")
         bot.back(delay=1)
-        return True
+        return _NO_POINTS
     bot.tap(*buy)
     # Bấm mua chỉ mở hộp xác nhận: phải bấm Confirm mới mua thật (chỉ khi đó mới lưu DB).
-    confirm = None
-    for _ in range(CONFIRM_CHECKS):
-        bot.sleep(1)
-        confirm = bot.find(CONFIRM_BUTTON)
-        if confirm is not None:
-            break
+    confirm = _wait(bot, CONFIRM_BUTTON)
     if confirm is None:
         if bot.find(PLUS, threshold=POPUP_TEMPLATE_THRESHOLD) is not None:
             bot.record(f"{LABEL}: {name} no confirm dialog and buy popup still open, back, not bought")
             bot.back(delay=1)
-            return False
+            return _PENDING
         bot.record(f"{LABEL}: {name} no confirm dialog but popup closed, assume bought")
-        return True
+        return _BOUGHT
     bot.tap(*confirm, delay=BUY_WAIT)
     if (bot.find(PLUS, threshold=POPUP_TEMPLATE_THRESHOLD) is not None or
             bot.find(CONFIRM_BUTTON) is not None):
         bot.record(f"{LABEL}: {name} still showing buy dialog after Confirm, back, not saved")
         bot.back(delay=1)
-        return False
+        return _PENDING
     bot.record(f"{LABEL}: đã mua {name} và xác nhận")
-    return True
+    return _BOUGHT
 
 
 # ---- Luật của việc (bảng bot/worker/priority.py: "run": JOB) -------------------------------------------------------
@@ -316,72 +323,103 @@ def _selection(settings: dict) -> dict[str, int]:
     return normalized(settings.get(SETTINGS_KEY), legacy_defaults=True)
 
 
-def _priority_keys(item_key: str) -> tuple[str, str]:
+def _done_key(item_key: str) -> str:
+    """Dấu "xong hôm nay" của một món: VIP/Tribute chỉ mua ở Daily Sale nên dùng khóa Daily của chúng."""
     if item_key == "tribute":
-        return TRIBUTE_MONTH_KEY, TRIBUTE_DAY_KEY
+        return TRIBUTE_DAY_KEY
     if item_key == "vip_points":
-        return MONTH_KEY, DAY_KEY
-    raise KeyError(item_key)
-
-
-def _sync_priority_item_done(ctx, item_key: str) -> None:
-    month_key, day_key = _priority_keys(item_key)
-    if ctx.is_daily_done(month_key) and ctx.is_daily_done(day_key):
-        key = _item_done_key(item_key)
-        if not ctx.is_daily_done(key):
-            ctx.mark_daily_done(key)
-            ctx.record(f"{LABEL}: {item_key} đã DONE ở cả Monthly Card và Daily Sale")
+        return DAY_KEY
+    return _item_done_key(item_key)
 
 
 def _catalog_done(ctx, settings: dict) -> bool:
-    """Khóa tổng duy nhất để scheduler bỏ qua toàn bộ việc trong ngày."""
-    return ctx.is_daily_done(ALL_DONE_KEY)
+    """Xong hôm nay khi mọi món ĐANG tích đã có khóa riêng: tích thêm món mới (VD Tribute sau khi mua VIP) thì làm tiếp."""
+    return _all_selected_items_done(ctx, settings)
 
 
 def _all_selected_items_done(ctx, settings: dict) -> bool:
-    """Mọi checkbox đã có khóa riêng (VIP cần đủ Monthly + Daily)."""
+    """Mọi checkbox đã có khóa riêng."""
     selected = _selection(settings)
-    for item in ITEMS:
-        if selected[item.key] <= 0:
-            continue
-        if item.key in {"tribute", "vip_points"}:
-            month_key, day_key = _priority_keys(item.key)
-            if not (ctx.is_daily_done(month_key) and ctx.is_daily_done(day_key)):
-                return False
-        elif not ctx.is_daily_done(_item_done_key(item.key)):
-            return False
-    return True
+    return all(ctx.is_daily_done(_done_key(item.key)) for item in ITEMS if selected[item.key] > 0)
 
 
 def _visible_section_ranges(ctx, screen, daily_reached: bool,
                             weekly_reached: bool):
+    """Vùng y được mua trên khung: chỉ từ tiêu đề Daily Sale trở xuống, không mua Monthly ở trên.
+
+    "daily" = giữa Daily Sale và Weekly Sale (VIP/Tribute), "below" = từ Daily Sale tới đáy (mọi món khác);
+    "daily_y" / "weekly_y" = y của tiêu đề đang thấy (None = không thấy).
+    """
     top, bottom = int(screen.shape[0] * .08), int(screen.shape[0] * .94)
     daily = ctx.find(DAILY_HEADER, screen=screen)
     weekly = ctx.find(WEEKLY_HEADER, screen=screen)
-    ranges = {"monthly": None, "daily": None}
-    if daily is not None:
-        ranges["monthly"] = (top, daily[1])
-        ranges["daily"] = (daily[1], weekly[1] if weekly is not None else bottom)
-    elif weekly is not None:
-        ranges["daily"] = (top, weekly[1])
-    elif daily_reached and not weekly_reached:
-        ranges["daily"] = (top, bottom)
-    else:
-        ranges["monthly"] = (top, bottom)
-    return (ranges, daily is not None or daily_reached,
-            weekly is not None or weekly_reached)
+    daily_reached = daily is not None or weekly is not None or daily_reached
+    weekly_reached = weekly is not None or weekly_reached
+    ranges = {"daily": None, "below": None,
+              "daily_y": daily[1] if daily is not None else None,
+              "weekly_y": weekly[1] if weekly is not None else None}
+    if daily_reached:
+        start = daily[1] if daily is not None else top
+        ranges["below"] = (start, bottom)
+        if weekly is not None:
+            ranges["daily"] = (start, weekly[1])
+        elif not weekly_reached:
+            ranges["daily"] = (start, bottom)
+    return ranges, daily_reached, weekly_reached
 
 
-def _mark_visible_done(ctx, item_key: str, done_key: str, label: str) -> None:
+def _swipe(ctx, swipe, duration: float) -> None:
+    """Bấm tiêu đề shop (50%, 3%) trước khi cuộn: lỡ bấm trúng vật phẩm (hiện ô mô tả) thì shop không cuộn được.
+
+    Chỉ bấm khi đang thấy màn Alliance Shop (tiêu đề shop); màn khác thì không bấm chỗ đó.
+    """
+    if ctx.find(SHOP_TITLE) is not None:
+        ctx.tap_percent(*UNFOCUS_TAP)
+    ctx.swipe_percent(*swipe, duration=duration, delay=SCAN_SETTLE)
+
+
+def _bottom_reached(ctx, screen, ranges: dict, weekly_reached: bool) -> bool:
+    """Giới hạn cuộn xuống: thấy Truce nằm dưới tiêu đề Weekly Sale (hàng cuối danh sách)."""
+    weekly_y = ranges.get("weekly_y")
+    if weekly_y is None and not weekly_reached:
+        return False
+    for item in _TRUCE_ITEMS:
+        if not (TEMPLATE_DIR / item.template).is_file():
+            continue
+        pos = ctx.find(item.template, threshold=ITEM_THRESHOLD, screen=screen)
+        if pos is not None and (weekly_y is None or pos[1] > weekly_y):
+            return True
+    return False
+
+
+def _fast_scroll(ctx, items) -> None:
+    """Cuộn thật nhanh xuống cho tới khi thấy VIP/Tribute ở Daily Sale (tối đa FAST_SWIPES lần)."""
+    for attempt in range(1, FAST_SWIPES + 1):
+        _swipe(ctx, FAST_SWIPE, FAST_SWIPE_DURATION)
+        screen = ctx.screenshot()
+        ranges, _, _ = _visible_section_ranges(ctx, screen, True, False)
+        if ranges["daily"] is None:
+            continue
+        for item in items:
+            if _find_item(ctx, screen, item.template, y_range=ranges["daily"])[0] is not None:
+                ctx.record(f"{LABEL}: cuộn nhanh {attempt} lần thì thấy {item.label}")
+                return
+    ctx.record(f"{LABEL}: cuộn nhanh {FAST_SWIPES} lần chưa thấy VIP/Tribute; quét tiếp từ đây")
+
+
+def _mark_visible_done(ctx, done_key: str, label: str) -> None:
     ctx.mark_daily_done(done_key)
     ctx.record(f"{LABEL}: {label} nút giá xám; ghi DONE vào DB")
-    if item_key in {"tribute", "vip_points"}:
-        _sync_priority_item_done(ctx, item_key)
 
 
 def _run_shop_session(ctx, settings: dict,
                       priority_filter: set[str] | None = None) -> None:
-    """Mở shop đúng một lần, xử lý mọi món nhìn thấy rồi mới cuộn/thoát."""
+    """Mở shop đúng một lần, xử lý mọi món nhìn thấy rồi mới cuộn/thoát.
+
+    Có tích VIP/Tribute: cuộn nhanh xuống tới chúng, mua, rồi cuộn chậm xuống tới Truce cuối danh sách và cuộn chậm
+    lên tới tiêu đề Daily Sale, mua từng món đã tích. Không tích: cuộn chậm từ đầu xuống tới Truce cuối danh sách.
+    Mua đủ thì dừng ngay.
+    """
     selected = _selection(settings)
     enabled = [item for item in ITEMS if selected[item.key] > 0]
     if not enabled:
@@ -391,130 +429,115 @@ def _run_shop_session(ctx, settings: dict,
     if missing:
         ctx.record(f"{LABEL}: thiếu ảnh chuẩn Alliance Shop cho: " +
                    ", ".join(item.label for item in missing))
+    if priority_filter is not None:
+        available = [item for item in available if _done_key(item.key) in priority_filter]
+    available = [item for item in available if not ctx.is_daily_done(_done_key(item.key))]
     if not available or not _open_shop(ctx):
         return
-    _shop_to_top(ctx)
 
-    item_by_key = {item.key: item for item in available}
-    attempted: set[str] = set()  # mỗi vị trí Monthly/Daily chỉ mua một lần/lượt
-    best_scores: dict[str, float] = {}
+    priority = [item for item in available if item.key in PRIORITY_KEYS]
     daily_reached = False
+    if priority:
+        _fast_scroll(ctx, priority)
+        daily_reached = True
+    attempted: set[str] = set()  # mỗi món chỉ thử mua một lần/lượt
+    best_scores: dict[str, float] = {}
     weekly_reached = False
-    swipes_after_weekly = 0
+    going_down = True
     for step in range(SCROLLS + 1):
         # Xử lý hết mọi vật phẩm trong cùng khung; popup đóng xong chụp lại,
         # tuyệt đối không Back ra Alliance Shop rồi vào lại.
         for _ in range(len(ITEMS) + 4):
             ctx.check()
             screen = ctx.screenshot()
+            # Cuộn lên thì đang ở trên Weekly Sale khi không thấy tiêu đề này.
             ranges, daily_reached, weekly_reached = _visible_section_ranges(
-                ctx, screen, daily_reached, weekly_reached)
-            candidates: list[tuple[object, str, str, tuple[int, int] | None]] = []
-
-            # Luôn ưu tiên Tribute rồi VIP, mỗi loại ở cả Monthly và Daily.
-            for section, index in (("monthly", 0), ("daily", 1)):
-                for key in ("tribute", "vip_points"):
-                    item = item_by_key.get(key)
-                    if item is None:
-                        continue
-                    done_key = _priority_keys(key)[index]
-                    if priority_filter is not None and done_key not in priority_filter:
-                        continue
-                    if not ctx.is_daily_done(done_key) and ranges[section] is not None:
-                        candidates.append((item, done_key,
-                                           f"{item.label} / {section.title()}",
-                                           ranges[section]))
-
-            # Sau hai món ưu tiên, thấy món nào khác trong khung thì làm ngay.
-            if priority_filter is None:
-                for item in available:
-                    if item.key in {"tribute", "vip_points"}:
-                        continue
-                    done_key = _item_done_key(item.key)
-                    if not ctx.is_daily_done(done_key):
-                        candidates.append((item, done_key, item.label, None))
+                ctx, screen, daily_reached, weekly_reached and going_down)
+            # Tribute, VIP trước (chỉ giữa Daily Sale và Weekly Sale), rồi tới món khác từ Daily Sale trở xuống.
+            candidates = []
+            for item in sorted(available, key=lambda item: item.key not in PRIORITY_KEYS):
+                done_key = _done_key(item.key)
+                y_range = ranges["daily" if item.key in PRIORITY_KEYS else "below"]
+                if y_range is not None and not ctx.is_daily_done(done_key):
+                    candidates.append((item, done_key, y_range))
 
             handled = False
-            for item, done_key, display, y_range in candidates:
+            no_points = False
+            for item, done_key, y_range in candidates:
                 icon, score, locked_match = _find_item(
                     ctx, screen, item.template, y_range=y_range)
                 best_scores[done_key] = max(best_scores.get(done_key, 0.0), score)
                 if icon is None:
                     continue
-                ctx.record(f"{LABEL}: thấy {display}, điểm {score:.3f}" +
+                ctx.record(f"{LABEL}: thấy {item.label}, điểm {score:.3f}" +
                            (" (so viền)" if locked_match else ""))
                 if not _price_green(ctx, screen, icon):
-                    _mark_visible_done(ctx, item.key, done_key, display)
+                    _mark_visible_done(ctx, done_key, item.label)
                     handled = True
                     break
+                # So viền chỉ dùng để nhận món Sold Out / bị khoá (giá xám). Giá xanh mà chỉ khớp viền thì không mua:
+                # món khác cùng màu khung (VD kiếm tím 15.000 khớp viền Truce 8h) không được chiếm lượt thử.
+                if locked_match:
+                    ctx.record(f"{LABEL}: {item.label} chỉ khớp viền mà giá xanh; bỏ qua")
+                    continue
                 if done_key in attempted:
                     continue
                 attempted.add(done_key)
-                if _buy(ctx, icon, display):
-                    ctx.sleep(1)
-                    after = ctx.screenshot()
-                    if not _price_green(ctx, after, icon):
-                        _mark_visible_done(ctx, item.key, done_key, display)
-                    else:
-                        ctx.record(f"{LABEL}: {display} vẫn còn màu; giữ PENDING và làm món kế tiếp")
+                result = _buy(ctx, icon, item.label)
+                if result == _BOUGHT:
+                    # Mua xong (đã Confirm) là xong món này, bỏ khỏi danh sách; không chờ nút giá xám.
+                    ctx.mark_daily_done(done_key)
+                    ctx.record(f"{LABEL}: {item.label} đã mua; ghi DONE vào DB")
+                no_points = result == _NO_POINTS
                 handled = True
                 break
-            if not handled:
+            if no_points or not handled:
                 break
 
-        if priority_filter is None and _all_selected_items_done(ctx, settings):
-            ctx.record(f"{LABEL}: mọi vật phẩm đã tích đã DONE ngay trong phiên shop hiện tại")
-            break
-        if priority_filter is not None and all(ctx.is_daily_done(key) for key in priority_filter):
-            break
-        if step >= SCROLLS:
-            ctx.record(f"{LABEL}: đã đủ {SCROLLS} lượt lướt nhưng chưa có "
-                       "mốc Weekly Sale; dừng theo trần an toàn")
-            break
-        ctx.record(f"{LABEL}: đã xử lý hết khung {step + 1}/{SCROLLS + 1}; vuốt chậm 1s rồi dừng 1s để quét")
-        ctx.swipe_percent(*SWIPE, duration=SWIPE_DURATION, delay=SCAN_SETTLE)
-        if weekly_reached:
-            swipes_after_weekly += 1
-            ctx.record(f"{LABEL}: đã thấy Weekly Sale; lướt thêm "
-                       f"{swipes_after_weekly}/{WEEKLY_EXTRA_SWIPES} để xuống cuối")
-        if swipes_after_weekly >= WEEKLY_EXTRA_SWIPES:
-            ctx.record(f"{LABEL}: đã thấy Weekly Sale và lướt thêm "
-                       f"đủ {WEEKLY_EXTRA_SWIPES} lần; xác nhận đã tới cuối")
+        if no_points:
+            # Không đủ điểm: mọi món đã tích coi như hôm nay đã mua xong, thoát shop luôn.
+            for item in available:
+                ctx.mark_daily_done(_done_key(item.key))
+            ctx.record(f"{LABEL}: không đủ Alliance Points; đánh dấu mọi món đã tích là xong hôm nay")
             break
 
-    for key in ("tribute", "vip_points"):
-        if key in item_by_key:
-            _sync_priority_item_done(ctx, key)
+        if all(ctx.is_daily_done(_done_key(item.key)) for item in available):
+            ctx.record(f"{LABEL}: mọi vật phẩm đã tích đã DONE ngay trong phiên shop hiện tại")
+            break
+        if going_down and _bottom_reached(ctx, screen, ranges, weekly_reached):
+            if not priority:
+                ctx.record(f"{LABEL}: thấy Truce cuối danh sách; đã quét hết")
+                break
+            ctx.record(f"{LABEL}: thấy Truce cuối danh sách; cuộn chậm lên tới Daily Sale")
+            going_down = False
+        elif not going_down and ranges.get("daily_y") is not None:
+            ctx.record(f"{LABEL}: cuộn lên tới tiêu đề Daily Sale; đã quét hết")
+            break
+        if step >= SCROLLS:
+            ctx.record(f"{LABEL}: đã đủ {SCROLLS} lượt cuộn; dừng theo trần an toàn")
+            break
+        ctx.record(f"{LABEL}: đã xử lý hết khung {step + 1}/{SCROLLS + 1}; "
+                   f"cuộn chậm {'xuống' if going_down else 'lên'}")
+        _swipe(ctx, SWIPE if going_down else SWIPE_UP, SWIPE_DURATION)
+
     for _ in range(2):
         ctx.back(delay=1)
-    pending_labels = []
-    for item in available:
-        if item.key in {"tribute", "vip_points"}:
-            for section, done_key in zip(("Monthly", "Daily"), _priority_keys(item.key)):
-                if (priority_filter is None or done_key in priority_filter) and not ctx.is_daily_done(done_key):
-                    pending_labels.append(f"{item.label}/{section} ({best_scores.get(done_key, 0):.3f})")
-        elif priority_filter is None and not ctx.is_daily_done(_item_done_key(item.key)):
-            done_key = _item_done_key(item.key)
-            pending_labels.append(f"{item.label} ({best_scores.get(done_key, 0):.3f})")
+    pending_labels = [f"{item.label} ({best_scores.get(_done_key(item.key), 0):.3f})"
+                      for item in available if not ctx.is_daily_done(_done_key(item.key))]
     if pending_labels:
         ctx.record(f"{LABEL}: kết thúc một lượt shop, còn PENDING: " + ", ".join(pending_labels))
 
 
-def buy_vip(bot, month: bool, day: bool) -> None:
-    """API cũ: kiểm tra VIP Monthly/Daily trong cùng một lần vào shop."""
+def buy_vip(bot) -> None:
+    """API cũ: mua 100 VIP Points ở Daily Sale trong một lần vào shop."""
     settings = {SETTINGS_KEY: {item.key: item.key == "vip_points" for item in ITEMS}}
-    wanted = ({MONTH_KEY} if month else set()) | ({DAY_KEY} if day else set())
-    if wanted:
-        _run_shop_session(bot, settings, priority_filter=wanted)
+    _run_shop_session(bot, settings, priority_filter={DAY_KEY})
 
 
 @save_errors("daily_alliance_vip")   # lỗi thì lưu `daily_alliance_vip_error` vào DB
 def _run(ctx, settings: dict):
     ctx.log(f"Daily Activities: {LABEL} — một lần vào shop, xử lý liên tục từ trên xuống")
     _run_shop_session(ctx, settings)
-    if _all_selected_items_done(ctx, settings):
-        ctx.mark_daily_done(ALL_DONE_KEY)
-        ctx.record(f"{LABEL}: tất cả vật phẩm đã tích đều DONE; ghi hoàn tất hôm nay vào DB")
 
 
 JOB = {"run": _run, "enabled": _enabled, "done": _catalog_done}
