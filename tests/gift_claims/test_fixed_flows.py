@@ -1435,7 +1435,7 @@ class FixedGiftFlowTests(unittest.TestCase):
         self.assertEqual(2, scan.call_count)
         bot.sleep.assert_called_once_with(refining_weekly_card.STEP_DELAY)
 
-    def test_login_gifts_uses_fixed_fallback_when_reward_image_is_missing(self):
+    def test_login_gifts_no_reward_button_is_done_without_tapping(self):
         bot = mock.Mock()
         bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
 
@@ -1443,11 +1443,21 @@ class FixedGiftFlowTests(unittest.TestCase):
             return (40, 140) if name == login_gifts.PAGE else None
 
         with (mock.patch.object(login_gifts, "find", side_effect=find_page),
-              mock.patch.object(login_gifts, "_tap_reward",
-                                return_value=False) as tap):
-            self.assertFalse(login_gifts.claim_opened(bot))
+              mock.patch.object(login_gifts, "_tap_reward") as tap):
+            self.assertTrue(login_gifts.claim_opened(bot))
 
-        tap.assert_called_once_with(bot, (45, 190))
+        tap.assert_not_called()
+        bot.tap.assert_not_called()
+
+    def test_login_gifts_real_screen_without_reward_button_is_done(self):
+        # Màn Login Gifts kiểu danh sách ngày (không có hộp quà phát sáng): không bấm gì, DONE.
+        bot = mock.Mock()
+        bot.screenshot.return_value = cv2.imread(
+            str(Path(__file__).parent / "screens" / "super_value_return_login_gifts_no_button.png"))
+        bot.find.side_effect = self.bot.find
+        bot._template.side_effect = self.bot._template
+        self.assertTrue(login_gifts.claim_opened(bot))
+        bot.tap.assert_not_called()
 
     def test_login_gifts_uses_captured_reward_button_before_fallback(self):
         bot = mock.Mock()

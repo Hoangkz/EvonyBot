@@ -8,7 +8,6 @@ PAGE = "SuperValueReturn/LoginGifts/title"
 CONGRATULATIONS = "SuperValueReturn/LoginGifts/congratulations"
 REWARD_BUTTON = "Common/button_reward_chest"
 REWARD_THRESHOLD = 0.80
-FALLBACK_REWARD_POS = (45, 190)
 
 
 def _tap_reward(bot, pos) -> bool:
@@ -37,7 +36,7 @@ def _tap_reward(bot, pos) -> bool:
 
 
 def claim_opened(bot) -> bool:
-    """Use the captured chest, falling back to the user-approved coordinate."""
+    """Đã ở trang Login Gifts: thấy nút quà (hộp quà phát sáng) thì bấm (_tap_reward); không thấy nút = đã nhận, DONE."""
     screen = bot.screenshot()
     if find(bot, PAGE, screen, threshold=0.70,
             region=(0, 15, 45, 25)) is None:
@@ -46,11 +45,9 @@ def claim_opened(bot) -> bool:
     target = find(bot, REWARD_BUTTON, screen, threshold=REWARD_THRESHOLD,
                   region=(0, 18, 100, 98))
     if target is None:
-        target = FALLBACK_REWARD_POS
-        bot.record("Gift Claims: Login Gifts không thấy ảnh nút quà; "
-                   "tap dự phòng (45, 190)")
-    else:
-        bot.record(f"Gift Claims: Login Gifts thấy nút quà tại {target}")
+        bot.record("Gift Claims: Login Gifts không thấy nút quà; DONE")
+        return True
+    bot.record(f"Gift Claims: Login Gifts thấy nút quà tại {target}")
     return _tap_reward(bot, target)
 
 
