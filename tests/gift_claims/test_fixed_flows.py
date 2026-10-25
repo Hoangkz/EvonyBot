@@ -26,6 +26,7 @@ back_to_territory = import_module(
     "bot.activities.gift_claims.back_to_territory.run")
 empire_depot = import_module("bot.activities.gift_claims.super_value_return.empire_depot.run")
 limited_offer = import_module("bot.activities.gift_claims.valuable_event.limited_offer.run")
+general_vault = import_module("bot.activities.gift_claims.valuable_event.general_vault.run")
 login_gifts = import_module("bot.activities.gift_claims.super_value_return.login_gifts.run")
 resource_consumption_sprint = import_module(
     "bot.activities.gift_claims.valuable_event.resource_consumption_sprint.run")
@@ -383,7 +384,7 @@ class FixedGiftFlowTests(unittest.TestCase):
         self.assertIn(spec.task.key, attempted)     # không bấm lại trong lượt này
         self.assertNotIn(spec.task.key, done)
 
-    def test_open_tab_taps_tab_and_top_center_then_waits_for_page_change(self):
+    def test_open_tab_taps_tab_waits_for_page_change_then_taps_title(self):
         rng = np.random.default_rng(4)
         same = rng.integers(0, 255, (704, 396, 3), dtype=np.uint8)
         changed = same.copy()
@@ -395,8 +396,8 @@ class FixedGiftFlowTests(unittest.TestCase):
         bot.screenshot.side_effect = (same, same, same, changed)     # trước bấm, 1s, 2s, 3s đã sang
         with mock.patch.object(valuable_event_zone, "tab_selected", return_value=False):
             self.assertTrue(valuable_event_zone.open_tab(bot, (120, 80)))
-        self.assertEqual([("tap", (120, 80)), ("tap_percent", (50, 5))], calls)
-        self.assertEqual(3, bot.sleep.call_count)
+        self.assertEqual([("tap", (120, 92)), ("tap_percent", (50, 5))], calls)   # bấm tab ở y 13% (92 / 704), không ở tâm icon
+        self.assertEqual(3 + 1, bot.sleep.call_count)                 # chờ sang trang 3 x 1s, bấm tiêu đề rồi nghỉ 1s
 
     def test_tab_uses_text_free_icon_or_text_for_events_without_icon(self):
         icon_spec = next(s for s in valuable_event.SPECS if "/LimitedOffer/" in s.tab)
@@ -460,14 +461,15 @@ class FixedGiftFlowTests(unittest.TestCase):
         self.assertTrue(valuable_event_zone.tab_selected(vault, (310, 85)))        # General Vault đang chọn
         self.assertFalse(valuable_event_zone.tab_selected(vault, (210, 85)))       # All-Out Preparation
 
-    def test_open_tab_does_not_tap_already_selected_tab(self):
+    def test_open_tab_does_not_tap_already_selected_tab_but_taps_title(self):
         screen = cv2.imread(str(Path(__file__).parent / "screens" /
                                 "valuable_event_tab_limited_offer_selected.png"))
         bot = mock.Mock()
         bot.screenshot.return_value = screen
         self.assertTrue(valuable_event_zone.open_tab(bot, (174, 85)))
         bot.tap.assert_not_called()
-        bot.sleep.assert_not_called()
+        bot.tap_percent.assert_called_once_with(50, 5)
+        bot.sleep.assert_called_once_with(1)
 
     def test_open_tab_retaps_once_then_gives_up(self):
         same = np.random.default_rng(5).integers(0, 255, (704, 396, 3), dtype=np.uint8)
@@ -476,6 +478,7 @@ class FixedGiftFlowTests(unittest.TestCase):
         with mock.patch.object(valuable_event_zone, "tab_selected", return_value=False):
             self.assertFalse(valuable_event_zone.open_tab(bot, (120, 80)))
         self.assertEqual(2, bot.tap.call_count)                       # bấm + bấm lại 1 lần
+        bot.tap_percent.assert_not_called()                           # chưa sang trang: không bấm tiêu đề
         self.assertEqual(2 * 5, bot.sleep.call_count)                 # mỗi lần chờ tối đa 5 x 1s
 
     def test_search_pass_order_visible_then_long_swipe_then_short_scan(self):
@@ -689,7 +692,7 @@ class FixedGiftFlowTests(unittest.TestCase):
             "gift_general_vault",
             "gift_refining_stone_sprint", "gift_strategic_stockpile",
             "gift_limited_offer", "gift_speedup_sprint", "gift_super_blazon_sale",
-            "gift_sulis_wishing", "gift_super_value_weekly_card",
+            "gift_super_value_weekly_card",
             "gift_successive_purchase_benefits", "gift_optional_package",
             "gift_active_monthly_card", "gift_tomb_expedition",
             "gift_wheel_of_dragon_war",
@@ -900,6 +903,41 @@ class FixedGiftFlowTests(unittest.TestCase):
         self.assertIn("ValuableEvent/ResourceConsumptionSprint/sold_out",
                       by_key[resource_consumption_sprint.KEY].done)
 
+    def test_general_vault_no_button_in_upper_half_is_done(self):
+        bot = mock.Mock()
+        with mock.patch.object(general_vault, "find_any", return_value=None) as find_any:
+            self.assertTrue(general_vault.claim_daily_free(bot))
+        self.assertEqual((0, 18, 100, 50), find_any.call_args.kwargs["region"])
+        bot.tap.assert_not_called()
+
+    def test_general_vault_taps_then_waits_for_congratulations(self):
+        bot = mock.Mock()
+        with (mock.patch.object(general_vault, "find_any",
+                                return_value=("ValuableEvent/GeneralVault/button_daily_free", (200, 300))),
+              mock.patch.object(general_vault, "close_congratulations",
+                                side_effect=(False, False, True)) as congrats):
+            self.assertTrue(general_vault.claim_daily_free(bot))
+        bot.tap.assert_called_once_with(200, 300)
+        self.assertEqual(3, congrats.call_count)            # 1s, 2s, 3s: thấy Congratulations
+        self.assertEqual(3, bot.sleep.call_count)
+
+    def test_general_vault_retries_once_then_pending(self):
+        bot = mock.Mock()
+        with (mock.patch.object(general_vault, "find_any",
+                                return_value=("ValuableEvent/GeneralVault/button_daily_free", (200, 300))),
+              mock.patch.object(general_vault, "close_congratulations", return_value=False)):
+            self.assertFalse(general_vault.claim_daily_free(bot))
+        self.assertEqual(2, bot.tap.call_count)              # bước 3 tối đa 2 lần
+        self.assertEqual(2 * 5, bot.sleep.call_count)        # mỗi lần chờ Congratulations tối đa 5 x 1s
+
+    def test_general_vault_button_gone_after_first_tap_is_done(self):
+        bot = mock.Mock()
+        with (mock.patch.object(general_vault, "find_any",
+                                side_effect=(("ValuableEvent/GeneralVault/button_daily_free", (200, 300)), None)),
+              mock.patch.object(general_vault, "close_congratulations", return_value=False)):
+            self.assertTrue(general_vault.claim_daily_free(bot))
+        bot.tap.assert_called_once_with(200, 300)
+
     def test_strict_terminal_tasks_never_finish_from_missing_claim_button(self):
         valuable = {spec.task.key: spec.flow for spec in valuable_event.SPECS}
         super_value = {spec.task.key: spec.flow
@@ -909,7 +947,6 @@ class FixedGiftFlowTests(unittest.TestCase):
             "gift_optional_package": valuable,
             "gift_successive_purchase_benefits": valuable,
             "gift_tomb_expedition": valuable,
-            "gift_general_vault": valuable,
             "gift_empire_depot": super_value,
             "gift_lucky_raffle": super_value,
         }
@@ -923,7 +960,7 @@ class FixedGiftFlowTests(unittest.TestCase):
                          valuable["gift_successive_purchase_benefits"].done)
         self.assertEqual(("ValuableEvent/TombExpedition/quests_done",),
                          valuable["gift_tomb_expedition"].done)
-        self.assertTrue(valuable["gift_general_vault"].congratulations_done)
+        self.assertIs(general_vault.claim_daily_free, valuable["gift_general_vault"].handler)
         self.assertEqual(("SuperValueReturn/EmpireDepot/chest_open",),
                          super_value["gift_empire_depot"].done)
         self.assertTrue(super_value["gift_lucky_raffle"].congratulations_done)

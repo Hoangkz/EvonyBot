@@ -11,7 +11,7 @@ from . import (
     optional_package, refining_stone_sprint, resource_consumption_sprint,
     runestone_consumption_sprint,
     speedup_sprint, strategic_stockpile, successive_purchase_benefits,
-    sulis_wishing, super_blazon_sale, super_value_weekly_card, tomb_expedition,
+    super_blazon_sale, super_value_weekly_card, tomb_expedition,
     wheel_of_dragon_war,
 )
 from ..common import (TEXT_CLAIM_CONTROLS, back_if_close_x, find,
@@ -70,7 +70,6 @@ SPECS = (
                  wheel_of_dragon_war.FLOW),
     ValuableSpec(strategic_stockpile.TASK, "ValuableEvent/StrategicStockpile/tab_current",
                  strategic_stockpile.FLOW),
-    ValuableSpec(sulis_wishing.TASK, "ValuableEvent/SulisWishing/tab_icon", ExactFlow(skip=True)),
 )
 
 

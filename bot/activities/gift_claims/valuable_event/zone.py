@@ -23,7 +23,7 @@ from . import (
     optional_package, refining_stone_sprint, resource_consumption_sprint,
     runestone_consumption_sprint,
     speedup_sprint, strategic_stockpile,
-    successive_purchase_benefits, sulis_wishing, super_blazon_sale,
+    successive_purchase_benefits, super_blazon_sale,
     super_value_weekly_card, tomb_expedition, wheel_of_dragon_war,
 )
 from .named_flow import SLOW_SWIPE_DURATION, STEP_DELAY, process_exact
@@ -35,7 +35,10 @@ SEEN_ATTR = "_valuable_event_seen"   # thuộc tính trên context: (mốc reset
 OPEN_ATTEMPTS = 3       # số lần về màn chính tìm nút + bấm; hết mà chưa vào thì bỏ hoạt động trong lần chạy này
 OPEN_WAITS = 8          # sau khi bấm: chụp kiểm tra màn Valuable Event tối đa chừng này lần, mỗi lần chờ 1s
 ICON_ABOVE = 30         # px (màn rộng 396): find_valuable_event trả về tâm chữ "Event", bấm lên icon phía trên
-AFTER_TAB_TAP = (50, 5)  # % màn: bấm tab event xong bấm luôn chỗ này, rồi mới chạy flow của event
+# % màn: tìm thấy tab thì bấm vào chính giữa ô tab. Ô tab cao y 62-122 trên màn 704 -> giữa y 92 (13%); icon nằm giữa ô theo
+# chiều ngang nên x lấy theo tab tìm được. Tâm icon (y ~75) chỉ là nửa trên ô: Optional Package bấm ở đó game không nhận.
+TAB_TAP_Y = 13
+AFTER_TAB_TAP = (50, 5)  # % màn (chỗ tiêu đề): đã sang trang event thì bấm chỗ này, nghỉ 1s, rồi mới chạy flow của event
 PAGE_PROBE = (2, 20, 30, 30)   # % màn: ô cắt trước khi bấm tab (dưới hàng tab, góc trái: banner trang event) để biết đã sang event chưa
 PAGE_SAME = 0.9                # ô đó còn khớp từ mức này = chưa sang trang event mới
 TAB_WAITS = 5                  # sau mỗi lần bấm tab: kiểm tra tối đa chừng này lần, mỗi lần chờ 1s
@@ -80,7 +83,7 @@ TASKS = (
     ancient_dynasty_treasury.TASK,
     general_vault.TASK, refining_stone_sprint.TASK, strategic_stockpile.TASK,
     limited_offer.TASK, speedup_sprint.TASK, super_blazon_sale.TASK,
-    sulis_wishing.TASK, super_value_weekly_card.TASK,
+    super_value_weekly_card.TASK,
     successive_purchase_benefits.TASK, optional_package.TASK,
     active_monthly_card.TASK, tomb_expedition.TASK,
     wheel_of_dragon_war.TASK,
@@ -210,22 +213,34 @@ def tab_selected(screen, pos) -> bool:
     return band.size > 0 and float(band.mean()) >= SELECTED_V
 
 
+def tap_title(bot) -> None:
+    """Đã ở trang event: bấm AFTER_TAB_TAP (chỗ tiêu đề) rồi nghỉ 1s, xong mới chạy flow của event."""
+    bot.record("Gift Claims: bấm chỗ tiêu đề trước khi làm event")
+    bot.tap_percent(*AFTER_TAB_TAP)
+    bot.sleep(STEP_DELAY)
+
+
 def open_tab(bot, pos) -> bool:
-    """Bấm tab event tại `pos` (rồi bấm AFTER_TAB_TAP) và chờ sang trang event đó. Tab đã được chọn sẵn (tab_selected) thì đang ở
-    đúng trang: không bấm. Còn lại: trước khi bấm cắt ô PAGE_PROBE (dưới hàng tab, góc trái); sau mỗi 1s kiểm tra ô đó đã đổi chưa,
-    tối đa TAB_WAITS lần; chưa đổi thì bấm lại tab một lần và chờ tiếp như vậy (TAB_TAPS lần bấm). True khi đã sang trang event."""
+    """Mở trang event của tab tại `pos`, rồi bấm chỗ tiêu đề (tap_title). Tab đã được chọn sẵn (tab_selected) thì đang ở đúng
+    trang: không bấm tab. Còn lại: trước khi bấm cắt ô PAGE_PROBE (dưới hàng tab, góc trái); bấm tab (x của `pos`, y TAB_TAP_Y),
+    sau mỗi 1s kiểm tra ô đó đã
+    đổi chưa, tối đa TAB_WAITS lần; chưa đổi thì bấm lại tab một lần và chờ tiếp như vậy (TAB_TAPS lần bấm). True khi đã sang trang
+    event (đã bấm chỗ tiêu đề)."""
     before = bot.screenshot()
     if tab_selected(before, pos):
-        bot.record("Gift Claims: tab event đang được chọn sẵn; đã ở đúng trang")
+        bot.record("Gift Claims: tab event đang được chọn sẵn; không bấm tab")
+        tap_title(bot)
         return True
     box = _box(before, PAGE_PROBE)
     probe = before[box[1]:box[3], box[0]:box[2]].copy()
-    for _ in range(TAB_TAPS):
-        bot.tap(*pos)
-        bot.tap_percent(*AFTER_TAB_TAP)
+    target = (pos[0], round(before.shape[0] * TAB_TAP_Y / 100))
+    for attempt in range(1, TAB_TAPS + 1):
+        bot.record(f"Gift Claims: bấm tab event tại {target} (lần {attempt}/{TAB_TAPS})")
+        bot.tap(*target)
         for _ in range(TAB_WAITS):
             bot.sleep(STEP_DELAY)
             if _page_changed(bot.screenshot(), probe, box):
+                tap_title(bot)
                 return True
     return False
 
