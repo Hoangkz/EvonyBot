@@ -16,7 +16,7 @@ import cv2
 from ....common import to_city
 from ....daily_reset import last_reset
 from ....ocr.find_valuable_event import find_valuable_event
-from ..common import REFERENCE_WIDTH, back_if_close_x, mark_task_done, on_main, return_home, skip_for_run
+from ..common import REFERENCE_WIDTH, back_if_close_x, mark_task_done, on_main, return_home
 from ..screens import GiftScreen, identify
 from . import (
     active_monthly_card, ancient_dynasty_treasury, general_vault, limited_offer,
@@ -294,7 +294,7 @@ def scan_to_right_edge(bot, pending: set[str], attempted: set[str], title) -> bo
 def open_valuable_event(bot) -> bool:
     """Từ màn chính (có nút •••; đang ở bản đồ thế giới thì to_city vào thành trước) tìm nút Valuable Event bằng find_valuable_event (mẫu chữ "Event" rồi OCR), bấm, chờ màn
     Valuable Event (tiêu đề ValuableEvent/title) tối đa OPEN_WAITS lần x 1s. Chưa vào thì về màn chính làm lại, tối đa
-    OPEN_ATTEMPTS lần; vẫn không vào thì bỏ hoạt động này trong lần chạy này (Start lại thì chạy bình thường)."""
+    OPEN_ATTEMPTS lần; vẫn không vào thì trả False (DB chưa xong: worker gọi lại lần sau)."""
     for attempt in range(1, OPEN_ATTEMPTS + 1):
         bot.check()
         screen = bot.screenshot()
@@ -317,8 +317,7 @@ def open_valuable_event(bot) -> bool:
                 return True
         bot.record(f"Gift Claims: bấm rồi mà chưa vào màn Valuable Event sau {OPEN_WAITS}s "
                    f"(lần {attempt}/{OPEN_ATTEMPTS})")
-    bot.record(f"Gift Claims: {OPEN_ATTEMPTS} lần không vào được Valuable Event; bỏ hoạt động này trong lần chạy này")
-    skip_for_run(bot, KEY)
+    bot.record(f"Gift Claims: {OPEN_ATTEMPTS} lần không vào được Valuable Event; lần sau làm tiếp")
     return False
 
 
@@ -368,7 +367,9 @@ def seen_today(bot) -> set[str]:
 
 
 def run(bot) -> bool:
-    """Chạy hoạt động Valuable Event; True khi mọi nhiệm vụ của nó đã xong hôm nay. Lượt nào thấy event MỚI (chưa thấy ở các lượt
+    """Xong event nào lưu DB event đó; đủ lượt thì lưu key tổng KEY. Worker (``gift_claims.job``) chỉ đọc KEY trong DB: chưa có
+    thì gọi lại, bị ngắt giữa chừng (hết 120s, boss...) thì lần sau chạy lại từ đầu và bỏ qua các event đã xong.
+    Chạy hoạt động Valuable Event; True khi mọi nhiệm vụ của nó đã xong hôm nay. Lượt nào thấy event MỚI (chưa thấy ở các lượt
     trước hôm nay, seen_today) thì đếm lại: lượt đó tính là lượt 1. Event lượt nào cũng thấy mà chưa DONE không reset lại nữa, để
     không lặp mãi."""
     if bot.is_daily_done(KEY):

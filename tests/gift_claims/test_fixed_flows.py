@@ -602,7 +602,7 @@ class FixedGiftFlowTests(unittest.TestCase):
             self.assertFalse(valuable_event_zone.scan_to_right_edge(bot, set(), set(), np.zeros((42, 396, 3), dtype=np.uint8)))
         bot.swipe_percent.assert_not_called()
 
-    def test_open_valuable_event_gives_up_for_this_run_after_three_tries(self):
+    def test_open_valuable_event_gives_up_after_three_tries(self):
         bot = mock.Mock(spec=["screenshot", "tap", "sleep", "check", "record", "is_daily_done"])
         bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
         bot.is_daily_done.return_value = False
@@ -615,9 +615,6 @@ class FixedGiftFlowTests(unittest.TestCase):
 
         self.assertEqual(3, bot.tap.call_count)
         self.assertEqual(3 * 8, bot.sleep.call_count)
-        self.assertTrue(common.skipped_for_run(bot, valuable_event_zone.KEY))
-        job = gift_claims.job(gift_claims.valuable_event)
-        self.assertTrue(job["done"](bot, {}))
 
     def test_empire_depot_uses_approved_fixed_fallback_and_verifies_title(self):
         bot = mock.Mock()

@@ -26,19 +26,19 @@ TASKS = [("a", "A"), ("b", "B")]
 
 
 class ScanTest(unittest.TestCase):
-    def test_zone_pending_waits_for_next_120_second_window(self):
+    def test_job_runs_when_checked_and_is_done_by_zone_key(self):
         bot = FakeBot()
         zone = SimpleNamespace(KEY="gift_zone", run=mock.Mock(return_value=False))
         job = gift_claims.job(zone)
 
-        with mock.patch.object(gift_claims.time, "monotonic",
-                               side_effect=(100.0, 219.9, 220.0)):
-            self.assertFalse(job["run"](bot, {}))
-            self.assertTrue(job["done"](bot, {}))
-            self.assertFalse(job["done"](bot, {}))
-
+        self.assertTrue(job["enabled"]({}))
+        self.assertTrue(job["enabled"]({"General": {"gift_claims": True}}))
+        self.assertFalse(job["enabled"]({"General": {"gift_claims": False}}))
+        self.assertFalse(job["run"](bot, {}))
         zone.run.assert_called_once_with(bot)
-        self.assertTrue(any("120s kế tiếp" in line for line in bot.log))
+        self.assertFalse(job["done"](bot, {}))
+        bot.mark_daily_done("gift_zone")
+        self.assertTrue(job["done"](bot, {}))
 
     def test_three_misses_mark_done(self):
         bot, calls = FakeBot(), []

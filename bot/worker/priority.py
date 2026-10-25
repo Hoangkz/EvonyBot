@@ -419,8 +419,8 @@ DATA ={
         }
     ],
     # Nhận quà event: chạy sau các Daily Activities; Event Center luôn đứng
-    # trước hai khu quà ngoài thành. Thuộc nhóm Daily Activities: ô tích
-    # "Claim Event Gifts" ở tab đó (settings["General"]["gift_claims"]).
+    # trước hai khu quà ngoài thành. Thuộc nhóm Daily Activities. Dựng giống
+    # daily_job: gift_claims.job(zone) = chung ô "Claim Event Gifts", xong khi key của zone có trong DB.
     "Gift Claims": [
         {
             "key": gift_claims.valuable_event.KEY,
@@ -438,13 +438,13 @@ DATA ={
             "priority": 1,
             "tail": True,
         },
-        # {
-        #     "key": gift_claims.event_center.KEY,
-        #     "group": "Daily Activities",
-        #     "run": gift_claims.job(gift_claims.event_center),
-        #     "label": "Gift Claims: Event Center",
-        #     "priority": 3,
-        #     "tail": True,
-        # },
+        {
+            "key": gift_claims.event_center.KEY,
+            "group": "Daily Activities",
+            "run": gift_claims.job(gift_claims.event_center),
+            "label": "Gift Claims: Event Center",
+            "priority": 3,
+            "tail": True,
+        },
     ],
 }

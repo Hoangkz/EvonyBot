@@ -79,8 +79,8 @@ Một lượt tìm (`search_pass`):
 1. Mở từ màn chính (`open_valuable_event`): ở màn chính (có nút •••; không ở đó thì `return_home`) truyền ảnh vào
    `bot/ocr/find_valuable_event.py` `find_valuable_event` (so mẫu chữ "Event" trong `Images/GiftClaims/ValuableEvent/event_text/`,
    không khớp thì OCR). Thấy thì bấm icon (cao hơn tâm chữ "Event" 30 px), cứ 1 giây chụp kiểm tra tiêu đề `ValuableEvent/title`,
-   tối đa 8 lần. Không thấy nút / 8 lần chưa vào: làm lại, tối đa 3 lần; vẫn chưa vào thì bỏ Valuable Event trong lần chạy này
-   (`skip_for_run`, ghi trên context, không ghi DB; `job.done` coi là xong), Start lại thì chạy bình thường.
+   tối đa 8 lần. Không thấy nút / 8 lần chưa vào: làm lại, tối đa 3 lần; vẫn chưa vào thì trả False
+   (key tổng chưa có trong DB: worker gọi lại lần sau).
 2. `do_visible`: làm các event cần làm đang thấy ở hàng tab (`run.py` `_tab`: ưu tiên ảnh icon KHÔNG chữ `<Event>/tab_icon.png` — dải thông báo chạy chữ hay đè lên dòng tên tab — ngưỡng 0.8; chưa có icon thì dùng ảnh có chữ trong `SPECS`; Super Blazon Sale có icon giống hệt Journey to Glory nên phải khớp thêm chữ tên cùng cột): bấm tab bên trái nhất (`open_tab`: tab đã được chọn sẵn (nền sáng: dải y 16.4-17.1% dưới chữ tên tab, độ sáng TB >= 60, tab thường ~33) thì không bấm; còn lại trước khi bấm cắt ô x 2-30% y 20-30% dưới hàng tab; bấm tab, bấm luôn x 50% y 5%; cứ 1s kiểm tra ô đó đã đổi chưa (khớp < 0.9 = đã sang event), tối đa 5 lần; chưa thì bấm lại tab 1 lần, chờ tiếp 5 lần; vẫn chưa thì bỏ qua event trong lượt này, lượt sau làm tiếp), chạy flow riêng
    (`process_exact`), xong thì DONE, chưa xong thì giữ PENDING và không thử lại trong lượt; chụp lại, lặp tới khi không còn.
 3. `swipe_to_left_edge` (một lần mỗi lượt), tối đa 8 cú: cú đầu kéo dài x 5% -> 1000%, từ cú thứ 2 kéo ngắn x 5% -> 95%, y 12%;
