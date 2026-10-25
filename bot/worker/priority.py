@@ -438,13 +438,13 @@ DATA ={
             "priority": 1,
             "tail": True,
         },
-        {
-            "key": gift_claims.event_center.KEY,
-            "group": "Daily Activities",
-            "run": gift_claims.job(gift_claims.event_center),
-            "label": "Gift Claims: Event Center",
-            "priority": 3,
-            "tail": True,
-        },
+        # {
+        #     "key": gift_claims.event_center.KEY,
+        #     "group": "Daily Activities",
+        #     "run": gift_claims.job(gift_claims.event_center),
+        #     "label": "Gift Claims: Event Center",
+        #     "priority": 3,
+        #     "tail": True,
+        # },
     ],
 }

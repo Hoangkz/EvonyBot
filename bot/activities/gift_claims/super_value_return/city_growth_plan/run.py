@@ -17,7 +17,7 @@ def claim_opened(bot):
     for page in range(6):
         bot.check()
         screen = bot.screenshot()
-        claimed_rows = find_all(bot, "CityGrowthPlan/claimed", screen,
+        claimed_rows = find_all(bot, "SuperValueReturn/CityGrowthPlan/claimed", screen,
                                 threshold=0.70, region=(20, 45, 50, 98))
         for y in (58, 67, 76, 85, 94):
             pixel_y = int(screen.shape[0] * y / 100)
@@ -27,11 +27,11 @@ def claim_opened(bot):
             after = bot.screenshot()
             if close_congratulations(bot):
                 claimed = True
-            elif find(bot, "CityGrowthPlan/detail_popup", bot.screenshot(), threshold=0.82,
+            elif find(bot, "SuperValueReturn/CityGrowthPlan/detail_popup", bot.screenshot(), threshold=0.82,
                     region=(80, 15, 100, 30)) is not None:
                 bot.back(delay=0.7)
             else:
-                checks = find_all(bot, "CityGrowthPlan/claimed", after,
+                checks = find_all(bot, "SuperValueReturn/CityGrowthPlan/claimed", after,
                                   threshold=0.70, region=(20, 45, 50, 98))
                 claimed = claimed or any(abs(check_y - pixel_y) <= 28
                                          for _, check_y in checks)
@@ -48,7 +48,7 @@ def claim_opened(bot):
 def run(bot):
     if (not open_named(bot, GiftScreen.SUPER_VALUE_RETURN)
             or not select_carousel_tab(bot, "SuperValueReturn/title",
-                                       "CityGrowthPlan/tab")):
+                                       "SuperValueReturn/CityGrowthPlan/tab")):
         return False
     claimed = claim_opened(bot)
     return_home(bot)

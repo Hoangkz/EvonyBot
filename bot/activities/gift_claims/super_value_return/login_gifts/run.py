@@ -4,8 +4,8 @@ from ...lobby import open_named
 from ...screens import GiftScreen
 
 KEY = "gift_login_gifts"
-PAGE = "LoginGifts/title"
-CONGRATULATIONS = "LoginGifts/congratulations"
+PAGE = "SuperValueReturn/LoginGifts/title"
+CONGRATULATIONS = "SuperValueReturn/LoginGifts/congratulations"
 REWARD_BUTTON = "Common/button_reward_chest"
 REWARD_THRESHOLD = 0.80
 FALLBACK_REWARD_POS = (45, 190)
@@ -57,7 +57,7 @@ def claim_opened(bot) -> bool:
 def run(bot):
     if (not open_named(bot, GiftScreen.SUPER_VALUE_RETURN)
             or not select_carousel_tab(bot, "SuperValueReturn/title",
-                                       "LoginGifts/tab")):
+                                       "SuperValueReturn/LoginGifts/tab")):
         return False
     done = claim_opened(bot)
     return_home(bot)

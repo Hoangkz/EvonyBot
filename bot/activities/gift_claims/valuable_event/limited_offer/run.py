@@ -5,7 +5,7 @@ from ...screens import GiftScreen
 
 KEY = "gift_limited_offer"
 FLOW = ExactFlow(
-    claims=("LimitedOffer/button_free_current", "LimitedOffer/button_free"),
+    claims=("ValuableEvent/LimitedOffer/button_free_current", "ValuableEvent/LimitedOffer/button_free"),
     # The reward area is authoritative: no Free after two checks means DONE.
     absence_done=True,
 )
@@ -13,7 +13,7 @@ FLOW = ExactFlow(
 
 def run(bot):
     return run_carousel_exact(bot, GiftScreen.VALUABLE_EVENT,
-                              "ValuableEvent/title", "LimitedOffer/tab", FLOW)
+                              "ValuableEvent/title", "ValuableEvent/LimitedOffer/tab_icon", FLOW)
 
 
 TASK = GiftTask(KEY, "Limited Offer", run)

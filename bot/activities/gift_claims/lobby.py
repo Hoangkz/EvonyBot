@@ -2,7 +2,8 @@
 import cv2
 import numpy as np
 
-from .common import (REFERENCE_WIDTH, find, find_all, find_valuable_event,
+from ...ocr.find_valuable_event import find_valuable_event as find_valuable_caption
+from .common import (REFERENCE_WIDTH, find, find_all,
                      return_home, swipe_around)
 from .screens import GiftScreen, identify
 
@@ -21,18 +22,18 @@ IGNORED_RIGHT_LAUNCHERS = ("FollowUs/facebook_icon",)
 EVENT_CENTER_LAUNCHERS = ("EventCenter/launcher_side", "EventCenter/launcher")
 FIXED_PARENT_LAUNCHERS = {
     GiftScreen.SUPER_VALUE_RETURN: (
-        ("EmpireDepot/launcher", "EmpireDepot/launcher_frame_1",
-         "EmpireDepot/launcher_frame_2", "EmpireDepot/launcher_frame_3",
+        ("SuperValueReturn/EmpireDepot/launcher", "SuperValueReturn/EmpireDepot/launcher_frame_1",
+         "SuperValueReturn/EmpireDepot/launcher_frame_2", "SuperValueReturn/EmpireDepot/launcher_frame_3",
          "SuperValueReturn/launcher_lucky_raffle",
          "SuperValueReturn/launcher_login_gifts"),
         (0, 68, 30, 96)),
     GiftScreen.BACK_TO_TERRITORY: (
-        ("BackToTerritory/title",), REGIONS[RIGHT]),
+        ("EventCenter/BackToTerritory/title",), REGIONS[RIGHT]),
 }
 PARENT_ANCHOR_TABS = {
     GiftScreen.VALUABLE_EVENT: (
-        "ResourceConsumptionSprint/tab", "LimitedOffer/tab"),
-    GiftScreen.SUPER_VALUE_RETURN: ("EmpireDepot/tab_current", "EmpireDepot/tab"),
+        "ValuableEvent/ResourceConsumptionSprint/tab", "ValuableEvent/LimitedOffer/tab_icon"),
+    GiftScreen.SUPER_VALUE_RETURN: ("SuperValueReturn/EmpireDepot/tab_current", "SuperValueReturn/EmpireDepot/tab"),
 }
 
 
@@ -235,6 +236,13 @@ def open_next(bot, boundary: str, attempted: list[tuple[int, int]]):
     name = name or GiftScreen.UNKNOWN
     bot.log(f"Gift Claims: vùng {boundary}, chấm đỏ {dot} mở {name.value}")
     return name
+
+
+def find_valuable_event(bot, screen):
+    """Chỗ chữ "Valuable Event" dưới nút ở màn chính (bot/ocr/find_valuable_event: mẫu chữ "Event" rồi OCR), quy về cùng chỗ hàm
+    cũ trả: cao hơn tâm chữ "Event" 10 px; nơi gọi bấm cao hơn 20 px nữa = lên icon."""
+    pos = find_valuable_caption(screen)
+    return None if pos is None else (pos[0], pos[1] - round(10 * screen.shape[1] / REFERENCE_WIDTH))
 
 
 def open_named(bot, expected):

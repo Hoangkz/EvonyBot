@@ -9,10 +9,10 @@ POLICY = EventPolicy("Dragon Battle", key=KEY, screen=GiftScreen.DRAGON_BATTLE)
 
 
 def run(bot):
-    if not open_event_center_event(bot, "DragonBattle/list_row", "DragonBattle/title"):
+    if not open_event_center_event(bot, "EventCenter/DragonBattle/list_row", "EventCenter/DragonBattle/title"):
         return False
     for attempt in range(2):
-        claimed = find(bot, "DragonBattle/status_reward_claimed", bot.screenshot(),
+        claimed = find(bot, "EventCenter/DragonBattle/status_reward_claimed", bot.screenshot(),
                        threshold=0.82, region=(0, 15, 100, 95))
         if claimed is not None:
             bot.record("Gift Claims: Dragon Battle đã thấy rương trạng thái "
@@ -23,7 +23,7 @@ def run(bot):
             bot.sleep(1.5)
     reward = None
     for attempt in range(4):
-        reward = find(bot, "DragonBattle/reward_230317", bot.screenshot(),
+        reward = find(bot, "EventCenter/DragonBattle/reward_230317", bot.screenshot(),
                       threshold=0.80, region=(0, 15, 100, 95))
         if reward is not None:
             break
@@ -42,7 +42,7 @@ def run(bot):
         bot.record("Gift Claims: Dragon Battle đã hiện Congratulations; DONE")
     else:
         for attempt in range(3):
-            claimed = find(bot, "DragonBattle/status_reward_claimed", bot.screenshot(),
+            claimed = find(bot, "EventCenter/DragonBattle/status_reward_claimed", bot.screenshot(),
                            threshold=0.82, region=(0, 15, 100, 95))
             if claimed is not None:
                 done = True

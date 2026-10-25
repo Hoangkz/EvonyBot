@@ -81,15 +81,21 @@ Một lượt tìm (`search_pass`):
    không khớp thì OCR). Thấy thì bấm icon (cao hơn tâm chữ "Event" 30 px), cứ 1 giây chụp kiểm tra tiêu đề `ValuableEvent/title`,
    tối đa 8 lần. Không thấy nút / 8 lần chưa vào: làm lại, tối đa 3 lần; vẫn chưa vào thì bỏ Valuable Event trong lần chạy này
    (`skip_for_run`, ghi trên context, không ghi DB; `job.done` coi là xong), Start lại thì chạy bình thường.
-2. `do_visible`: làm các event cần làm đang thấy ở hàng tab (ảnh tab trong `run.py` `SPECS`): bấm tab bên trái nhất (`open_tab`: tab đã được chọn sẵn (nền sáng: dải y 16.4-17.1% dưới chữ tên tab, độ sáng TB >= 60, tab thường ~33) thì không bấm; còn lại trước khi bấm cắt ô x 2-30% y 20-30% dưới hàng tab; bấm tab, bấm luôn x 50% y 5%; cứ 1s kiểm tra ô đó đã đổi chưa (khớp < 0.9 = đã sang event), tối đa 5 lần; chưa thì bấm lại tab 1 lần, chờ tiếp 5 lần; vẫn chưa thì bỏ qua event trong lượt này, lượt sau làm tiếp), chạy flow riêng
+2. `do_visible`: làm các event cần làm đang thấy ở hàng tab (`run.py` `_tab`: ưu tiên ảnh icon KHÔNG chữ `<Event>/tab_icon.png` — dải thông báo chạy chữ hay đè lên dòng tên tab — ngưỡng 0.8; chưa có icon thì dùng ảnh có chữ trong `SPECS`; Super Blazon Sale có icon giống hệt Journey to Glory nên phải khớp thêm chữ tên cùng cột): bấm tab bên trái nhất (`open_tab`: tab đã được chọn sẵn (nền sáng: dải y 16.4-17.1% dưới chữ tên tab, độ sáng TB >= 60, tab thường ~33) thì không bấm; còn lại trước khi bấm cắt ô x 2-30% y 20-30% dưới hàng tab; bấm tab, bấm luôn x 50% y 5%; cứ 1s kiểm tra ô đó đã đổi chưa (khớp < 0.9 = đã sang event), tối đa 5 lần; chưa thì bấm lại tab 1 lần, chờ tiếp 5 lần; vẫn chưa thì bỏ qua event trong lượt này, lượt sau làm tiếp), chạy flow riêng
    (`process_exact`), xong thì DONE, chưa xong thì giữ PENDING và không thử lại trong lượt; chụp lại, lặp tới khi không còn.
 3. `swipe_to_left_edge` (một lần mỗi lượt), tối đa 8 cú: cú đầu kéo dài x 5% -> 1000%, từ cú thứ 2 kéo ngắn x 5% -> 95%, y 12%;
    sau mỗi cú nghỉ 1s rồi cắt một icon ở hàng tab; sau cú kế tiếp icon đó vẫn thấy (khớp >= 0.8) và lệch <= 20 px = đã tới giới
    hạn bên trái. Rồi `do_visible`.
 4. `scan_to_right_edge`: kéo ngắn x 60% -> 5%, y 12% (phải sang trái), tối đa 30 cú, mỗi chỗ `do_visible`; trước mỗi cú cắt icon
-   ngoài cùng bên trái, kéo xong nghỉ 1s icon đó vẫn đứng nguyên chỗ (khớp >= 0.8, lệch <= 2 px; đổi chỗ thì chưa phải) = đã chạm bên phải. 95% -> 5% dịch ~4 tab một
+   ngoài cùng bên trái, kéo xong nghỉ 1s icon đó vẫn đứng nguyên chỗ (khớp >= 0.8, lệch <= 2 px; đổi chỗ thì chưa phải) = hàng tab không dịch; phải 2 cú liên tiếp không dịch mới là chạm bên phải (popup sau khi nhận quà phủ lên làm cú kéo không dịch, từng làm bot báo chạm phải khi mới tới Super Blazon Sale). 95% -> 5% dịch ~4 tab một
    cú nên sót tab; 60% -> 5% đi hết 12 cú, mọi tab đều hiện đủ (thử trên 21913). Icon tab có khung cánh vàng giống nhau nên phải
    xét cả độ lệch, không chỉ "còn thấy".
+   Sau MỖI cú kéo (dài / ngắn), nghỉ 1s rồi chụp: thấy dấu X đỏ của dải thông báo chạy chữ (y 92-116) thì bấm tắt
+   (`find_notice_x`: chỉ nhận hình dấu X — cụm đỏ nét mảnh, phủ cả hai đường chéo — không đọc chữ thông báo vì mỗi lần mỗi khác).
+   Trước MỌI cú kéo (cả kéo về trái lẫn kéo ngắn): `wait_title_clear` — thanh tiêu đề (y 0-6%) phải khớp ảnh cắt lúc vừa vào màn
+   (`capture_title`, mỗi lượt cắt lại; chỉ là biến truyền giữa các hàm của lượt, không gắn lên bot — hết lượt / sang nhiệm vụ khác là không còn) ở ngưỡng 0.99, so chênh lệch điểm ảnh (1 - chênh lệch TB / 255) để nhạy cả lớp phủ tối
+   (chụp lúc khác nhau giống 1.0; phủ tối 10% -> 0.978). Không khớp thì chờ 1s, tối đa 5 lần; vẫn không khớp thì Back rồi kiểm tra
+   lại; vẫn không khớp thì dừng lượt (không tính).
 5. Chạm bên phải (hoặc mọi event cần làm đã xong): ghi `gift_valuable_event_pass_N`, bấm Back, lượt mới làm lại từ bước 1.
    Lượt nào thấy event MỚI (chưa thấy ở các lượt trước của lần chạy này) thì đếm lại: xoá các key lượt, lượt đó tính là lượt 1
    (VD lượt 1 không thấy A, lượt 2 thấy A -> lượt 2 là lượt 1). Event lượt nào cũng thấy mà chưa DONE chỉ reset lần đầu, không lặp mãi.

@@ -9,16 +9,16 @@ POLICY = EventPolicy(
     key=KEY,
     screen=GiftScreen.GRACE_OF_STAR_TRAIL,
     reward_navigation=(
-        "GraceOfStarTrail/button_star_trail_gift_current",
-        "GraceOfStarTrail/button_star_trail_gift_alt",
-        "GraceOfStarTrail/button_star_trail_gift",
+        "EventCenter/GraceOfStarTrail/button_star_trail_gift_current",
+        "EventCenter/GraceOfStarTrail/button_star_trail_gift_alt",
+        "EventCenter/GraceOfStarTrail/button_star_trail_gift",
     ),
 )
 
 
 def run(bot):
-    if not open_event_center_event(bot, "GraceOfStarTrail/list_row",
-                                   "GraceOfStarTrail/title"):
+    if not open_event_center_event(bot, "EventCenter/GraceOfStarTrail/list_row",
+                                   "EventCenter/GraceOfStarTrail/title"):
         return False
     # Reuse the same two-pass Star Trail Gift -> coin Claim contract as the
     # Event Center list scanner so standalone execution cannot checkpoint a

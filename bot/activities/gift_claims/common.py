@@ -36,28 +36,6 @@ TEXT_CLAIM_CONTROLS = (
     "Common/button_free_text",
 )
 
-# The launcher caption has two stable visual states: a dim caption after the
-# daily rewards are complete and a glowing caption while rewards remain.  Keep
-# both templates text-only so matching does not depend on the animated chest or
-# the city scene behind it.
-VALUABLE_EVENT_LABELS = (
-    "ValuableEvent/launcher_text_done",
-    "ValuableEvent/launcher_text_pending",
-)
-VALUABLE_EVENT_REGION = (40, 68, 88, 96)
-VALUABLE_EVENT_WIDE_REGION = (15, 50, 100, 100)
-VALUABLE_EVENT_THRESHOLDS = (0.85, 0.80, 0.75, 0.70, 0.65)
-# Older and full-icon captures are useful fallbacks when glow, badges or the
-# city background make the tiny caption-only crops unstable.  Values are the
-# vertical adjustment needed to return a caption position: callers tap 20 px
-# above that position, so the full-icon template is translated back to the
-# centre of its icon before tapping.
-VALUABLE_EVENT_FALLBACKS = (
-    ("ValuableEvent/launcher", 0),
-    ("ValuableEvent/launcher_done_icon", 20),
-)
-
-
 @dataclass(frozen=True)
 class GiftTask:
     key: str
@@ -137,50 +115,6 @@ def find(bot, name: str, screen=None, threshold: float = 0.82, region=None):
     screen = bot.screenshot() if screen is None else screen
     return bot.find(_scaled_template(bot, name, screen), threshold=threshold,
                     screen=screen, region=region)
-
-
-def find_valuable_event(bot, screen):
-    """Find only the ``Valuable Event`` caption on an existing screenshot.
-
-    This deliberately mirrors the project's ``find_event_center`` threshold
-    ladder.  Both the completed/dim and pending/glowing captions are accepted;
-    the icon artwork and notification badge are not part of either template.
-    """
-    for threshold in VALUABLE_EVENT_THRESHOLDS:
-        for label in VALUABLE_EVENT_LABELS:
-            pos = find(bot, label, screen=screen, threshold=threshold,
-                       region=VALUABLE_EVENT_REGION)
-            if pos is not None:
-                state = label.rsplit("_", 1)[-1]
-                bot.log(
-                    f"Gift Claims: Valuable Event ({state}) at threshold "
-                    f"{threshold}")
-                return pos
-    # The city can be left panned far enough that the launcher falls outside
-    # the old bottom-centre box.  Search a wider lower-half region only after
-    # the precise caption search failed, and accept the two existing launcher
-    # captures as fallbacks.  This keeps the common case strict while making
-    # the recovery path resilient to glow/badge animation.
-    scale = screen.shape[1] / REFERENCE_WIDTH
-    for threshold in VALUABLE_EVENT_THRESHOLDS:
-        for label in VALUABLE_EVENT_LABELS:
-            pos = find(bot, label, screen=screen, threshold=threshold,
-                       region=VALUABLE_EVENT_WIDE_REGION)
-            if pos is not None:
-                state = label.rsplit("_", 1)[-1]
-                bot.log(
-                    f"Gift Claims: Valuable Event ({state}) ở vùng tìm rộng "
-                    f"tại threshold {threshold}")
-                return pos
-        for template, caption_offset in VALUABLE_EVENT_FALLBACKS:
-            pos = find(bot, template, screen=screen, threshold=threshold,
-                       region=VALUABLE_EVENT_WIDE_REGION)
-            if pos is not None:
-                bot.log(
-                    f"Gift Claims: Valuable Event dùng ảnh fallback {template} "
-                    f"tại threshold {threshold}")
-                return pos[0], pos[1] + round(caption_offset * scale)
-    return None
 
 
 def find_all(bot, name: str, screen=None, threshold: float = 0.82,
@@ -373,7 +307,7 @@ def close_congratulations(bot, *, attempts: int = 3) -> bool:
     """Close the common reward popup and report a verified claim."""
     for attempt in range(attempts):
         screen = bot.screenshot()
-        if find(bot, "LoginGifts/congratulations", screen, threshold=0.78,
+        if find(bot, "SuperValueReturn/LoginGifts/congratulations", screen, threshold=0.78,
                 region=(0, 38, 100, 62)) is not None:
             bot.back(delay=0.8)
             return True

@@ -52,7 +52,7 @@ def ensure_skip_animation(bot) -> bool:
 
 FLOW = ExactFlow(
     prepare=ensure_skip_animation,
-    claims=("WheelOfDragonWar/button_spin_once_free",),
+    claims=("ValuableEvent/WheelOfDragonWar/button_spin_once_free",),
     claim_threshold=0.86,
     # DONE only when Spin Once Free is no longer visible.
     absence_done=True,
@@ -64,7 +64,7 @@ def run(bot):
         bot,
         GiftScreen.VALUABLE_EVENT,
         "ValuableEvent/title",
-        "WheelOfDragonWar/tab",
+        "ValuableEvent/WheelOfDragonWar/tab_icon",
         FLOW,
     )
 

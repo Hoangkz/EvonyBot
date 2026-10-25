@@ -7,7 +7,7 @@ from ..common import (GiftTask, ClaimReport, TEXT_CLAIM_CONTROLS, back_if_close_
                       close_congratulations, find, find_all, return_home)
 
 KEY = "gift_back_to_territory"
-PAGE = "BackToTerritory/title"
+PAGE = "EventCenter/BackToTerritory/title"
 DOT = "ValuableEvent/notification_dot"
 TOP = (0, 7, 100, 19)
 LOWER = (0, 20, 100, 88)
@@ -37,7 +37,7 @@ def _claim_visible_login_rewards(bot, max_taps=12) -> ClaimReport:
     for _ in range(max_taps):
         bot.check()
         before = bot.screenshot()
-        positions = find_all(bot, "BackToTerritory/button_claim", before,
+        positions = find_all(bot, "EventCenter/BackToTerritory/button_claim", before,
                              threshold=0.82, region=REWARD_LIST)
         if not positions:
             break
@@ -49,7 +49,7 @@ def _claim_visible_login_rewards(bot, max_taps=12) -> ClaimReport:
             verified += 1
             continue
         after = bot.screenshot()
-        remaining = find_all(bot, "BackToTerritory/button_claim", after,
+        remaining = find_all(bot, "EventCenter/BackToTerritory/button_claim", after,
                              threshold=0.82, region=REWARD_LIST)
         if not any((x - position[0]) ** 2 + (y - position[1]) ** 2 <= 32 ** 2
                    for x, y in remaining):

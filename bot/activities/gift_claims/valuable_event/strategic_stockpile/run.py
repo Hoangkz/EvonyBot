@@ -6,9 +6,9 @@ from ..named_flow import ExactFlow, run_carousel_exact
 
 KEY = "gift_strategic_stockpile"
 FLOW = ExactFlow(
-    opened=("StrategicStockpile/title",),
-    claims=("StrategicStockpile/button_free_text",),
-    done=("StrategicStockpile/chest_claimed",),
+    opened=("ValuableEvent/StrategicStockpile/title",),
+    claims=("ValuableEvent/StrategicStockpile/button_free_text",),
+    done=("ValuableEvent/StrategicStockpile/chest_claimed",),
     # Check that Free is really present, then tap ten pixels to its right and
     # ten pixels above as measured on the current Strategic Stockpile layout.
     claim_offset=(10, -10),
@@ -18,7 +18,7 @@ FLOW = ExactFlow(
 def run(bot):
     return run_carousel_exact(bot, GiftScreen.VALUABLE_EVENT,
                               "ValuableEvent/title",
-                              "StrategicStockpile/tab_current", FLOW)
+                              "ValuableEvent/StrategicStockpile/tab_current", FLOW)
 
 
 TASK = GiftTask(KEY, "Strategic Stockpile", run)

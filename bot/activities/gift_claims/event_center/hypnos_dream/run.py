@@ -7,7 +7,7 @@ POLICY = EventPolicy(
     "Hypnos' Dream",
     key="gift_hypnos_dream",
     screen=GiftScreen.HYPNOS_DREAM,
-    navigation=("Rewards", "HypnosDream/button_rewards_text"),
+    navigation=("Rewards", "EventCenter/HypnosDream/button_rewards_text"),
 )
 
 

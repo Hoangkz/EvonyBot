@@ -5,15 +5,15 @@ from ...screens import GiftScreen
 
 KEY = "gift_lucky_raffle"
 FLOW = ExactFlow(
-    claims=("LuckyRaffle/button_claimable_current",),
-    done=("LuckyRaffle/chest_open",),
+    claims=("SuperValueReturn/LuckyRaffle/button_claimable_current",),
+    done=("SuperValueReturn/LuckyRaffle/chest_open",),
     congratulations_done=True,
 )
 
 
 def run(bot):
     return run_carousel_exact(bot, GiftScreen.SUPER_VALUE_RETURN,
-                              "SuperValueReturn/title", "LuckyRaffle/tab",
+                              "SuperValueReturn/title", "SuperValueReturn/LuckyRaffle/tab",
                               FLOW)
 
 

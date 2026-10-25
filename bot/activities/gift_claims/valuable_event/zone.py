@@ -60,6 +60,20 @@ LEFT_ICON = (8, 7.5, 26, 13.5)   # % màn: ô cắt icon ngoài cùng bên trái
 # khớp nhầm sang tab bên cạnh (0.6-0.8+); ở biên thật hàng tab đứng yên.
 LEFT_SAME_PX = 20                # swipe_to_left_edge: VD x 10 -> 20 vẫn là giới hạn trái
 SHORT_SAME_PX = 2                # scan_to_right_edge (kéo ngắn): icon đổi chỗ thì KHÔNG phải giới hạn, phải đứng nguyên chỗ
+EDGE_CONFIRM = 2                 # scan_to_right_edge: số cú kéo ngắn liên tiếp không dịch mới là chạm bên phải (cú đầu có thể bị popup chặn)
+# Trước mỗi cú kéo: thanh tiêu đề phải khớp gần như tuyệt đối với ảnh cắt lúc vừa vào màn Valuable Event (popup sau khi nhận quà
+# phủ lên thì cú kéo không làm hàng tab dịch). So bằng chênh lệch điểm ảnh (1 - chênh lệch TB / 255) để nhạy cả lớp phủ tối:
+# dải y 0-6% chụp lúc khác nhau giống 1.0; phủ tối 10% -> 0.978, 30% -> 0.937.
+TITLE_REGION = (0, 0, 100, 6)    # % màn: thanh tiêu đề
+TITLE_SAME = 0.99
+TITLE_WAITS = 5                  # không khớp: chờ 1s, tối đa chừng này lần; vẫn không khớp thì Back
+# Dải thông báo chạy chữ đè lên dòng tên tab (y 92-116 trên màn 704) có dấu X đỏ để tắt: sau mỗi cú kéo (dài / ngắn) thấy thì bấm.
+# Chỉ nhận dấu X (chữ thông báo mỗi lần mỗi khác): cụm đỏ cỡ NOTICE_X_PX, nét mảnh (tỉ lệ điểm đỏ NOTICE_X_FILL, chấm đỏ thông
+# báo thì tròn đặc), điểm đỏ nằm dọc cả hai đường chéo (>= NOTICE_X_DIAG; dấu X thật 0.54 / 0.60, chỗ đỏ khác <= 0.48).
+NOTICE_BAND = (13.0, 16.7)       # % màn: dải thông báo
+NOTICE_X_PX = (9, 22)            # px (màn rộng 396): cạnh cụm đỏ
+NOTICE_X_FILL = (0.15, 0.5)
+NOTICE_X_DIAG = 0.5
 
 TASKS = (
     resource_consumption_sprint.TASK, runestone_consumption_sprint.TASK,
@@ -97,18 +111,78 @@ def _at_edge(screen, icon, cut_x: int, same_px: float) -> bool:
     return score >= EDGE_SAME and abs(x - cut_x) <= same_px * screen.shape[1] / REFERENCE_WIDTH
 
 
+def find_notice_x(screen) -> "tuple[int, int] | None":
+    """Tâm dấu X đỏ của dải thông báo chạy chữ, hoặc None. Chỉ xét hình dấu X, không đọc chữ thông báo."""
+    height, width = screen.shape[:2]
+    scale = width / REFERENCE_WIDTH
+    top, bottom = int(height * NOTICE_BAND[0] / 100), int(height * NOTICE_BAND[1] / 100)
+    hsv = cv2.cvtColor(screen[top:bottom], cv2.COLOR_BGR2HSV)
+    red = (((hsv[..., 0] <= 10) | (hsv[..., 0] >= 170)) & (hsv[..., 1] > 140) & (hsv[..., 2] > 140)).astype("uint8")
+    count, labels, stats, _ = cv2.connectedComponentsWithStats(red, 8)
+    low, high = NOTICE_X_PX[0] * scale, NOTICE_X_PX[1] * scale
+    for i in range(1, count):
+        x, y, w, h, area = (int(v) for v in stats[i])
+        if not (low <= w <= high and low <= h <= high and 0.7 <= w / h <= 1.4):
+            continue
+        if not NOTICE_X_FILL[0] <= area / (w * h) <= NOTICE_X_FILL[1]:
+            continue
+        ys, xs = (labels[y:y + h, x:x + w] == i).nonzero()
+        u, v = xs / w, ys / h
+        if (abs(u - v) < 0.25).mean() >= NOTICE_X_DIAG and (abs(u + v - 1) < 0.25).mean() >= NOTICE_X_DIAG:
+            return x + w // 2, top + y + h // 2
+    return None
+
+
 def _settled_screenshot(bot):
+    """Sau một cú kéo: nghỉ 1s rồi chụp; thấy dấu X của dải thông báo thì bấm tắt, nghỉ 1s, chụp lại."""
+    bot.sleep(EDGE_SETTLE)
+    screen = bot.screenshot()
+    notice = find_notice_x(screen)
+    if notice is None:
+        return screen
+    bot.record(f"Gift Claims: thấy dấu X của thông báo tại {notice}; bấm tắt")
+    bot.tap(*notice)
     bot.sleep(EDGE_SETTLE)
     return bot.screenshot()
 
 
-def swipe_to_left_edge(bot) -> bool:
+def capture_title(bot, screen=None):
+    """Cắt thanh tiêu đề (TITLE_REGION) trên màn Valuable Event vừa vào, làm mốc so trước mỗi cú kéo. Chỉ là biến của lượt tìm
+    (search_pass truyền xuống các hàm kéo), không gắn lên bot: hết lượt / sang nhiệm vụ khác là không còn."""
+    screen = bot.screenshot() if screen is None else screen
+    return _cut(screen, TITLE_REGION)
+
+
+def title_matches(screen, title) -> bool:
+    """Thanh tiêu đề hiện tại khớp ảnh mốc `title` (1 - chênh lệch điểm ảnh TB / 255 >= TITLE_SAME)."""
+    current = _cut(screen, TITLE_REGION)
+    if current.shape != title.shape:
+        return False
+    return 1 - float(cv2.absdiff(current, title).mean()) / 255 >= TITLE_SAME
+
+
+def wait_title_clear(bot, title) -> bool:
+    """Trước một cú kéo: thanh tiêu đề phải khớp ảnh mốc `title`. Không khớp thì chờ 1s, tối đa TITLE_WAITS lần; vẫn không khớp thì
+    Back (đóng popup đang phủ) rồi kiểm tra lại. True khi đã khớp."""
+    for _ in range(TITLE_WAITS):
+        if title_matches(bot.screenshot(), title):
+            return True
+        bot.sleep(STEP_DELAY)
+    bot.record(f"Gift Claims: thanh tiêu đề Valuable Event chưa khớp sau {TITLE_WAITS} lần chờ; bấm Back")
+    bot.back(delay=STEP_DELAY)
+    return title_matches(bot.screenshot(), title)
+
+
+def swipe_to_left_edge(bot, title) -> bool:
     """Kéo hàng tab về giới hạn bên trái, tối đa EDGE_SWIPES cú: cú đầu kéo dài FIRST_SWIPE (5% -> 1000%), từ cú thứ 2 kéo ngắn
     EDGE_BACK_SWIPE (5% -> 95%). Sau mỗi cú nghỉ 1s, cắt một icon (EDGE_ICON); sau cú kế tiếp icon đó vẫn thấy, lệch không quá
     LEFT_SAME_PX = đã tới giới hạn, dừng. Icon mất thì kéo tiếp. True khi thấy đã tới giới hạn."""
     icon = None
     cut_x = 0
     for swipe in range(1, EDGE_SWIPES + 1):
+        if not wait_title_clear(bot, title):
+            bot.record("Gift Claims: tiêu đề Valuable Event vẫn bị che; dừng kéo về trái")
+            return False
         bot.swipe_percent(*(FIRST_SWIPE if swipe == 1 else EDGE_BACK_SWIPE), duration=SLOW_SWIPE_DURATION)
         screen = _settled_screenshot(bot)
         if icon is not None and _at_edge(screen, icon, cut_x, LEFT_SAME_PX):
@@ -185,19 +259,34 @@ def do_visible(bot, pending: set[str], attempted: set[str]) -> None:
         bot.sleep(STEP_DELAY)
 
 
-def scan_to_right_edge(bot, pending: set[str], attempted: set[str]) -> bool:
+def scan_to_right_edge(bot, pending: set[str], attempted: set[str], title) -> bool:
     """Kéo ngắn SHORT_SWIPE (phải sang trái) tối đa SHORT_SWIPES cú, mỗi chỗ làm các event cần làm đang thấy. Trước mỗi cú cắt
-    icon ngoài cùng bên trái (LEFT_ICON); kéo xong (nghỉ 1s) icon đó vẫn đứng nguyên chỗ (lệch <= SHORT_SAME_PX; đổi chỗ thì chưa phải) = đã chạm bên phải.
-    True khi chạm bên phải."""
+    icon ngoài cùng bên trái (LEFT_ICON); kéo xong (nghỉ 1s) icon đó vẫn đứng nguyên chỗ (lệch <= SHORT_SAME_PX; đổi chỗ thì chưa phải)
+    = hàng tab không dịch. Phải EDGE_CONFIRM cú liên tiếp không dịch mới là chạm bên phải (cú đầu không dịch có thể do popup sau khi
+    nhận quà phủ lên). Trước mỗi cú chờ tiêu đề rõ (wait_title_clear); không rõ thì dừng, lượt không được tính. True khi chạm bên phải."""
+    still = 0
     for _ in range(SHORT_SWIPES):
         do_visible(bot, pending, attempted)
+        if not wait_title_clear(bot, title):
+            bot.record("Gift Claims: tiêu đề Valuable Event vẫn bị che; dừng lượt này (không tính lượt)")
+            return False
         before = bot.screenshot()
         icon = _cut(before, LEFT_ICON)
+        cut_x = _box(before, LEFT_ICON)[0]
         bot.swipe_percent(*SHORT_SWIPE, duration=SLOW_SWIPE_DURATION)
-        if _at_edge(_settled_screenshot(bot), icon, _box(before, LEFT_ICON)[0], SHORT_SAME_PX):
-            bot.record("Gift Claims: hàng tab Valuable Event đã chạm bên phải")
-            do_visible(bot, pending, attempted)
-            return True
+        after = _settled_screenshot(bot)
+        if not _at_edge(after, icon, cut_x, SHORT_SAME_PX):
+            still = 0
+            continue
+        still += 1
+        score, x = _find_icon(after, icon)
+        if still < EDGE_CONFIRM:
+            bot.record(f"Gift Claims: hàng tab Valuable Event không dịch (icon khớp {score:.2f}, lệch {x - cut_x} px); "
+                       "kéo thêm một cú để kiểm tra")
+            continue
+        bot.record(f"Gift Claims: hàng tab Valuable Event đã chạm bên phải ({EDGE_CONFIRM} cú liên tiếp không dịch)")
+        do_visible(bot, pending, attempted)
+        return True
     bot.record(f"Gift Claims: kéo ngắn {SHORT_SWIPES} cú vẫn chưa chạm bên phải hàng tab Valuable Event")
     return False
 
@@ -238,15 +327,16 @@ def search_pass(bot, pending: set[str], attempted: set[str]) -> bool:
     hết hàng tab (chạm bên phải) hoặc mọi event cần làm đã xong."""
     if not open_valuable_event(bot):
         return False
+    title = capture_title(bot)
     do_visible(bot, pending, attempted)
     if not pending:
         return True
     bot.record("Gift Claims: kéo dài hàng tab Valuable Event về giới hạn bên trái")
-    swipe_to_left_edge(bot)
+    swipe_to_left_edge(bot, title)
     do_visible(bot, pending, attempted)
     if not pending:
         return True
-    return scan_to_right_edge(bot, pending, attempted)
+    return scan_to_right_edge(bot, pending, attempted, title)
 
 
 def _pass_key(number: int) -> str:

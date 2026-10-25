@@ -14,8 +14,8 @@ from ...valuable_event.named_flow import ExactFlow, SLOW_SWIPE_DURATION, STEP_DE
 
 KEY = "gift_refining_weekly_card"
 PAGE = "SuperValueReturn/title"
-TAB = "RefiningWeeklyCard/tab"
-CLAIM = "RefiningWeeklyCard/button_claim"
+TAB = "SuperValueReturn/RefiningWeeklyCard/tab"
+CLAIM = "SuperValueReturn/RefiningWeeklyCard/button_claim"
 
 # The user-marked green frame in the 396x704 reference screenshot is roughly
 # x=10..380, y=474..689. Keep both search and every touch inside that frame.

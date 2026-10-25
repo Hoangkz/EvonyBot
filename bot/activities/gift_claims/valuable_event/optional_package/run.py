@@ -5,14 +5,14 @@ from ..named_flow import ExactFlow, run_carousel_exact
 
 KEY = "gift_optional_package"
 FLOW = ExactFlow(
-    claims=("OptionalPackage/button_claimable",),
-    done=("OptionalPackage/chest_open",),
+    claims=("ValuableEvent/OptionalPackage/button_claimable",),
+    done=("ValuableEvent/OptionalPackage/chest_open",),
 )
 
 
 def run(bot):
     return run_carousel_exact(bot, GiftScreen.VALUABLE_EVENT,
-                              "ValuableEvent/title", "OptionalPackage/tab", FLOW)
+                              "ValuableEvent/title", "ValuableEvent/OptionalPackage/tab_icon", FLOW)
 
 
 TASK = GiftTask(KEY, "Optional Package", run)

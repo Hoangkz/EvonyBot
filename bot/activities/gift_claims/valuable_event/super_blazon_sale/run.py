@@ -5,9 +5,9 @@ from ...screens import GiftScreen
 
 KEY = "gift_super_blazon_sale"
 FLOW = ExactFlow(
-    claims=("SuperBlazonSale/button_free_current",
-            "SuperBlazonSale/button_free"),
-    done=("SuperBlazonSale/chest_open",),
+    claims=("ValuableEvent/SuperBlazonSale/button_free_current",
+            "ValuableEvent/SuperBlazonSale/button_free"),
+    done=("ValuableEvent/SuperBlazonSale/chest_open",),
     # If button_free is absent in the reward panel, the free gift is complete.
     absence_done=True,
 )
@@ -15,7 +15,7 @@ FLOW = ExactFlow(
 
 def run(bot):
     return run_carousel_exact(bot, GiftScreen.VALUABLE_EVENT,
-                              "ValuableEvent/title", "SuperBlazonSale/tab", FLOW)
+                              "ValuableEvent/title", "ValuableEvent/SuperBlazonSale/tab_current", FLOW)
 
 
 TASK = GiftTask(KEY, "Super Blazon Sale", run)
