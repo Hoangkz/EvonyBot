@@ -1,10 +1,13 @@
-"""find_super_value_return: TH1 -> TH5 trên ảnh màn thành thật (396x704)."""
+"""find_super_value_return: TH1 -> TH5 trên ảnh màn thành thật (396x704); open_super_value_return: bấm, chờ, bấm lại, bỏ qua."""
 import unittest
 from pathlib import Path
+from unittest import mock
 
 import cv2
 
-from bot.activities.gift_claims.super_value_return import launcher
+from bot.activities.gift_claims.common import skipped_for_run
+from bot.activities.gift_claims.screens import GiftScreen
+from bot.activities.gift_claims.super_value_return import launcher, zone
 
 ROOT = Path(__file__).parents[2]
 SCREENS = Path(__file__).parent / "screens"
@@ -89,6 +92,24 @@ class SuperValueLauncherTest(unittest.TestCase):
         self.assertEqual((37, 553), launcher.find_super_value_return(bot))
         self.assertIn("hall_of_historic_generals", bot.log[-1])
 
+    def test_th2_each_launcher_icon_on_its_screen(self):
+        # Ảnh màn thành có từng icon ở chỗ nút vào (dưới mũi tên lên); xoá đen góc trên phải để bỏ TH1 (vài màn có Login Gifts ở đó).
+        expected = {
+            "empire_depot": (34, 557), "lucky_raffle": (34, 557), "login_gifts": (35, 553),
+            "city_growth_plan": (34, 557), "refining_weekly_card": (34, 557), "shopping_spree": (36, 557),
+            "first_purchase": (34, 557),
+        }
+        for icon, pos in expected.items():
+            with self.subTest(icon=icon):
+                bot = FakeBot(screen(SCREENS / f"super_value_return_{icon}.png", LOGIN_TOP))
+                self.assertEqual(pos, launcher.find_super_value_return(bot))
+                self.assertIn(f"launcher_icons/{icon} ", bot.log[-1])
+
+    def test_th1_wins_over_th2(self):
+        bot = FakeBot(screen(SCREENS / "super_value_return_empire_depot.png"))
+        self.assertEqual((362, 167), launcher.find_super_value_return(bot))
+        self.assertIn("TH1", bot.log[-1])
+
     def test_th3_button_below_up_arrow(self):
         bot = FakeBot(screen(ARROW_UP_SCREEN, SHOPPING_ICON))
         self.assertEqual((34, 555), launcher.find_super_value_return(bot))
@@ -110,6 +131,54 @@ class SuperValueLauncherTest(unittest.TestCase):
     def test_nothing_found(self):
         bot = FakeBot(screen(ARROW_UP_SCREEN, (0, 0, 396, 704)))
         self.assertIsNone(launcher.find_super_value_return(bot))
+
+
+class OpenSuperValueReturnTest(unittest.TestCase):
+    """Màn sau mỗi lần chụp: "main" (màn thành), "svr" (Super Value Return), "other" (màn khác)."""
+
+    def _open(self, after_tap):
+        bot = mock.Mock(spec=["check", "screenshot", "tap", "sleep", "record"])
+        frames = iter(["main", "main"] + after_tap)      # 2 lần chụp đầu: kiểm tra đang ở màn thành
+        bot.screenshot.side_effect = lambda: next(frames)
+        with (mock.patch.object(zone, "on_main", side_effect=lambda _b, s: s == "main"),
+              mock.patch.object(zone, "to_city", return_value=False),
+              mock.patch.object(zone, "return_home") as home,
+              mock.patch.object(zone, "find_super_value_return", return_value=(34, 557)),
+              mock.patch.object(zone, "identify",
+                                side_effect=lambda _b, s: GiftScreen.SUPER_VALUE_RETURN if s == "svr" else None)):
+            opened = zone.open_super_value_return(bot)
+        return opened, bot, home
+
+    def test_opens_when_title_shows(self):
+        opened, bot, _ = self._open(["main", "main", "svr"])
+        self.assertTrue(opened)
+        bot.tap.assert_called_once_with(34, 557)
+        self.assertEqual(3, bot.sleep.call_count)
+        self.assertFalse(skipped_for_run(bot, zone.KEY))
+
+    def test_still_in_city_taps_again_once(self):
+        opened, bot, _ = self._open(["main"] * 8 + ["svr"])
+        self.assertTrue(opened)
+        self.assertEqual(2, bot.tap.call_count)
+
+    def test_still_in_city_after_two_taps_skips_until_start(self):
+        opened, bot, _ = self._open(["main"] * 16)
+        self.assertFalse(opened)
+        self.assertEqual(2, bot.tap.call_count)
+        self.assertEqual(2 * 8, bot.sleep.call_count)
+        self.assertTrue(skipped_for_run(bot, zone.KEY))
+
+    def test_other_screen_goes_home_and_skips_until_start(self):
+        opened, bot, home = self._open(["other"] * 8)
+        self.assertFalse(opened)
+        bot.tap.assert_called_once_with(34, 557)
+        home.assert_called_once_with(bot)
+        self.assertTrue(skipped_for_run(bot, zone.KEY))
+
+    def test_real_title_screen_is_super_value_return(self):
+        from bot.activities.gift_claims.screens import identify
+        self.assertEqual(GiftScreen.SUPER_VALUE_RETURN,
+                         identify(FakeBot(), screen(SCREENS / "super_value_return_title.png")))
 
 
 if __name__ == "__main__":

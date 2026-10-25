@@ -8,26 +8,29 @@
    - TH3: mũi tên đi lên (`arrow_up`, vùng x 0-30% y 70-88%): nút vào nằm ngay dưới, thấp hơn tâm mũi tên 40 px.
    - TH4: mũi tên đi xuống (`arrow_down`, vùng x 0-30% y 55-80%): bấm vào, nghỉ 1s cho thành mũi tên đi lên, rồi xét TH3.
    - TH5: lấy y của icon Valuable Event (`find_valuable_event`, cao hơn chữ "Event" 30 px), x = 40.
-   Bấm rồi chờ tiêu đề Super Value Return, cứ 1s xem lại, tối đa 8 lần; chưa vào thì về màn chính làm lại, tối đa 3 lần.
-2. Chạy lần lượt Login Gifts, Empire Depot, Lucky Raffle, City Growth Plan
-   Stage 1 và Refining Weekly Card; mỗi task dùng DB key riêng.
-3. City Growth Plan Stage 1 chỉ DONE khi trong khung thưởng đã cuộn tới ảnh
-   chứa đồng thời hàng số 15 và dấu tích xanh đã nhận. Ảnh tham chiếu thuộc tab
-   này; Refining Weekly Card thật dùng các mốc Daily Activity 20/50/80.
-4. Mỗi vị trí carousel chỉ chọn **một** tab. Sau khi bấm Login Gifts hoặc một
-   tab khác, bot phải chờ toàn bộ thao tác nhận quà ở vùng dưới trả về DONE hay
-   PENDING, ghi trạng thái và nghỉ 1 giây; chỉ sau đó mới được lướt carousel
-   phía trên để tìm tab tiếp theo. Không tái sử dụng tọa độ tab lấy từ ảnh cũ.
-   Login Gifts luôn được mở để chạy flow riêng, không dùng trạng thái chấm đỏ
-   làm điều kiện DONE.
-5. Trong Login Gifts, tìm ảnh `button_reward_chest`; không thấy thì tap dự
-   phòng `(45, 190)`. `Congratulations!` hoặc ảnh chụp mới không còn hộp quà
-   đều xác nhận DONE.
-6. Với các tab còn lại, chạy flow riêng của Empire Depot, Lucky Raffle, City
-   Growth Plan hoặc Refining Weekly Card.
-7. Quét lại carousel theo hai hướng. Task đã thấy nhưng chưa đạt điều kiện DONE
-   được giữ PENDING và bot tiếp tục tab kế tiếp; chỉ task không xuất hiện trong
-   một lượt quét đầy đủ mới được cộng một lần không thấy, đủ 3 lần mới DONE.
-8. Quay về màn thành.
+   Bấm rồi cứ 1s xem có tiêu đề Super Value Return chưa, tối đa 8 lần:
+   - Vào được màn có tiêu đề Super Value Return: đúng, làm tiếp.
+   - Vẫn ở màn thành: bấm lại nút đó 1 lần, chờ như trên; vẫn không vào thì bỏ Super Value Return khỏi danh sách nhiệm vụ
+     tới khi bấm Start lại.
+   - Sang màn khác: về thành, bỏ Super Value Return khỏi danh sách nhiệm vụ tới khi bấm Start lại.
+   Bỏ qua = `skip_for_run` ghi trên context (không ghi DB); `gift_claims.job` coi là xong trong lần Start này.
+Sau khi vào màn: giống Valuable Event (code riêng trong `zone.py`, không dùng chung file với Valuable Event).
 
-Badge của tab khác không được dùng để kết luận tab hiện tại chưa xong.
+2. `do_visible`: đóng popup che hàng tab (Depot Rewards Boost: `button_close_popup`; panel có nút X: Back). Tìm tab các event
+   chưa xong (ảnh tab trong `run.py` `SPECS`, vùng y 7-19%), làm tab bên trái nhất trước: tab đã chọn sẵn thì không bấm; còn lại
+   bấm chính giữa ô tab (x của tab, y 13%), cứ 1s xem trang đã đổi chưa, tối đa 5 lần, bấm lại 1 lần; sang trang rồi bấm chỗ
+   tiêu đề (x 50% y 5%), nghỉ 1s, chạy flow riêng của event:
+   - Login Gifts: `login_gifts.claim_opened` (nút `button_reward_chest`, không thấy thì bấm (45, 190); Congratulations hoặc
+     hộp quà biến mất = DONE).
+   - Refining Weekly Card: `refining_weekly_card.claim_opened` (quét khung xanh tới khi một lượt quét sạch nút Claim).
+   - Empire Depot, Lucky Raffle, City Growth Plan Stage 1: `process_exact` với flow trong `SPECS` (City Growth Plan chỉ DONE khi
+     thấy hàng 15 có dấu tích xanh).
+   DONE thì lưu key của event; chưa thì giữ PENDING, không thử lại trong lượt.
+3. Kéo dài hàng tab về giới hạn bên trái: cú đầu x 5% -> 500%, từ cú thứ 2 kéo ngắn 5% -> 95%, tối đa 8 cú; làm tiếp các event
+   vừa hiện ra.
+4. Kéo ngắn từ phải sang trái (60% -> 5%), mỗi chỗ làm các event đang thấy; icon ngoài cùng bên trái đứng nguyên chỗ 2 cú liên
+   tiếp = chạm bên phải. Trước mỗi cú kéo, thanh tiêu đề phải khớp ảnh cắt lúc vừa vào màn (popup che thì chờ 1s x 5 rồi Back);
+   sau mỗi cú thấy dấu X của dải thông báo thì bấm tắt.
+5. Chạm bên phải: lưu DB đã xong lượt tìm N (`gift_super_value_return_pass_N`), Back, làm lại từ bước 1. Lượt thấy event mới
+   thì đếm lại từ lượt 1. Đủ 3 lượt (hoặc mọi event đã xong): đánh dấu mọi event và key tổng `gift_super_value_return` là xong
+   hôm nay, về màn thành.

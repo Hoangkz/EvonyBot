@@ -4,7 +4,7 @@ from unittest import mock
 from types import SimpleNamespace
 
 from bot.activities import gift_claims
-from bot.activities.gift_claims import scan
+from bot.activities.gift_claims import common, scan
 from bot.activities.gift_claims.common import mark_task_done
 from bot.activities.gift_claims.event_center import zone as event_center_zone
 
@@ -39,6 +39,14 @@ class ScanTest(unittest.TestCase):
         self.assertFalse(job["done"](bot, {}))
         bot.mark_daily_done("gift_zone")
         self.assertTrue(job["done"](bot, {}))
+
+    def test_job_skipped_for_run_counts_as_done_until_next_start(self):
+        bot = FakeBot()
+        job = gift_claims.job(SimpleNamespace(KEY="gift_zone", run=mock.Mock()))
+        common.skip_for_run(bot, "gift_zone")
+        self.assertTrue(job["done"](bot, {}))          # worker loại khỏi danh sách trong lần Start này
+        self.assertFalse(job["done"](FakeBot(), {}))   # Start lại: context mới, làm lại
+        self.assertNotIn("gift_zone", bot.done)        # không ghi DB
 
     def test_three_misses_mark_done(self):
         bot, calls = FakeBot(), []

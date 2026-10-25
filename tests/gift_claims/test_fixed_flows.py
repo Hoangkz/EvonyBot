@@ -971,7 +971,6 @@ class FixedGiftFlowTests(unittest.TestCase):
 
     def test_horizontal_carousels_have_twelve_swipe_safety_ceiling(self):
         self.assertEqual(12, valuable_event.MAX_SWIPES)
-        self.assertEqual(12, super_value_return.MAX_SWIPES)
 
     def test_gift_zone_priorities_put_event_center_before_outside_zones(self):
         from bot.worker.priority import DATA
@@ -1309,49 +1308,85 @@ class FixedGiftFlowTests(unittest.TestCase):
             item.key for item in valuable_event_zone.TASKS
         } for task in super_value_zone.TASKS))
 
-    def test_super_value_settles_lower_task_before_scrolling_to_next_tab(self):
+    def test_super_value_search_pass_order_visible_then_long_swipe_then_short_scan(self):
         bot = mock.Mock()
-        bot.is_daily_done.return_value = False
-        screen = np.zeros((704, 396, 3), dtype=np.uint8)
-        bot.screenshot.return_value = screen
-        first, second = (super_value_return.SPECS[0],
-                         super_value_return.SPECS[2])
-        events = []
+        calls = []
+        with (mock.patch.object(super_value_zone, "open_super_value_return",
+                                side_effect=lambda b: calls.append("open") or True),
+              mock.patch.object(super_value_zone, "capture_title",
+                                side_effect=lambda b: calls.append("title")),
+              mock.patch.object(super_value_zone, "do_visible",
+                                side_effect=lambda *a: calls.append("visible")),
+              mock.patch.object(super_value_zone, "swipe_to_left_edge",
+                                side_effect=lambda *a: calls.append("long") or True),
+              mock.patch.object(super_value_zone, "scan_to_right_edge",
+                                side_effect=lambda *a: calls.append("short") or True)):
+            self.assertTrue(super_value_zone.search_pass(bot, {"gift_lucky_raffle"}, set()))
+        self.assertEqual(["open", "title", "visible", "long", "visible", "short"], calls)
 
-        def find_named(_bot, name, *_args, **_kwargs):
-            if name == super_value_return.PAGE:
-                return (198, 25)
-            if name == first.tab:
-                return (70, 70)
-            if name == second.tab:
-                return (170, 70)
-            return None
+    def test_super_value_first_swipe_is_500_percent(self):
+        self.assertEqual((5, 12, 500, 12), super_value_zone.FIRST_SWIPE)
 
-        def process(_bot, flow):
-            events.append("first" if flow is first.flow else "second")
-            return flow is second.flow
+    def test_super_value_three_passes_then_marks_every_event_done(self):
+        bot, done = self._daily_bot()
+        with (mock.patch.object(super_value_zone, "search_pass", return_value=True) as search,
+              mock.patch.object(super_value_zone, "return_home", return_value=True)):
+            self.assertTrue(super_value_zone.run(bot))
+        self.assertEqual(3, search.call_count)
+        for number in (1, 2, 3):
+            self.assertIn(f"gift_super_value_return_pass_{number}", done)
+        for task in super_value_zone.TASKS:
+            self.assertIn(task.key, done)
+        self.assertIn(super_value_zone.KEY, done)
 
-        bot.sleep.side_effect = lambda *_args, **_kwargs: events.append("settle")
-        bot.swipe_percent.side_effect = (
-            lambda *_args, **_kwargs: events.append("swipe"))
-        with (mock.patch.object(super_value_return, "SPECS", (first, second)),
-              mock.patch.object(super_value_return, "MAX_SWIPES", 2),
-              mock.patch.object(super_value_return, "find",
-                                side_effect=find_named),
-              mock.patch.object(super_value_return, "process_exact",
-                                side_effect=process),
-              mock.patch.object(super_value_return, "carousel_moved",
-                                return_value=True),
-              mock.patch.object(super_value_return, "mark_task_done")):
-            results, clean = super_value_return.run_opened(
-                bot, {first.task.key, second.task.key})
+    def test_super_value_new_event_resets_pass_count(self):
+        bot, done = self._daily_bot()
+        with (mock.patch.object(super_value_zone, "search_pass",
+                                side_effect=self._passes_seeing((), ("A",), (), ())) as search,
+              mock.patch.object(super_value_zone, "return_home", return_value=True)):
+            self.assertTrue(super_value_zone.run(bot))
+        self.assertEqual(4, search.call_count)
 
-        self.assertTrue(clean)
-        self.assertEqual("terminal_not_found", results[first.task.key])
-        self.assertEqual("done", results[second.task.key])
-        self.assertLess(events.index("first"), events.index("settle"))
-        self.assertLess(events.index("settle"), events.index("swipe"))
-        self.assertLess(events.index("swipe"), events.index("second"))
+    def test_super_value_open_fail_keeps_pass(self):
+        bot, done = self._daily_bot()
+        with (mock.patch.object(super_value_zone, "search_pass", return_value=False),
+              mock.patch.object(super_value_zone, "return_home", return_value=True)):
+            self.assertFalse(super_value_zone.run(bot))
+        self.assertNotIn("gift_super_value_return_pass_1", done)
+        self.assertNotIn(super_value_zone.KEY, done)
+
+    def test_super_value_do_visible_runs_leftmost_tab_then_marks_done(self):
+        bot, done = self._daily_bot()
+        bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
+        lucky = next(s for s in super_value_return.SPECS if s.task.key == "gift_lucky_raffle")
+        empire = next(s for s in super_value_return.SPECS if s.task.key == "gift_empire_depot")
+        positions = {lucky.tab: (250, 80), empire.tab: (120, 80)}
+        order = []
+        with (mock.patch.object(super_value_zone, "close_popup", return_value=False),
+              mock.patch.object(super_value_zone, "find_tab",
+                                side_effect=lambda _b, spec, _s: positions.get(spec.tab)),
+              mock.patch.object(super_value_zone, "open_tab", return_value=True),
+              mock.patch.object(super_value_zone, "run_event",
+                                side_effect=lambda _b, spec: order.append(spec.task.key) or True)):
+            pending = {lucky.task.key, empire.task.key}
+            super_value_zone.do_visible(bot, pending, set())
+        self.assertEqual(["gift_empire_depot", "gift_lucky_raffle"], order)   # tab bên trái trước
+        self.assertEqual(set(), pending)
+        self.assertIn("gift_empire_depot", done)
+        self.assertIn("gift_lucky_raffle", done)
+
+    def test_super_value_run_event_uses_own_claim_for_login_gifts_and_refining(self):
+        bot = mock.Mock()
+        specs = {s.task.key: s for s in super_value_return.SPECS}
+        with (mock.patch.object(super_value_zone.login_gifts, "claim_opened", return_value=True) as login,
+              mock.patch.object(super_value_zone.refining_weekly_card, "claim_opened", return_value=False) as refining,
+              mock.patch.object(super_value_zone, "process_exact", return_value=True) as exact):
+            self.assertTrue(super_value_zone.run_event(bot, specs["gift_login_gifts"]))
+            self.assertFalse(super_value_zone.run_event(bot, specs["gift_refining_weekly_card"]))
+            self.assertTrue(super_value_zone.run_event(bot, specs["gift_lucky_raffle"]))
+        login.assert_called_once_with(bot)
+        refining.assert_called_once_with(bot)
+        exact.assert_called_once_with(bot, specs["gift_lucky_raffle"].flow)
 
     def test_city_growth_done_requires_level_15_and_claimed_tick_crop(self):
         marker = cv2.imread(str(IMAGES / "GiftClaims" /
@@ -2897,7 +2932,6 @@ class FixedGiftFlowTests(unittest.TestCase):
             self.bot, "Common/button_claim_text", screen, threshold=0.76))
 
         for collection in (valuable_event.COMMON_LOWER_CLAIMS,
-                           super_value_return.COMMON_LOWER_CLAIMS,
                            event_center.FIXED_CLAIMS,
                            back_to_territory.FIXED_CLAIMS):
             self.assertIn("Common/button_claim_text", collection)

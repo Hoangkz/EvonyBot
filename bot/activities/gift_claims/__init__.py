@@ -19,7 +19,7 @@ limited_offer = import_module(f"{__name__}.valuable_event.limited_offer.run")
 login_gifts = import_module(f"{__name__}.super_value_return.login_gifts.run")
 from .common import (TEXT_CLAIM_CONTROLS, back_if_close_x,
                      claim_fixed_controls, claim_sparkles, mark_task_done,
-                     return_home)
+                     return_home, skipped_for_run)
 from .screens import GiftScreen
 
 
@@ -30,10 +30,11 @@ def enabled(settings: dict) -> bool:
 
 def job(zone) -> dict:
     """Dòng nhiệm vụ cho bảng ``priority.py``, giống ``daily_job`` của Daily Activities: chạy khi ô "Claim Event Gifts" được
-    tích; xong hôm nay = key riêng của hoạt động (``zone.KEY``) có trong DB. ``zone.run`` tự lưu key đó khi làm xong."""
+    tích; xong hôm nay = key riêng của hoạt động (``zone.KEY``) có trong DB. ``zone.run`` tự lưu key đó khi làm xong. Hoạt động
+    tự bỏ mình tới khi Start lại (``skip_for_run``, VD không vào được màn) cũng tính là xong trong lần chạy này."""
     return {"run": lambda ctx, _settings: zone.run(ctx),
             "enabled": enabled,
-            "done": lambda ctx, _settings: ctx.is_daily_done(zone.KEY)}
+            "done": lambda ctx, _settings: ctx.is_daily_done(zone.KEY) or skipped_for_run(ctx, zone.KEY)}
 
 
 __all__ = ["event_center", "super_value_return", "valuable_event", "enabled", "job"]
