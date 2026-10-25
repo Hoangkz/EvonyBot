@@ -7,7 +7,7 @@ the next label. Red notification dots are deliberately not part of this flow.
 from dataclasses import dataclass
 
 from . import (
-    active_monthly_card, ancient_dynasty_treasury, general_vault, limited_offer,
+    active_monthly_card, ancient_dynasty_treasury, general_vault, golden_tree_rewards, limited_offer,
     optional_package, refining_stone_sprint, resource_consumption_sprint,
     runestone_consumption_sprint,
     speedup_sprint, strategic_stockpile, successive_purchase_benefits,
@@ -70,6 +70,8 @@ SPECS = (
                  wheel_of_dragon_war.FLOW),
     ValuableSpec(strategic_stockpile.TASK, "ValuableEvent/StrategicStockpile/tab_current",
                  strategic_stockpile.FLOW),
+    ValuableSpec(golden_tree_rewards.TASK, "ValuableEvent/GoldenTreeRewards/tab_icon",
+                 golden_tree_rewards.FLOW),
 )
 
 

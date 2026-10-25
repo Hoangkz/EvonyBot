@@ -19,7 +19,7 @@ from ....ocr.find_valuable_event import find_valuable_event
 from ..common import REFERENCE_WIDTH, back_if_close_x, mark_task_done, on_main, return_home
 from ..screens import GiftScreen, identify
 from . import (
-    active_monthly_card, ancient_dynasty_treasury, general_vault, limited_offer,
+    active_monthly_card, ancient_dynasty_treasury, general_vault, golden_tree_rewards, limited_offer,
     optional_package, refining_stone_sprint, resource_consumption_sprint,
     runestone_consumption_sprint,
     speedup_sprint, strategic_stockpile,
@@ -86,7 +86,7 @@ TASKS = (
     super_value_weekly_card.TASK,
     successive_purchase_benefits.TASK, optional_package.TASK,
     active_monthly_card.TASK, tomb_expedition.TASK,
-    wheel_of_dragon_war.TASK,
+    wheel_of_dragon_war.TASK, golden_tree_rewards.TASK,
 )
 
 

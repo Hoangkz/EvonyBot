@@ -1,6 +1,14 @@
 # Flow: Super Value Return (hoạt động độc lập)
 
-1. Mở Super Value Return khi có badge đỏ ở vùng ngoài thành.
+1. Mở Super Value Return (`zone.open_super_value_return`): ở màn thành chính có nút ••• (đang ở bản đồ thế giới thì vào thành
+   trước), tìm nút vào bằng `launcher.find_super_value_return`, xét theo thứ tự ưu tiên:
+   - TH1: icon Login Gifts góc trên bên phải (`login_gifts_top`, vùng x 70-100% y 10-50%).
+   - TH2: một icon trong `Images/GiftClaims/SuperValueReturn/launcher_icons/` ở vùng x 0-50% y 70-88%. Ảnh mẫu chỉ là vùng
+     nhỏ trong icon, không có chữ, không chạm chấm đỏ. Nhiều chỗ khớp thì lấy chỗ có x bé nhất.
+   - TH3: mũi tên đi lên (`arrow_up`, vùng x 0-30% y 70-88%): nút vào nằm ngay dưới, thấp hơn tâm mũi tên 40 px.
+   - TH4: mũi tên đi xuống (`arrow_down`, vùng x 0-30% y 55-80%): bấm vào, nghỉ 1s cho thành mũi tên đi lên, rồi xét TH3.
+   - TH5: lấy y của icon Valuable Event (`find_valuable_event`, cao hơn chữ "Event" 30 px), x = 40.
+   Bấm rồi chờ tiêu đề Super Value Return, cứ 1s xem lại, tối đa 8 lần; chưa vào thì về màn chính làm lại, tối đa 3 lần.
 2. Chạy lần lượt Login Gifts, Empire Depot, Lucky Raffle, City Growth Plan
    Stage 1 và Refining Weekly Card; mỗi task dùng DB key riêng.
 3. City Growth Plan Stage 1 chỉ DONE khi trong khung thưởng đã cuộn tới ảnh

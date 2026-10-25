@@ -40,6 +40,8 @@ speedup_sprint = import_module(
     "bot.activities.gift_claims.valuable_event.speedup_sprint.run")
 wheel_of_dragon_war = import_module(
     "bot.activities.gift_claims.valuable_event.wheel_of_dragon_war.run")
+golden_tree_rewards = import_module(
+    "bot.activities.gift_claims.valuable_event.golden_tree_rewards.run")
 refining_weekly_card = import_module(
     "bot.activities.gift_claims.super_value_return.refining_weekly_card.run")
 super_value_return = import_module(
@@ -695,7 +697,7 @@ class FixedGiftFlowTests(unittest.TestCase):
             "gift_super_value_weekly_card",
             "gift_successive_purchase_benefits", "gift_optional_package",
             "gift_active_monthly_card", "gift_tomb_expedition",
-            "gift_wheel_of_dragon_war",
+            "gift_wheel_of_dragon_war", "gift_golden_tree_rewards",
         }
         self.assertEqual(expected, valuable_event.KEYS)
         self.assertTrue(all(spec.tab.split("/", 1)[0] for spec in valuable_event.SPECS))
@@ -1023,6 +1025,177 @@ class FixedGiftFlowTests(unittest.TestCase):
                          flow.claims)
         self.assertTrue(flow.absence_done)
         self.assertEqual(0.86, flow.claim_threshold)
+
+    @staticmethod
+    def _golden_tree_screens():
+        screens = Path(__file__).parent / "screens"
+        page = cv2.imread(str(screens / "valuable_event_golden_tree_rewards.png"))        # chưa chọn quà, đã tích Skip
+        popup = cv2.imread(str(screens / "valuable_event_golden_tree_rewards_popup.png"))
+        chosen = page.copy()                                    # đã chọn vàng: ô quà mục tiêu hết dấu +
+        chosen[244:282, 34:76] = popup[222:260, 76:118]
+        unchecked = page.copy()                                 # chưa tích Skip animation
+        unchecked[562:584, 279:304] = 30
+        return page, popup, chosen, unchecked
+
+    @staticmethod
+    def _golden_tree_congrats(screen):
+        """`screen` có popup chữ "Congratulations!" (Images/Event/congratulations.png) giữa màn."""
+        out = screen.copy()
+        text = cv2.imread(str(IMAGES / "Event" / "congratulations.png"))
+        out[300:300 + text.shape[0], 132:132 + text.shape[1]] = text
+        return out
+
+    @staticmethod
+    def _golden_tree_bot(screen, on_tap=None):
+        bot = CvBot()
+        bot.current = screen
+        bot.screenshot = lambda: bot.current
+        bot.sleep = mock.Mock()
+        bot.check = mock.Mock()
+        bot.record = mock.Mock()
+        bot.back = mock.Mock()
+        bot.tap = mock.Mock(side_effect=on_tap)
+        return bot
+
+    def test_golden_tree_rewards_tab_found_on_real_screen(self):
+        page, _popup, _chosen, _unchecked = self._golden_tree_screens()
+        spec = next(s for s in valuable_event.SPECS if s.task.key == golden_tree_rewards.KEY)
+        self.assertIs(golden_tree_rewards.claim, spec.flow.handler)
+        pos = valuable_event._tab(self._golden_tree_bot(page), spec, page)
+        self.assertIsNotNone(pos)
+        self.assertAlmostEqual(185, pos[0], delta=3)
+
+    def test_golden_tree_rewards_ticks_skip_then_selects_gold(self):
+        page, popup, chosen, unchecked = self._golden_tree_screens()
+
+        def on_tap(x, y, **_kwargs):
+            if bot.current is unchecked and abs(x - 291) <= 3 and abs(y - 573) <= 3:
+                bot.current = page                              # tích Skip animation
+            elif bot.current is page and abs(x - 55) <= 5 and abs(y - 263) <= 5:
+                bot.current = popup                             # dấu + -> popup Rewards
+            elif bot.current is popup and abs(x - 198) <= 5 and abs(y - 552) <= 5:
+                bot.current = chosen                            # Confirm -> về trang
+
+        bot = self._golden_tree_bot(unchecked, on_tap)
+        self.assertTrue(golden_tree_rewards.claim(bot))
+        taps = [call.args for call in bot.tap.call_args_list]
+        self.assertEqual(4, len(taps))                          # Skip, dấu +, vàng, Confirm
+        self.assertAlmostEqual(100, taps[2][0], delta=5)        # ô vàng 1M
+        self.assertAlmostEqual(242, taps[2][1], delta=5)
+        bot.back.assert_not_called()
+
+    def test_golden_tree_rewards_already_chosen_is_done_without_tapping(self):
+        _page, _popup, chosen, _unchecked = self._golden_tree_screens()
+        bot = self._golden_tree_bot(chosen)
+        self.assertTrue(valuable_named_flow.process_exact(bot, golden_tree_rewards.FLOW))
+        bot.tap.assert_not_called()
+
+    @staticmethod
+    def _golden_tree_whiten(screen, *xs):
+        """Số giá dưới các nút tâm `xs` thành màu trắng (đủ xu)."""
+        out = screen.copy()
+        for x in xs:
+            area = out[640:657, x - 12:x + 12]
+            hsv = cv2.cvtColor(area, cv2.COLOR_BGR2HSV)
+            red = ((hsv[..., 0] <= 10) | (hsv[..., 0] >= 170)) & (hsv[..., 1] > 120) & (hsv[..., 2] > 90)
+            area[red] = 255
+        return out
+
+    def test_golden_tree_rewards_numbers_red_at_zero_coins(self):
+        _page, _popup, chosen, _unchecked = self._golden_tree_screens()
+        self.assertIsNone(golden_tree_rewards.affordable(chosen))
+        self.assertEqual((5, 199), golden_tree_rewards.affordable(self._golden_tree_whiten(chosen, 199, 73)))
+        self.assertEqual((10, 325), golden_tree_rewards.affordable(self._golden_tree_whiten(chosen, 325, 199, 73)))
+
+    def test_golden_tree_rewards_real_screen_with_5_coins_taps_pest_control(self):
+        # Screenshot_20261025-224503: 5 xu, đã chọn vàng; số 1 và 5 trắng, số 10 đỏ.
+        screens = Path(__file__).parent / "screens"
+        rich = cv2.imread(str(screens / "valuable_event_golden_tree_rewards_coins_5.png"))
+        _page, _popup, chosen, _unchecked = self._golden_tree_screens()
+        self.assertEqual((5, 199), golden_tree_rewards.affordable(rich))
+        spec = next(s for s in valuable_event.SPECS if s.task.key == golden_tree_rewards.KEY)
+        self.assertIsNotNone(valuable_event._tab(self._golden_tree_bot(rich), spec, rich))   # có chấm đỏ thông báo
+
+        def on_tap(x, y, **_kwargs):
+            bot.current = self._golden_tree_congrats(rich)      # bấm nút xu -> popup Congratulations
+
+        bot = self._golden_tree_bot(rich, on_tap)
+        bot.back.side_effect = lambda **_kwargs: setattr(bot, "current", chosen)   # Back đóng popup; hết xu
+        self.assertTrue(golden_tree_rewards.claim(bot))
+        bot.tap.assert_called_once_with(199, 620)               # không bấm Skip / dấu +, chỉ bấm Pest Control
+        bot.back.assert_called_once()
+
+    def test_golden_tree_rewards_spends_big_to_small_until_all_red(self):
+        _page, _popup, chosen, _unchecked = self._golden_tree_screens()
+        # Đủ xu cho 10 và 5: bấm 10 -> còn 5 -> bấm 5 -> hết (cả ba đỏ).
+        rich = self._golden_tree_whiten(chosen, 325, 199, 73)
+        some = self._golden_tree_whiten(chosen, 199, 73)
+        left = self._golden_tree_whiten(chosen, 73)
+        after = {325: some, 199: left, 73: chosen}
+        closed = []
+
+        def on_tap(x, y, **_kwargs):
+            self.assertEqual(620, y)
+            closed.append(after[x])
+            bot.current = self._golden_tree_congrats(after[x])  # mỗi lần bấm ra popup Congratulations
+
+        bot = self._golden_tree_bot(rich, on_tap)
+        bot.back.side_effect = lambda **_kwargs: setattr(bot, "current", closed[-1])
+        self.assertTrue(golden_tree_rewards.spend_coins(bot))
+        self.assertEqual([325, 199, 73], [call.args[0] for call in bot.tap.call_args_list])
+        self.assertEqual(3, bot.back.call_count)                # Back đóng popup sau mỗi lần bấm
+
+    def test_golden_tree_rewards_no_popup_goes_back_to_search_without_back(self):
+        _page, _popup, chosen, _unchecked = self._golden_tree_screens()
+        rich = self._golden_tree_whiten(chosen, 199)
+
+        def on_tap(x, y, **_kwargs):
+            bot.current = chosen                                # không ra popup, số đã đỏ
+
+        bot = self._golden_tree_bot(rich, on_tap)
+        self.assertTrue(golden_tree_rewards.spend_coins(bot))
+        bot.tap.assert_called_once_with(199, 620)
+        self.assertEqual(golden_tree_rewards.WAITS, bot.sleep.call_count)   # chờ popup 1s x 5 rồi quay lại bước tìm
+        bot.back.assert_not_called()
+
+    def test_golden_tree_rewards_one_coin_waits_three_times_for_popup(self):
+        _page, _popup, chosen, _unchecked = self._golden_tree_screens()
+        rich = self._golden_tree_whiten(chosen, 73)
+
+        def on_tap(x, y, **_kwargs):
+            bot.current = chosen                                # không ra popup, số đã đỏ
+
+        bot = self._golden_tree_bot(rich, on_tap)
+        self.assertTrue(golden_tree_rewards.spend_coins(bot))
+        bot.tap.assert_called_once_with(73, 620)
+        self.assertEqual(3, bot.sleep.call_count)               # nút 1 xu: chờ popup 1s x 3 rồi quay lại bước tìm
+        bot.back.assert_not_called()
+
+    def test_golden_tree_rewards_ticks_skip_on_real_unchecked_screen(self):
+        # Ảnh máy 21913: ô Skip animation chưa tích.
+        unchecked = cv2.imread(str(Path(__file__).parent / "screens" /
+                                   "valuable_event_golden_tree_rewards_skip_unchecked.png"))
+        page = self._golden_tree_screens()[0]
+        bot = self._golden_tree_bot(unchecked, lambda x, y, **_kwargs: setattr(bot, "current", page))
+        self.assertTrue(wheel_of_dragon_war.ensure_skip_animation(
+            bot, golden_tree_rewards.SKIP_TAP, golden_tree_rewards.SKIP_BOX, "Golden Tree Rewards"))
+        bot.tap.assert_called_once_with(291, 573, delay=1.0)
+
+    def test_golden_tree_rewards_restarts_when_popup_never_opens(self):
+        page, _popup, _chosen, _unchecked = self._golden_tree_screens()
+        bot = self._golden_tree_bot(page)
+        self.assertFalse(golden_tree_rewards.select_reward(bot))
+        # Mỗi lượt bấm dấu + rồi chờ 5 lần; không thấy popup thì làm lại từ đầu, tối đa 3 lượt.
+        self.assertEqual(golden_tree_rewards.ATTEMPTS, bot.tap.call_count)
+        self.assertEqual(golden_tree_rewards.ATTEMPTS * golden_tree_rewards.WAITS, bot.sleep.call_count)
+
+    def test_golden_tree_rewards_stays_pending_off_its_page(self):
+        screen = cv2.imread(str(Path(__file__).parent / "screens" /
+                                "valuable_event_tab_limited_offer_selected.png"))
+        bot = self._golden_tree_bot(screen)
+        spec = next(s for s in valuable_event.SPECS if s.task.key == golden_tree_rewards.KEY)
+        self.assertIsNone(valuable_event._tab(bot, spec, screen))
+        self.assertFalse(valuable_named_flow.process_exact(bot, golden_tree_rewards.FLOW))
 
     def test_wheel_skip_animation_taps_and_verifies_green_check(self):
         blank = np.zeros((704, 396, 3), dtype=np.uint8)
