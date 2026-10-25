@@ -196,7 +196,7 @@ def open_next(bot, boundary: str, attempted: list[tuple[int, int]]):
     if not return_home(bot):
         bot.record("Gift Claims: không về được màn chính; chưa được coi là hết vùng")
         return None
-    bot.sleep(0.7)
+    bot.sleep(1)
     screen = bot.screenshot()
     dots = red_dots(screen, boundary)
     ignored = _ignored_right_dots(bot, screen) if boundary == RIGHT else set()

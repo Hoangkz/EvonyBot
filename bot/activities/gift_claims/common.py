@@ -140,7 +140,7 @@ def return_home(bot) -> bool:
         screen = bot.screenshot()
         if bot.find("exit/1escEvony.png", threshold=0.82, screen=screen,
                     region=(45, 50, 85, 70)) is not None:
-            bot.tap_percent(34, 59, delay=0.7)  # Cancel
+            bot.tap_percent(34, 59, delay=1)  # Cancel
             continue
         if on_main(bot, screen):
             return True
@@ -292,10 +292,10 @@ def close_congratulations(bot, *, attempts: int = 3) -> bool:
         screen = bot.screenshot()
         if find(bot, "SuperValueReturn/LoginGifts/congratulations", screen, threshold=0.78,
                 region=(0, 38, 100, 62)) is not None:
-            bot.back(delay=0.8)
+            bot.back(delay=1)
             return True
         if attempt + 1 < attempts:
-            bot.sleep(0.4)
+            bot.sleep(1)
     return False
 
 
@@ -402,7 +402,7 @@ def sparkle_point(before: np.ndarray, after: np.ndarray,
 def tap_sparkle(bot, *, region=(0, 20, 100, 88)) -> bool:
     """Sample animation twice and tap one safe compact sparkle if present."""
     before = bot.screenshot()
-    bot.sleep(0.4)
+    bot.sleep(1)
     after = bot.screenshot()
     point = sparkle_point(before, after, region)
     if point is None:
@@ -464,7 +464,7 @@ def back_if_close_x(bot, screen=None) -> bool:
     if not close:
         return False
     bot.record("Gift Claims: thấy nút X; dùng Back để thoát mục")
-    bot.back(delay=0.8)
+    bot.back(delay=1)
     return True
 
 
