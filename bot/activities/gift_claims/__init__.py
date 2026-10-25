@@ -1,11 +1,13 @@
-"""Gift Claims: ba hoạt động độc lập, mỗi hoạt động có hàm ``run(bot)`` riêng.
+"""Gift Claims: các việc nhận quà cuối chuỗi Daily Activities.
 
 - ``valuable_event.run``: Valuable Event.
 - ``super_value_return.run``: Login Gifts, Empire Depot và các tab cùng màn.
 - ``event_center.run``:   Back to Territory (icon ngoài) + các event con trong Event Center.
+- Revelry Carnival: dùng toàn bộ Parade Mask và nhận mọi nút Claim xanh.
 
 Mỗi hoạt động có danh sách nhiệm vụ (key trong ``daily_done``); vòng kiểm tra 3 lần nằm ở ``scan.py``. Worker ưu tiên
-Event Center trước Valuable Event và Super Value Return (``bot/worker/priority.py``, nhóm "Gift Claims"), khi ô
+Event Center trước Revelry Carnival, Valuable Event và Super Value Return
+(``bot/worker/priority.py``, nhóm "Gift Claims"), khi ô
 "Claim Event Gifts" ở tab Daily Activities được tích (``settings["General"]["gift_claims"]`, mặc định bật).
 """
 from importlib import import_module
@@ -25,6 +27,11 @@ from .screens import GiftScreen
 
 RETRY_WINDOW_SECONDS = 120.0
 RETRY_AFTER_ATTR = "_gift_claims_zone_retry_after"
+
+
+def enabled(settings: dict) -> bool:
+    """Ô chung ``Claim Event Gifts`` điều khiển mọi tail task nhận quà."""
+    return bool((settings.get("General") or {}).get("gift_claims", True))
 
 
 def _retry_after(ctx) -> dict[str, float]:
@@ -56,9 +63,26 @@ def job(zone) -> dict:
             return True
         return time.monotonic() < _retry_after(ctx).get(zone.KEY, 0.0)
 
-    return {"run": run,
-            "enabled": lambda settings: bool((settings.get("General") or {}).get("gift_claims", True)),
-            "done": done}
+    return {"run": run, "enabled": enabled, "done": done}
 
 
-__all__ = ["event_center", "super_value_return", "valuable_event", "job"]
+def task(job_spec: dict, *, after: str | None = None) -> dict:
+    """Đưa một job có sẵn vào Claim Gifts và dùng ô bật/tắt chung của nhóm.
+
+    Revelry Carnival vẫn dùng ``event_job`` để giữ nguyên điều hướng và luật
+    checkpoint, nhưng không còn phụ thuộc checkbox ở tab Event.
+    """
+    original_done = job_spec.get("done")
+
+    def done(ctx, settings):
+        # ``True`` ở đây chỉ làm worker tạm bỏ qua task trong lần xét hiện tại.
+        # Worker đọc lại DB mỗi vòng, nên task tự xuất hiện ngay khi zone trước
+        # đã ghi key tổng DONE.
+        if after is not None and not ctx.is_daily_done(after):
+            return True
+        return bool(original_done(ctx, settings)) if original_done else False
+
+    return {**job_spec, "enabled": enabled, "done": done}
+
+
+__all__ = ["event_center", "super_value_return", "valuable_event", "enabled", "job", "task"]

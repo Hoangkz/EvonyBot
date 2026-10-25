@@ -15,6 +15,7 @@ from .common import EventState
 from .constants import GATHER_TROOPS_ICON, KINGS_PATH_ICON
 from .gather_troops import cultivate_generals, ground_troop, mounted_troop, ranged_troop, siege_machine, trap_factory
 from .kings_path import black_market, city_tax, donate, heal, patrol, refine, train_troop, wheel
+from . import revelry_carnival
 
 # (key event, tên log, icon trong danh sách event, [(key nhiệm vụ trong settings / event.py,
 # hàm chạy nhiệm vụ)] theo thứ tự chạy).
@@ -36,6 +37,16 @@ EVENTS = [
         (wheel.KEY, wheel.run),
         (refine.KEY, refine.run),
         (black_market.KEY, black_market.run),
+    ]),
+]
+
+# Revelry Carnival dùng chung bộ điều hướng của các event ngoài thành, nhưng là
+# một việc nhận quà cuối chuỗi và được bật/tắt bằng "Claim Event Gifts".  Giữ
+# metadata ở đây để event_job() vẫn dùng chung luật lưu kết quả, còn worker xếp
+# nó trong nhóm Gift Claims thay vì tab Event.
+GIFT_EVENTS = [
+    ("revelry_carnival", "Revelry Carnival", revelry_carnival.ICON, [
+        (revelry_carnival.KEY, revelry_carnival.run),
     ]),
 ]
 # Mọi nhiệm vụ theo thứ tự chạy.
@@ -73,9 +84,10 @@ def claim_event(bot, event: str, name: str, icon: str):
 # - `<event>_absent`           event không còn trong game: mọi nhiệm vụ của event bỏ qua tới lần reset server.
 # "Xong" luôn tính lại từ các dấu đó (đọc DB) mỗi vòng lặp.
 # =============================================================================================
-_KEY_OF = {run: key for _, _, _, tasks in EVENTS for key, run in tasks}   # hàm làm việc -> key nhiệm vụ
-_EVENT_OF = {key: event for event, _, _, tasks in EVENTS for key, _ in tasks}   # key nhiệm vụ -> key event
-_EVENT_INFO = {event: (name, icon, [key for key, _ in tasks]) for event, name, icon, tasks in EVENTS}
+_ALL_EVENTS = EVENTS + GIFT_EVENTS
+_KEY_OF = {run: key for _, _, _, tasks in _ALL_EVENTS for key, run in tasks}   # hàm làm việc -> key nhiệm vụ
+_EVENT_OF = {key: event for event, _, _, tasks in _ALL_EVENTS for key, _ in tasks}   # key nhiệm vụ -> key event
+_EVENT_INFO = {event: (name, icon, [key for key, _ in tasks]) for event, name, icon, tasks in _ALL_EVENTS}
 
 
 # ---- Đọc cấu hình tab Event ----------------------------------------------------------------

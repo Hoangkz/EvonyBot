@@ -5,6 +5,8 @@ import numpy as np
 from ..common import (GiftTask, ClaimReport, TEXT_CLAIM_CONTROLS, back_if_close_x,
                       claim_fixed_controls, claim_sparkles,
                       close_congratulations, find, find_all, return_home)
+from ..valuable_event.named_flow import (CAROUSEL_EDGE_CONFIRMATIONS,
+                                         carousel_moved)
 
 KEY = "gift_back_to_territory"
 PAGE = "BackToTerritory/title"
@@ -14,7 +16,6 @@ LOWER = (0, 20, 100, 88)
 SPARKLE_REWARDS = (0, 45, 100, 82)
 INNER_NAV = (0, 41, 100, 61)
 REWARD_LIST = (0, 58, 100, 96)
-MAX_SWIPES = 8
 FIXED_CLAIMS = TEXT_CLAIM_CONTROLS
 
 
@@ -137,15 +138,23 @@ def claim_opened(bot) -> int:
 
 def _verify_clean(bot) -> bool:
     for direction in (-1, 1):
-        for step in range(MAX_SWIPES + 1):
+        stagnant_swipes = 0
+        while True:
             bot.check()
-            if _dots(bot, bot.screenshot()):
+            before = bot.screenshot()
+            if _dots(bot, before):
                 return False
-            if step < MAX_SWIPES:
-                if direction < 0:
-                    bot.swipe_percent(85, 14, 20, 14, duration=0.5, delay=1)
-                else:
-                    bot.swipe_percent(20, 14, 85, 14, duration=0.5, delay=1)
+            if direction < 0:
+                bot.swipe_percent(85, 14, 20, 14, duration=0.5, delay=1)
+            else:
+                bot.swipe_percent(20, 14, 85, 14, duration=0.5, delay=1)
+            after = bot.screenshot()
+            if not carousel_moved(before, after):
+                stagnant_swipes += 1
+                if stagnant_swipes >= CAROUSEL_EDGE_CONFIRMATIONS:
+                    break
+            else:
+                stagnant_swipes = 0
     return True
 
 
@@ -156,7 +165,8 @@ def run_opened(bot, handled=None) -> bool:
         return False
     attempted = handled if handled is not None else set()
     for direction in (-1, 1):
-        for step in range(MAX_SWIPES + 1):
+        stagnant_swipes = 0
+        while True:
             while True:
                 bot.check()
                 screen = bot.screenshot()
@@ -172,11 +182,22 @@ def run_opened(bot, handled=None) -> bool:
                 # If the two-minute slice interrupts claim_opened, this tab is
                 # intentionally not remembered and will resume next time.
                 attempted.add(signature)
-            if step < MAX_SWIPES:
-                if direction < 0:
-                    bot.swipe_percent(85, 14, 20, 14, duration=0.5, delay=1)
-                else:
-                    bot.swipe_percent(20, 14, 85, 14, duration=0.5, delay=1)
+            before = bot.screenshot()
+            if direction < 0:
+                bot.swipe_percent(85, 14, 20, 14, duration=0.5, delay=1)
+            else:
+                bot.swipe_percent(20, 14, 85, 14, duration=0.5, delay=1)
+            after = bot.screenshot()
+            if not carousel_moved(before, after):
+                stagnant_swipes += 1
+                if stagnant_swipes >= CAROUSEL_EDGE_CONFIRMATIONS:
+                    edge = "trái" if direction < 0 else "phải"
+                    bot.record("Gift Claims: Back to Territory đã xác nhận "
+                               f"biên {edge} sau "
+                               f"{CAROUSEL_EDGE_CONFIRMATIONS} cú không đổi")
+                    break
+            else:
+                stagnant_swipes = 0
     clean = _verify_clean(bot)
     bot.record("Gift Claims: Back to Territory - "
                + ("DONE, phần trên hết đỏ" if clean

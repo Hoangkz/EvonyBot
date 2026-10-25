@@ -112,6 +112,40 @@ SEEN_POLICIES_ATTR = "_gift_claims_event_center_seen_policies"
 SCAN_COMPLETE_ATTR = "_gift_claims_event_center_scan_complete"
 SCANNED_CATEGORIES_ATTR = "_gift_claims_event_center_scanned_categories"
 PENDING_THIS_RUN_ATTR = "_gift_claims_event_center_pending_this_run"
+CATEGORY_RESUME_KEYS = {
+    "limited": "gift_event_center_resume_limited",
+    "activities": "gift_event_center_resume_activities",
+}
+
+
+def _ordered_categories(bot):
+    """Put the durable resume category first for the next 120-second window."""
+    preferred = next((category for category, _ in CATEGORIES
+                      if bot.is_daily_done(CATEGORY_RESUME_KEYS[category])), None)
+    if preferred is None:
+        return CATEGORIES
+    return tuple(item for item in CATEGORIES if item[0] == preferred) + tuple(
+        item for item in CATEGORIES if item[0] != preferred)
+
+
+def _set_resume_category(bot, category: str) -> None:
+    """Persist which category must run first after a timeout or boss yield."""
+    wanted = CATEGORY_RESUME_KEYS[category]
+    for key in CATEGORY_RESUME_KEYS.values():
+        if key == wanted:
+            if not bot.is_daily_done(key):
+                bot.mark_daily_done(key)
+        elif bot.done_at(key) is not None:
+            bot.forget_daily(key)
+    bot.record(f"Gift Claims: lượt Event Center kế tiếp bắt đầu từ {category}")
+
+
+def clear_resume_category(bot) -> None:
+    for key in CATEGORY_RESUME_KEYS.values():
+        if bot.done_at(key) is not None:
+            bot.forget_daily(key)
+
+
 EVENT_POLICIES = (
     blessing_of_pallas.POLICY,
     dragon_battle.POLICY,
@@ -418,35 +452,21 @@ def _handle_dwarf(bot):
 
 
 def _handle_dragon_battle(bot):
-    """Tap the exact Dragon chest; Congratulations or the claimed chest is DONE."""
-    already_done = _wait_for(
-        bot, "DragonBattle/status_reward_claimed", attempts=2, threshold=0.82,
+    """No current claim button is DONE; a tap requires Congratulations."""
+    button = _wait_for(
+        bot, "DragonBattle/button_claim_015225", attempts=4, threshold=0.80,
         region=(0, 15, 100, 95), delay=UI_SETTLE_SECONDS)
-    if already_done is not None:
-        bot.record("Gift Claims: Dragon Battle đã thấy rương trạng thái "
-                   "Screenshot_20261025-012404; DONE")
+    if button is None:
+        bot.record("Gift Claims: Dragon Battle không còn nút "
+                   "Screenshot_20261026-015225; DONE")
         return ClaimReport(0, 1), True
-    reward = _wait_for(
-        bot, "DragonBattle/reward_230317", attempts=4, threshold=0.80,
-        region=(0, 15, 100, 95), delay=UI_SETTLE_SECONDS)
-    if reward is None:
-        bot.record("Gift Claims: Dragon Battle không thấy rương "
-                   "Screenshot_20261023-230317; giữ PENDING")
-        return ClaimReport(), False
-    bot.record("Gift Claims: Dragon Battle tap rương "
-               "Screenshot_20261023-230317")
-    bot.tap(*reward, delay=UI_SETTLE_SECONDS)
+    bot.record("Gift Claims: Dragon Battle tap nút "
+               "Screenshot_20261026-015225")
+    bot.tap(*button, delay=UI_SETTLE_SECONDS)
     if close_congratulations(bot, attempts=5):
         bot.record("Gift Claims: Dragon Battle đã hiện Congratulations; DONE")
         return ClaimReport(1, 1), True
-    claimed = _wait_for(
-        bot, "DragonBattle/status_reward_claimed", attempts=3, threshold=0.82,
-        region=(0, 15, 100, 95), delay=UI_SETTLE_SECONDS)
-    if claimed is not None:
-        bot.record("Gift Claims: Dragon Battle rương đã đổi sang trạng thái "
-                   "Screenshot_20261025-012404; DONE")
-        return ClaimReport(1, 1), True
-    bot.record("Gift Claims: Dragon Battle bấm rương nhưng chưa thấy "
+    bot.record("Gift Claims: Dragon Battle đã bấm nhưng chưa thấy "
                "Congratulations; giữ PENDING")
     return ClaimReport(1, 0), False
 
@@ -2299,7 +2319,10 @@ def run_opened(bot, handled=None):
 
     visited = handled if handled is not None else set()
     all_clean = True
-    for category, x_percent in CATEGORIES:
+    categories = _ordered_categories(bot)
+    bot.record("Gift Claims: thứ tự Event Center lượt này: "
+               + " -> ".join(category for category, _ in categories))
+    for category, x_percent in categories:
         bot.check()
         if _category_db_done(bot, category):
             bot.record(f"Gift Claims: Event Center/{category} toàn bộ key đã "
@@ -2321,6 +2344,9 @@ def run_opened(bot, handled=None):
                 scanned_categories = set()
                 setattr(bot, SCANNED_CATEGORIES_ATTR, scanned_categories)
             scanned_categories.add(category)
+            next_category = ("activities" if category == "limited"
+                             else "limited")
+            _set_resume_category(bot, next_category)
         category_done = scanned_clean and _category_db_done(bot, category)
         if category_done:
             # Persist category completion in the same in-memory checkpoint set

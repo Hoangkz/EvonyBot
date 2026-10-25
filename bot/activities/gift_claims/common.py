@@ -36,25 +36,33 @@ TEXT_CLAIM_CONTROLS = (
     "Common/button_free_text",
 )
 
-# The launcher caption has two stable visual states: a dim caption after the
-# daily rewards are complete and a glowing caption while rewards remain.  Keep
-# both templates text-only so matching does not depend on the animated chest or
-# the city scene behind it.
+# Median of the launcher name only, built from 50 live frames on emulator
+# 21513. Do not include the changing chest artwork, badge, or city background.
 VALUABLE_EVENT_LABELS = (
-    "ValuableEvent/launcher_text_done",
-    "ValuableEvent/launcher_text_pending",
+    "ValuableEvent/launcher_name_median",
 )
 VALUABLE_EVENT_REGION = (40, 68, 88, 96)
 VALUABLE_EVENT_WIDE_REGION = (15, 50, 100, 100)
-VALUABLE_EVENT_THRESHOLDS = (0.85, 0.80, 0.75, 0.70, 0.65)
-# Older and full-icon captures are useful fallbacks when glow, badges or the
-# city background make the tiny caption-only crops unstable.  Values are the
-# vertical adjustment needed to return a caption position: callers tap 20 px
-# above that position, so the full-icon template is translated back to the
-# centre of its icon before tapping.
-VALUABLE_EVENT_FALLBACKS = (
-    ("ValuableEvent/launcher", 0),
-    ("ValuableEvent/launcher_done_icon", 20),
+# Across the 50 source frames the real name scores 0.9268..0.9948, while the
+# strongest unrelated match is 0.3988. Keep 0.80 as a conservative floor.
+VALUABLE_EVENT_THRESHOLDS = (0.90, 0.85, 0.80)
+
+# Super Value Return can be represented by its own gold artwork or different
+# named launchers (First Purchase, Empire Depot, Login Gifts, Lucky Raffle).
+# First Purchase and Login Gifts use median crops from 50-frame captures,
+# exactly like Event Center's median template; animation variants are not used
+# for matching. Each entry stores the y adjustment from the crop centre to the
+# real tap target. No coordinate-only fallback is allowed.
+SUPER_VALUE_RETURN_REGION = (0, 68, 30, 96)
+SUPER_VALUE_RETURN_THRESHOLDS = (0.95, 0.90, 0.85)
+SUPER_VALUE_RETURN_LAUNCHERS = (
+    ("SuperValueReturn/launcher_super_value_return_192710", 0),
+    ("SuperValueReturn/launcher_first_purchase_median", 0),
+    # Full 71x67 launcher median from 50 live frames; move from its centre
+    # into the green icon body instead of tapping the caption below it.
+    ("SuperValueReturn/launcher_login_gifts_median", -15),
+    ("EmpireDepot/launcher", -20),
+    ("SuperValueReturn/launcher_lucky_raffle", -20),
 )
 
 
@@ -123,46 +131,49 @@ def find(bot, name: str, screen=None, threshold: float = 0.82, region=None):
 
 
 def find_valuable_event(bot, screen):
-    """Find only the ``Valuable Event`` caption on an existing screenshot.
-
-    This deliberately mirrors the project's ``find_event_center`` threshold
-    ladder.  Both the completed/dim and pending/glowing captions are accepted;
-    the icon artwork and notification badge are not part of either template.
-    """
+    """Find only the median ``Valuable Event`` name in a screenshot."""
     for threshold in VALUABLE_EVENT_THRESHOLDS:
         for label in VALUABLE_EVENT_LABELS:
             pos = find(bot, label, screen=screen, threshold=threshold,
                        region=VALUABLE_EVENT_REGION)
             if pos is not None:
-                state = label.rsplit("_", 1)[-1]
                 bot.log(
-                    f"Gift Claims: Valuable Event ({state}) at threshold "
+                    "Gift Claims: Valuable Event name median at threshold "
                     f"{threshold}")
                 return pos
-    # The city can be left panned far enough that the launcher falls outside
-    # the old bottom-centre box.  Search a wider lower-half region only after
-    # the precise caption search failed, and accept the two existing launcher
-    # captures as fallbacks.  This keeps the common case strict while making
-    # the recovery path resilient to glow/badge animation.
-    scale = screen.shape[1] / REFERENCE_WIDTH
+    # Search a wider lower-half region only after the precise caption search
+    # failed. The same name-only template is used; changing artwork is never a
+    # fallback.
     for threshold in VALUABLE_EVENT_THRESHOLDS:
         for label in VALUABLE_EVENT_LABELS:
             pos = find(bot, label, screen=screen, threshold=threshold,
                        region=VALUABLE_EVENT_WIDE_REGION)
             if pos is not None:
-                state = label.rsplit("_", 1)[-1]
                 bot.log(
-                    f"Gift Claims: Valuable Event ({state}) ở vùng tìm rộng "
+                    "Gift Claims: Valuable Event name median ở vùng tìm rộng "
                     f"tại threshold {threshold}")
                 return pos
-        for template, caption_offset in VALUABLE_EVENT_FALLBACKS:
+    return None
+
+
+def find_super_value_return(bot, screen):
+    """Find a Super Value Return launcher and return its real tap target.
+
+    Like ``find_event_center``, this tries a descending threshold ladder over
+    stable templates. Caption crops are translated upward to the icon body;
+    the stable icon crop is tapped at its own centre.
+    """
+    scale = screen.shape[1] / REFERENCE_WIDTH
+    for threshold in SUPER_VALUE_RETURN_THRESHOLDS:
+        for template, tap_dy in SUPER_VALUE_RETURN_LAUNCHERS:
             pos = find(bot, template, screen=screen, threshold=threshold,
-                       region=VALUABLE_EVENT_WIDE_REGION)
-            if pos is not None:
-                bot.log(
-                    f"Gift Claims: Valuable Event dùng ảnh fallback {template} "
-                    f"tại threshold {threshold}")
-                return pos[0], pos[1] + round(caption_offset * scale)
+                       region=SUPER_VALUE_RETURN_REGION)
+            if pos is None:
+                continue
+            target = (pos[0], max(0, pos[1] + round(tap_dy * scale)))
+            bot.log("Gift Claims: Super Value Return launcher "
+                    f"{template} at threshold {threshold:.2f}")
+            return target
     return None
 
 

@@ -2,10 +2,14 @@
 
 ## Phạm vi
 
-Gift Claims gồm **ba hoạt động độc lập**, mỗi hoạt động có hàm `run(bot)` riêng.
+Gift Claims gồm **ba khu độc lập và nhiệm vụ Revelry Carnival**.
 Worker chạy nhóm quà sau khi hoàn thành các Daily Activities và ưu tiên theo
-thứ tự **Event Center -> Valuable Event -> Super Value Return** khi ô **Claim Event Gifts** ở tab Daily
+thứ tự **Event Center -> Revelry Carnival -> Valuable Event -> Super Value Return** khi ô **Claim Event Gifts** ở tab Daily
 Activities được tích (`settings["General"]["gift_claims"]`, mặc định bật):
+
+Revelry Carnival chỉ trở thành nhiệm vụ tới lượt sau khi Event Center đã ghi
+key tổng `gift_event_center` DONE, không chạy chen vào lúc Event Center đang
+PENDING hoặc đang nghỉ giữa hai cửa sổ 120 giây.
 
 Khu nào còn PENDING sau một lượt sẽ tạm nghỉ 120 giây thay vì chặn khu kế
 tiếp. Khi cửa sổ mới bắt đầu, thứ tự trên được áp dụng lại từ Event Center.
@@ -16,6 +20,8 @@ tiếp. Khi cửa sổ mới bắt đầu, thứ tự trên được áp dụng 
   `gift_super_value_return`.
 - `gift_claims.event_center.run`: Back to Territory (icon ngoài) + các event con trong danh sách Limited của Event
   Center. Key tổng `gift_event_center`.
+- Revelry Carnival: dùng toàn bộ Parade Mask rồi nhận mọi nút Claim xanh; dùng
+  key `revelry_carnival` và logic điều hướng event hiện có.
 
 Mỗi nhiệm vụ con có key `daily_done` riêng (ví dụ `gift_limited_offer`). DB lưu timestamp ISO;
 `BotWorker.is_daily_done()` so với lần reset server gần nhất (mặc định 14:00, lấy từ DB settings): 15:00 ngày 15/10 thì
@@ -47,8 +53,15 @@ gift_claims/
 2. Một **lượt** = tìm từng event còn lại (mở trang cha bằng vị trí/launcher cố định, không dựa vào chấm đỏ):
    - Thấy: nhận quà theo quy tắc nhóm bên dưới, ghi key xong của event đó, đưa số lần "không thấy" về 0.
    - Không thấy: back về màn chính, ghi thêm một lần "không thấy" (key `<key>_miss_1..3`).
-3. Chạy tối đa 3 lượt liên tiếp. Event không thấy cả 3 lần = hôm nay không có, ghi key xong. Thấy ở bất kỳ lượt nào thì
-   đã xong và đếm về 0.
+3. Mỗi cửa sổ chạy Event Center ghi tối đa một lượt `miss` cho từng category đã
+   quét đủ. Lượt kế tiếp sau 120 giây đọc lại `miss_1/2/3` từ DB; event không
+   thấy trong đủ 3 lượt = hôm nay không có, ghi key xong. Nếu Limited đã quét
+   đủ nhưng timeout xảy ra trong Activities, checkpoint Limited vẫn được giữ.
+   Đồng thời DB lưu category cần chạy trước: Limited xong thì lượt kế tiếp ưu
+   tiên Activities; Activities xong thì chuyển lại Limited. Vì vậy một category
+   dài không thể chiếm đầu mọi cửa sổ 120 giây.
+   Valuable Event và Super Value Return cũng dùng các key `miss_1/2/3`; thấy
+   event ở bất kỳ lượt nào thì đưa bộ đếm không thấy về 0.
 4. Không mở được trang cha (launcher/Event Center không hiện) **không** tính là "không thấy": lượt đó dừng, chờ lần chạy sau.
 5. Mọi nhiệm vụ con xong thì ghi key tổng của hoạt động.
 6. Số lần "không thấy" lưu trong DB nên nhường Join Boss hay khởi động lại vẫn đếm tiếp. Hết giới hạn 120 giây hoặc có

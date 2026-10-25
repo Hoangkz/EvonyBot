@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from typing import Callable
 
 import cv2
+import numpy as np
 
 from ...common import (ClaimReport, TEXT_CLAIM_CONTROLS, back_if_close_x,
                        claim_fixed_controls, claim_sparkles,
@@ -16,6 +17,11 @@ from ...common import (ClaimReport, TEXT_CLAIM_CONTROLS, back_if_close_x,
 from ...lobby import open_named
 
 TOP_CAROUSEL = (0, 7, 100, 19)
+# Fingerprint only the static task-name band. Artwork above it can animate
+# while the horizontal carousel itself is stationary.
+CAROUSEL_STABLE_BAND = (0, 12, 100, 18)
+CAROUSEL_EDGE_CONFIRMATIONS = 2
+CAROUSEL_SAME_DISTANCE = 16
 # Task labels must be a strong visual match. A full carousel sweep that finds
 # no label is counted by scan.run_zone; only three complete misses become DONE.
 TASK_TAB_THRESHOLD = 0.82
@@ -26,14 +32,32 @@ STEP_DELAY = 1.0
 SLOW_SWIPE_DURATION = 1.0
 
 
+def carousel_signature(screen) -> bytes:
+    """Animation-tolerant dHash of the task-name band in the top strip."""
+    height, width = screen.shape[:2]
+    x0, y0, x1, y1 = CAROUSEL_STABLE_BAND
+    patch = cv2.cvtColor(
+        screen[round(height * y0 / 100):round(height * y1 / 100),
+               round(width * x0 / 100):round(width * x1 / 100)],
+        cv2.COLOR_BGR2GRAY,
+    )
+    tiny = cv2.resize(patch, (49, 10), interpolation=cv2.INTER_AREA)
+    return np.packbits(tiny[:, 1:] > tiny[:, :-1]).tobytes()
+
+
+def same_carousel_position(before: bytes, after: bytes,
+                           max_distance=CAROUSEL_SAME_DISTANCE) -> bool:
+    """True when two settled label bands represent the same position."""
+    old = np.frombuffer(before, dtype=np.uint8)
+    new = np.frombuffer(after, dtype=np.uint8)
+    return old.shape == new.shape and int(
+        np.unpackbits(np.bitwise_xor(old, new)).sum()) <= max_distance
+
+
 def carousel_moved(before, after) -> bool:
-    """Ignore icon animation and measure horizontal motion of tab edges."""
-    top, bottom = round(before.shape[0] * .07), round(before.shape[0] * .19)
-    old = cv2.Canny(cv2.cvtColor(before[top:bottom], cv2.COLOR_BGR2GRAY), 80, 160)
-    new = cv2.Canny(cv2.cvtColor(after[top:bottom], cv2.COLOR_BGR2GRAY), 80, 160)
-    (shift_x, _), _response = cv2.phaseCorrelate(old.astype("float32"),
-                                                  new.astype("float32"))
-    return abs(shift_x) >= 2.0
+    """Return whether the named-tab strip moved between settled frames."""
+    return not same_carousel_position(
+        carousel_signature(before), carousel_signature(after))
 
 
 @dataclass(frozen=True)
@@ -51,12 +75,20 @@ class ExactFlow:
     congratulations_done: bool = False
     absence_done: bool = False
     claim_offset: tuple[int, int] = (0, 0)
+    claim_region: tuple[int, int, int, int] = LOWER_CONTENT
     # Full-button captures can share most of their frame with adjacent paid
     # offers. Individual flows may require a stricter score before tapping.
     claim_threshold: float = 0.72
     fallback_tap: tuple[int, int] | None = None
     navigation_threshold: float = 0.72
     scroll_claims: bool = False
+    # Per-event vertical list geometry.  Defaults preserve the older flows;
+    # events with a bounded task panel can keep the whole gesture and the
+    # movement check inside that panel.
+    scroll_start: tuple[int, int] = (50, 90)
+    scroll_end: tuple[int, int] = (50, 55)
+    scroll_region: tuple[int, int, int, int] = LOWER_CONTENT
+    max_scroll_pages: int = 6
     skip: bool = False
     # Optional page-specific setup which must be verified before claims.
     prepare: Callable[[object], bool] | None = None
@@ -110,7 +142,8 @@ def _tap_navigation(bot, flow: ExactFlow) -> bool:
         if flow.navigation_first_match:
             break
     if not acted and flow.fallback_tap is not None:
-        bot.record("Gift Claims: không thấy nút Scores; dùng fallback được cấu hình x=45 y=190")
+        bot.record("Gift Claims: không thấy nút điều hướng; dùng fallback được cấu hình "
+                   f"x={flow.fallback_tap[0]} y={flow.fallback_tap[1]}")
         bot.tap(*flow.fallback_tap, delay=STEP_DELAY)
         acted = True
     return acted
@@ -136,14 +169,15 @@ def process_exact(bot, flow: ExactFlow) -> bool:
     if _done(bot, flow):
         return True
 
-    pages = 6 if flow.scroll_claims else 1
+    pages = flow.max_scroll_pages if flow.scroll_claims else 1
     saw_claim = False
+    reached_scroll_end = not flow.scroll_claims
     for page in range(pages):
         blocked: set[tuple[str, int, int]] = set()
         while True:
             bot.check()
             screen = bot.screenshot()
-            hit = find_any(bot, flow.claims, screen,
+            hit = find_any(bot, flow.claims, screen, region=flow.claim_region,
                            threshold=flow.claim_threshold)
             if hit is None:
                 break
@@ -168,7 +202,7 @@ def process_exact(bot, flow: ExactFlow) -> bool:
         if not flow.scroll_claims or page + 1 >= pages:
             break
         before = bot.screenshot()
-        bot.swipe_percent(50, 90, 50, 55,
+        bot.swipe_percent(*flow.scroll_start, *flow.scroll_end,
                           duration=SLOW_SWIPE_DURATION, delay=STEP_DELAY)
         # Re-check at every list position. A terminal row may be visible only
         # midway through the green reward frame and would otherwise be scrolled
@@ -176,16 +210,27 @@ def process_exact(bot, flow: ExactFlow) -> bool:
         if _done(bot, flow):
             return True
         after = bot.screenshot()
-        if float(cv2.absdiff(before, after).mean()) < 0.5:
+        height, width = before.shape[:2]
+        x0, y0, x1, y1 = flow.scroll_region
+        left, top = round(width * x0 / 100), round(height * y0 / 100)
+        right, bottom = round(width * x1 / 100), round(height * y1 / 100)
+        before_list = before[top:bottom, left:right]
+        after_list = after[top:bottom, left:right]
+        if float(cv2.absdiff(before_list, after_list).mean()) < 0.5:
+            reached_scroll_end = True
+            bot.record("Gift Claims: danh sách đã tới cuối; dừng lướt")
             break
 
     if _done(bot, flow):
         return True
-    if (flow.absence_done
+    if (flow.absence_done and reached_scroll_end
             and _wait_any(bot, flow.claims, attempts=2,
+                          region=flow.claim_region,
                           threshold=flow.claim_threshold) is None):
-        bot.record("Gift Claims: không còn nút nhận trong vùng y>125; DONE")
+        bot.record("Gift Claims: không còn nút nhận trong vùng được cấu hình; DONE")
         return True
+    if flow.scroll_claims and not reached_scroll_end:
+        bot.record("Gift Claims: đã chạm giới hạn lướt nhưng chưa xác nhận đáy; giữ PENDING")
     if flow.scroll_claims and saw_claim:
         # A list can finish with its terminal Go/Continue below the current
         # viewport. Return to the top once and verify it rather than guessing.

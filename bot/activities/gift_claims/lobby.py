@@ -2,8 +2,8 @@
 import cv2
 import numpy as np
 
-from .common import (REFERENCE_WIDTH, find, find_all, find_valuable_event,
-                     return_home, swipe_around)
+from .common import (REFERENCE_WIDTH, find, find_all, find_super_value_return,
+                     find_valuable_event, return_home, swipe_around)
 from .screens import GiftScreen, identify
 
 BOTTOM = "bottom"
@@ -17,15 +17,10 @@ REGIONS = {
 MAX_OPENS_PER_BOUNDARY = 16
 OPEN_WAIT_ATTEMPTS = 6
 VALUABLE_LAUNCH_ATTEMPTS = 3
+SUPER_VALUE_LAUNCH_ATTEMPTS = 4
 IGNORED_RIGHT_LAUNCHERS = ("FollowUs/facebook_icon",)
 EVENT_CENTER_LAUNCHERS = ("EventCenter/launcher_side", "EventCenter/launcher")
 FIXED_PARENT_LAUNCHERS = {
-    GiftScreen.SUPER_VALUE_RETURN: (
-        ("EmpireDepot/launcher", "EmpireDepot/launcher_frame_1",
-         "EmpireDepot/launcher_frame_2", "EmpireDepot/launcher_frame_3",
-         "SuperValueReturn/launcher_lucky_raffle",
-         "SuperValueReturn/launcher_login_gifts"),
-        (0, 68, 30, 96)),
     GiftScreen.BACK_TO_TERRITORY: (
         ("BackToTerritory/title",), REGIONS[RIGHT]),
 }
@@ -242,6 +237,7 @@ def open_named(bot, expected):
     if not return_home(bot):
         return False
     launcher = None
+    launcher_is_tap_target = False
     if expected == GiftScreen.VALUABLE_EVENT:
         # The launcher moves with the city and its glow/badge is animated.
         # Check fresh frames and re-centre the city between misses instead of
@@ -299,6 +295,27 @@ def open_named(bot, expected):
                     "Gift Claims: không mở được SuperValueReturn để đi vòng "
                     "sang ValuableEvent")
             return_home(bot)
+    elif expected == GiftScreen.SUPER_VALUE_RETURN:
+        # Animation changes the launcher artwork every few frames. Sample
+        # several fresh screenshots and use the dedicated multi-template
+        # detector. Never replace a miss with a hard-coded tap.
+        for attempt in range(SUPER_VALUE_LAUNCH_ATTEMPTS):
+            screen = bot.screenshot()
+            if identify(bot, screen) == expected:
+                return True
+            launcher = find_super_value_return(bot, screen)
+            if launcher is not None:
+                launcher_is_tap_target = True
+                break
+            if attempt + 1 < SUPER_VALUE_LAUNCH_ATTEMPTS:
+                bot.log("Gift Claims: chưa thấy launcher SuperValueReturn; "
+                        f"chụp lại frame animation ({attempt + 1}/"
+                        f"{SUPER_VALUE_LAUNCH_ATTEMPTS - 1})")
+                bot.sleep(0.4)
+        if launcher is None:
+            bot.record("Gift Claims: không nhận diện được launcher "
+                       "SuperValueReturn sau 4 frame; không bấm tọa độ cứng")
+            return False
     else:
         screen = bot.screenshot()
         if identify(bot, screen) == expected:
@@ -311,19 +328,15 @@ def open_named(bot, expected):
                                 region=region)
                 if launcher is not None:
                     break
-    fixed_fallback = False
-    if launcher is None and expected == GiftScreen.SUPER_VALUE_RETURN:
-        scale = screen.shape[1] / REFERENCE_WIDTH
-        bot.record("Gift Claims: không thấy Empire Depot; dùng fallback x=30 y=560")
-        bot.tap(round(30 * scale), round(560 * scale), delay=1)
-        fixed_fallback = True
-    elif launcher is None:
+    if launcher is None:
         bot.log(f"Gift Claims: không tìm thấy launcher {expected.value} bằng ảnh/tên")
         return False
-    if not fixed_fallback:
-        bot.record(f"Gift Claims: mở {expected.value} bằng ảnh launcher")
-        # Template contains the caption; the icon body above is the click target
-        # and follows the carousel if its slot moves.
+    bot.record(f"Gift Claims: mở {expected.value} bằng ảnh launcher")
+    if launcher_is_tap_target:
+        bot.tap(*launcher, delay=1)
+    else:
+        # Generic templates contain the caption; the icon body above is the
+        # click target and follows the carousel if its slot moves.
         bot.tap(launcher[0], max(0, launcher[1] - 20), delay=1)
     for attempt in range(OPEN_WAIT_ATTEMPTS):
         screen = bot.screenshot()

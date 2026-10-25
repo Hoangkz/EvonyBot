@@ -16,12 +16,11 @@ from . import (
 )
 from ..common import (TEXT_CLAIM_CONTROLS, back_if_close_x, find,
                       mark_task_done)
-from .named_flow import (ExactFlow, SLOW_SWIPE_DURATION, STEP_DELAY,
-                         TASK_TAB_THRESHOLD, TOP_CAROUSEL, carousel_moved,
-                         process_exact)
+from .named_flow import (CAROUSEL_EDGE_CONFIRMATIONS, ExactFlow,
+                         SLOW_SWIPE_DURATION, STEP_DELAY, TASK_TAB_THRESHOLD,
+                         TOP_CAROUSEL, carousel_moved, process_exact)
 
 PAGE = "ValuableEvent/title"
-MAX_SWIPES = 12
 MAX_PARENT_PASSES = 2
 COMMON_LOWER_CLAIMS = TEXT_CLAIM_CONTROLS
 
@@ -90,17 +89,16 @@ def run_opened(bot, due_keys: set[str], *, handled: set[str] | None = None
     handled = handled if handled is not None else set()
     pending = set(due_keys) - handled
     attempted_this_sweep: set[str] = set()
-    # Inspect while moving toward the first edge, then reverse and inspect the
-    # entire strip.  The rewind phase deliberately performs every bounded
-    # swipe: animated artwork made carousel_moved() occasionally report a
-    # false boundary halfway across the strip, causing the old flow to reverse
-    # before the first tasks were reached.
+    # Establish the real first edge, then reverse and scan to the real final
+    # edge. There is deliberately no swipe-count ceiling: an edge is proven
+    # only by two consecutive settled no-movement swipes. bot.check() remains
+    # the common Stop/deadline guard.
     for phase, start_x, end_x in (("rewind", 20, 85), ("scan", 85, 55)):
         bot.record("Gift Claims: Valuable Event " +
                    ("đưa carousel về biên đầu" if phase == "rewind" else
                     "quét carousel từ đầu tới cuối"))
         stagnant_swipes = 0
-        for step in range(MAX_SWIPES + 1):
+        while True:
             bot.check()
             screen = bot.screenshot()
             if back_if_close_x(bot, screen):
@@ -109,7 +107,6 @@ def run_opened(bot, due_keys: set[str], *, handled: set[str] | None = None
                        if spec.task.key in pending
                        and spec.task.key not in attempted_this_sweep
                        and (pos := _tab(bot, spec, screen)) is not None]
-            processed_task = False
             if visible:
                 # Settle exactly one lower-panel flow before moving the upper
                 # carousel. Never reuse the other tab coordinates captured
@@ -128,7 +125,6 @@ def run_opened(bot, due_keys: set[str], *, handled: set[str] | None = None
                     mark_task_done(bot, key)
                     handled.add(key)
                     pending.discard(key)
-                processed_task = True
                 bot.record(f"Gift Claims: {spec.task.label} đã chốt trạng thái "
                            f"{'DONE' if completed else 'PENDING'}; "
                            "chờ 1s rồi mới lướt carousel trên")
@@ -137,23 +133,26 @@ def run_opened(bot, due_keys: set[str], *, handled: set[str] | None = None
             if not pending:
                 return results, True
 
-            if step < MAX_SWIPES:
-                bot.swipe_percent(start_x, 14, end_x, 14,
-                                  duration=SLOW_SWIPE_DURATION, delay=STEP_DELAY)
-                after = bot.screenshot()
-                if not carousel_moved(screen, after):
-                    # A lower task was useful progress. Re-capture this same
-                    # carousel position so every visible tab gets a chance
-                    # before two genuinely empty/stagnant swipes end a pass.
-                    stagnant_swipes = 0 if processed_task else stagnant_swipes + 1
-                    if phase == "scan" and stagnant_swipes >= 2:
-                        bot.log("Gift Claims: Valuable Event đã chạm biên carousel")
-                        break
-                else:
-                    stagnant_swipes = 0
+            # Take the baseline after processing the lower task. A frame from
+            # before selecting it has a different highlight and cannot prove
+            # whether the carousel itself moved.
+            before_swipe = bot.screenshot()
+            bot.swipe_percent(start_x, 14, end_x, 14,
+                              duration=SLOW_SWIPE_DURATION, delay=STEP_DELAY)
+            after = bot.screenshot()
+            if not carousel_moved(before_swipe, after):
+                stagnant_swipes += 1
+                if stagnant_swipes >= CAROUSEL_EDGE_CONFIRMATIONS:
+                    edge = "đầu" if phase == "rewind" else "cuối"
+                    bot.record("Gift Claims: Valuable Event đã xác nhận "
+                               f"biên {edge} sau "
+                               f"{CAROUSEL_EDGE_CONFIRMATIONS} cú không đổi")
+                    break
+            else:
+                stagnant_swipes = 0
 
-    bot.record("Gift Claims: Valuable Event đã lướt hết vùng trên; "
-               "tìm từng nhiệm vụ bằng ảnh tên, không dùng dấu đỏ")
+    bot.record("Gift Claims: Valuable Event đã xác nhận đủ biên đầu và "
+               "biên cuối; tìm từng nhiệm vụ bằng ảnh tên")
     return results, True
 
 

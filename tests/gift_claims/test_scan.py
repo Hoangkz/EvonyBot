@@ -1,5 +1,6 @@
 """Vòng kiểm tra 3 lần của hoạt động quà (bot/activities/gift_claims/scan.py)."""
 import unittest
+from importlib import import_module
 from unittest import mock
 from types import SimpleNamespace
 
@@ -7,6 +8,9 @@ from bot.activities import gift_claims
 from bot.activities.gift_claims import scan
 from bot.activities.gift_claims.common import mark_task_done
 from bot.activities.gift_claims.event_center import zone as event_center_zone
+
+event_center_run = import_module(
+    "bot.activities.gift_claims.event_center.run")
 
 
 class FakeBot:
@@ -132,6 +136,88 @@ class ScanTest(unittest.TestCase):
             event_center_zone._sweep(bot, ["gift_dwarfs_treasure"])
 
         self.assertEqual({marker}, getattr(bot, event_center_zone.HANDLED_ATTR))
+
+    def test_event_center_persists_completed_category_before_later_timeout(self):
+        bot = FakeBot()
+        key = "gift_dragon_battle"
+
+        def interrupted_after_limited(_bot, _handled):
+            setattr(bot, event_center_zone.SCANNED_CATEGORIES_ATTR,
+                    {"limited"})
+            setattr(bot, event_center_zone.SEEN_POLICIES_ATTR, set())
+            raise RuntimeError("simulated Activities timeout")
+
+        with (mock.patch.object(event_center_zone, "open_event_center",
+                                return_value=object()),
+              mock.patch.object(event_center_zone, "identify",
+                                return_value=None),
+              mock.patch.object(event_center_zone, "run_opened",
+                                side_effect=interrupted_after_limited),
+              self.assertRaises(RuntimeError)):
+            event_center_zone._sweep(bot, [key])
+
+        self.assertEqual(1, scan.misses(bot, key))
+        self.assertIn(f"{key}_miss_1", bot.done)
+
+    def test_event_center_resumes_miss_counter_across_three_windows(self):
+        bot = FakeBot()
+        key = "gift_dragon_battle"
+
+        def scanned_limited(_bot, _handled):
+            setattr(bot, event_center_zone.SCANNED_CATEGORIES_ATTR,
+                    {"limited"})
+            setattr(bot, event_center_zone.SEEN_POLICIES_ATTR, set())
+            return False
+
+        with (mock.patch.object(event_center_zone, "open_event_center",
+                                return_value=object()),
+              mock.patch.object(event_center_zone, "identify",
+                                return_value=None),
+              mock.patch.object(event_center_zone, "run_opened",
+                                side_effect=scanned_limited)):
+            event_center_zone._sweep(bot, [key])
+            self.assertEqual(1, scan.misses(bot, key))
+            event_center_zone._sweep(bot, [key])
+            self.assertEqual(2, scan.misses(bot, key))
+            event_center_zone._sweep(bot, [key])
+
+        self.assertIn(key, bot.done)
+
+    def test_event_center_resume_category_rotates_durably(self):
+        bot = FakeBot()
+        self.assertEqual("limited",
+                         event_center_run._ordered_categories(bot)[0][0])
+
+        event_center_run._set_resume_category(bot, "activities")
+        self.assertEqual("activities",
+                         event_center_run._ordered_categories(bot)[0][0])
+        self.assertIn(
+            event_center_run.CATEGORY_RESUME_KEYS["activities"], bot.done)
+
+        event_center_run._set_resume_category(bot, "limited")
+        self.assertEqual("limited",
+                         event_center_run._ordered_categories(bot)[0][0])
+        self.assertNotIn(
+            event_center_run.CATEGORY_RESUME_KEYS["activities"], bot.done)
+
+    def test_limited_completion_checkpoints_activities_before_timeout(self):
+        bot = FakeBot()
+        bot.screenshot = lambda: object()
+
+        with (mock.patch.object(event_center_run, "find",
+                                return_value=(198, 25)),
+              mock.patch.object(event_center_run, "_select_category",
+                                return_value=True),
+              mock.patch.object(event_center_run, "_category_db_done",
+                                return_value=False),
+              mock.patch.object(event_center_run, "_scan_category",
+                                side_effect=(True,
+                                             RuntimeError("Activities timeout"))),
+              self.assertRaises(RuntimeError)):
+            event_center_run.run_opened(bot, set())
+
+        self.assertEqual("activities",
+                         event_center_run._ordered_categories(bot)[0][0])
 
 
 if __name__ == "__main__":

@@ -193,7 +193,8 @@ EVENT_TITLE_REGION = (20, 0, 80, 8)   # % màn hình: thanh tiêu đề
 # cắt khác mọi ảnh tiêu đề đã có (điểm < TITLE_SAME) và không phải vùng trơn (độ lệch chuẩn >=
 # TITLE_MIN_STD, VD màn đen lúc đang tải).
 EVENT_LIST_TITLE_BOX = (60, 8, 276, 30)
-REFRESH_TITLE_ICONS = (GATHER_TROOPS_ICON, KINGS_PATH_ICON)
+REVELRY_CARNIVAL_ICON = f"{EV}/RevelryCarnival/icon.png"
+REFRESH_TITLE_ICONS = (GATHER_TROOPS_ICON, KINGS_PATH_ICON, REVELRY_CARNIVAL_ICON)
 TITLE_SAME = 0.9
 TITLE_MIN_STD = 10
 
