@@ -45,6 +45,8 @@ INIT_TAB = "Initialization"  # device id is not stored; server goes to devices.s
 SERVER_TIME = "server_time"
 # Key trong bảng `settings`: "Auto Times Out" (phút, chọn ở màn Home), dùng chung mọi thiết bị.
 AUTO_TIMEOUT = "auto_timeout"
+# Key trong bảng `settings`: khoảng port Load Devices quét (chọn ở màn Home), lưu "start-end".
+SCAN_PORTS = "scan_ports"
 
 # Tab title -> column of `devices` holding that tab's settings JSON.
 TAB_COLUMNS = {
@@ -330,6 +332,18 @@ class Database:
     def set_auto_timeout(self, minutes: str):
         """Lưu "Auto Times Out" (số phút), chung mọi thiết bị."""
         self.set_setting(AUTO_TIMEOUT, minutes)
+
+    def scan_ports(self, default: tuple[int, int]) -> tuple[int, int]:
+        """Khoảng port (start, end) Load Devices quét, chọn ở màn Home; chưa lưu / hỏng -> `default`."""
+        try:
+            start, end = (int(v) for v in self.get_setting(SCAN_PORTS).split("-"))
+        except ValueError:
+            return default
+        return (start, end) if 1 <= start <= end <= 65535 else default
+
+    def set_scan_ports(self, start: int, end: int):
+        """Lưu khoảng port Load Devices quét, chung mọi thiết bị."""
+        self.set_setting(SCAN_PORTS, f"{start}-{end}")
 
     def set_bubble_until(self, serial: str, bubble_until: str):
         """Lưu thời điểm bubble hết (ISO theo giờ máy; rỗng -> NULL = chưa biết)."""

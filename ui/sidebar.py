@@ -24,6 +24,9 @@ from PyQt5.QtWidgets import (
 from .add_device_dialog import AddDeviceDialog
 
 
+MAX_LIST_HEIGHT = 480
+
+
 class _FitScrollArea(QScrollArea):
     """Vùng cuộn cao đúng bằng nội dung (lớn nhất là phần còn trống): nút Add đứng ngay dưới port cuối, không bị
     đẩy xuống đáy khi còn chỗ; hết chỗ thì vùng này co lại và cuộn."""
@@ -92,7 +95,14 @@ class Sidebar(QWidget):
             self.add_device_requested.emit(dialog.address)
 
     def _list_changed(self):
-        self._list_container.adjustSize()
+        # Chiều cao tối thiểu = đúng nội dung (tối đa MAX_LIST_HEIGHT, quá thì cuộn): layout không ép vùng này về 0
+        # làm nút Add đè lên port.
+        # Tính từ chính các nút (nút vừa thêm chưa được show nên layout.sizeHint() còn bỏ qua nó).
+        margins = self._list_layout.contentsMargins()
+        count = len(self._buttons)
+        height = (margins.top() + margins.bottom() + self._list_layout.spacing() * (count - 1)
+                  + sum(b.sizeHint().height() for b in self._buttons.values())) if count else 0
+        self._scroll.setMinimumHeight(min(height, MAX_LIST_HEIGHT))
         self._scroll.updateGeometry()
 
     def add_device(self, device_id: str, label: str | None = None) -> QPushButton:

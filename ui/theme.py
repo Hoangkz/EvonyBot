@@ -183,14 +183,17 @@ QPushButton#ApplyAllButton:disabled {{
 }}
 
 /* ---- Inputs ---- */
-QComboBox, QLineEdit {{
+QComboBox, QLineEdit, QSpinBox#PortSpin {{
     border: 1px solid {COLORS['border']};
     border-radius: 5px;
     padding: 5px 8px;
     background: {COLORS['bg_panel']};
 }}
-QLineEdit:focus {{
+QLineEdit:focus, QSpinBox#PortSpin:focus {{
     border: 1px solid {COLORS['accent']};
+}}
+QSpinBox#PortSpin[invalid="true"] {{
+    border: 1px solid {COLORS['danger']};
 }}
 
 /* ---- Popup nhập liệu dùng chung (ui/dialogs.py: Add device, New profile) ---- */

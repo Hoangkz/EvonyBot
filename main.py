@@ -199,6 +199,9 @@ class MainWindow(QMainWindow):
         self.home_view.set_auto_timeout(self.db.auto_timeout())
         self.bots.auto_timeout_minutes = self.home_view.auto_timeout_minutes
         self.home_view.auto_timeout_changed.connect(self._on_auto_timeout_changed)
+        # Khoảng port Load Devices quét (Start / End port ở màn Home): nạp lại giá trị đã lưu, sửa là lưu DB.
+        self.home_view.set_scan_ports(*self.db.scan_ports(self.home_view.scan_ports()))
+        self.home_view.scan_ports_changed.connect(self.db.set_scan_ports)
         self.bots.daily_task_done.connect(self.db.mark_daily_task_done)
         self.bots.daily_task_cleared.connect(lambda serial, task: self.db.mark_daily_task_done(serial, task, False))
         self.bots.daily_task_done.connect(lambda serial, _task: self._refresh_event_times(serial))
