@@ -7,9 +7,10 @@ from concurrent.futures import ThreadPoolExecutor
 from PyQt5.QtCore import QThread, pyqtSignal
 
 ADB_HOST = "127.0.0.1"
-PORT_START = 21503
+PORT_START = 21503   # mặc định; người dùng đổi ở màn Home (database.py: scan_ports)
 PORT_END = 25000
 PORT_STEP = 10
+MAX_WORKERS = 400    # khoảng port do người dùng chọn có thể rất lớn: không mở quá chừng này luồng một lúc
 SETTLE_RETRIES = 10
 SETTLE_DELAY = 0.5  # seconds
 
@@ -20,12 +21,17 @@ class AdbScanWorker(QThread):
     finished_scan = pyqtSignal(list)
     failed = pyqtSignal(str)
 
+    def __init__(self, parent=None, port_start: int = PORT_START, port_end: int = PORT_END):
+        super().__init__(parent)
+        self.port_start = port_start
+        self.port_end = port_end
+
     def run(self):
         try:
             import adbutils
 
             adb = adbutils.adb
-            addresses = [f"{ADB_HOST}:{p}" for p in range(PORT_START, PORT_END + 1, PORT_STEP)]
+            addresses = [f"{ADB_HOST}:{p}" for p in range(self.port_start, self.port_end + 1, PORT_STEP)]
 
             def connect(addr: str):
                 try:
@@ -33,9 +39,9 @@ class AdbScanWorker(QThread):
                 except Exception:
                     return None
 
-            # Fire all connects at once and wait for every one to finish (like Promise.all).
+            # Fire the connects concurrently (up to MAX_WORKERS at a time) and wait for every one to finish.
             try:
-                with ThreadPoolExecutor(max_workers=len(addresses)) as pool:
+                with ThreadPoolExecutor(max_workers=min(len(addresses), MAX_WORKERS)) as pool:
                     list(pool.map(connect, addresses))
             except Exception:
                 pass  # best-effort only

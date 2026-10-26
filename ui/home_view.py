@@ -13,6 +13,7 @@ from PyQt5.QtWidgets import (
     QMessageBox,
     QProgressDialog,
     QPushButton,
+    QSpinBox,
     QTableWidget,
     QTableWidgetItem,
     QTimeEdit,
@@ -24,6 +25,7 @@ import updater
 from version import __version__
 
 from .workers import AdbScanWorker, UpdateCheckWorker, UpdateDownloadWorker
+from .workers.adb_scan_worker import PORT_END, PORT_START, PORT_STEP
 
 TIMEOUT_OPTIONS = ["30", "60", "90", "120", "180", "240", "300", "360"]
 
@@ -36,6 +38,7 @@ class HomeView(QWidget):
     active_all_requested = pyqtSignal()     # kích hoạt mọi thiết bị đang Inactive
     reset_time_changed = pyqtSignal(str)   # giờ reset server "HH:MM" người dùng vừa chọn
     auto_timeout_changed = pyqtSignal(str)  # số phút "Auto Times Out" người dùng vừa chọn
+    scan_ports_changed = pyqtSignal(int, int)   # (start, end) port Load Devices quét, người dùng vừa sửa
     active_toggled = pyqtSignal(str, bool)  # (serial, muốn kích hoạt?) người dùng bấm nút Active/Inactive
 
     def __init__(self, parent=None):
@@ -57,6 +60,16 @@ class HomeView(QWidget):
         self.load_button.setMinimumSize(170, 50)
         self.load_button.clicked.connect(self._load_devices)
         top.addWidget(self.load_button)
+        top.addSpacing(16)
+        # Khoảng port Load Devices quét (mặc định 21503 - 25000, bước 10 như MEmu); sửa tuỳ ý, lưu vào DB.
+        top.addWidget(QLabel("Start port"))
+        self.start_port_spin = self._port_spin(PORT_START)
+        top.addWidget(self.start_port_spin)
+        top.addWidget(QLabel("End port"))
+        self.end_port_spin = self._port_spin(PORT_END)
+        top.addWidget(self.end_port_spin)
+        self.start_port_spin.valueChanged.connect(self._on_ports_edited)
+        self.end_port_spin.valueChanged.connect(self._on_ports_edited)
         top.addStretch(1)
         self.update_button = QPushButton(f"Version {__version__}")
         self.update_button.setFixedHeight(32)
@@ -150,13 +163,55 @@ class HomeView(QWidget):
         )
         layout.addWidget(self.table, 1)
 
+    # ---- khoảng port quét ---------------------------------------------
+    @staticmethod
+    def _port_spin(value: int) -> QSpinBox:
+        spin = QSpinBox()
+        spin.setObjectName("PortSpin")     # kiểu viền riêng trong theme.py (không đổi các ô số ở tab khác)
+        spin.setRange(1, 65535)
+        spin.setValue(value)
+        spin.setFixedWidth(90)
+        # Load Devices tắt nút khi đang quét nên focus trượt sang ô kế tiếp (Start port) và bôi đen số: chỉ nhận focus khi bấm vào.
+        spin.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
+        spin.setButtonSymbols(QSpinBox.ButtonSymbols.NoButtons)
+        spin.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        spin.setToolTip(f"Load Devices scans ports from Start to End, step {PORT_STEP} (End must not be below Start)")
+        return spin
+
+    def _on_ports_edited(self, _value: int = 0):
+        """Sửa Start / End: khoảng hợp lệ thì lưu; End nhỏ hơn Start thì hai ô viền đỏ và Load Devices không làm gì."""
+        valid = self.ports_valid()
+        for spin in (self.start_port_spin, self.end_port_spin):
+            spin.setProperty("invalid", not valid)
+            spin.style().unpolish(spin)
+            spin.style().polish(spin)
+        if valid:
+            self.scan_ports_changed.emit(*self.scan_ports())
+
+    def scan_ports(self) -> tuple[int, int]:
+        """(start, end) port Load Devices sẽ quét."""
+        return self.start_port_spin.value(), self.end_port_spin.value()
+
+    def ports_valid(self) -> bool:
+        start, end = self.scan_ports()
+        return start <= end
+
+    def set_scan_ports(self, start: int, end: int):
+        """Nạp khoảng port đã lưu (không phát tín hiệu)."""
+        for spin, value in ((self.start_port_spin, start), (self.end_port_spin, end)):
+            spin.blockSignals(True)
+            spin.setValue(value)
+            spin.blockSignals(False)
+
     # ------------------------------------------------------------------
     def _load_devices(self):
         if self._worker is not None and self._worker.isRunning():
             return
+        if not self.ports_valid():       # End < Start: không quét
+            return
         self.load_button.setEnabled(False)
         self.load_button.setText("Loading...")
-        self._worker = AdbScanWorker(self)
+        self._worker = AdbScanWorker(self, *self.scan_ports())
         self._worker.finished_scan.connect(self._on_scan_finished)
         self._worker.failed.connect(self._on_scan_failed)
         self._worker.start()

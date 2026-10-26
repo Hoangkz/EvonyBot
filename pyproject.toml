@@ -2,6 +2,7 @@
 #   poe setup     create the venv
 #   poe install   install requirements into the venv
 #   poe dev       run the app
+#   poe dev:ui    run only the UI with mock ports (no emulator / license)
 #   poe test      run tests/real_run.py target() on the real emulator (add --shots to save screenshots)
 #   poe build     build the installer (installer/build.ps1)
 #   poe clean     remove build output (keeps the cached Python embed zip)
@@ -20,6 +21,9 @@ i.help = "Alias for install"
 
 dev.cmd = "venv/Scripts/python.exe main.py"
 dev.help = "Run the app"
+
+"dev:ui".cmd = "venv/Scripts/python.exe dev_ui.py"
+"dev:ui".help = "Run only the UI (Sidebar + Home) with mock device ports, no emulator / license"
 
 test.cmd = "venv/Scripts/python.exe -m tests.real_run"
 test.help = "Run tests/real_run.py target() on the real emulator (edit target() to test another function)"

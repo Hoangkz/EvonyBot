@@ -8,7 +8,7 @@ from datetime import datetime
 
 from PyQt5.QtCore import QPoint, QSize, Qt, QTimer, pyqtSignal
 from PyQt5.QtGui import QColor, QFont, QFontMetrics, QIcon, QPainter, QPen, QPixmap, QPolygon
-from PyQt5.QtWidgets import QHBoxLayout, QInputDialog, QLineEdit, QMenu, QMessageBox, QPushButton, QWidget
+from PyQt5.QtWidgets import QDialog, QHBoxLayout, QMenu, QMessageBox, QPushButton, QWidget
 
 from .constants import (
     ACTIVITY_BUTTONS,
@@ -27,6 +27,7 @@ from .constants import (
     PROFILE_NAME_MAX,
     PROFILE_ROW_POS,
 )
+from ..dialogs import TextInputDialog
 from ..emulator_window import EmulatorWindowError, toggle_maximize
 from ..theme import COLORS
 from .tab_placeholder import DesignerTab, confirm_reset
@@ -264,20 +265,19 @@ class InitializationTab(DesignerTab):
         if len(self._profile_names) >= PROFILE_MAX:
             QMessageBox.warning(self, "New profile", f"Each device can have at most {PROFILE_MAX} profiles.")
             return
-        dialog = QInputDialog(self)
-        dialog.setInputMode(QInputDialog.TextInput)     # ô nhập chỉ được tạo sau khi chọn chế độ
-        dialog.setWindowTitle("New profile")
-        dialog.setLabelText("Profile name:")
-        dialog.findChild(QLineEdit).setMaxLength(PROFILE_NAME_MAX)
-        if not dialog.exec_():
-            return
-        name = dialog.textValue().strip()
-        if not name:
-            return
+        dialog = TextInputDialog(
+            "New profile", "New profile",
+            hint="Copies this device's current settings into a new profile.",
+            placeholder="Profile name", ok_text="Create", max_length=PROFILE_NAME_MAX,
+            validate=self._profile_name_error, parent=self)
+        if dialog.exec_() == QDialog.Accepted:
+            self.profile_added.emit(dialog.value())
+
+    def _profile_name_error(self, name: str) -> str | None:
+        """Thông báo lỗi nếu `name` không dùng được làm tên hồ sơ mới, ngược lại None."""
         if name.lower() == "default" or name.lower() in (n.lower() for n in self._profile_names):
-            QMessageBox.warning(self, "New profile", f"A profile named '{name}' already exists.")
-            return
-        self.profile_added.emit(name)
+            return f"A profile named '{name}' already exists."
+        return None
 
     def _toggle_emulator_window(self):
         try:

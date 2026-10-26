@@ -74,6 +74,14 @@ RIBBON_SEARCH = [
     ((60, 12, 70, 40), (0.86, 0.84, 0.82, 0.80)),
     ((80, 30, 100, 50), (0.86, 0.855, 0.85, 0.845)),
 ]
+# Nút event nhận bằng ICON trước (find_event_button gọi button_icon.find_button_icon), không có icon
+# nào khớp mới tìm đuôi ruy băng như trên. Mỗi event một ảnh trong BUTTON_ICON_DIR (tạo bằng
+# .claude/skills/template-images/scripts/find_icon.py, xem FIND_ICON.md). Dò trong 2 vùng (% màn hình,
+# x0, y0, x1, y1): vùng 1 cột phải, vùng 2 cột trái. Điểm khớp đo sau biến đổi Laplacian (không phải ảnh
+# màu): khung thật 0,85-0,95.
+BUTTON_ICON_DIR = f"{EV}/ButtonIcon"
+BUTTON_ICON_REGIONS = [(70, 25, 100, 55), (60, 0, 90, 55)]
+BUTTON_ICON_THRESHOLD = 0.8
 # Bấm vào icon nút: lệch so với tâm đuôi ruy băng (đuôi (253, 173) -> icon (283, 145)).
 RIBBON_BUTTON_OFFSET = (30, -28)
 # Không thấy Event Center trên màn chính: kéo màn hình rồi quét lại. Toạ độ % màn hình
