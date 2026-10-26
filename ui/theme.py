@@ -189,6 +189,50 @@ QComboBox, QLineEdit {{
     padding: 5px 8px;
     background: {COLORS['bg_panel']};
 }}
+QLineEdit:focus {{
+    border: 1px solid {COLORS['accent']};
+}}
+
+/* ---- Popup nhập liệu dùng chung (ui/dialogs.py: Add device, New profile) ---- */
+QDialog#StyledDialog {{
+    background: {COLORS['bg_panel']};
+}}
+QLabel#DialogTitle {{
+    font-size: 13pt;
+    font-weight: 600;
+}}
+QLabel#DialogHint {{
+    color: {COLORS['text_secondary']};
+    font-size: 9.5pt;
+}}
+QLineEdit#DialogInput {{
+    padding: 9px 12px;
+    border-radius: 8px;
+    selection-background-color: {COLORS['accent']};
+    selection-color: white;
+}}
+QLabel#DialogError {{
+    color: #b42318;
+    background: #fdecec;
+    border: 1px solid #f7c8c9;
+    border-radius: 8px;
+    padding: 8px 12px;
+}}
+QDialog#StyledDialog QPushButton {{
+    padding: 9px 18px;
+    border-radius: 8px;
+}}
+/* Nút chính có viền đậm hơn nền để nhìn ra là nút (các bộ chọn có id nên phải ghi rõ cả hover / disabled) */
+QDialog#StyledDialog QPushButton[primary="true"] {{
+    border: 1px solid #2748c7;
+}}
+QDialog#StyledDialog QPushButton[primary="true"]:hover {{
+    border: 1px solid #1f3aa3;
+}}
+QDialog#StyledDialog QPushButton[primary="true"]:disabled {{
+    border: 1px solid {COLORS['disabled_border']};
+}}
+
 QCheckBox, QRadioButton {{
     padding: 3px 2px;
     spacing: 8px;

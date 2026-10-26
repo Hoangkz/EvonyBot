@@ -215,6 +215,7 @@ class MainWindow(QMainWindow):
 
         self.sidebar.home_selected.connect(lambda: self.stack.setCurrentWidget(self.home_view))
         self.sidebar.device_selected.connect(self._show_device)
+        self.sidebar.add_device_requested.connect(self._on_add_device_requested)
         self.home_view.devices_loaded.connect(self._on_devices_loaded)
         self.home_view.active_toggled.connect(self._on_active_toggled)
         self.home_view.start_all_requested.connect(self._on_start_all_requested)
@@ -365,6 +366,15 @@ class MainWindow(QMainWindow):
         if skipped:
             QMessageBox.warning(self, "Cannot activate all devices",
                                 f"Device limit reached ({limit}): {skipped} device(s) left inactive.")
+
+    def _on_add_device_requested(self, addr: str):
+        """Nút + ở sidebar: popup đã adb connect thành công `addr`; thêm máy vào danh sách."""
+        if addr in self._device_ids:
+            self.sidebar.select_device(addr)
+            return
+        self._active.setdefault(addr, False)
+        self._register_device(addr)
+        self._refresh_run_counts()
 
     def _register_next_device(self):
         if self._pending_devices:

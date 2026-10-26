@@ -46,6 +46,7 @@ from ...ocr import read_progress
 from ...ocr.read_progress import run_two_lines as read_progress_two_lines
 from ..result import TaskResult, report
 from . import constants, cycle
+from .button_icon import find_button_icon
 from .constants import (
     BACK,
     CLAIM,
@@ -579,7 +580,12 @@ def find_event_button(bot, screen):
     Event Center, có khi lên hàng trên cùng). Tìm đuôi ruy băng trong cả 2 vùng RIBBON_SEARCH:
     vùng nào trả về toạ độ thì vùng đó đúng. Ngưỡng thứ nhất trước, không vùng nào đạt thì lần
     lượt thử các ngưỡng thấp hơn; cả 2 vùng cùng đạt thì lấy chỗ khớp cao hơn. Ngưỡng thấp nhất
-    cũng không đạt: None (không có ruy băng = không có event đang diễn ra; người gọi tự kiểm Event Center)."""
+    cũng không đạt: None (không có ruy băng = không có event đang diễn ra; người gọi tự kiểm Event Center).
+    Trước hết thử nhận bằng icon (Images/Event/ButtonIcon/, xem button_icon.py) trong chính 2 vùng
+    của ruy băng: thấy icon nào thì trả luôn, không thì mới tìm ruy băng như trên."""
+    icon = find_button_icon(bot, screen)
+    if icon is not None:
+        return icon
     matches = [(*bot.best_match(RIBBON_TAIL, screen=screen, region=region), thresholds)
                for region, thresholds in RIBBON_SEARCH]
     dx, dy = RIBBON_BUTTON_OFFSET
