@@ -34,7 +34,7 @@ from bot.worker import BotManager
 
 import licensing
 from database import DEFAULT_PROFILE, TAB_COLUMNS, Database, is_event_key
-from ui import DeviceView, HomeView, Sidebar
+from ui import DeviceView, GuideView, HomeView, Sidebar
 from ui.device_view import subtract_craft_item
 from ui import theme
 from ui.activation_dialog import ActivationDialog
@@ -143,6 +143,8 @@ class MainWindow(QMainWindow):
         self.home_view = HomeView()
         self.stack.addWidget(self.home_view)
         self.stack.setCurrentWidget(self.home_view)
+        self.guide_view = GuideView()
+        self.stack.addWidget(self.guide_view)
 
         self.device_views: dict[str, DeviceView] = {}
         # Building a DeviceView is heavy (8 designer tabs), so new devices
@@ -217,6 +219,7 @@ class MainWindow(QMainWindow):
         self._current_tab_index = 0
 
         self.sidebar.home_selected.connect(lambda: self.stack.setCurrentWidget(self.home_view))
+        self.sidebar.guide_selected.connect(lambda: self.stack.setCurrentWidget(self.guide_view))
         self.sidebar.device_selected.connect(self._show_device)
         self.sidebar.add_device_requested.connect(self._on_add_device_requested)
         self.home_view.devices_loaded.connect(self._on_devices_loaded)

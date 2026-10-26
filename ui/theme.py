@@ -177,6 +177,13 @@ QPushButton#ApplyAllButton:disabled {{
     border: 1px solid {COLORS['disabled_border']};
     color: {COLORS['disabled_text']};
 }}
+#Sidebar QPushButton#GuideButton {{
+    text-align: center;
+    padding: 0px;
+    margin: 0px 0px 6px 0px;
+    border-radius: 14px;
+    font-weight: 600;
+}}
 #Sidebar QPushButton:disabled {{
     background: {COLORS['disabled_bg']};
     color: {COLORS['disabled_text']};

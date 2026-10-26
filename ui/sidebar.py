@@ -13,6 +13,7 @@ from PyQt5.QtCore import QSize, Qt, pyqtSignal
 from PyQt5.QtWidgets import (
     QButtonGroup,
     QDialog,
+    QHBoxLayout,
     QLabel,
     QPushButton,
     QScrollArea,
@@ -42,6 +43,7 @@ class _FitScrollArea(QScrollArea):
 class Sidebar(QWidget):
     device_selected = pyqtSignal(str)      # device_id
     home_selected = pyqtSignal()
+    guide_selected = pyqtSignal()
     add_device_requested = pyqtSignal(str)   # port người dùng nhập
 
     def __init__(self, parent=None):
@@ -58,9 +60,21 @@ class Sidebar(QWidget):
         outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(0)
 
+        # Nút Hướng dẫn nằm cùng hàng với tiêu đề (nút nhỏ bên phải) để không chiếm chỗ của danh sách port.
+        title_row = QHBoxLayout()
+        title_row.setContentsMargins(0, 0, 8, 0)
         title = QLabel("EvonyBot")
         title.setObjectName("SidebarTitle")
-        outer.addWidget(title)
+        title_row.addWidget(title, 1)
+        self.guide_button = QPushButton("?")
+        self.guide_button.setObjectName("GuideButton")
+        self.guide_button.setToolTip("Hướng dẫn sử dụng")
+        self.guide_button.setCheckable(True)
+        self.guide_button.setFixedSize(28, 28)
+        self.guide_button.clicked.connect(self.guide_selected.emit)
+        self._group.addButton(self.guide_button)
+        title_row.addWidget(self.guide_button, 0, Qt.AlignmentFlag.AlignBottom)
+        outer.addLayout(title_row)
 
         self.home_button = QPushButton("🏠  Home")
         self.home_button.setCheckable(True)
