@@ -1,4 +1,4 @@
-"""Per-event policies used by the Event Center red-dot scanner."""
+"""Per-event policies used by the Event Center named-row scanner."""
 from dataclasses import dataclass
 from importlib import import_module
 
@@ -9,9 +9,8 @@ from ..screens import GiftScreen
 class EventPolicy:
     """A named Event Center event and its safe reward contract.
 
-    ``screen`` is intentionally optional: Pallas is still processed by the
-    generic red-row scanner, but we do not claim to identify it by name until
-    a stable title crop is captured.
+    ``screen`` is intentionally optional: a policy without a stable page title
+    can only be entered through an explicitly registered named list-row image.
     """
 
     label: str
@@ -28,7 +27,7 @@ def run_opened_event(bot, policy: EventPolicy):
 
     Navigation and scheduling deliberately remain outside this function.  It
     lets every event package expose a small ``run(bot)`` entry point now while
-    preserving the current red-dot scanner as the sole caller until a later
+    preserving the current named-row scanner as the sole caller until a later
     scheduler design is chosen.
     """
     scanner = import_module(f"{__package__}.run")

@@ -24,7 +24,16 @@
 6. Sau khi DONE 1 mới đóng panel một lần, mở `Wind Power Storage`, rồi bấm
    `Challenge Quest`. Phải thấy lại title Wind Blessings trước khi nhận.
 7. Phần Challenge Quest dùng cùng cơ chế: ở nguyên panel, nhận/lướt vùng xanh
-   đến khi không còn Claim. Đây là DONE 2.
-8. Chỉ ghi DB DONE khi cả DONE 1 và DONE 2 đều hoàn tất. Nếu chạm giới hạn an
-   toàn 12 lượt lướt hoặc còn Claim chưa xác minh thì giữ PENDING.
-9. Chờ 1 giây sau thao tác/popup trước khi chụp và xác minh khung mới.
+   đến khi không còn Claim. Đây là kiểm tra DONE 2.
+8. Sau DONE 2 có hai nhánh:
+   - Nếu không có Claim, hoặc có nhưng không bấm nhận được Claim nào: DONE ngay.
+   - Nếu đã nhận được ít nhất một Claim và đã nhận hết: Back về Wind Power
+     Storage, tìm rương cuối bằng ảnh median 40x40 trong vùng `(2,15,28,35)` ở
+     ngưỡng `0.70`, rồi bấm rương. Thấy `Congratulations!` thì DONE; nếu không
+     thấy popup, kiểm tra lại đúng vùng và rương đã biến mất thì cũng DONE.
+9. Ảnh rương cuối đo từ 60 frame thật trên 21513: điểm thấp nhất/trung vị/cao
+   nhất `0.7728/0.9442/0.9736`, nhiễu ngoài vùng cao nhất `0.2478`.
+10. Nếu chạm giới hạn an toàn 12 lượt lướt, còn Claim chưa nhận hết, thiếu
+    rương cuối, hoặc bấm xong không có Congratulations và rương vẫn còn thì
+    giữ PENDING.
+11. Chờ 1 giây sau thao tác/popup trước khi chụp và xác minh khung mới.

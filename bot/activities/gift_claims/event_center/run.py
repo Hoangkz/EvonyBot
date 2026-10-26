@@ -74,9 +74,9 @@ APPLE_ORNAMENT_THRESHOLD = 0.70
 APPLE_ORNAMENT_WIDTH_RATIO = 0.18
 # Exact text/border scores fall to 0.485 on the user's lagged live frames,
 # while their HSV bands remain decisive (ACTIVE S=185/81% saturated; DONE
-# S=24/7%). Require the exact control to score at least 0.45, then let the
+# S=24/7%). Require the exact control to score at least 0.44, then let the
 # strict yellow/gray colour gates below decide the state.
-APPLE_COLOR_LOCATE_THRESHOLD = 0.45
+APPLE_COLOR_LOCATE_THRESHOLD = 0.44
 APPLE_ACTIVE_SATURATION_MIN = 110.0
 APPLE_ACTIVE_COLOR_RATIO_MIN = 0.35
 APPLE_DONE_SATURATION_MAX = 65.0
@@ -86,6 +86,7 @@ APPLE_COLOR_SATURATION_CUTOFF = 100
 # làm template DONE chỉ còn khoảng 0.50 (log thực tế 0.507). Khi đồng thời thấy
 # Once đỏ và dải tại vị trí x10 đã xám, ngưỡng định vị thấp này là an toàn.
 APPLE_RED_POST_TAP_GRAY_LOCATE_THRESHOLD = 0.45
+APPLE_RED_X10_DISTINCT_DISTANCE = 45
 MAX_APPLE_TAPS_PER_PHASE = 100
 APPLE_STATE_MISS_RETRIES = 3
 # MEmu can become noticeably slower when the worker controls many devices at
@@ -113,6 +114,11 @@ MAX_WISHFUL_TAPS_PER_CLAIM = 3
 WISHFUL_EDGE_CONFIRMATIONS = 2
 WISHFUL_DONE_ONE_LIMIT = (
     "EventCenter/WishfulWindmillFestival/status_done_one_claim_limit", 0.84)
+WISHFUL_DONE_TWO_CHEST = (
+    "EventCenter/WishfulWindmillFestival/button_done2_reward_chest_median",
+    0.70,
+)
+WISHFUL_DONE_TWO_CHEST_REGION = (2, 15, 28, 35)
 EMPTY_POSITION_CHECKS = 2
 APPLE_GREEN_ONCE_STATES = (
     ("EventCenter/DwarfsLuckyApple/status_green_wish_once", 0.84),
@@ -745,6 +751,38 @@ def _claim_wishful_panel(bot, phase: str) -> tuple[ClaimReport, bool]:
     return ClaimReport(attempted, verified), False
 
 
+def _claim_wishful_done_two_chest(bot) -> tuple[ClaimReport, bool]:
+    """Claim the final chest; verify Congratulations or its disappearance."""
+    template, threshold = WISHFUL_DONE_TWO_CHEST
+    chest = _wait_for(
+        bot, template, attempts=5, threshold=threshold,
+        region=WISHFUL_DONE_TWO_CHEST_REGION,
+        delay=WISHFUL_SETTLE_SECONDS,
+    )
+    if chest is None:
+        bot.record("Gift Claims: Wishful Windmill đã nhận Claim DONE 2 nhưng "
+                   "chưa thấy rương cuối; giữ PENDING")
+        return ClaimReport(), False
+    bot.record(f"Gift Claims: Wishful Windmill thấy rương cuối tại {chest}; tap")
+    bot.tap(*chest, delay=WISHFUL_SETTLE_SECONDS)
+    if close_congratulations(bot, attempts=8, region=(0, 18, 100, 65)):
+        bot.record("Gift Claims: Wishful Windmill rương cuối hiện "
+                   "Congratulations; DONE")
+        return ClaimReport(1, 1), True
+    remaining = _wait_for(
+        bot, template, attempts=2, threshold=threshold,
+        region=WISHFUL_DONE_TWO_CHEST_REGION,
+        delay=WISHFUL_SETTLE_SECONDS,
+    )
+    if remaining is None:
+        bot.record("Gift Claims: Wishful Windmill không thấy Congratulations "
+                   "nhưng rương cuối đã biến mất khỏi đúng vùng; DONE")
+        return ClaimReport(1, 1), True
+    bot.record("Gift Claims: Wishful Windmill đã bấm rương cuối nhưng chưa "
+               "thấy Congratulations và rương vẫn còn; giữ PENDING")
+    return ClaimReport(1, 0), False
+
+
 def _wait_event_row_open(bot, expected_screen=None, *, delay=UI_SETTLE_SECONDS):
     """Wait through Event Center transition frames after selecting one row.
 
@@ -805,7 +843,24 @@ def _handle_wishful(bot):
     second, second_done = _claim_wishful_panel(bot, "Challenge Quest")
     total = ClaimReport(first.attempted + second.attempted,
                         first.verified + second.verified)
-    return total, second_done
+    if second.attempted == 0:
+        bot.record("Gift Claims: Wishful Windmill DONE 2 không có nút Claim; "
+                   "DONE ngay, không cần nhận rương cuối")
+        return total, second_done
+    if second.verified == 0:
+        bot.record("Gift Claims: Wishful Windmill DONE 2 không bấm nhận được "
+                   "Claim nào; DONE ngay, chuyển nhiệm vụ khác")
+        return total, True
+    if not second_done:
+        return total, False
+
+    # At least one DONE-2 Claim was really received and the panel is clean.
+    # Return to Wind Power Storage, then the final chest must show
+    # Congratulations before the whole event is persisted as DONE.
+    bot.back(delay=WISHFUL_SETTLE_SECONDS)
+    chest, chest_done = _claim_wishful_done_two_chest(bot)
+    return ClaimReport(total.attempted + chest.attempted,
+                       total.verified + chest.verified), chest_done
 
 
 def _apple_done_ornament_matches(screen, template, center) -> tuple[bool, tuple[float, float]]:
@@ -948,25 +1003,53 @@ def _apple_red_x10_post_tap_done(bot, screen) -> bool:
     and tapped red x10; it additionally requires an exact red Once state and
     a grey colour band at the weak x10 match.
     """
+    red_once = _apple_special_state(
+        bot, screen, APPLE_RED_ONCE_STATES,
+        "Wish Once táo đỏ sau khi đã bấm x10")
+    if red_once is None:
+        return False
+
+    # The live terminal layout can remove x10 completely and leave only Wish
+    # Once. The x10 ACTIVE template then weakly matches that remaining control
+    # (0.449 in the supplied frame). Do not mistake it for a separate x10: a
+    # genuinely actionable x10 is yellow and spatially distinct from Once.
+    active = "EventCenter/DwarfsLuckyApple/button_red_wish_x10"
+    active_template = _scaled_template(bot, active, screen)
+    active_score, active_pos = bot.best_match(
+        active_template, screen=screen, region=(0, 15, 100, 98))
+    if active_pos is not None:
+        active_saturation, active_color_ratio = _apple_button_color_band(
+            screen, active_pos)
+        once_pos = red_once[1]
+        distance_sq = ((active_pos[0] - once_pos[0]) ** 2 +
+                       (active_pos[1] - once_pos[1]) ** 2)
+        active_is_yellow = (
+            active_saturation >= APPLE_ACTIVE_SATURATION_MIN and
+            active_color_ratio >= APPLE_ACTIVE_COLOR_RATIO_MIN)
+        if (active_score >= APPLE_COLOR_LOCATE_THRESHOLD and
+                active_is_yellow and
+                distance_sq > APPLE_RED_X10_DISTINCT_DISTANCE ** 2):
+            bot.record("Gift Claims: Dwarf's Lucky Apple vẫn thấy một nút "
+                       "đỏ x10 vàng tách biệt với Wish Once; tiếp tục pha")
+            return False
+
     finished = "EventCenter/DwarfsLuckyApple/status_red_wish_x10_done"
     done_template = _scaled_template(bot, finished, screen)
     done_score, done_pos = bot.best_match(
         done_template, screen=screen, region=(0, 15, 100, 98))
-    if (done_pos is None or
-            done_score < APPLE_RED_POST_TAP_GRAY_LOCATE_THRESHOLD):
-        return False
-    saturation, color_ratio = _apple_button_color_band(screen, done_pos)
-    if (saturation > APPLE_DONE_SATURATION_MAX or
-            color_ratio > APPLE_DONE_COLOR_RATIO_MAX):
-        return False
-    red_once = _apple_special_state(
-        bot, screen, APPLE_RED_ONCE_STATES,
-        "Wish Once táo đỏ bên cạnh x10 đã xám")
-    if red_once is None:
-        return False
-    bot.record("Gift Claims: Dwarf's Lucky Apple đỏ x10 sau tap đã xám "
-               f"(score={done_score:.3f}, S={saturation:.1f}, tỷ lệ màu="
-               f"{color_ratio:.2f}) và còn Wish Once; xác nhận DONE")
+    if (done_pos is not None and
+            done_score >= APPLE_RED_POST_TAP_GRAY_LOCATE_THRESHOLD):
+        saturation, color_ratio = _apple_button_color_band(screen, done_pos)
+        if (saturation <= APPLE_DONE_SATURATION_MAX and
+                color_ratio <= APPLE_DONE_COLOR_RATIO_MAX):
+            bot.record("Gift Claims: Dwarf's Lucky Apple đỏ x10 sau tap đã "
+                       f"xám (score={done_score:.3f}, S={saturation:.1f}, "
+                       f"tỷ lệ màu={color_ratio:.2f}) và còn Wish Once; "
+                       "xác nhận DONE")
+            return True
+
+    bot.record("Gift Claims: Dwarf's Lucky Apple đã từng bấm đỏ x10, hiện "
+               "chỉ còn Wish Once và không còn x10 vàng tách biệt; DONE")
     return True
 
 
@@ -1058,12 +1141,12 @@ def _apple_phase(bot, active: str, finished: str,
             _close_apple_congratulations(bot, attempts=1)
             bot.sleep(UI_SETTLE_SECONDS)
             continue
-        state, button = _apple_button_state(bot, screen, active, finished)
-        if state == "done":
-            return ClaimReport(attempted, attempted), True
         if (attempted > 0 and
                 active == "EventCenter/DwarfsLuckyApple/button_red_wish_x10" and
                 _apple_red_x10_post_tap_done(bot, screen)):
+            return ClaimReport(attempted, attempted), True
+        state, button = _apple_button_state(bot, screen, active, finished)
+        if state == "done":
             return ClaimReport(attempted, attempted), True
         if state != "active" or button is None:
             missing_frames += 1

@@ -176,7 +176,10 @@ Một lượt tìm (`search_pass`):
   để nhận tất cả nút Claim trùng nhau. Chỉ sau đó mới dò sparkle; một sparkle
   không sinh Congratulations thì dừng tab đó. Nếu người dùng bấm Stop giữa
   tab, tab đó chưa được ghi nhớ và phải được mở lại ở lần chạy sau.
-- Event Center: quét xong toàn bộ nhóm Limited trước rồi luôn chuyển sang
+- Event Center: không nhận diện hoặc bấm theo dấu đỏ ngoài danh sách. Bot chỉ
+  tìm và mở các nhiệm vụ đã được đăng ký bằng ảnh tên dòng trong code; các dòng
+  mua hàng/xã hội hoặc nhiệm vụ chưa có ảnh tên sẽ bị bỏ qua. Quét xong toàn bộ
+  nhóm Limited trước rồi luôn chuyển sang
   Activities; không vào Competition. Một nhiệm vụ đã thấy nhưng chạy hết flow
   riêng mà chưa DONE được giữ PENDING và không được mở lại trong cùng lượt
   120 giây. Mỗi nhóm
@@ -207,16 +210,15 @@ Một lượt tìm (`search_pass`):
   được gì, event được coi là đã cạn quà và DONE hôm nay. Mỗi lượt vẫn cho phép
   nút đặc biệt xuất hiện trễ trong số lần dò hữu hạn. Bacchus Tavern vẫn được
   nhận diện và bỏ qua. Sau mỗi event phải quay lại danh sách trước khi
-  cuộn tiếp. Sau một vòng quét đầy đủ, badge mua hàng/khóa vẫn đỏ nhưng event đã
-  có checkpoint và đã thử đủ bốn lần được ghi `skip/done`; badge mới chưa từng
-  xử lý vẫn chặn DONE.
+  cuộn tiếp. Sau một vòng quét đầy đủ, trạng thái hoàn tất chỉ dựa trên các
+  nhiệm vụ tên đã đăng ký và key DB; dấu đỏ còn lại không chặn DONE.
 - Revelation of Horus và Sealed Imperial Treasury được nhận diện theo tiêu đề,
   bỏ qua ngay và coi là DONE.
 - Grace of Star Trail bấm icon `Star Trail Gift`, chờ màn con rồi bấm tiếp icon
   đồng xu có chữ `Claim`; chỉ bước thứ hai mới tính là nhận xu. Dwarf's Treasure
   dùng crop gồm cả rương `Daily Free` để tâm ảnh nằm trong vùng bấm thật.
-- Limited chủ động tìm dòng Grace of Star Trail một lần ngay cả khi dòng ngoài
-  không có badge đỏ. Việc cuộn danh sách dừng sớm khi ảnh ổn định ở biên; các
+- Limited chủ động tìm mọi dòng tên đã đăng ký, bao gồm Grace of Star Trail.
+  Việc cuộn danh sách dừng sớm khi ảnh ổn định ở biên; các
   nhóm đã DONE được checkpoint để lần chạy sau không quét lại.
 - Màn xoay vòng chưa có tiêu đề cố định: vẫn tìm toàn bộ nút chữ nhận trong
   vùng nội dung, sau đó kiểm tra sparkle đủ bốn lần. Nếu không có kết quả nhận
