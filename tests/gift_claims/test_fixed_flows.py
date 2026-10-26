@@ -3375,6 +3375,8 @@ class FixedGiftFlowTests(unittest.TestCase):
                   ("done", (200, 500)))
         with (mock.patch.object(event_center, "_apple_congratulations_hit",
                                 return_value=None),
+              mock.patch.object(event_center, "identify",
+                                return_value=GiftScreen.DWARFS_LUCKY_APPLE),
               mock.patch.object(event_center, "_apple_button_state",
                                 side_effect=states) as state):
             _report, done = event_center._apple_phase(
@@ -3383,6 +3385,69 @@ class FixedGiftFlowTests(unittest.TestCase):
         self.assertTrue(done)
         self.assertEqual(4, state.call_count)
         bot.back.assert_not_called()
+
+    def test_lucky_apple_lagged_colour_bands_override_low_template_score(self):
+        bot = mock.Mock()
+        screen = np.zeros((704, 396, 3), dtype=np.uint8)
+        yellow = (185.4, 0.81)
+        gray = (23.7, 0.07)
+        with (mock.patch.object(event_center, "_scaled_template",
+                                side_effect=("active", "done")),
+              mock.patch.object(bot, "best_match",
+                                side_effect=((0.485, (250, 500)),
+                                             (0.312, (250, 500)))),
+              mock.patch.object(event_center, "_apple_button_color_band",
+                                side_effect=(yellow, gray))):
+            state, _ = event_center._apple_button_state(
+                bot, screen, "active.png", "done.png")
+        self.assertEqual("active", state)
+
+        with (mock.patch.object(event_center, "_scaled_template",
+                                side_effect=("active", "done")),
+              mock.patch.object(bot, "best_match",
+                                side_effect=((0.545, (250, 500)),
+                                             (0.491, (250, 500)))),
+              mock.patch.object(event_center, "_apple_button_color_band",
+                                side_effect=(gray, gray))):
+            state, _ = event_center._apple_button_state(
+                bot, screen, "active.png", "done.png")
+        self.assertEqual("done", state)
+
+    def test_lucky_apple_missing_popup_still_rechecks_and_taps_active(self):
+        bot = mock.Mock()
+        bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
+        with (mock.patch.object(event_center, "_apple_congratulations_hit",
+                                return_value=None),
+              mock.patch.object(event_center, "identify",
+                                return_value=GiftScreen.DWARFS_LUCKY_APPLE),
+              mock.patch.object(event_center, "_apple_button_state",
+                                side_effect=(("active", (250, 500)),
+                                             ("done", (250, 500)))),
+              mock.patch.object(event_center, "_close_apple_congratulations",
+                                return_value=False) as close):
+            report, done = event_center._apple_phase(
+                bot, "active.png", "done.png", max_taps=2)
+
+        self.assertTrue(done)
+        self.assertEqual(common.ClaimReport(1, 1), report)
+        bot.tap.assert_called_once_with(
+            250, 500, delay=event_center.UI_SETTLE_SECONDS)
+        close.assert_called_once_with(bot, attempts=3)
+
+    def test_lucky_apple_stops_after_three_frames_on_wrong_page(self):
+        bot = mock.Mock()
+        bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
+        with (mock.patch.object(event_center, "_apple_congratulations_hit",
+                                return_value=None),
+              mock.patch.object(event_center, "identify",
+                                return_value=GiftScreen.EVENT_CENTER),
+              mock.patch.object(event_center, "_apple_button_state",
+                                return_value=(None, None))):
+            _report, done = event_center._apple_phase(
+                bot, "active.png", "done.png", max_taps=2)
+
+        self.assertFalse(done)
+        self.assertEqual(3, bot.screenshot.call_count)
 
     def test_lucky_apple_immediately_propagates_worker_120s_timeout(self):
         bot = mock.Mock()

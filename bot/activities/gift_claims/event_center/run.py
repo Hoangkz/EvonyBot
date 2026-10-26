@@ -72,7 +72,11 @@ MAX_EVENT_VERIFY_PASSES = 2
 APPLE_STATE_THRESHOLD = 0.80
 APPLE_ORNAMENT_THRESHOLD = 0.70
 APPLE_ORNAMENT_WIDTH_RATIO = 0.18
-APPLE_COLOR_LOCATE_THRESHOLD = 0.72
+# Exact text/border scores fall to 0.485 on the user's lagged live frames,
+# while their HSV bands remain decisive (ACTIVE S=185/81% saturated; DONE
+# S=24/7%). Require the exact control to score at least 0.45, then let the
+# strict yellow/gray colour gates below decide the state.
+APPLE_COLOR_LOCATE_THRESHOLD = 0.45
 APPLE_ACTIVE_SATURATION_MIN = 110.0
 APPLE_ACTIVE_COLOR_RATIO_MIN = 0.35
 APPLE_DONE_SATURATION_MAX = 65.0
@@ -1040,6 +1044,7 @@ def _apple_phase(bot, active: str, finished: str,
     """
     attempted = 0
     missing_frames = 0
+    wrong_page_frames = 0
     while attempted < max_taps:
         bot.check()
         screen = bot.screenshot()
@@ -1062,21 +1067,35 @@ def _apple_phase(bot, active: str, finished: str,
             return ClaimReport(attempted, attempted), True
         if state != "active" or button is None:
             missing_frames += 1
+            if identify(bot, screen) != GiftScreen.DWARFS_LUCKY_APPLE:
+                wrong_page_frames += 1
+                bot.record("Gift Claims: Dwarf's Lucky Apple không còn thấy "
+                           "title trang hiện tại "
+                           f"({wrong_page_frames}/{APPLE_STATE_MISS_RETRIES})")
+                if wrong_page_frames >= APPLE_STATE_MISS_RETRIES:
+                    bot.record("Gift Claims: Dwarf's Lucky Apple đã rời trang; "
+                               "dừng PENDING thay vì đọc nút trên màn khác")
+                    return ClaimReport(attempted, 0), False
+            else:
+                wrong_page_frames = 0
             bot.record(f"Gift Claims: Dwarf's Lucky Apple chưa đọc được trạng "
-                       f"thái pha hiện tại ({missing_frames}/"
-                       f"{APPLE_STATE_MISS_RETRIES}); chờ rồi kiểm tra lại")
+                       f"thái pha hiện tại (lần {missing_frames}); chờ rồi "
+                       "kiểm tra lại nút")
             if missing_frames % APPLE_STATE_MISS_RETRIES == 0:
                 bot.record("Gift Claims: Dwarf's Lucky Apple vẫn ở nguyên "
                            "trang để đọc lại; không chuyển PENDING/không Back")
             bot.sleep(UI_SETTLE_SECONDS)
             continue
         missing_frames = 0
+        wrong_page_frames = 0
         attempted += 1
         bot.record(f"Gift Claims: Dwarf's Lucky Apple tap {active} "
                    f"({attempted}/{max_taps})")
         bot.tap(*button, delay=UI_SETTLE_SECONDS)
-        _close_apple_congratulations(
-            bot, attempts=1, safe_tap_after_reward=True)
+        # Wait for a late Congratulations, but never tap the title merely
+        # because an overloaded device did not render the popup. The next
+        # loop still checks ACTIVE/DONE and presses ACTIVE again when needed.
+        _close_apple_congratulations(bot, attempts=3)
         # Keep recognition separate from the tap/animation delay. The next
         # ACTIVE/DONE comparison must use a stable post-popup frame.
         bot.sleep(UI_SETTLE_SECONDS)

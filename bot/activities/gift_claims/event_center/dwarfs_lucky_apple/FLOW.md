@@ -33,15 +33,17 @@
    `(195, 20)` ở vùng title phía trên để đóng popup, rồi kiểm tra lại nút trên
    ảnh màn hình mới. Sau khi đóng popup phải chờ ít nhất 1 giây; tuyệt đối
    không so ảnh `DONE/ACTIVE` trên khung hình vẫn còn `Congratulations!`, và
-   không dùng Back vì Back có thể thoát khỏi trang sự kiện. Ngay sau một lần
-   bấm nút nhận Apple, nếu hiệu ứng làm template `Congratulations!` nhận hụt,
-   bot vẫn phải tap an toàn `(195, 20)` một lần trước khi xét trạng thái mới.
+   không dùng Back vì Back có thể thoát khỏi trang sự kiện. Sau một lần bấm,
+   bot chờ tối đa ba frame để tìm popup. Nếu popup lag hoặc không xuất hiện thì
+   không tap title mù; bot chuyển sang đọc lại ACTIVE/DONE và tiếp tục bấm nút
+   ACTIVE nếu nó vẫn còn.
 6. Mọi ảnh trạng thái DONE phải xác minh thêm cả hoa văn viền trái và viền phải
    của template. Nếu thiếu một trong hai viền thì không được kết luận DONE.
 7. ACTIVE/DONE còn được phân biệt bằng dải màu HSV 70x24 ở tâm nút. Nút vàng
    ACTIVE phải có độ bão hòa trung bình ít nhất `110` và tối thiểu `35%` pixel
    có saturation từ `100`; nút xám DONE phải có trung bình không quá `65` và
-   tỷ lệ pixel màu không quá `20%`. Điểm template chỉ dùng để định vị; nếu ảnh
+   tỷ lệ pixel màu không quá `20%`. Điểm template từ `0.45` chỉ dùng để định
+   vị khi dải màu đạt điều kiện chặt; nếu ảnh
    DONE khớp cao nhưng dải vẫn vàng thì phải tiếp tục bấm, không được chuyển
    pha. DONE chỉ hợp lệ khi đồng thời đủ dải xám và hai viền hoa văn.
    Riêng layout thật sau khi vừa bấm đỏ x10 có thể làm ảnh DONE cũ chỉ đạt
@@ -54,6 +56,8 @@
    vụ và chụp lại mỗi 1 giây; ba lần không đọc được không được chuyển PENDING
    hoặc Back ra danh sách. Chỉ bộ đếm 120 giây của worker mới được ngắt để quay
    lại Join Boss, rồi lần chạy sau tiếp tục nhiệm vụ chưa DONE.
+   Riêng khi ba frame liên tiếp không còn nhận diện được title Dwarf's Lucky
+   Apple, bot dừng PENDING vì đã rời trang, không tiếp tục đọc màu màn hình khác.
    Ngay khi vào Dwarf, log ghi rõ deadline worker còn bao nhiêu giây.
    Nếu log báo không có deadline thì Join Boss không hoạt động hoặc
    worker đang chờ thể lực; Dwarf vẫn thuộc Event Center/Activities.
