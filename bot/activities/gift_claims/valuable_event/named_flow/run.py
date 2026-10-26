@@ -22,6 +22,12 @@ TOP_CAROUSEL = (0, 7, 100, 19)
 CAROUSEL_STABLE_BAND = (0, 12, 100, 18)
 CAROUSEL_EDGE_CONFIRMATIONS = 2
 CAROUSEL_SAME_DISTANCE = 16
+# Vertical reward frames are larger and contain more small animated details
+# than the task-name strip.  Their dHash contains 576 bits; allowing 24
+# changed bits keeps roughly the same noise tolerance as the horizontal
+# carousel while still clearly separating a real list movement.
+LIST_EDGE_CONFIRMATIONS = 2
+LIST_SAME_DISTANCE = 24
 # Task labels must be a strong visual match. A full carousel sweep that finds
 # no label is counted by scan.run_zone; only three complete misses become DONE.
 TASK_TAB_THRESHOLD = 0.82
@@ -60,6 +66,51 @@ def carousel_moved(before, after) -> bool:
         carousel_signature(before), carousel_signature(after))
 
 
+def region_dhash_signature(screen, region, *, hash_width=48,
+                           hash_height=12) -> bytes:
+    """Build a reusable dHash for one percentage-based screen region.
+
+    ``region`` is ``(x0, y0, x1, y1)`` in screen percentages.  The returned
+    hash contains ``hash_width * hash_height`` bits.
+    """
+    height, width = screen.shape[:2]
+    x0, y0, x1, y1 = region
+    patch = cv2.cvtColor(
+        screen[round(height * y0 / 100):round(height * y1 / 100),
+               round(width * x0 / 100):round(width * x1 / 100)],
+        cv2.COLOR_BGR2GRAY,
+    )
+    if patch.size == 0:
+        raise ValueError(f"empty dHash region: {region}")
+    tiny = cv2.resize(patch, (hash_width + 1, hash_height),
+                      interpolation=cv2.INTER_AREA)
+    return np.packbits(tiny[:, 1:] > tiny[:, :-1]).tobytes()
+
+
+def region_hamming_distance(before, after, region, *, hash_width=48,
+                            hash_height=12) -> int:
+    """Return the dHash Hamming distance for the same region in two images."""
+    old = np.frombuffer(region_dhash_signature(
+        before, region, hash_width=hash_width, hash_height=hash_height),
+        dtype=np.uint8)
+    new = np.frombuffer(region_dhash_signature(
+        after, region, hash_width=hash_width, hash_height=hash_height),
+        dtype=np.uint8)
+    if old.shape != new.shape:
+        return max(old.size, new.size) * 8
+    return int(np.unpackbits(np.bitwise_xor(old, new)).sum())
+
+
+def list_signature(screen, region) -> bytes:
+    """Compatibility wrapper for the 576-bit vertical reward-frame dHash."""
+    return region_dhash_signature(screen, region)
+
+
+def list_hamming_distance(before, after, region) -> int:
+    """Compatibility wrapper for vertical reward-frame Hamming distance."""
+    return region_hamming_distance(before, after, region)
+
+
 @dataclass(frozen=True)
 class ExactFlow:
     """Stable controls and terminal markers for one rotating event."""
@@ -89,6 +140,11 @@ class ExactFlow:
     scroll_end: tuple[int, int] = (50, 55)
     scroll_region: tuple[int, int, int, int] = LOWER_CONTENT
     max_scroll_pages: int = 6
+    # Selected Valuable Event lists prove their real top and bottom with dHash
+    # instead of treating a fixed page count as an edge.
+    confirm_scroll_edges: bool = False
+    scroll_same_distance: int = LIST_SAME_DISTANCE
+    scroll_edge_confirmations: int = LIST_EDGE_CONFIRMATIONS
     skip: bool = False
     # Optional page-specific setup which must be verified before claims.
     prepare: Callable[[object], bool] | None = None
@@ -149,6 +205,98 @@ def _tap_navigation(bot, flow: ExactFlow) -> bool:
     return acted
 
 
+def _claim_current_scroll_position(bot, flow: ExactFlow) -> tuple[bool, bool]:
+    """Claim one settled viewport; return (saw_claim, completed)."""
+    saw_claim = False
+    blocked: set[tuple[str, int, int]] = set()
+    while True:
+        bot.check()
+        screen = bot.screenshot()
+        hit = find_any(bot, flow.claims, screen, region=flow.claim_region,
+                       threshold=flow.claim_threshold)
+        if hit is None:
+            return saw_claim, False
+        name, pos = hit
+        signature = (name, round(pos[0] / 20), round(pos[1] / 20))
+        if signature in blocked:
+            return saw_claim, False
+        blocked.add(signature)
+        saw_claim = True
+        bot.record(f"Gift Claims: tap exact claim {name}")
+        scale = screen.shape[1] / 396
+        target = (round(pos[0] + flow.claim_offset[0] * scale),
+                  round(pos[1] + flow.claim_offset[1] * scale))
+        bot.tap(*target, delay=STEP_DELAY)
+        if close_congratulations(bot, attempts=3):
+            bot.record(f"Gift Claims: {name} -> Congratulations")
+            if flow.congratulations_done:
+                return saw_claim, True
+        if _done(bot, flow):
+            return saw_claim, True
+
+
+def _swipe_vertical(bot, flow: ExactFlow, *, toward_start: bool) -> int:
+    """Swipe once inside the configured frame and return its dHash distance."""
+    before = bot.screenshot()
+    start, end = ((flow.scroll_end, flow.scroll_start) if toward_start else
+                  (flow.scroll_start, flow.scroll_end))
+    bot.swipe_percent(*start, *end, duration=SLOW_SWIPE_DURATION,
+                      delay=STEP_DELAY)
+    after = bot.screenshot()
+    return list_hamming_distance(before, after, flow.scroll_region)
+
+
+def _process_edge_scrolled(bot, flow: ExactFlow) -> tuple[bool, bool, bool]:
+    """Return (completed, saw_claim, reached_bottom) for a vertical list."""
+    # First establish the real top.  There is deliberately no local swipe
+    # ceiling: bot.check() is the shared Stop/deadline guard.
+    unchanged = 0
+    while unchanged < flow.scroll_edge_confirmations:
+        bot.check()
+        distance = _swipe_vertical(bot, flow, toward_start=True)
+        unchanged = unchanged + 1 if distance <= flow.scroll_same_distance else 0
+        bot.record("Gift Claims: quét vùng xanh về đầu, Hamming "
+                   f"{distance}/{flow.scroll_same_distance}, không đổi "
+                   f"{unchanged}/{flow.scroll_edge_confirmations}")
+        if _done(bot, flow):
+            return True, False, False
+
+    bot.record("Gift Claims: đã xác nhận đầu vùng xanh; quét dọc tới cuối")
+    saw_claim = False
+    unchanged = 0
+    while True:
+        bot.check()
+        claimed, completed = _claim_current_scroll_position(bot, flow)
+        saw_claim = saw_claim or claimed
+        if completed:
+            return True, saw_claim, False
+        # Removing a reward can collapse rows and expose more content.  Any
+        # edge evidence collected before that layout change is no longer
+        # valid, so start the two-frame confirmation again.
+        if claimed:
+            unchanged = 0
+        distance = _swipe_vertical(bot, flow, toward_start=False)
+        unchanged = unchanged + 1 if distance <= flow.scroll_same_distance else 0
+        bot.record("Gift Claims: quét vùng xanh tới cuối, Hamming "
+                   f"{distance}/{flow.scroll_same_distance}, không đổi "
+                   f"{unchanged}/{flow.scroll_edge_confirmations}")
+        if _done(bot, flow):
+            return True, saw_claim, False
+        if unchanged >= flow.scroll_edge_confirmations:
+            # Process the final settled viewport once more.  If a claim
+            # changes the layout, continue and prove the new bottom again.
+            claimed, completed = _claim_current_scroll_position(bot, flow)
+            saw_claim = saw_claim or claimed
+            if completed:
+                return True, saw_claim, True
+            if claimed:
+                unchanged = 0
+                continue
+            bot.record("Gift Claims: đã xác nhận cuối vùng xanh sau "
+                       f"{flow.scroll_edge_confirmations} cú không đổi")
+            return False, saw_claim, True
+
+
 def process_exact(bot, flow: ExactFlow) -> bool:
     """Run one selected lower panel and return only on its explicit DONE rule."""
     if flow.skip:
@@ -168,6 +316,26 @@ def process_exact(bot, flow: ExactFlow) -> bool:
     navigated = _tap_navigation(bot, flow)
     if _done(bot, flow):
         return True
+
+    if flow.scroll_claims and flow.confirm_scroll_edges:
+        completed, saw_claim, reached_scroll_end = _process_edge_scrolled(bot, flow)
+        if completed:
+            return True
+        if (flow.absence_done and reached_scroll_end
+                and _wait_any(bot, flow.claims, attempts=2,
+                              region=flow.claim_region,
+                              threshold=flow.claim_threshold) is None):
+            bot.record("Gift Claims: đã xác nhận cuối vùng xanh và không còn "
+                       "nút nhận; DONE")
+            return True
+        if saw_claim:
+            bot.record("Gift Claims: đã nhận quà nhưng chưa thấy trạng thái "
+                       "DONE; giữ PENDING")
+        if navigated or opened_missing:
+            bot.record("Gift Claims: không nhận diện được trạng thái nhiệm vụ; "
+                       "Back một lần về trang event")
+            bot.back(delay=STEP_DELAY)
+        return False
 
     pages = flow.max_scroll_pages if flow.scroll_claims else 1
     saw_claim = False

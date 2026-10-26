@@ -42,6 +42,12 @@ refining_weekly_card = import_module(
     "bot.activities.gift_claims.valuable_event.refining_weekly_card.run")
 active_monthly_card = import_module(
     "bot.activities.gift_claims.valuable_event.active_monthly_card.run")
+hall_of_historic_generals = import_module(
+    "bot.activities.gift_claims.valuable_event.hall_of_historic_generals.run")
+soul_of_spiritual_beast = import_module(
+    "bot.activities.gift_claims.valuable_event.soul_of_spiritual_beast.run")
+super_value_weekly_card = import_module(
+    "bot.activities.gift_claims.valuable_event.super_value_weekly_card.run")
 super_value_return = import_module(
     "bot.activities.gift_claims.valuable_event.super_value_return.run")
 super_value_zone = import_module(
@@ -80,6 +86,26 @@ class CvBot:
 
 
 class FixedGiftFlowTests(unittest.TestCase):
+    def test_gift_claim_images_are_split_into_three_event_families(self):
+        root = IMAGES / "GiftClaims"
+        self.assertEqual(
+            {"Common", "Event", "EventCenter", "FollowUs", "Lobby",
+             "SuperValueReturn", "ValuableEvent"},
+            {path.name for path in root.iterdir() if path.is_dir()})
+        self.assertEqual(
+            {"RevelryCarnival"},
+            {path.name for path in (root / "Event").iterdir()
+             if path.is_dir()})
+        self.assertEqual(17, len([
+            path for path in (root / "EventCenter").iterdir()
+            if path.is_dir()]))
+        self.assertEqual(16, len([
+            path for path in (root / "ValuableEvent").iterdir()
+            if path.is_dir()]))
+        self.assertEqual(7, len([
+            path for path in (root / "SuperValueReturn").iterdir()
+            if path.is_dir()]))
+
     def setUp(self):
         self.bot = CvBot()
 
@@ -96,66 +122,79 @@ class FixedGiftFlowTests(unittest.TestCase):
         screen = np.zeros((704, 396, 3), dtype=np.uint8)
         self.assertIsNone(identify(self.bot, screen))
 
-    def test_dragon_battle_current_button_has_supplied_dimensions(self):
-        button = cv2.imread(str(
-            IMAGES / "GiftClaims" / "DragonBattle" /
-            "button_claim_015225.png"))
-        self.assertEqual((25, 40), button.shape[:2])
+    def test_dragon_battle_reward_and_claimed_images_are_supplied(self):
+        reward = cv2.imread(str(
+            IMAGES / "GiftClaims" / "EventCenter" / "DragonBattle" /
+            "reward.png"))
+        claimed = cv2.imread(str(
+            IMAGES / "GiftClaims" / "EventCenter" / "DragonBattle" /
+            "status_reward_claimed.png"))
+        self.assertEqual((42, 52), reward.shape[:2])
+        self.assertEqual((34, 40), claimed.shape[:2])
 
-    def test_dragon_battle_is_done_only_after_congratulations(self):
+    def test_dragon_battle_is_done_after_congratulations(self):
         bot = mock.Mock()
-        with (mock.patch.object(event_center, "_wait_for",
-                                return_value=(210, 500)),
-              mock.patch.object(event_center, "close_congratulations",
+        bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
+        with (mock.patch.object(dragon_battle, "_reward_claimed",
+                                return_value=False),
+              mock.patch.object(dragon_battle, "_find_reward_chest",
+                                return_value=(370, 229)),
+              mock.patch.object(dragon_battle, "close_congratulations",
                                 return_value=True)):
             report, done = event_center._handle_dragon_battle(bot)
 
         self.assertTrue(done)
         self.assertEqual(common.ClaimReport(1, 1), report)
         bot.tap.assert_called_once_with(
-            210, 500, delay=event_center.UI_SETTLE_SECONDS)
+            370, 229, delay=dragon_battle.STEP_DELAY)
 
-    def test_dragon_battle_stays_pending_without_congratulations(self):
+    def test_dragon_battle_stays_pending_without_terminal_state(self):
         bot = mock.Mock()
-        with (mock.patch.object(event_center, "_wait_for",
-                                return_value=(210, 500)),
-              mock.patch.object(event_center, "close_congratulations",
+        bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
+        with (mock.patch.object(dragon_battle, "_reward_claimed",
+                                return_value=False),
+              mock.patch.object(dragon_battle, "_find_reward_chest",
+                                return_value=(370, 229)),
+              mock.patch.object(dragon_battle, "close_congratulations",
                                 return_value=False)):
             report, done = event_center._handle_dragon_battle(bot)
 
         self.assertFalse(done)
         self.assertEqual(common.ClaimReport(1, 0), report)
 
-    def test_dragon_battle_missing_button_is_done_without_tapping(self):
+    def test_dragon_battle_missing_chest_is_pending_without_tapping(self):
         bot = mock.Mock()
-        with mock.patch.object(event_center, "_wait_for",
-                               return_value=None):
+        bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
+        with (mock.patch.object(dragon_battle, "_reward_claimed",
+                                return_value=False),
+              mock.patch.object(dragon_battle, "_find_reward_chest",
+                                return_value=None)):
             report, done = event_center._handle_dragon_battle(bot)
+
+        self.assertFalse(done)
+        self.assertEqual(common.ClaimReport(), report)
+        bot.tap.assert_not_called()
+
+    def test_dragon_battle_opened_chest_is_done_without_tapping(self):
+        bot = mock.Mock()
+        bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
+        with mock.patch.object(dragon_battle, "_reward_claimed",
+                               return_value=True):
+            report, done = dragon_battle.claim_opened(bot)
 
         self.assertTrue(done)
         self.assertEqual(common.ClaimReport(0, 1), report)
         bot.tap.assert_not_called()
 
-    def test_dragon_battle_standalone_missing_button_is_done(self):
+    def test_dragon_battle_standalone_tap_requires_terminal_state(self):
         bot = mock.Mock()
-        screen = np.zeros((704, 396, 3), dtype=np.uint8)
-        bot.screenshot.return_value = screen
+        bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
         with (mock.patch.object(dragon_battle, "open_event_center_event",
                                 return_value=True),
-              mock.patch.object(dragon_battle, "find", return_value=None)):
-            done = dragon_battle.run(bot)
-
-        self.assertTrue(done)
-        bot.tap.assert_not_called()
-
-    def test_dragon_battle_standalone_tap_requires_congratulations(self):
-        bot = mock.Mock()
-        screen = np.zeros((704, 396, 3), dtype=np.uint8)
-        bot.screenshot.return_value = screen
-        with (mock.patch.object(dragon_battle, "open_event_center_event",
-                                return_value=True),
-              mock.patch.object(dragon_battle, "find",
-                                return_value=(210, 500)),
+              mock.patch.object(dragon_battle, "_reward_claimed",
+                                return_value=False),
+              mock.patch.object(dragon_battle, "_find_reward_chest",
+                                return_value=(370, 229)),
               mock.patch.object(dragon_battle, "close_congratulations",
                                 return_value=False)):
             done = dragon_battle.run(bot)
@@ -241,6 +280,10 @@ class FixedGiftFlowTests(unittest.TestCase):
     def test_super_value_return_finder_rejects_blank_city_region(self):
         screen = np.zeros((704, 396, 3), dtype=np.uint8)
         self.assertIsNone(common.find_super_value_return(self.bot, screen))
+
+    def test_super_value_return_empire_fallback_uses_measured_threshold(self):
+        self.assertEqual(0.62,
+                         common.SUPER_VALUE_RETURN_EMPIRE_THRESHOLD)
 
     def test_named_valuable_event_uses_dedicated_caption_finder(self):
         bot = mock.Mock()
@@ -370,6 +413,8 @@ class FixedGiftFlowTests(unittest.TestCase):
         with (mock.patch.object(lobby, "return_home", return_value=True),
               mock.patch.object(lobby, "find_super_value_return",
                                 return_value=None) as finder,
+              mock.patch.object(lobby, "find_valuable_event",
+                                return_value=None),
               mock.patch.object(lobby, "identify", return_value=None)):
             self.assertFalse(lobby.open_named(bot, GiftScreen.SUPER_VALUE_RETURN))
 
@@ -378,6 +423,39 @@ class FixedGiftFlowTests(unittest.TestCase):
         self.assertTrue(any(
             "không bấm tọa độ cứng" in call.args[0]
             for call in bot.record.call_args_list))
+
+    def test_super_value_return_does_not_route_through_valuable_event(self):
+        bot = mock.Mock()
+        bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
+        with (mock.patch.object(lobby, "return_home", return_value=True),
+              mock.patch.object(lobby, "find_super_value_return",
+                                return_value=None),
+              mock.patch.object(lobby, "find_valuable_event") as valuable,
+              mock.patch.object(lobby, "identify", return_value=None),
+              mock.patch.object(lobby, "_switch_parent_carousel") as switch):
+            self.assertFalse(lobby.open_named(
+                bot, GiftScreen.SUPER_VALUE_RETURN))
+
+        valuable.assert_not_called()
+        switch.assert_not_called()
+        bot.tap.assert_not_called()
+
+    def test_parent_switch_confirms_both_edges_without_swipe_ceiling(self):
+        bot = mock.Mock()
+        screen = np.zeros((704, 396, 3), dtype=np.uint8)
+        bot.screenshot.return_value = screen
+        with (mock.patch.object(lobby, "identify",
+                                return_value=GiftScreen.VALUABLE_EVENT),
+              mock.patch.object(lobby, "find", return_value=None)):
+            self.assertFalse(lobby._switch_parent_carousel(
+                bot, GiftScreen.SUPER_VALUE_RETURN))
+
+        swipes = bot.swipe_percent.call_args_list
+        self.assertEqual(4, len(swipes))
+        self.assertTrue(all(call.args[:4] == (20, 14, 85, 14)
+                            for call in swipes[:2]))
+        self.assertTrue(all(call.args[:4] == (90, 14, 10, 14)
+                            for call in swipes[2:]))
 
     def test_lobby_skips_facebook_follow_us_before_opening_next_dot(self):
         bot = mock.Mock()
@@ -472,7 +550,7 @@ class FixedGiftFlowTests(unittest.TestCase):
         bot = mock.Mock()
         bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
         flow = valuable_named_flow.ExactFlow(
-            claims=("LimitedOffer/button_free_current",), absence_done=True)
+            claims=("ValuableEvent/LimitedOffer/button_free_current",), absence_done=True)
         with mock.patch.object(valuable_named_flow, "find", return_value=None) as find:
             self.assertTrue(valuable_named_flow.process_exact(bot, flow))
         self.assertTrue(find.call_args_list)
@@ -498,13 +576,13 @@ class FixedGiftFlowTests(unittest.TestCase):
               mock.patch.object(valuable_named_flow, "back_if_close_x",
                                 return_value=False)):
             report, navigated = valuable_named_flow.process_lower(
-                bot, (), ("ResourceConsumptionSprint/button_free",))
+                bot, (), ("ValuableEvent/ResourceConsumptionSprint/button_free",))
 
         self.assertEqual(common.ClaimReport(), report)
         self.assertEqual(0, navigated)
         self.assertEqual(["fixed", "sparkle"] * 3, order)
         controls = fixed_claims.call_args_list[0].args[1]
-        self.assertEqual("ResourceConsumptionSprint/button_free", controls[0])
+        self.assertEqual("ValuableEvent/ResourceConsumptionSprint/button_free", controls[0])
         self.assertTrue(all(name in controls for name in common.TEXT_CLAIM_CONTROLS))
 
     def test_valuable_verified_claim_resets_three_empty_rounds(self):
@@ -594,6 +672,36 @@ class FixedGiftFlowTests(unittest.TestCase):
         self.assertLess(events.index("settle"), events.index("swipe"))
         self.assertLess(events.index("swipe"), events.index("second"))
 
+    def test_valuable_uses_visible_screen_order_not_spec_priority(self):
+        bot = mock.Mock()
+        screen = np.zeros((704, 396, 3), dtype=np.uint8)
+        bot.screenshot.return_value = screen
+        first, second = valuable_event.SPECS[:2]
+        processed = []
+
+        def find_named(_bot, name, *_args, **_kwargs):
+            if name == valuable_event.PAGE:
+                return (198, 25)
+            if name == first.tab:
+                return (180, 70)
+            if name == second.tab:
+                return (60, 70)
+            return None
+
+        def process(_bot, flow):
+            processed.append(flow)
+            return True
+
+        with (mock.patch.object(valuable_event, "SPECS", (first, second)),
+              mock.patch.object(valuable_event, "find", side_effect=find_named),
+              mock.patch.object(valuable_event, "process_exact",
+                                side_effect=process)):
+            _, clean = valuable_event.run_opened(
+                bot, {first.task.key, second.task.key})
+
+        self.assertTrue(clean)
+        self.assertEqual([second.flow, first.flow], processed)
+
     def test_valuable_absent_task_requires_both_confirmed_edges(self):
         bot = mock.Mock()
         bot.is_daily_done.return_value = False
@@ -617,18 +725,18 @@ class FixedGiftFlowTests(unittest.TestCase):
     def test_ancient_dynasty_treasury_requires_opened_chest_done(self):
         flow = ancient_dynasty_treasury.FLOW
         done = cv2.imread(str(
-            IMAGES / "GiftClaims" / "AncientDynastyTreasury" /
+            IMAGES / "GiftClaims" / "ValuableEvent" / "AncientDynastyTreasury" /
             "status_done.png"))
         label = cv2.imread(str(
-            IMAGES / "GiftClaims" / "AncientDynastyTreasury" /
+            IMAGES / "GiftClaims" / "ValuableEvent" / "AncientDynastyTreasury" /
             "label_daily_free.png"))
         self.assertEqual(
-            ("AncientDynastyTreasury/label_daily_free",
-             "AncientDynastyTreasury/button_daily_free"), flow.navigation)
+            ("ValuableEvent/AncientDynastyTreasury/label_daily_free",
+             "ValuableEvent/AncientDynastyTreasury/button_daily_free"), flow.navigation)
         self.assertEqual(((0, -24), (0, 0)), flow.navigation_offsets)
         self.assertTrue(flow.navigation_first_match)
         self.assertEqual(common.TEXT_CLAIM_CONTROLS, flow.claims)
-        self.assertEqual(("AncientDynastyTreasury/status_done",), flow.done)
+        self.assertEqual(("ValuableEvent/AncientDynastyTreasury/status_done",), flow.done)
         self.assertFalse(flow.absence_done)
         self.assertEqual((34, 43), done.shape[:2])
         self.assertEqual((13, 57), label.shape[:2])
@@ -656,7 +764,7 @@ class FixedGiftFlowTests(unittest.TestCase):
         by_key = {spec.task.key: spec.flow for spec in valuable_event.SPECS}
         self.assertTrue(by_key[limited_offer.KEY].absence_done)
         self.assertTrue(by_key[super_blazon_sale.KEY].absence_done)
-        self.assertIn("ResourceConsumptionSprint/sold_out",
+        self.assertIn("ValuableEvent/ResourceConsumptionSprint/sold_out",
                       by_key[resource_consumption_sprint.KEY].done)
 
     def test_strict_terminal_tasks_never_finish_from_missing_claim_button(self):
@@ -676,17 +784,17 @@ class FixedGiftFlowTests(unittest.TestCase):
             self.assertFalse(flows[key].absence_done, key)
 
         self.assertTrue(valuable["gift_resource_consumption_sprint"].congratulations_done)
-        self.assertEqual(("OptionalPackage/chest_open",),
+        self.assertEqual(("ValuableEvent/OptionalPackage/chest_open",),
                          valuable["gift_optional_package"].done)
-        self.assertEqual(("SuccessivePurchaseBenefits/chest_open",),
+        self.assertEqual(("ValuableEvent/SuccessivePurchaseBenefits/chest_open",),
                          valuable["gift_successive_purchase_benefits"].done)
-        self.assertEqual(("TombExpedition/quests_done",),
+        self.assertEqual(("ValuableEvent/TombExpedition/quests_done",),
                          valuable["gift_tomb_expedition"].done)
         self.assertTrue(valuable["gift_general_vault"].congratulations_done)
-        self.assertEqual(("EmpireDepot/chest_open",),
+        self.assertEqual(("SuperValueReturn/EmpireDepot/chest_open",),
                          super_value["gift_empire_depot"].done)
         self.assertTrue(super_value["gift_lucky_raffle"].congratulations_done)
-        self.assertEqual(("LuckyRaffle/chest_open",),
+        self.assertEqual(("SuperValueReturn/LuckyRaffle/chest_open",),
                          super_value["gift_lucky_raffle"].done)
 
     def test_horizontal_carousels_have_no_local_swipe_ceiling(self):
@@ -754,32 +862,32 @@ class FixedGiftFlowTests(unittest.TestCase):
 
     def test_strategic_stockpile_uses_free_offset_and_claimed_chest(self):
         flow = strategic_stockpile.FLOW
-        self.assertEqual(("StrategicStockpile/title",), flow.opened)
-        self.assertEqual(("StrategicStockpile/button_free_text",), flow.claims)
-        self.assertEqual(("StrategicStockpile/chest_claimed",), flow.done)
+        self.assertEqual(("ValuableEvent/StrategicStockpile/title",), flow.opened)
+        self.assertEqual(("ValuableEvent/StrategicStockpile/button_free_text",), flow.claims)
+        self.assertEqual(("ValuableEvent/StrategicStockpile/chest_claimed",), flow.done)
         self.assertEqual((10, -10), flow.claim_offset)
 
     def test_runestone_consumption_sprint_has_explicit_done_rules(self):
         flow = runestone_consumption_sprint.FLOW
-        self.assertEqual(("RunestoneConsumptionSprint/subtab_sprint_package",),
+        self.assertEqual(("ValuableEvent/RunestoneConsumptionSprint/subtab_sprint_package",),
                          flow.navigation)
-        self.assertEqual(("RunestoneConsumptionSprint/button_free",), flow.claims)
-        self.assertEqual(("RunestoneConsumptionSprint/sold_out",), flow.done)
+        self.assertEqual(("ValuableEvent/RunestoneConsumptionSprint/button_free",), flow.claims)
+        self.assertEqual(("ValuableEvent/RunestoneConsumptionSprint/sold_out",), flow.done)
         self.assertTrue(flow.congratulations_done)
 
     def test_speedup_sprint_only_taps_free_and_requires_sold_out(self):
         flow = speedup_sprint.FLOW
-        self.assertEqual(("SpeedupSprint/subtab_package",), flow.navigation)
-        self.assertEqual(("SpeedupSprint/button_free",), flow.claims)
+        self.assertEqual(("ValuableEvent/SpeedupSprint/subtab_package",), flow.navigation)
+        self.assertEqual(("ValuableEvent/SpeedupSprint/button_free",), flow.claims)
         self.assertEqual(0.95, flow.claim_threshold)
-        self.assertEqual(("SpeedupSprint/status_sold_out",), flow.done)
+        self.assertEqual(("ValuableEvent/SpeedupSprint/status_sold_out",), flow.done)
         self.assertFalse(flow.absence_done)
         self.assertFalse(flow.congratulations_done)
 
     def test_wheel_of_dragon_war_flow_uses_skip_then_free_disappearance(self):
         flow = wheel_of_dragon_war.FLOW
         self.assertIs(flow.prepare, wheel_of_dragon_war.ensure_skip_animation)
-        self.assertEqual(("WheelOfDragonWar/button_spin_once_free",),
+        self.assertEqual(("ValuableEvent/WheelOfDragonWar/button_spin_once_free",),
                          flow.claims)
         self.assertTrue(flow.absence_done)
         self.assertEqual(0.86, flow.claim_threshold)
@@ -873,35 +981,364 @@ class FixedGiftFlowTests(unittest.TestCase):
         self.assertEqual(4, len(swipes))
         self.assertTrue(all(call.args[:4] == (20, 14, 85, 14)
                             for call in swipes[:2]))
-        self.assertTrue(all(call.args[:4] == (85, 14, 55, 14)
+        self.assertTrue(all(call.args[:4] == (90, 14, 10, 14)
                             for call in swipes[2:]))
 
     def test_super_value_return_has_one_standard_spec_per_child_module(self):
         expected = {
             "gift_empire_depot", "gift_lucky_raffle", "gift_city_growth_plan",
             "gift_login_gifts", "gift_refining_weekly_card",
+            "gift_hall_of_historic_generals", "gift_soul_of_spiritual_beast",
         }
         self.assertEqual(expected, super_value_return.KEYS)
         self.assertTrue(all(spec.tab.split("/", 1)[0] for spec in super_value_return.SPECS))
         self.assertTrue(all(hasattr(spec, "flow") for spec in super_value_return.SPECS))
 
-    def test_super_value_return_is_an_independent_five_task_zone(self):
+    def test_super_value_return_is_an_independent_seven_task_zone(self):
         self.assertEqual("gift_super_value_return", super_value_zone.KEY)
         self.assertEqual(
-            ["gift_login_gifts", "gift_empire_depot", "gift_lucky_raffle",
-             "gift_city_growth_plan", "gift_refining_weekly_card"],
+            ["gift_login_gifts", "gift_empire_depot",
+             "gift_hall_of_historic_generals", "gift_soul_of_spiritual_beast",
+             "gift_lucky_raffle", "gift_city_growth_plan",
+             "gift_refining_weekly_card"],
             [task.key for task in super_value_zone.TASKS])
         self.assertTrue(all(task.key not in {
             item.key for item in valuable_event_zone.TASKS
         } for task in super_value_zone.TASKS))
+
+    def test_hall_claim_and_claimed_require_opposite_colour_bands(self):
+        claim = cv2.imread(str(
+            IMAGES / "GiftClaims" / "SuperValueReturn" / "HallOfHistoricGenerals" /
+            "button_claim.png"))
+        claimed = cv2.imread(str(
+            IMAGES / "GiftClaims" / "SuperValueReturn" / "HallOfHistoricGenerals" /
+            "status_claimed.png"))
+
+        claim_center = (claim.shape[1] // 2, claim.shape[0] // 2)
+        claimed_center = (claimed.shape[1] // 2, claimed.shape[0] // 2)
+        self.assertTrue(hall_of_historic_generals._is_green_claim(
+            claim, claim_center))
+        self.assertFalse(hall_of_historic_generals._is_gray_claimed(
+            claim, claim_center))
+        self.assertFalse(hall_of_historic_generals._is_green_claim(
+            claimed, claimed_center))
+        self.assertTrue(hall_of_historic_generals._is_gray_claimed(
+            claimed, claimed_center))
+
+    def test_hall_full_claimed_scan_is_done_without_new_claim(self):
+        bot = mock.Mock()
+        views = (
+            (False, False, True, False),
+            (False, False, True, False),
+            (False, False, True, False),
+        )
+        with (mock.patch.object(hall_of_historic_generals, "_swipe_to_top"),
+              mock.patch.object(hall_of_historic_generals,
+                                "_claim_current_view", side_effect=views),
+              mock.patch.object(hall_of_historic_generals, "_swipe",
+                                side_effect=(0, 0))):
+            outcome = hall_of_historic_generals._scan_rewards(bot)
+
+        self.assertEqual(hall_of_historic_generals.DONE, outcome)
+
+    def test_hall_done_1_requires_a_second_full_pass_without_claim(self):
+        bot = mock.Mock()
+        views = (
+            (True, False, True, False),
+            (False, False, True, False),
+            (False, False, True, False),
+            (False, False, True, False),
+            (False, False, True, False),
+            (False, False, True, False),
+        )
+        with (mock.patch.object(hall_of_historic_generals,
+                                "_swipe_to_top") as to_top,
+              mock.patch.object(hall_of_historic_generals,
+                                "_claim_current_view", side_effect=views),
+              mock.patch.object(hall_of_historic_generals, "_swipe",
+                                side_effect=(0, 0, 0, 0))):
+            outcome = hall_of_historic_generals._scan_rewards(bot)
+
+        self.assertEqual(hall_of_historic_generals.DONE_1, outcome)
+        self.assertEqual(2, to_top.call_count)
+
+    def test_hall_done_1_is_not_written_as_db_done(self):
+        bot = mock.Mock()
+        screen = np.zeros((704, 396, 3), dtype=np.uint8)
+        bot.screenshot.return_value = screen
+        spec = next(spec for spec in super_value_return.SPECS
+                    if spec.task.key == hall_of_historic_generals.KEY)
+
+        def find_named(_bot, name, *_args, **_kwargs):
+            if name == super_value_return.PAGE:
+                return (198, 25)
+            if name == spec.tab:
+                return (100, 70)
+            return None
+
+        with (mock.patch.object(super_value_return, "SPECS", (spec,)),
+              mock.patch.object(super_value_return, "find",
+                                side_effect=find_named),
+              mock.patch.object(super_value_return, "carousel_moved",
+                                return_value=False),
+              mock.patch.object(
+                  super_value_return.hall_of_historic_generals,
+                  "claim_opened",
+                  return_value=hall_of_historic_generals.DONE_1),
+              mock.patch.object(super_value_return, "mark_task_done") as mark):
+            results, clean = super_value_return.run_opened(
+                bot, {hall_of_historic_generals.KEY})
+
+        self.assertTrue(clean)
+        self.assertEqual(hall_of_historic_generals.DONE_1,
+                         results[hall_of_historic_generals.KEY])
+        mark.assert_not_called()
+
+    def test_hall_claim_cycle_backs_then_claims_main_chests(self):
+        bot = mock.Mock()
+        with (mock.patch.object(hall_of_historic_generals, "_open_scores",
+                                return_value=True),
+              mock.patch.object(hall_of_historic_generals, "_scan_rewards",
+                                return_value=hall_of_historic_generals.DONE_1),
+              mock.patch.object(hall_of_historic_generals, "_main_open",
+                                return_value=True),
+              mock.patch.object(hall_of_historic_generals,
+                                "_claim_main_chests", return_value=True) as chests):
+            outcome = hall_of_historic_generals.claim_opened(bot)
+
+        self.assertEqual(hall_of_historic_generals.DONE_1, outcome)
+        bot.back.assert_called_once_with(
+            delay=hall_of_historic_generals.STEP_DELAY)
+        chests.assert_called_once_with(bot)
+
+    def test_hall_without_new_claim_does_not_check_main_chests(self):
+        bot = mock.Mock()
+        with (mock.patch.object(hall_of_historic_generals, "_open_scores",
+                                return_value=True),
+              mock.patch.object(hall_of_historic_generals, "_scan_rewards",
+                                return_value=hall_of_historic_generals.DONE),
+              mock.patch.object(hall_of_historic_generals,
+                                "_claim_main_chests") as chests):
+            outcome = hall_of_historic_generals.claim_opened(bot)
+
+        self.assertEqual(hall_of_historic_generals.DONE, outcome)
+        chests.assert_not_called()
+
+    def test_hall_missing_congratulations_accepts_chest_absence(self):
+        bot = mock.Mock()
+        screen = np.zeros((704, 396, 3), dtype=np.uint8)
+        bot.screenshot.return_value = screen
+        with (mock.patch.object(hall_of_historic_generals, "_main_open",
+                                return_value=True),
+              mock.patch.object(hall_of_historic_generals,
+                                "find_reward_chest",
+                                side_effect=[(50, 243), None, None]),
+              mock.patch.object(hall_of_historic_generals, "find",
+                                return_value=None)):
+            complete = hall_of_historic_generals._claim_main_chests(bot)
+
+        self.assertTrue(complete)
+        bot.tap.assert_called_once_with(
+            50, 243, delay=hall_of_historic_generals.STEP_DELAY)
+
+    def test_hall_done_1_is_deferred_until_next_claim_gifts_run(self):
+        bot = mock.Mock()
+        deferred = set()
+        result = {hall_of_historic_generals.KEY:
+                  hall_of_historic_generals.DONE_1}
+
+        with (mock.patch.object(super_value_zone, "identify",
+                                return_value=GiftScreen.SUPER_VALUE_RETURN),
+              mock.patch.object(super_value_zone, "run_opened",
+                                return_value=(result, True)) as opened):
+            inspected = super_value_zone._sweep(
+                bot, [hall_of_historic_generals.KEY], deferred)
+            second = super_value_zone._sweep(
+                bot, [hall_of_historic_generals.KEY], deferred)
+
+        self.assertEqual(set(), inspected)
+        self.assertEqual(set(), second)
+        self.assertEqual({hall_of_historic_generals.KEY}, deferred)
+        opened.assert_called_once()
+
+    def test_soul_claim_and_claimed_require_opposite_colour_bands(self):
+        claim = cv2.imread(str(
+            IMAGES / "GiftClaims" / "SuperValueReturn" /
+            "SoulOfSpiritualBeast" / "button_claim.png"))
+        claimed = cv2.imread(str(
+            IMAGES / "GiftClaims" / "SuperValueReturn" /
+            "SoulOfSpiritualBeast" / "status_claimed.png"))
+
+        claim_screen = np.zeros((704, 396, 3), dtype=np.uint8)
+        claimed_screen = np.zeros((704, 396, 3), dtype=np.uint8)
+        claim_screen[200:200 + claim.shape[0],
+                     250:250 + claim.shape[1]] = claim
+        claimed_screen[200:200 + claimed.shape[0],
+                       250:250 + claimed.shape[1]] = claimed
+        claim_center = (250 + claim.shape[1] // 2,
+                        200 + claim.shape[0] // 2)
+        claimed_center = (250 + claimed.shape[1] // 2,
+                          200 + claimed.shape[0] // 2)
+        self.assertTrue(soul_of_spiritual_beast._is_green_claim(
+            claim_screen, claim_center))
+        self.assertFalse(soul_of_spiritual_beast._is_gray_claimed(
+            claim_screen, claim_center))
+        self.assertFalse(soul_of_spiritual_beast._is_green_claim(
+            claimed_screen, claimed_center))
+        self.assertTrue(soul_of_spiritual_beast._is_gray_claimed(
+            claimed_screen, claimed_center))
+
+    def test_soul_all_claimed_in_both_tabs_is_done(self):
+        bot = mock.Mock()
+        with (mock.patch.object(soul_of_spiritual_beast, "_main_open",
+                                return_value=True),
+              mock.patch.object(soul_of_spiritual_beast,
+                                "_claim_main_chests", return_value=True),
+              mock.patch.object(soul_of_spiritual_beast, "_open_quests",
+                                return_value=True),
+              mock.patch.object(soul_of_spiritual_beast,
+                                "_select_quest_tab", return_value=True),
+              mock.patch.object(soul_of_spiritual_beast, "_scan_quest_tab",
+                                side_effect=[(False, False, True, False),
+                                             (False, False, True, False)])):
+            outcome = soul_of_spiritual_beast.claim_opened(bot)
+
+        self.assertEqual(soul_of_spiritual_beast.DONE, outcome)
+        bot.back.assert_called_once()
+
+    def test_soul_failed_initial_chest_still_opens_challenge_quest(self):
+        bot = mock.Mock()
+        with (mock.patch.object(soul_of_spiritual_beast, "_main_open",
+                                return_value=True),
+              mock.patch.object(soul_of_spiritual_beast,
+                                "_claim_main_chests", return_value=False),
+              mock.patch.object(soul_of_spiritual_beast,
+                                "_open_quests", return_value=True) as quests,
+              mock.patch.object(soul_of_spiritual_beast,
+                                "_select_quest_tab", return_value=True),
+              mock.patch.object(soul_of_spiritual_beast, "_scan_quest_tab",
+                                side_effect=[(False, False, True, False),
+                                             (False, False, True, False)])):
+            outcome = soul_of_spiritual_beast.claim_opened(bot)
+
+        self.assertEqual(soul_of_spiritual_beast.DONE, outcome)
+        quests.assert_called_once_with(bot)
+
+    def test_soul_claims_both_tabs_then_checks_main_chests_and_defers(self):
+        bot = mock.Mock()
+        with (mock.patch.object(soul_of_spiritual_beast, "_main_open",
+                                return_value=True),
+              mock.patch.object(soul_of_spiritual_beast,
+                                "_claim_main_chests",
+                                side_effect=[True, True]) as chests,
+              mock.patch.object(soul_of_spiritual_beast, "_open_quests",
+                                return_value=True),
+              mock.patch.object(soul_of_spiritual_beast,
+                                "_select_quest_tab", return_value=True),
+              mock.patch.object(soul_of_spiritual_beast, "_scan_quest_tab",
+                                side_effect=[(True, False, True, False),
+                                             (False, False, True, False)])):
+            outcome = soul_of_spiritual_beast.claim_opened(bot)
+
+        self.assertEqual(soul_of_spiritual_beast.DONE_1, outcome)
+        self.assertEqual(2, chests.call_count)
+        bot.sleep.assert_any_call(1)
+        bot.back.assert_called_once()
+
+    def test_soul_without_claim_skips_post_claim_chest_sequence(self):
+        bot = mock.Mock()
+        with (mock.patch.object(soul_of_spiritual_beast, "_main_open",
+                                return_value=True),
+              mock.patch.object(soul_of_spiritual_beast,
+                                "_claim_main_chests", return_value=True) as chests,
+              mock.patch.object(soul_of_spiritual_beast, "_open_quests",
+                                return_value=True),
+              mock.patch.object(soul_of_spiritual_beast,
+                                "_select_quest_tab", return_value=True),
+              mock.patch.object(soul_of_spiritual_beast, "_scan_quest_tab",
+                                side_effect=[(False, False, True, True),
+                                             (False, False, True, False)])):
+            outcome = soul_of_spiritual_beast.claim_opened(bot)
+
+        self.assertEqual(soul_of_spiritual_beast.DONE_1, outcome)
+        chests.assert_called_once()
+
+    def test_soul_does_not_open_main_chest_until_both_tabs_are_clear(self):
+        bot = mock.Mock()
+        with (mock.patch.object(soul_of_spiritual_beast, "_main_open",
+                                return_value=True),
+              mock.patch.object(soul_of_spiritual_beast,
+                                "_claim_main_chests", return_value=True) as chests,
+              mock.patch.object(soul_of_spiritual_beast, "_open_quests",
+                                return_value=True),
+              mock.patch.object(soul_of_spiritual_beast,
+                                "_select_quest_tab", return_value=True),
+              mock.patch.object(soul_of_spiritual_beast, "_scan_quest_tab",
+                                side_effect=[(True, True, True, False),
+                                             (True, False, True, False)])):
+            outcome = soul_of_spiritual_beast.claim_opened(bot)
+
+        self.assertEqual(soul_of_spiritual_beast.PENDING, outcome)
+        # The first call checks the chest before opening Quests. There must be
+        # no second, post-Claim pass while either tab still has a Claim.
+        chests.assert_called_once()
+
+    def test_soul_missing_congratulations_accepts_confirmed_chest_absence(self):
+        bot = mock.Mock()
+        screen = np.zeros((704, 396, 3), dtype=np.uint8)
+        bot.screenshot.return_value = screen
+        with (mock.patch.object(soul_of_spiritual_beast, "_main_open",
+                                return_value=True),
+              mock.patch.object(soul_of_spiritual_beast,
+                                "find_reward_chest",
+                                side_effect=[(40, 198), None, None]),
+              mock.patch.object(soul_of_spiritual_beast, "find",
+                                return_value=None)):
+            complete = soul_of_spiritual_beast._claim_main_chests(bot)
+
+        self.assertTrue(complete)
+        bot.tap.assert_called_once_with(40, 198,
+                                        delay=soul_of_spiritual_beast.STEP_DELAY)
+
+    def test_soul_done_1_is_not_written_as_db_done(self):
+        bot = mock.Mock()
+        screen = np.zeros((704, 396, 3), dtype=np.uint8)
+        bot.screenshot.return_value = screen
+        spec = next(spec for spec in super_value_return.SPECS
+                    if spec.task.key == soul_of_spiritual_beast.KEY)
+
+        def find_named(_bot, name, *_args, **_kwargs):
+            if name == super_value_return.PAGE:
+                return (198, 25)
+            if name == spec.tab:
+                return (100, 70)
+            return None
+
+        with (mock.patch.object(super_value_return, "SPECS", (spec,)),
+              mock.patch.object(super_value_return, "find",
+                                side_effect=find_named),
+              mock.patch.object(super_value_return, "carousel_moved",
+                                return_value=False),
+              mock.patch.object(
+                  super_value_return.soul_of_spiritual_beast,
+                  "claim_opened", return_value=soul_of_spiritual_beast.DONE_1),
+              mock.patch.object(super_value_return, "mark_task_done") as mark):
+            results, clean = super_value_return.run_opened(
+                bot, {soul_of_spiritual_beast.KEY})
+
+        self.assertTrue(clean)
+        self.assertEqual(soul_of_spiritual_beast.DONE_1,
+                         results[soul_of_spiritual_beast.KEY])
+        mark.assert_not_called()
 
     def test_super_value_settles_lower_task_before_scrolling_to_next_tab(self):
         bot = mock.Mock()
         bot.is_daily_done.return_value = False
         screen = np.zeros((704, 396, 3), dtype=np.uint8)
         bot.screenshot.return_value = screen
-        first, second = (super_value_return.SPECS[0],
-                         super_value_return.SPECS[2])
+        first = super_value_return.SPECS[0]
+        second = next(spec for spec in super_value_return.SPECS
+                      if spec.task.key == "gift_lucky_raffle")
         events = []
 
         def find_named(_bot, name, *_args, **_kwargs):
@@ -966,15 +1403,16 @@ class FixedGiftFlowTests(unittest.TestCase):
 
     def test_city_growth_done_requires_level_15_and_claimed_tick_crop(self):
         marker = cv2.imread(str(IMAGES / "GiftClaims" /
+                                "SuperValueReturn" /
                                 "CityGrowthPlan" /
                                 "level_15_claimed.png"))
         self.assertIsNotNone(marker)
         self.assertGreater(marker.shape[1], 100)
         city = next(spec for spec in super_value_return.SPECS
                     if spec.task.key == "gift_city_growth_plan")
-        self.assertEqual(("CityGrowthPlan/level_15_claimed",), city.flow.done)
+        self.assertEqual(("SuperValueReturn/CityGrowthPlan/level_15_claimed",), city.flow.done)
 
-    def test_refining_weekly_card_does_not_treat_go_as_done(self):
+    def test_refining_weekly_card_uses_custom_done_state(self):
         self.assertEqual((), refining_weekly_card.FLOW.done)
         self.assertEqual((refining_weekly_card.CLAIM,),
                          refining_weekly_card.FLOW.claims)
@@ -984,11 +1422,14 @@ class FixedGiftFlowTests(unittest.TestCase):
         screen = np.zeros((704, 396, 3), dtype=np.uint8)
         bot.screenshot.return_value = screen
 
-        with (mock.patch.object(refining_weekly_card, "find",
-                                return_value=None),
+        with (mock.patch.object(refining_weekly_card, "_green_claims",
+                                return_value=[]),
+              mock.patch.object(refining_weekly_card, "_yellow_continues",
+                                return_value=[]),
               mock.patch.object(refining_weekly_card,
                                 "EDGE_CONFIRMATIONS", 1)):
-            self.assertTrue(refining_weekly_card.claim_opened(bot))
+            self.assertEqual(refining_weekly_card.DONE_1,
+                             refining_weekly_card.claim_opened(bot))
 
         self.assertGreater(bot.swipe_percent.call_count, 0)
         allowed = {refining_weekly_card.SCAN_SWIPE,
@@ -1005,13 +1446,97 @@ class FixedGiftFlowTests(unittest.TestCase):
 
         with (mock.patch.object(refining_weekly_card, "_swipe_to_top"),
               mock.patch.object(refining_weekly_card, "_scan_full_list",
-                                side_effect=[(True, False), (False, False)]) as scan):
-            self.assertTrue(refining_weekly_card.claim_opened(bot))
+                                side_effect=[
+                                    (True, False, False),
+                                    (False, False, True),
+                                ]) as scan):
+            self.assertEqual(refining_weekly_card.DONE,
+                             refining_weekly_card.claim_opened(bot))
 
         self.assertEqual(2, scan.call_count)
-        bot.sleep.assert_called_once_with(refining_weekly_card.STEP_DELAY)
 
-    def test_login_gifts_uses_fixed_fallback_when_reward_image_is_missing(self):
+    def test_refining_weekly_card_done_requires_only_yellow_continue(self):
+        bot = mock.Mock()
+        with mock.patch.object(
+                refining_weekly_card, "_scan_full_list",
+                return_value=(False, False, True)):
+            self.assertEqual(refining_weekly_card.DONE,
+                             refining_weekly_card.claim_opened(bot))
+
+        with mock.patch.object(
+                refining_weekly_card, "_scan_full_list",
+                return_value=(False, False, False)):
+            self.assertEqual(refining_weekly_card.DONE_1,
+                             refining_weekly_card.claim_opened(bot))
+
+    def test_refining_weekly_card_templates_have_green_and_yellow_bands(self):
+        claim = cv2.imread(str(IMAGES / "GiftClaims" / "SuperValueReturn" /
+                               "RefiningWeeklyCard" / "button_claim.png"))
+        continue_button = cv2.imread(str(
+            IMAGES / "GiftClaims" / "SuperValueReturn" /
+            "RefiningWeeklyCard" / "button_continue.png"))
+        self.assertIsNotNone(claim)
+        self.assertIsNotNone(continue_button)
+        claim_green, claim_yellow = refining_weekly_card._colour_ratios(claim)
+        continue_green, continue_yellow = refining_weekly_card._colour_ratios(
+            continue_button)
+        self.assertGreater(claim_green, refining_weekly_card.GREEN_MIN_RATIO)
+        self.assertLess(claim_yellow, refining_weekly_card.YELLOW_MIN_RATIO)
+        self.assertLess(continue_green, refining_weekly_card.GREEN_MIN_RATIO)
+        self.assertGreater(continue_yellow,
+                           refining_weekly_card.YELLOW_MIN_RATIO)
+
+    def test_refining_done_1_is_not_written_as_db_done(self):
+        bot = mock.Mock()
+        screen = np.zeros((704, 396, 3), dtype=np.uint8)
+        bot.screenshot.return_value = screen
+        spec = next(spec for spec in super_value_return.SPECS
+                    if spec.task.key == refining_weekly_card.KEY)
+
+        def find_named(_bot, name, *_args, **_kwargs):
+            if name == super_value_return.PAGE:
+                return (198, 25)
+            if name == spec.tab:
+                return (100, 70)
+            return None
+
+        with (mock.patch.object(super_value_return, "SPECS", (spec,)),
+              mock.patch.object(super_value_return, "find",
+                                side_effect=find_named),
+              mock.patch.object(super_value_return, "carousel_moved",
+                                return_value=False),
+              mock.patch.object(
+                  super_value_return.refining_weekly_card,
+                  "claim_opened", return_value=refining_weekly_card.DONE_1),
+              mock.patch.object(super_value_return, "mark_task_done") as mark):
+            results, clean = super_value_return.run_opened(
+                bot, {refining_weekly_card.KEY})
+
+        self.assertTrue(clean)
+        self.assertEqual(refining_weekly_card.DONE_1,
+                         results[refining_weekly_card.KEY])
+        mark.assert_not_called()
+
+    def test_refining_done_1_is_deferred_until_next_120s_run(self):
+        bot = mock.Mock()
+        deferred = set()
+        result = {refining_weekly_card.KEY: refining_weekly_card.DONE_1}
+
+        with (mock.patch.object(super_value_zone, "identify",
+                                return_value=GiftScreen.SUPER_VALUE_RETURN),
+              mock.patch.object(super_value_zone, "run_opened",
+                                return_value=(result, True)) as opened):
+            inspected = super_value_zone._sweep(
+                bot, [refining_weekly_card.KEY], deferred)
+            second = super_value_zone._sweep(
+                bot, [refining_weekly_card.KEY], deferred)
+
+        self.assertEqual(set(), inspected)
+        self.assertEqual(set(), second)
+        self.assertEqual({refining_weekly_card.KEY}, deferred)
+        opened.assert_called_once()
+
+    def test_login_gifts_absent_chest_is_done_without_fallback_tap(self):
         bot = mock.Mock()
         bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
 
@@ -1019,29 +1544,56 @@ class FixedGiftFlowTests(unittest.TestCase):
             return (40, 140) if name == login_gifts.PAGE else None
 
         with (mock.patch.object(login_gifts, "find", side_effect=find_page),
+              mock.patch.object(login_gifts, "find_reward_chest",
+                                return_value=None),
               mock.patch.object(login_gifts, "_tap_reward",
                                 return_value=False) as tap):
-            self.assertFalse(login_gifts.claim_opened(bot))
+            self.assertTrue(login_gifts.claim_opened(bot))
 
-        tap.assert_called_once_with(bot, (45, 190))
+        tap.assert_not_called()
+        bot.tap.assert_not_called()
 
-    def test_login_gifts_uses_captured_reward_button_before_fallback(self):
+    def test_login_gifts_uses_captured_reward_button(self):
         bot = mock.Mock()
-        bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
+        screen = np.zeros((704, 396, 3), dtype=np.uint8)
+        bot.screenshot.return_value = screen
 
         def find_page(_bot, name, *_args, **_kwargs):
             if name == login_gifts.PAGE:
                 return (40, 140)
-            if name == login_gifts.REWARD_BUTTON:
-                return (51, 192)
             return None
 
         with (mock.patch.object(login_gifts, "find", side_effect=find_page),
+              mock.patch.object(login_gifts, "find_reward_chest",
+                                return_value=(51, 192)) as find_chest,
               mock.patch.object(login_gifts, "_tap_reward",
                                 return_value=True) as tap):
             self.assertTrue(login_gifts.claim_opened(bot))
 
+        find_chest.assert_called_once_with(
+            bot, screen, region=login_gifts.REWARD_REGION,
+            threshold=login_gifts.REWARD_THRESHOLD)
         tap.assert_called_once_with(bot, (51, 192))
+
+    def test_reward_chest_finder_supports_region_or_full_screen(self):
+        bot = mock.Mock()
+        screen = np.zeros((704, 396, 3), dtype=np.uint8)
+        region = (2, 22, 18, 34)
+        with mock.patch.object(common, "find",
+                               side_effect=[(51, 192), (52, 193)]) as finder:
+            regional = common.find_reward_chest(bot, screen, region=region)
+            full = common.find_reward_chest(bot, screen)
+
+        self.assertEqual((51, 192), regional)
+        self.assertEqual((52, 193), full)
+        self.assertEqual(
+            mock.call(bot, common.REWARD_CHEST_TEMPLATE, screen=screen,
+                      threshold=common.REWARD_CHEST_THRESHOLD, region=region),
+            finder.call_args_list[0])
+        self.assertEqual(
+            mock.call(bot, common.REWARD_CHEST_TEMPLATE, screen=screen,
+                      threshold=common.REWARD_CHEST_THRESHOLD, region=None),
+            finder.call_args_list[1])
 
     def test_shared_reward_chest_uses_measured_full_crop_and_threshold(self):
         chest = cv2.imread(str(IMAGES / "GiftClaims" / "Common" /
@@ -1049,7 +1601,8 @@ class FixedGiftFlowTests(unittest.TestCase):
         self.assertEqual((47, 47), chest.shape[:2])
         self.assertEqual("Common/button_reward_chest",
                          login_gifts.REWARD_BUTTON)
-        self.assertEqual(0.80, login_gifts.REWARD_THRESHOLD)
+        self.assertEqual(0.78, login_gifts.REWARD_THRESHOLD)
+        self.assertEqual((2, 22, 18, 34), login_gifts.REWARD_REGION)
 
         flows = {spec.task.key: spec.flow for spec in valuable_event.SPECS}
         for key in ("gift_super_value_weekly_card",
@@ -1058,13 +1611,13 @@ class FixedGiftFlowTests(unittest.TestCase):
                              flows[key].navigation)
             self.assertEqual(0.80, flows[key].navigation_threshold)
 
-    def test_active_monthly_card_scrolls_claim_frame_until_claim_is_absent(self):
+    def test_active_monthly_card_uses_supplied_green_scroll_frame(self):
         flow = active_monthly_card.FLOW
         claim = cv2.imread(str(
-            IMAGES / "GiftClaims" / "ActiveMonthlyCard" / "button_claim.png"))
+            IMAGES / "GiftClaims" / "ValuableEvent" / "ActiveMonthlyCard" / "button_claim.png"))
 
         self.assertEqual((26, 62), claim.shape[:2])
-        self.assertEqual(("ActiveMonthlyCard/button_claim",), flow.claims)
+        self.assertEqual(("ValuableEvent/ActiveMonthlyCard/button_claim",), flow.claims)
         self.assertEqual((4, 59, 96, 99), flow.claim_region)
         self.assertEqual((), flow.done)
         self.assertTrue(flow.scroll_claims)
@@ -1072,8 +1625,66 @@ class FixedGiftFlowTests(unittest.TestCase):
         self.assertEqual((50, 92), flow.scroll_start)
         self.assertEqual((50, 65), flow.scroll_end)
         self.assertEqual((4, 59, 96, 99), flow.scroll_region)
-        self.assertEqual(12, flow.max_scroll_pages)
+        self.assertTrue(flow.confirm_scroll_edges)
+        self.assertEqual(24, flow.scroll_same_distance)
+        self.assertEqual(2, flow.scroll_edge_confirmations)
         self.assertEqual((52, 326), flow.fallback_tap)
+
+    def test_super_value_weekly_card_uses_same_vertical_green_frame_edges(self):
+        flow = super_value_weekly_card.FLOW
+        self.assertEqual(common.TEXT_CLAIM_CONTROLS, flow.claims)
+        self.assertEqual((), flow.done)
+        self.assertTrue(flow.absence_done)
+        self.assertEqual((4, 59, 96, 99), flow.claim_region)
+        self.assertTrue(flow.scroll_claims)
+        self.assertEqual((50, 92), flow.scroll_start)
+        self.assertEqual((50, 65), flow.scroll_end)
+        self.assertEqual((4, 59, 96, 99), flow.scroll_region)
+        self.assertTrue(flow.confirm_scroll_edges)
+        self.assertEqual(24, flow.scroll_same_distance)
+        self.assertEqual(2, flow.scroll_edge_confirmations)
+
+    def test_vertical_green_frame_requires_two_unchanged_swipes_per_edge(self):
+        bot = mock.Mock()
+        screen = np.zeros((704, 396, 3), dtype=np.uint8)
+        bot.screenshot.return_value = screen
+        flow = valuable_named_flow.ExactFlow(
+            scroll_claims=True, confirm_scroll_edges=True,
+            scroll_region=(4, 59, 96, 99))
+
+        # A moved frame resets the first edge counter.  Both the real top and
+        # bottom then require two consecutive distances <= 24.
+        distances = (5, 30, 10, 8, 50, 20, 24)
+        with mock.patch.object(valuable_named_flow, "_swipe_vertical",
+                               side_effect=distances) as swipe:
+            completed, saw_claim, bottom = (
+                valuable_named_flow._process_edge_scrolled(bot, flow))
+
+        self.assertFalse(completed)
+        self.assertFalse(saw_claim)
+        self.assertTrue(bottom)
+        self.assertEqual(len(distances), swipe.call_count)
+
+    def test_reusable_region_hamming_distance_ignores_outside_changes(self):
+        before = np.zeros((100, 100, 3), dtype=np.uint8)
+        after = before.copy()
+        after[:, :40] = 255
+
+        distance = valuable_named_flow.region_hamming_distance(
+            before, after, (50, 0, 100, 100))
+
+        self.assertEqual(0, distance)
+
+    def test_reusable_region_hamming_distance_counts_changed_hash_bits(self):
+        rising = np.tile(np.arange(100, dtype=np.uint8), (100, 1))
+        falling = np.fliplr(rising)
+        before = np.repeat(rising[:, :, None], 3, axis=2)
+        after = np.repeat(falling[:, :, None], 3, axis=2)
+
+        distance = valuable_named_flow.region_hamming_distance(
+            before, after, (0, 0, 100, 100))
+
+        self.assertEqual(48 * 12, distance)
 
     def test_exact_flow_uses_configured_claim_scroll_geometry(self):
         bot = mock.Mock()
@@ -1113,15 +1724,25 @@ class FixedGiftFlowTests(unittest.TestCase):
     def test_login_gift_confirms_and_closes_congratulations(self):
         bot = mock.Mock()
         bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
+        shown = [False]
 
         def find_popup(_bot, name, *_args, **_kwargs):
-            return (198, 319) if name == login_gifts.CONGRATULATIONS else None
+            if name == login_gifts.CONGRATULATIONS and not shown[0]:
+                shown[0] = True
+                return (198, 319)
+            if name == login_gifts.PAGE:
+                return (40, 140)
+            return None
 
-        with mock.patch.object(login_gifts, "find", side_effect=find_popup):
+        with (mock.patch.object(login_gifts, "find", side_effect=find_popup),
+              mock.patch.object(login_gifts, "find_reward_chest",
+                                return_value=None)):
             self.assertTrue(login_gifts._tap_reward(bot, (123, 470)))
 
         bot.tap.assert_called_once_with(123, 470, delay=1)
         bot.back.assert_called_once_with(delay=1)
+        self.assertEqual(login_gifts.POST_TAP_WAIT,
+                         bot.sleep.call_args_list[0].args[0])
 
     def test_login_gift_is_done_when_fresh_screenshot_has_no_chest(self):
         bot = mock.Mock()
@@ -1132,11 +1753,33 @@ class FixedGiftFlowTests(unittest.TestCase):
                 return (40, 140)
             return None
 
-        with mock.patch.object(login_gifts, "find", side_effect=find_state):
+        with (mock.patch.object(login_gifts, "find", side_effect=find_state),
+              mock.patch.object(login_gifts, "find_reward_chest",
+                                return_value=None)):
             self.assertTrue(login_gifts._tap_reward(bot, (45, 190)))
 
         bot.tap.assert_called_once_with(45, 190, delay=1)
         bot.back.assert_not_called()
+
+    def test_login_gift_congratulations_alone_is_not_done_if_chest_remains(self):
+        bot = mock.Mock()
+        bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
+        shown = [False]
+
+        def find_state(_bot, name, *_args, **_kwargs):
+            if name == login_gifts.CONGRATULATIONS and not shown[0]:
+                shown[0] = True
+                return (198, 319)
+            if name == login_gifts.PAGE:
+                return (40, 140)
+            return None
+
+        with (mock.patch.object(login_gifts, "find", side_effect=find_state),
+              mock.patch.object(login_gifts, "find_reward_chest",
+                                return_value=(40, 198))):
+            self.assertFalse(login_gifts._tap_reward(bot, (40, 198)))
+
+        bot.back.assert_called_once_with(delay=1)
 
     def test_back_to_territory_claims_congratulations_day(self):
         bot = mock.Mock()
@@ -1189,18 +1832,18 @@ class FixedGiftFlowTests(unittest.TestCase):
 
     def test_legion_hunting_assets_and_limited_registration(self):
         for name in ("list_row.png", "title.png", "button_claim.png"):
-            self.assertTrue((IMAGES / "GiftClaims" / "LegionHunting" /
+            self.assertTrue((IMAGES / "GiftClaims" / "EventCenter" / "LegionHunting" /
                              name).is_file())
         legion = next(policy for policy in event_center.EVENT_POLICIES
                       if policy.key == "gift_legion_hunting")
         self.assertEqual(GiftScreen.LEGION_HUNTING, legion.screen)
         self.assertNotIn(legion.key, event_center.POLICY_CATEGORIES)
-        self.assertTrue(any(row[0] == "LegionHunting/list_row"
+        self.assertTrue(any(row[0] == "EventCenter/LegionHunting/list_row"
                             and row[2] == GiftScreen.LEGION_HUNTING
                             for row in event_center.FORCED_LIMITED_ROWS))
 
     def test_legion_hunting_title_identifies_opened_page(self):
-        title = cv2.imread(str(IMAGES / "GiftClaims" / "LegionHunting" /
+        title = cv2.imread(str(IMAGES / "GiftClaims" / "EventCenter" / "LegionHunting" /
                                "title.png"))
         screen = np.zeros((704, 396, 3), dtype=np.uint8)
         height, width = title.shape[:2]
@@ -1234,6 +1877,96 @@ class FixedGiftFlowTests(unittest.TestCase):
             _, done = event_center._handle_legion_hunting(bot)
 
         self.assertFalse(done)
+
+    def test_moment_of_glory_assets_and_limited_registration(self):
+        for name in ("list_row.png", "title.png", "status_claimed.png"):
+            self.assertTrue((IMAGES / "GiftClaims" / "EventCenter" /
+                             "MomentOfGlory" / name).is_file())
+        moment = next(policy for policy in event_center.EVENT_POLICIES
+                      if policy.key == "gift_moment_of_glory")
+        self.assertEqual(GiftScreen.MOMENT_OF_GLORY, moment.screen)
+        self.assertNotIn(moment.key, event_center.POLICY_CATEGORIES)
+        self.assertTrue(any(
+            row[0] == "EventCenter/MomentOfGlory/list_row"
+            and row[2] == GiftScreen.MOMENT_OF_GLORY
+            for row in event_center.FORCED_LIMITED_ROWS))
+
+    def test_moment_of_glory_title_identifies_opened_page(self):
+        title = cv2.imread(str(IMAGES / "GiftClaims" / "EventCenter" /
+                               "MomentOfGlory" / "title.png"))
+        screen = np.zeros((704, 396, 3), dtype=np.uint8)
+        height, width = title.shape[:2]
+        screen[5:5 + height, 100:100 + width] = title
+        self.assertEqual(GiftScreen.MOMENT_OF_GLORY,
+                         identify(CvBot(), screen))
+
+    def test_moment_of_glory_no_claim_full_pass_is_done(self):
+        bot = mock.Mock()
+        with (mock.patch.object(event_center, "_moment_swipe_to_top"),
+              mock.patch.object(event_center, "_scan_moment_once",
+                                return_value=(common.ClaimReport(),
+                                              True, False)) as scan):
+            report, done = event_center._handle_moment_of_glory(bot)
+
+        self.assertTrue(done)
+        self.assertEqual(common.ClaimReport(), report)
+        scan.assert_called_once_with(bot)
+
+    def test_moment_of_glory_claim_requires_clean_followup_pass(self):
+        bot = mock.Mock()
+        with (mock.patch.object(event_center,
+                                "_moment_swipe_to_top") as to_top,
+              mock.patch.object(event_center, "_scan_moment_once",
+                                side_effect=[
+                                    (common.ClaimReport(2, 2), True, False),
+                                    (common.ClaimReport(), True, False),
+                                ]) as scan):
+            report, done = event_center._handle_moment_of_glory(bot)
+
+        self.assertTrue(done)
+        self.assertEqual(common.ClaimReport(2, 2), report)
+        self.assertEqual(2, to_top.call_count)
+        self.assertEqual(2, scan.call_count)
+
+    def test_moment_of_glory_stuck_claim_stays_pending(self):
+        bot = mock.Mock()
+        with (mock.patch.object(event_center, "_moment_swipe_to_top"),
+              mock.patch.object(event_center, "_scan_moment_once",
+                                return_value=(common.ClaimReport(1, 0),
+                                              False, True))):
+            _, done = event_center._handle_moment_of_glory(bot)
+
+        self.assertFalse(done)
+
+    def test_moment_of_glory_rejects_gray_claimed_prefix(self):
+        claimed = cv2.imread(str(
+            IMAGES / "GiftClaims" / "EventCenter" / "MomentOfGlory" /
+            "status_claimed.png"))
+        screen = np.zeros((704, 396, 3), dtype=np.uint8)
+        top, left = 610, 300
+        screen[top:top + claimed.shape[0],
+               left:left + claimed.shape[1]] = claimed
+        center = (left + claimed.shape[1] // 2,
+                  top + claimed.shape[0] // 2)
+
+        with mock.patch.object(event_center, "find_all",
+                               return_value=[center]):
+            self.assertEqual([], event_center._moment_claims(bot=mock.Mock(),
+                                                              screen=screen))
+
+    def test_moment_of_glory_accepts_green_claim_band(self):
+        claim = cv2.imread(str(IMAGES / "GiftClaims" / "Common" /
+                               "button_claim_text.png"))
+        screen = np.zeros((704, 396, 3), dtype=np.uint8)
+        top, left = 610, 315
+        screen[top:top + claim.shape[0], left:left + claim.shape[1]] = claim
+        center = (left + claim.shape[1] // 2,
+                  top + claim.shape[0] // 2)
+
+        with mock.patch.object(event_center, "find_all",
+                               return_value=[center]):
+            self.assertEqual([center], event_center._moment_claims(
+                bot=mock.Mock(), screen=screen))
 
     def test_event_center_persistent_inner_badge_is_processed_once(self):
         screen = np.zeros((704, 396, 3), dtype=np.uint8)
@@ -1287,7 +2020,7 @@ class FixedGiftFlowTests(unittest.TestCase):
         bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
 
         def find_named(_bot, name, *_args, **_kwargs):
-            if name == "PreciousBlazonExchange/button_rewards_text":
+            if name == "EventCenter/PreciousBlazonExchange/button_rewards_text":
                 return (49, 235)
             return None
 
@@ -1410,9 +2143,9 @@ class FixedGiftFlowTests(unittest.TestCase):
 
         def find_named(_bot, name, *_args, **_kwargs):
             calls[name] = calls.get(name, 0) + 1
-            if name == "PoseidonsDay/tab_packages_red_dot":
+            if name == "EventCenter/PoseidonsDay/tab_packages_red_dot":
                 return (34, 78)
-            if (name == "PoseidonsDay/button_daily_free_text" and
+            if (name == "EventCenter/PoseidonsDay/button_daily_free_text" and
                     calls[name] >= 2):
                 return (355, 155)
             return None
@@ -1455,7 +2188,7 @@ class FixedGiftFlowTests(unittest.TestCase):
         bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
         with mock.patch.object(event_center, "find", return_value=None):
             self.assertIsNone(event_center._wait_for(
-                bot, "WishfulWindmillFestival/button_claim", attempts=3,
+                bot, "EventCenter/WishfulWindmillFestival/button_claim", attempts=3,
                 delay=event_center.WISHFUL_SETTLE_SECONDS))
         self.assertEqual(
             [mock.call(event_center.WISHFUL_SETTLE_SECONDS)] * 2,
@@ -1471,7 +2204,7 @@ class FixedGiftFlowTests(unittest.TestCase):
             self.assertTrue(event_center._wishful_open_blessings(bot))
 
         entry_call = find_entry.call_args_list[0]
-        self.assertEqual("WishfulWindmillFestival/button_wind_blessings",
+        self.assertEqual("EventCenter/WishfulWindmillFestival/button_wind_blessings",
                          entry_call.args[1])
         self.assertEqual((0, 12, 100, 85), entry_call.kwargs["region"])
         bot.tap.assert_called_once_with(
@@ -1487,7 +2220,7 @@ class FixedGiftFlowTests(unittest.TestCase):
             self.assertTrue(event_center._wishful_open_blessings(bot))
 
         chest_call = find_entry.call_args_list[1]
-        self.assertEqual("WishfulWindmillFestival/button_reward_chest_wind",
+        self.assertEqual("EventCenter/WishfulWindmillFestival/button_reward_chest_wind",
                          chest_call.args[1])
         self.assertEqual(0.86, chest_call.kwargs["threshold"])
         self.assertEqual((0, 12, 100, 85), chest_call.kwargs["region"])
@@ -1501,7 +2234,7 @@ class FixedGiftFlowTests(unittest.TestCase):
               mock.patch.object(
                   event_center, "_wishful_find_entry",
                   return_value=((35, 260),
-                                "WishfulWindmillFestival/button_wind_blessings",
+                                "EventCenter/WishfulWindmillFestival/button_wind_blessings",
                                 0.68, "Wind Blessings")),
               mock.patch.object(event_center, "_wait_for",
                                 return_value=(36, 261))):
@@ -1514,16 +2247,16 @@ class FixedGiftFlowTests(unittest.TestCase):
 
     def test_wishful_new_crops_have_the_exact_supplied_dimensions(self):
         chest = cv2.imread(str(
-            IMAGES / "GiftClaims" / "WishfulWindmillFestival" /
+            IMAGES / "GiftClaims" / "EventCenter" / "WishfulWindmillFestival" /
             "button_reward_chest_wind.png"))
         title = cv2.imread(str(
-            IMAGES / "GiftClaims" / "WishfulWindmillFestival" /
+            IMAGES / "GiftClaims" / "EventCenter" / "WishfulWindmillFestival" /
             "title_wind_blessings_text.png"))
         limit = cv2.imread(str(
-            IMAGES / "GiftClaims" / "WishfulWindmillFestival" /
+            IMAGES / "GiftClaims" / "EventCenter" / "WishfulWindmillFestival" /
             "status_done_one_claim_limit.png"))
         claimed = cv2.imread(str(
-            IMAGES / "GiftClaims" / "WishfulWindmillFestival" /
+            IMAGES / "GiftClaims" / "EventCenter" / "WishfulWindmillFestival" /
             "status_claimed.png"))
         self.assertEqual((32, 39), chest.shape[:2])
         self.assertEqual((18, 131), title.shape[:2])
@@ -1675,7 +2408,7 @@ class FixedGiftFlowTests(unittest.TestCase):
                          bot.sleep.call_args_list)
 
     def test_star_trail_coin_claim_uses_exact_user_crop(self):
-        claim = cv2.imread(str(IMAGES / "GiftClaims" / "GraceOfStarTrail" /
+        claim = cv2.imread(str(IMAGES / "GiftClaims" / "EventCenter" / "GraceOfStarTrail" /
                                "button_claim.png"))
         self.assertEqual((49, 41), claim.shape[:2])
 
@@ -1765,8 +2498,8 @@ class FixedGiftFlowTests(unittest.TestCase):
                                 return_value=(190.0, 0.75))):
             state, position = event_center._apple_button_state(
                 bot, screen,
-                "DwarfsLuckyApple/button_red_wish_x10",
-                "DwarfsLuckyApple/status_red_wish_x10_done")
+                "EventCenter/DwarfsLuckyApple/button_red_wish_x10",
+                "EventCenter/DwarfsLuckyApple/status_red_wish_x10_done")
 
         self.assertEqual("active", state)
         self.assertEqual((300, 620), position)
@@ -1784,8 +2517,8 @@ class FixedGiftFlowTests(unittest.TestCase):
                                 return_value=(True, (0.95, 0.96)))):
             state, _ = event_center._apple_button_state(
                 bot, screen,
-                "DwarfsLuckyApple/button_red_wish_x10",
-                "DwarfsLuckyApple/status_red_wish_x10_done")
+                "EventCenter/DwarfsLuckyApple/button_red_wish_x10",
+                "EventCenter/DwarfsLuckyApple/status_red_wish_x10_done")
 
         self.assertEqual("done", state)
 
@@ -1833,8 +2566,8 @@ class FixedGiftFlowTests(unittest.TestCase):
               mock.patch.object(event_center, "_close_apple_congratulations",
                                 return_value=True)):
             report, done = event_center._apple_phase(
-                bot, "DwarfsLuckyApple/button_red_wish_x10",
-                "DwarfsLuckyApple/status_red_wish_x10_done")
+                bot, "EventCenter/DwarfsLuckyApple/button_red_wish_x10",
+                "EventCenter/DwarfsLuckyApple/status_red_wish_x10_done")
 
         self.assertTrue(done)
         self.assertEqual(common.ClaimReport(1, 1), report)
@@ -1853,8 +2586,8 @@ class FixedGiftFlowTests(unittest.TestCase):
                                 return_value=(False, (0.92, 0.31)))):
             state, position = event_center._apple_button_state(
                 bot, screen,
-                "DwarfsLuckyApple/button_red_wish_x10",
-                "DwarfsLuckyApple/status_red_wish_x10_done")
+                "EventCenter/DwarfsLuckyApple/button_red_wish_x10",
+                "EventCenter/DwarfsLuckyApple/status_red_wish_x10_done")
 
         self.assertEqual("done", state)
         self.assertEqual((300, 620), position)
@@ -1875,8 +2608,8 @@ class FixedGiftFlowTests(unittest.TestCase):
               as ornament):
             state, position = event_center._apple_button_state(
                 bot, screen,
-                "DwarfsLuckyApple/button_red_wish_x10",
-                "DwarfsLuckyApple/status_red_wish_x10_done")
+                "EventCenter/DwarfsLuckyApple/button_red_wish_x10",
+                "EventCenter/DwarfsLuckyApple/status_red_wish_x10_done")
 
         self.assertEqual("done", state)
         self.assertEqual((300, 620), position)
@@ -1895,14 +2628,14 @@ class FixedGiftFlowTests(unittest.TestCase):
                                 return_value=(False, (0.256, 0.132)))):
             state, position = event_center._apple_button_state(
                 bot, screen,
-                "DwarfsLuckyApple/button_green_wish_x10",
-                "DwarfsLuckyApple/status_green_wish_x10_done")
+                "EventCenter/DwarfsLuckyApple/button_green_wish_x10",
+                "EventCenter/DwarfsLuckyApple/status_green_wish_x10_done")
 
         self.assertEqual("active", state)
         self.assertEqual((300, 620), position)
 
     def test_lucky_apple_real_templates_have_separate_gray_yellow_bands(self):
-        folder = IMAGES / "GiftClaims" / "DwarfsLuckyApple"
+        folder = IMAGES / "GiftClaims" / "EventCenter" / "DwarfsLuckyApple"
         active = cv2.imread(str(folder / "button_red_wish_x10.png"))
         done = cv2.imread(str(folder / "status_red_wish_x10_done.png"))
 
@@ -1938,8 +2671,8 @@ class FixedGiftFlowTests(unittest.TestCase):
               as ornament):
             state, position = event_center._apple_button_state(
                 bot, screen,
-                "DwarfsLuckyApple/button_red_wish_x10",
-                "DwarfsLuckyApple/status_red_wish_x10_done")
+                "EventCenter/DwarfsLuckyApple/button_red_wish_x10",
+                "EventCenter/DwarfsLuckyApple/status_red_wish_x10_done")
 
         self.assertEqual("active", state)
         self.assertEqual((300, 620), position)
@@ -1947,7 +2680,8 @@ class FixedGiftFlowTests(unittest.TestCase):
 
     def test_lucky_apple_ornament_check_uses_both_template_edges(self):
         template = cv2.imread(str(IMAGES / "GiftClaims" /
-                                  "DwarfsLuckyApple" /
+                                  "EventCenter" /
+                                "DwarfsLuckyApple" /
                                   "status_red_wish_x10_done.png"))
         screen = np.zeros((704, 396, 3), dtype=np.uint8)
         top, left = 500, 140
@@ -1963,7 +2697,8 @@ class FixedGiftFlowTests(unittest.TestCase):
 
     def test_lucky_apple_ornament_check_reverses_odd_template_center_exactly(self):
         template = cv2.imread(str(IMAGES / "GiftClaims" /
-                                  "DwarfsLuckyApple" /
+                                  "EventCenter" /
+                                "DwarfsLuckyApple" /
                                   "status_green_wish_x10_done.png"))
         self.assertEqual(1, template.shape[1] % 2)
         screen = np.zeros((704, 396, 3), dtype=np.uint8)
@@ -2070,20 +2805,20 @@ class FixedGiftFlowTests(unittest.TestCase):
         self.assertTrue(done)
         self.assertEqual(common.ClaimReport(9, 9), report)
         self.assertEqual(
-            [("DwarfsLuckyApple/button_green_wish_x100",
-              "DwarfsLuckyApple/status_green_wish_x100_done"),
-             ("DwarfsLuckyApple/button_green_wish_x10",
-              "DwarfsLuckyApple/status_green_wish_x10_done"),
-             ("DwarfsLuckyApple/button_red_wish_x10",
-              "DwarfsLuckyApple/status_red_wish_x10_done")],
+            [("EventCenter/DwarfsLuckyApple/button_green_wish_x100",
+              "EventCenter/DwarfsLuckyApple/status_green_wish_x100_done"),
+             ("EventCenter/DwarfsLuckyApple/button_green_wish_x10",
+              "EventCenter/DwarfsLuckyApple/status_green_wish_x10_done"),
+             ("EventCenter/DwarfsLuckyApple/button_red_wish_x10",
+              "EventCenter/DwarfsLuckyApple/status_red_wish_x10_done")],
             [call.args[1:3] for call in phase.call_args_list])
         self.assertEqual(2, bot.tap.call_count)
 
     def test_lucky_apple_only_once_on_both_tabs_is_done(self):
         bot = mock.Mock()
         bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
-        green_state = ("DwarfsLuckyApple/status_green_wish_once", (250, 540))
-        red_state = ("DwarfsLuckyApple/status_red_wish_once", (250, 540))
+        green_state = ("EventCenter/DwarfsLuckyApple/status_green_wish_once", (250, 540))
+        red_state = ("EventCenter/DwarfsLuckyApple/status_red_wish_once", (250, 540))
         with (mock.patch.object(event_center, "_wait_for_any",
                                 side_effect=((300, 300), (100, 300))),
               mock.patch.object(event_center, "_wait_apple_special_state",
@@ -2137,7 +2872,7 @@ class FixedGiftFlowTests(unittest.TestCase):
         once.assert_called_once()
 
     def test_lucky_apple_new_state_crops_match_supplied_files(self):
-        folder = IMAGES / "GiftClaims" / "DwarfsLuckyApple"
+        folder = IMAGES / "GiftClaims" / "EventCenter" / "DwarfsLuckyApple"
         self.assertEqual((37, 106), cv2.imread(str(
             folder / "status_green_wish_once.png")).shape[:2])
         self.assertEqual((40, 147), cv2.imread(str(
@@ -2171,8 +2906,8 @@ class FixedGiftFlowTests(unittest.TestCase):
         with mock.patch.object(event_center, "find", side_effect=find_variant):
             position = event_center._wait_for_any(
                 bot,
-                ("DwarfsLuckyApple/tab_green_apple",
-                 "DwarfsLuckyApple/tab_green_apple_1"),
+                ("EventCenter/DwarfsLuckyApple/tab_green_apple",
+                 "EventCenter/DwarfsLuckyApple/tab_green_apple_1"),
                 attempts=4, threshold=0.70, region=(45, 40, 100, 68))
 
         self.assertEqual((287, 319), position)
@@ -2216,8 +2951,57 @@ class FixedGiftFlowTests(unittest.TestCase):
         bot.tap.assert_called_once_with(
             190, 75, delay=event_center.APPLE_LIST_SETTLE_SECONDS)
 
-    def test_event_center_scans_at_most_four_list_positions(self):
-        self.assertEqual(3, event_center.MAX_SCROLLS)
+    def test_event_center_uses_two_confirmations_without_local_swipe_ceiling(self):
+        self.assertEqual(2, event_center.LIST_EDGE_CONFIRMATIONS)
+        self.assertEqual(8, event_center.LIST_SAME_DISTANCE)
+        self.assertFalse(hasattr(event_center, "MAX_SCROLLS"))
+        self.assertFalse(hasattr(event_center, "APPLE_LIST_MAX_SWIPES"))
+
+    def test_event_center_list_hamming_ignores_right_side_animation(self):
+        first = np.zeros((704, 396, 3), dtype=np.uint8)
+        for y in range(110, 700, 100):
+            first[y:y + 4, :270] = 220
+            first[y + 15:y + 28, 70:220] = 160
+        animated = first.copy()
+        animated[110:690, 275:] = 255
+
+        old = event_center._list_signature(first)
+        new = event_center._list_signature(animated)
+        self.assertEqual(0, event_center._list_hamming_distance(old, new))
+        self.assertTrue(event_center._same_list_position(old, new))
+
+    def test_event_center_list_hamming_detects_vertical_displacement(self):
+        first = np.zeros((704, 396, 3), dtype=np.uint8)
+        for index, y in enumerate(range(110, 700, 87)):
+            first[y:y + 3, :270] = 220
+            first[y + 10:y + 18 + index, 60:230] = 80 + index * 20
+        shifted = np.roll(first, 60, axis=0)
+
+        distance = event_center._list_hamming_distance(
+            event_center._list_signature(first),
+            event_center._list_signature(shifted))
+        self.assertGreater(distance, event_center.LIST_SAME_DISTANCE)
+
+    def test_event_center_top_edge_requires_two_unchanged_swipes(self):
+        bot = mock.Mock()
+        bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
+        with mock.patch.object(event_center, "_same_list_position",
+                               side_effect=(True, False, True, True)):
+            self.assertTrue(event_center._return_list_to_top(bot, "limited"))
+
+        self.assertEqual(4, bot.swipe_percent.call_count)
+
+    def test_event_center_bottom_edge_requires_two_unchanged_swipes(self):
+        bot = mock.Mock()
+        bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
+        with (mock.patch.object(event_center, "_return_list_to_top",
+                                return_value=True),
+              mock.patch.object(event_center, "_row_dots", return_value=[]),
+              mock.patch.object(event_center, "_same_list_position",
+                                side_effect=(True, False, True, True))):
+            self.assertTrue(event_center._verify_clean(bot, "limited"))
+
+        self.assertEqual(4, bot.swipe_percent.call_count)
 
     def test_eagle_of_freedom_no_claim_after_full_scroll_is_done(self):
         bot = mock.Mock()
@@ -2236,9 +3020,9 @@ class FixedGiftFlowTests(unittest.TestCase):
         screen = np.zeros((704, 396, 3), dtype=np.uint8)
 
         def matches(_bot, name, *_args, **_kwargs):
-            if name == "EagleOfFreedom/status_claimed":
+            if name == "EventCenter/EagleOfFreedom/status_claimed":
                 return [(330, 350)]
-            if name == "EagleOfFreedom/button_claim":
+            if name == "EventCenter/EagleOfFreedom/button_claim":
                 # The shorter Claim template matches inside Claimed.
                 return [(318, 350)]
             return []
@@ -2270,7 +3054,7 @@ class FixedGiftFlowTests(unittest.TestCase):
         visited = set()
         with (mock.patch.object(event_center, "find",
                                 side_effect=lambda _bot, name, *_args, **_kwargs:
-                                (120, 220) if name.startswith("GraceOfStarTrail/")
+                                (120, 220) if name.startswith("EventCenter/GraceOfStarTrail/")
                                 else None),
               mock.patch.object(event_center, "_row_dots", return_value=[]),
               mock.patch.object(event_center, "identify",
@@ -2292,7 +3076,7 @@ class FixedGiftFlowTests(unittest.TestCase):
         visited = {event_center.FORCED_EVENT_PREFIX + b"grace_of_star_trail"}
         with (mock.patch.object(event_center, "find",
                                 side_effect=lambda _bot, name, *_args, **_kwargs:
-                                (120, 220) if name.startswith("DwarfsTreasure/")
+                                (120, 220) if name.startswith("EventCenter/DwarfsTreasure/")
                                 else None),
               mock.patch.object(event_center, "_row_dots", return_value=[]),
               mock.patch.object(event_center, "identify",
@@ -2346,7 +3130,7 @@ class FixedGiftFlowTests(unittest.TestCase):
             seen_regions.append((name, kwargs.get("region")))
             if name.endswith("button_star_trail_gift_current"):
                 return (360, 90)
-            if name == "GraceOfStarTrail/button_claim":
+            if name == "EventCenter/GraceOfStarTrail/button_claim":
                 return (355, 116)
             return None
 
@@ -2356,7 +3140,7 @@ class FixedGiftFlowTests(unittest.TestCase):
             report = event_center._tap_reward_navigation(bot)
 
         self.assertEqual(common.ClaimReport(2, 1), report)
-        self.assertIn(("GraceOfStarTrail/button_claim",
+        self.assertIn(("EventCenter/GraceOfStarTrail/button_claim",
                        event_center.REWARD_NAV_REGION), seen_regions)
 
     def test_event_center_scans_limited_then_activities(self):
@@ -2463,10 +3247,13 @@ class FixedGiftFlowTests(unittest.TestCase):
 
     def test_event_center_special_templates_are_tightly_cropped(self):
         rewards = cv2.imread(str(IMAGES / "GiftClaims" /
-                                 "PreciousBlazonExchange" / "button_rewards_text.png"))
+                                 "EventCenter" /
+                                "PreciousBlazonExchange" / "button_rewards_text.png"))
         daily = cv2.imread(str(IMAGES / "GiftClaims" /
-                               "DwarfsTreasure" / "button_daily_free_chest.png"))
+                               "EventCenter" /
+                                "DwarfsTreasure" / "button_daily_free_chest.png"))
         hypnos = cv2.imread(str(IMAGES / "GiftClaims" /
+                                "EventCenter" /
                                 "HypnosDream" / "button_rewards_text.png"))
         self.assertLessEqual(rewards.shape[0], 22)
         self.assertLessEqual(hypnos.shape[0], 18)
@@ -2474,10 +3261,10 @@ class FixedGiftFlowTests(unittest.TestCase):
         self.assertLessEqual(daily.shape[1], 50)
 
     def test_star_trail_current_icon_is_a_clickable_crop(self):
-        icon = cv2.imread(str(IMAGES / "GiftClaims" / "GraceOfStarTrail" /
+        icon = cv2.imread(str(IMAGES / "GiftClaims" / "EventCenter" / "GraceOfStarTrail" /
                               "button_star_trail_gift_current.png"))
         self.assertEqual((75, 68), icon.shape[:2])
-        self.assertEqual("GraceOfStarTrail/button_star_trail_gift_current",
+        self.assertEqual("EventCenter/GraceOfStarTrail/button_star_trail_gift_current",
                          event_center.REWARD_NAVIGATION[0])
 
     def test_revelation_and_sealed_treasury_are_immediate_skips(self):
@@ -2553,7 +3340,7 @@ class FixedGiftFlowTests(unittest.TestCase):
                 self.assertTrue(any((IMAGES / "GiftClaims" / folder).glob("*.png")))
 
     def test_common_claim_text_matches_claim_and_claim_free_prefix(self):
-        claim = cv2.imread(str(IMAGES / "GiftClaims" / "BackToTerritory" /
+        claim = cv2.imread(str(IMAGES / "GiftClaims" / "EventCenter" / "BackToTerritory" /
                               "button_claim.png"))
         screen = np.zeros((704, 396, 3), dtype=np.uint8)
         screen[400:400 + claim.shape[0], 200:200 + claim.shape[1]] = claim

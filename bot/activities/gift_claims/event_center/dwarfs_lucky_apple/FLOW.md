@@ -4,7 +4,7 @@
    dùng nhịp chờ chung 1,5–2 giây của Limited:
    - vuốt về đỉnh, mỗi cú vuốt chờ `0,8 giây`; hai cú liên tiếp không làm danh
      sách đổi mới xác nhận đã tới đỉnh;
-   - từ đỉnh, chụp và tìm đúng `DwarfsLuckyApple/list_row`, rồi vuốt xuống từng
+   - từ đỉnh, chụp và tìm đúng `EventCenter/DwarfsLuckyApple/list_row`, rồi vuốt xuống từng
      bước; sau mỗi bước chờ `0,8 giây` mới chụp và tìm tiếp;
    - hai cú vuốt liên tiếp không đổi ảnh mới xác nhận đã tới đáy;
    - chưa thấy thì đảo chiều, tiếp tục quét từ đáy lên đỉnh với cùng nhịp

@@ -33,43 +33,43 @@ class ValuableSpec:
 
 
 SPECS = (
-    ValuableSpec(limited_offer.TASK, "LimitedOffer/tab_current",
+    ValuableSpec(limited_offer.TASK, "ValuableEvent/LimitedOffer/tab_current",
                  limited_offer.FLOW),
     ValuableSpec(resource_consumption_sprint.TASK,
-                 "ResourceConsumptionSprint/tab_current",
+                 "ValuableEvent/ResourceConsumptionSprint/tab_current",
                  resource_consumption_sprint.FLOW),
     ValuableSpec(runestone_consumption_sprint.TASK,
-                 "RunestoneConsumptionSprint/tab",
+                 "ValuableEvent/RunestoneConsumptionSprint/tab",
                  runestone_consumption_sprint.FLOW),
-    ValuableSpec(super_blazon_sale.TASK, "SuperBlazonSale/tab_current",
+    ValuableSpec(super_blazon_sale.TASK, "ValuableEvent/SuperBlazonSale/tab_current",
                  super_blazon_sale.FLOW),
-    ValuableSpec(optional_package.TASK, "OptionalPackage/tab", optional_package.FLOW),
+    ValuableSpec(optional_package.TASK, "ValuableEvent/OptionalPackage/tab", optional_package.FLOW),
     ValuableSpec(super_value_weekly_card.TASK,
-                 "SuperValueWeeklyCard/tab_current",
+                 "ValuableEvent/SuperValueWeeklyCard/tab_current",
                  super_value_weekly_card.FLOW),
-    ValuableSpec(active_monthly_card.TASK, "ActiveMonthlyCard/tab",
+    ValuableSpec(active_monthly_card.TASK, "ValuableEvent/ActiveMonthlyCard/tab",
                  active_monthly_card.FLOW),
     ValuableSpec(successive_purchase_benefits.TASK,
-                 "SuccessivePurchaseBenefits/tab_current",
+                 "ValuableEvent/SuccessivePurchaseBenefits/tab_current",
                  successive_purchase_benefits.FLOW),
-    ValuableSpec(tomb_expedition.TASK, "TombExpedition/tab", tomb_expedition.FLOW),
-    ValuableSpec(general_vault.TASK, "GeneralVault/tab_current",
+    ValuableSpec(tomb_expedition.TASK, "ValuableEvent/TombExpedition/tab", tomb_expedition.FLOW),
+    ValuableSpec(general_vault.TASK, "ValuableEvent/GeneralVault/tab_current",
                  general_vault.FLOW),
     # Older rotations remain named and use only their known safe controls.
     ValuableSpec(ancient_dynasty_treasury.TASK,
-                 "AncientDynastyTreasury/tab",
+                 "ValuableEvent/AncientDynastyTreasury/tab",
                  ancient_dynasty_treasury.FLOW),
-    ValuableSpec(refining_stone_sprint.TASK, "RefiningStoneSprint/tab", ExactFlow(
-        navigation=("SpeedupSprint/subtab_package",),
-        claims=("SpeedupSprint/button_free",), claim_threshold=0.95,
+    ValuableSpec(refining_stone_sprint.TASK, "ValuableEvent/RefiningStoneSprint/tab", ExactFlow(
+        navigation=("ValuableEvent/SpeedupSprint/subtab_package",),
+        claims=("ValuableEvent/SpeedupSprint/button_free",), claim_threshold=0.95,
         absence_done=True)),
-    ValuableSpec(speedup_sprint.TASK, "SpeedupSprint/tab",
+    ValuableSpec(speedup_sprint.TASK, "ValuableEvent/SpeedupSprint/tab",
                  speedup_sprint.FLOW),
-    ValuableSpec(wheel_of_dragon_war.TASK, "WheelOfDragonWar/tab",
+    ValuableSpec(wheel_of_dragon_war.TASK, "ValuableEvent/WheelOfDragonWar/tab",
                  wheel_of_dragon_war.FLOW),
-    ValuableSpec(strategic_stockpile.TASK, "StrategicStockpile/tab_current",
+    ValuableSpec(strategic_stockpile.TASK, "ValuableEvent/StrategicStockpile/tab_current",
                  strategic_stockpile.FLOW),
-    ValuableSpec(sulis_wishing.TASK, "SulisWishing/tab", ExactFlow(skip=True)),
+    ValuableSpec(sulis_wishing.TASK, "ValuableEvent/SulisWishing/tab", ExactFlow(skip=True)),
 )
 
 
@@ -111,6 +111,9 @@ def run_opened(bot, due_keys: set[str], *, handled: set[str] | None = None
                 # Settle exactly one lower-panel flow before moving the upper
                 # carousel. Never reuse the other tab coordinates captured
                 # before the selected event animated or changed its content.
+                # Choose by the current on-screen position, never by SPECS or
+                # a task priority: whichever pending task is visible first is
+                # handled first.
                 spec, pos = min(visible, key=lambda item: item[1][0])
                 key = spec.task.key
                 bot.record(f"Gift Claims: Valuable Event mở {spec.task.label}")

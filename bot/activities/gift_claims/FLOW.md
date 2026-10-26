@@ -22,6 +22,13 @@ tiếp. Khi cửa sổ mới bắt đầu, thứ tự trên được áp dụng 
   Center. Key tổng `gift_event_center`.
 - Revelry Carnival: dùng toàn bộ Parade Mask rồi nhận mọi nút Claim xanh; dùng
   key `revelry_carnival` và logic điều hướng event hiện có.
+  Khi mới vào, bot kiểm tra vùng danh sách quà: có Claim xanh thì nhận ngay;
+  chỉ có Claim xám thì mới bấm Parade Mask. `How to get` là DONE riêng cho
+  bước Parade Mask và được checkpoint bằng `revelry_carnival_parade_masks_used`,
+  nhưng chưa phải DONE toàn nhiệm vụ. Sau mỗi Claim/Use, nếu hiện
+  Congratulations thì Back đúng một lần và chờ popup biến mất hoặc nút Claim
+  hiện rõ. Toàn nhiệm vụ chỉ DONE sau một lượt quét đủ biên đầu-biên cuối mà
+  không còn Claim xanh.
 
 Mỗi nhiệm vụ con có key `daily_done` riêng (ví dụ `gift_limited_offer`). DB lưu timestamp ISO;
 `BotWorker.is_daily_done()` so với lần reset server gần nhất (mặc định 14:00, lấy từ DB settings): 15:00 ngày 15/10 thì
@@ -109,14 +116,20 @@ giây và chờ 1 giây để các máy chạy đồng thời có thời gian �
   sau một lượt quét đầy đủ chỉ ghi `miss 1/3`; đủ ba lượt quét đầy đủ không
   thấy mới ghi task đó DONE. Không còn chấm đỏ trong một lượt cũng không được
   bỏ qua quy tắc ba lượt này.
-- Super Value Return: luôn kiểm tra Login Gifts một lần; Empire Depot và Lucky
-  Raffle dùng Claimable; City Growth Plan ưu tiên Claim All rồi chỉ nhận cột
-  miễn phí bên trái.
-- Login Gifts: tìm đúng ảnh `button_reward_chest`; nếu không thấy thì bấm điểm
-  dự phòng `(45, 190)`. Không dùng chấm đỏ hay quét rương theo từng hàng. Sau
-  khi bấm phải chụp màn hình mới: thấy Congratulations **hoặc** trang Login
-  Gifts vẫn mở nhưng không còn nút rương thì DONE; rương vẫn còn mà không có
-  Congratulations thì giữ PENDING.
+- Super Value Return: thấy tab nào thì xử lý tab đó, không ưu tiên theo danh
+  sách. Empire Depot và Lucky Raffle dùng Claimable; City Growth Plan ưu tiên
+  Claim All rồi chỉ nhận cột miễn phí bên trái. Hall of Historic Generals dùng
+  chữ + dải màu để tách Claim xanh khỏi Claimed xám và chỉ ghi DB DONE sau một
+  lượt xác nhận toàn bộ Claimed. Soul of Spiritual Beast quét dọc riêng hai tab
+  Daily Tasks và Seasonal trong vùng nhiệm vụ; có Claim trong lượt thì nhận hết,
+  quay lại màn Challenge Quest và vét rương. Rương biến mất là điều kiện kết
+  thúc kể cả khi Congratulations không xuất hiện. Lượt có nhận chỉ ghi DONE_1;
+  chỉ khi cả hai tab đã toàn bộ Claimed mới ghi DONE tổng.
+- Login Gifts: chỉ bấm khi tìm đúng ảnh `button_reward_chest`; nếu không thấy
+  thì giữ PENDING, không dùng tọa độ dự phòng. Không dùng chấm đỏ hay quét rương theo từng hàng. Sau
+  khi bấm phải chờ và đóng Congratulations nếu có, sau đó chụp lại. Chỉ khi
+  trang Login Gifts vẫn mở và hai frame liên tiếp không còn nút rương mới DONE;
+  Congratulations một mình không đủ điều kiện.
 - Back to Territory nằm ở thanh phải cùng vùng ngoài thành với Event Center,
   nhưng là màn ngang cấp và không phải event con của Event Center. Với mỗi tab
   đỏ trên carousel, duyệt tiếp toàn bộ badge đỏ
@@ -128,7 +141,11 @@ giây và chờ 1 giây để các máy chạy đồng thời có thời gian �
   Activities; không vào Competition. Một nhiệm vụ đã thấy nhưng chạy hết flow
   riêng mà chưa DONE được giữ PENDING và không được mở lại trong cùng lượt
   120 giây. Mỗi nhóm
-  chỉ duyệt tối đa bốn vị trí danh sách (vị trí đầu và ba lần lướt chậm). Ở
+  đưa danh sách về biên đầu rồi quét đến biên cuối, mỗi biên chỉ được xác nhận
+  sau hai cú lướt ổn định liên tiếp không làm danh sách di chuyển. Event Center
+  dùng Hamming trên cấu trúc dọc 96 dải của phần trái danh sách, ngưỡng `8/96`,
+  để bỏ qua artwork, đồng hồ và dòng mô tả động. Không có
+  giới hạn cứng số vị trí; Stop/deadline 120 giây là giới hạn an toàn. Ở
   từng vị trí bot log rõ danh sách tên nhiệm vụ còn pending trước khi dò và
   bấm. Event không xuất hiện trong một lượt quét đầy đủ được log `lần 1/3`,
   `2/3`, `3/3`; sau ba lượt mới coi là hôm nay không có và ghi DONE.

@@ -12,7 +12,7 @@ KEY = "gift_sulis_wishing"
 
 def run(bot):
     opened = (open_named(bot, GiftScreen.VALUABLE_EVENT)
-              and select_carousel_tab(bot, "ValuableEvent/title", "SulisWishing/tab"))
+              and select_carousel_tab(bot, "ValuableEvent/title", "ValuableEvent/SulisWishing/tab"))
     if opened:
         bot.log("Gift Claims: Sulis Wishing opened; no free claim control shown")
         return_home(bot)

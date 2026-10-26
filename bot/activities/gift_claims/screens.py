@@ -25,29 +25,31 @@ class GiftScreen(str, Enum):
     WISHFUL_WINDMILL_FESTIVAL = "WishfulWindmillFestival"
     EAGLE_OF_FREEDOM = "EagleOfFreedom"
     LEGION_HUNTING = "LegionHunting"
+    MOMENT_OF_GLORY = "MomentOfGlory"
 
 
 TITLE_TEMPLATES = {
     GiftScreen.SUPER_VALUE_RETURN: "SuperValueReturn/title",
     GiftScreen.VALUABLE_EVENT: "ValuableEvent/title",
     GiftScreen.EVENT_CENTER: "EventCenter/title",
-    GiftScreen.DRAGON_BATTLE: "DragonBattle/title",
+    GiftScreen.DRAGON_BATTLE: "EventCenter/DragonBattle/title",
     # Check Eagle before Grace: their wide red title bars score about 0.727
     # against each other, while Eagle's supplied title is an exact 1.0 match.
-    GiftScreen.EAGLE_OF_FREEDOM: "EagleOfFreedom/title",
-    GiftScreen.LEGION_HUNTING: "LegionHunting/title",
-    GiftScreen.GRACE_OF_STAR_TRAIL: "GraceOfStarTrail/title",
-    GiftScreen.BACCHUS_TAVERN: "BacchusTavern/title",
-    GiftScreen.BACK_TO_TERRITORY: "BackToTerritory/title",
+    GiftScreen.EAGLE_OF_FREEDOM: "EventCenter/EagleOfFreedom/title",
+    GiftScreen.LEGION_HUNTING: "EventCenter/LegionHunting/title",
+    GiftScreen.MOMENT_OF_GLORY: "EventCenter/MomentOfGlory/title",
+    GiftScreen.GRACE_OF_STAR_TRAIL: "EventCenter/GraceOfStarTrail/title",
+    GiftScreen.BACCHUS_TAVERN: "EventCenter/BacchusTavern/title",
+    GiftScreen.BACK_TO_TERRITORY: "EventCenter/BackToTerritory/title",
     GiftScreen.FOLLOW_US: "FollowUs/title",
-    GiftScreen.PRECIOUS_BLAZON_EXCHANGE: "PreciousBlazonExchange/title",
-    GiftScreen.POSEIDONS_DAY: "PoseidonsDay/title",
-    GiftScreen.HYPNOS_DREAM: "HypnosDream/title",
-    GiftScreen.DWARFS_TREASURE: "DwarfsTreasure/title",
-    GiftScreen.DWARFS_LUCKY_APPLE: "DwarfsLuckyApple/title",
-    GiftScreen.REVELATION_OF_HORUS: "RevelationOfHorus/title",
-    GiftScreen.SEALED_IMPERIAL_TREASURY: "SealedImperialTreasury/title",
-    GiftScreen.WISHFUL_WINDMILL_FESTIVAL: "WishfulWindmillFestival/title",
+    GiftScreen.PRECIOUS_BLAZON_EXCHANGE: "EventCenter/PreciousBlazonExchange/title",
+    GiftScreen.POSEIDONS_DAY: "EventCenter/PoseidonsDay/title",
+    GiftScreen.HYPNOS_DREAM: "EventCenter/HypnosDream/title",
+    GiftScreen.DWARFS_TREASURE: "EventCenter/DwarfsTreasure/title",
+    GiftScreen.DWARFS_LUCKY_APPLE: "EventCenter/DwarfsLuckyApple/title",
+    GiftScreen.REVELATION_OF_HORUS: "EventCenter/RevelationOfHorus/title",
+    GiftScreen.SEALED_IMPERIAL_TREASURY: "EventCenter/SealedImperialTreasury/title",
+    GiftScreen.WISHFUL_WINDMILL_FESTIVAL: "EventCenter/WishfulWindmillFestival/title",
 }
 
 PAGE_MARKERS = {
@@ -55,8 +57,8 @@ PAGE_MARKERS = {
     # label.  The exact Skip animation controls supplied by the user are a
     # safer page identity and cannot occur on the Event Center list.
     GiftScreen.GIANTS_WISDOM_TEMPLE: (
-        "GiantsWisdomTemple/checkbox_skip_animation_unchecked",
-        "GiantsWisdomTemple/checkbox_skip_animation_checked",
+        "EventCenter/GiantsWisdomTemple/checkbox_skip_animation_unchecked",
+        "EventCenter/GiantsWisdomTemple/checkbox_skip_animation_checked",
     ),
 }
 

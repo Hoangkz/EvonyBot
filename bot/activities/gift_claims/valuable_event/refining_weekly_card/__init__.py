@@ -1,3 +1,7 @@
-from .run import FLOW, KEY, TASK, claim_opened, run
+from .run import (DONE, DONE_1, FLOW, KEY, PENDING, TASK, claim_opened,
+                  run)
 
-__all__ = ["FLOW", "KEY", "TASK", "claim_opened", "run"]
+__all__ = [
+    "DONE", "DONE_1", "FLOW", "KEY", "PENDING", "TASK", "claim_opened",
+    "run",
+]

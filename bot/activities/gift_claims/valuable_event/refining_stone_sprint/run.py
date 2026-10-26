@@ -11,9 +11,9 @@ def run(bot):
         bot,
         GiftScreen.VALUABLE_EVENT,
         "ValuableEvent/title",
-        "RefiningStoneSprint/tab",
-        ("SpeedupSprint/button_free",),
-        navigation=("SpeedupSprint/subtab_package",),
+        "ValuableEvent/RefiningStoneSprint/tab",
+        ("ValuableEvent/SpeedupSprint/button_free",),
+        navigation=("ValuableEvent/SpeedupSprint/subtab_package",),
     )
 
 

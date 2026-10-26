@@ -17,18 +17,41 @@ REGIONS = {
 MAX_OPENS_PER_BOUNDARY = 16
 OPEN_WAIT_ATTEMPTS = 6
 VALUABLE_LAUNCH_ATTEMPTS = 3
-SUPER_VALUE_LAUNCH_ATTEMPTS = 4
+# The city launcher rotates through animated event artwork. Emulator 21503
+# exposed the valid Empire Depot frame only on capture 10 in a live run, so
+# sample a full ten-second window instead of treating four frames as absence.
+SUPER_VALUE_LAUNCH_ATTEMPTS = 50
+SUPER_VALUE_LAUNCH_INTERVAL = 0.2
+PARENT_EDGE_CONFIRMATIONS = 2
+PARENT_SAME_DISTANCE = 16
 IGNORED_RIGHT_LAUNCHERS = ("FollowUs/facebook_icon",)
 EVENT_CENTER_LAUNCHERS = ("EventCenter/launcher_side", "EventCenter/launcher")
 FIXED_PARENT_LAUNCHERS = {
     GiftScreen.BACK_TO_TERRITORY: (
-        ("BackToTerritory/title",), REGIONS[RIGHT]),
+        ("EventCenter/BackToTerritory/title",), REGIONS[RIGHT]),
 }
 PARENT_ANCHOR_TABS = {
     GiftScreen.VALUABLE_EVENT: (
-        "ResourceConsumptionSprint/tab", "LimitedOffer/tab"),
-    GiftScreen.SUPER_VALUE_RETURN: ("EmpireDepot/tab_current", "EmpireDepot/tab"),
+        "ValuableEvent/ResourceConsumptionSprint/tab", "ValuableEvent/LimitedOffer/tab"),
 }
+
+
+def _parent_carousel_signature(screen) -> bytes:
+    """dHash only the stable task-name band of the parent carousel."""
+    height, width = screen.shape[:2]
+    patch = cv2.cvtColor(
+        screen[round(height * 12 / 100):round(height * 18 / 100), :],
+        cv2.COLOR_BGR2GRAY,
+    )
+    tiny = cv2.resize(patch, (49, 10), interpolation=cv2.INTER_AREA)
+    return np.packbits(tiny[:, 1:] > tiny[:, :-1]).tobytes()
+
+
+def _parent_carousel_moved(before, after) -> bool:
+    old = np.frombuffer(_parent_carousel_signature(before), dtype=np.uint8)
+    new = np.frombuffer(_parent_carousel_signature(after), dtype=np.uint8)
+    distance = int(np.unpackbits(np.bitwise_xor(old, new)).sum())
+    return old.shape != new.shape or distance > PARENT_SAME_DISTANCE
 
 
 def _switch_parent_carousel(bot, expected) -> bool:
@@ -37,8 +60,12 @@ def _switch_parent_carousel(bot, expected) -> bool:
     if current not in (GiftScreen.VALUABLE_EVENT, GiftScreen.SUPER_VALUE_RETURN):
         return False
     anchors = PARENT_ANCHOR_TABS.get(expected, ())
-    for direction in (-1, 1):
-        for step in range(9):
+    # Prove the real first edge, then scan to the real final edge. There is no
+    # fixed swipe ceiling; bot.check() remains the shared deadline/Stop guard.
+    for phase, start_x, end_x in (("rewind", 20, 85), ("scan", 85, 55)):
+        unchanged = 0
+        while True:
+            bot.check()
             screen = bot.screenshot()
             if identify(bot, screen) == expected:
                 return True
@@ -51,11 +78,19 @@ def _switch_parent_carousel(bot, expected) -> bool:
                 bot.tap(*target, delay=1)
                 if identify(bot, bot.screenshot()) == expected:
                     return True
-            if step < 8:
-                if direction < 0:
-                    bot.swipe_percent(85, 14, 20, 14, duration=0.5, delay=1)
-                else:
-                    bot.swipe_percent(20, 14, 85, 14, duration=0.5, delay=1)
+            before = bot.screenshot()
+            bot.swipe_percent(start_x, 14, end_x, 14,
+                              duration=0.5, delay=1)
+            after = bot.screenshot()
+            if _parent_carousel_moved(before, after):
+                unchanged = 0
+                continue
+            unchanged += 1
+            if unchanged >= PARENT_EDGE_CONFIRMATIONS:
+                bot.record("Gift Claims: carousel cha đã xác nhận biên "
+                           f"{'đầu' if phase == 'rewind' else 'cuối'} sau "
+                           f"{PARENT_EDGE_CONFIRMATIONS} cú không đổi")
+                break
     return False
 
 
@@ -311,10 +346,11 @@ def open_named(bot, expected):
                 bot.log("Gift Claims: chưa thấy launcher SuperValueReturn; "
                         f"chụp lại frame animation ({attempt + 1}/"
                         f"{SUPER_VALUE_LAUNCH_ATTEMPTS - 1})")
-                bot.sleep(0.4)
+                bot.sleep(SUPER_VALUE_LAUNCH_INTERVAL)
         if launcher is None:
             bot.record("Gift Claims: không nhận diện được launcher "
-                       "SuperValueReturn sau 4 frame; không bấm tọa độ cứng")
+                       f"SuperValueReturn sau {SUPER_VALUE_LAUNCH_ATTEMPTS} "
+                       "frame; không mở ValuableEvent và không bấm tọa độ cứng")
             return False
     else:
         screen = bot.screenshot()
@@ -344,7 +380,8 @@ def open_named(bot, expected):
             return True
         if attempt + 1 < OPEN_WAIT_ATTEMPTS:
             bot.sleep(1)
-    if _switch_parent_carousel(bot, expected):
+    if (expected != GiftScreen.SUPER_VALUE_RETURN
+            and _switch_parent_carousel(bot, expected)):
         return True
     bot.log(f"Gift Claims: launcher ảnh không mở {expected.value}")
     return_home(bot)

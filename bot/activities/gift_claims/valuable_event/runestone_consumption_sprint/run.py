@@ -5,9 +5,9 @@ from ..named_flow import ExactFlow, run_carousel_exact
 
 KEY = "gift_runestone_consumption_sprint"
 FLOW = ExactFlow(
-    navigation=("RunestoneConsumptionSprint/subtab_sprint_package",),
-    claims=("RunestoneConsumptionSprint/button_free",),
-    done=("RunestoneConsumptionSprint/sold_out",),
+    navigation=("ValuableEvent/RunestoneConsumptionSprint/subtab_sprint_package",),
+    claims=("ValuableEvent/RunestoneConsumptionSprint/button_free",),
+    done=("ValuableEvent/RunestoneConsumptionSprint/sold_out",),
     congratulations_done=True,
 )
 
@@ -17,7 +17,7 @@ def run(bot):
         bot,
         GiftScreen.VALUABLE_EVENT,
         "ValuableEvent/title",
-        "RunestoneConsumptionSprint/tab",
+        "ValuableEvent/RunestoneConsumptionSprint/tab",
         FLOW,
     )
 

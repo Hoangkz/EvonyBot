@@ -1,8 +1,9 @@
 """Deterministic two-zone runner for Super Value Return / Empire Depot."""
 from dataclasses import dataclass
 
-from .. import (city_growth_plan, empire_depot, login_gifts, lucky_raffle,
-                refining_weekly_card)
+from .. import (city_growth_plan, empire_depot, hall_of_historic_generals,
+                login_gifts, lucky_raffle, refining_weekly_card,
+                soul_of_spiritual_beast)
 from ...common import (TEXT_CLAIM_CONTROLS, back_if_close_x, find,
                        mark_task_done)
 from ..named_flow import (CAROUSEL_EDGE_CONFIRMATIONS, ExactFlow,
@@ -22,19 +23,23 @@ class SuperValueSpec:
 
 
 SPECS = (
-    SuperValueSpec(empire_depot.TASK, "EmpireDepot/tab_current", ExactFlow(
-        claims=("EmpireDepot/button_claimable_current",),
-        done=("EmpireDepot/chest_open",))),
-    SuperValueSpec(login_gifts.TASK, "LoginGifts/tab_text", ExactFlow()),
-    SuperValueSpec(lucky_raffle.TASK, "LuckyRaffle/tab", lucky_raffle.FLOW),
-    SuperValueSpec(refining_weekly_card.TASK, "RefiningWeeklyCard/tab",
+    SuperValueSpec(empire_depot.TASK, "SuperValueReturn/EmpireDepot/tab_current", ExactFlow(
+        claims=("SuperValueReturn/EmpireDepot/button_claimable_current",),
+        done=("SuperValueReturn/EmpireDepot/chest_open",))),
+    SuperValueSpec(login_gifts.TASK, "SuperValueReturn/LoginGifts/tab_text", ExactFlow()),
+    SuperValueSpec(hall_of_historic_generals.TASK,
+                   "SuperValueReturn/HallOfHistoricGenerals/tab", ExactFlow()),
+    SuperValueSpec(soul_of_spiritual_beast.TASK,
+                   "SuperValueReturn/SoulOfSpiritualBeast/tab", ExactFlow()),
+    SuperValueSpec(lucky_raffle.TASK, "SuperValueReturn/LuckyRaffle/tab", lucky_raffle.FLOW),
+    SuperValueSpec(refining_weekly_card.TASK, "SuperValueReturn/RefiningWeeklyCard/tab",
                    refining_weekly_card.FLOW),
     # Kept for event rotations that still expose the older free reward column.
-    SuperValueSpec(city_growth_plan.TASK, "CityGrowthPlan/tab", ExactFlow(
-        claims=("CityGrowthPlan/button_claim_all", "Common/button_claim_all_text"),
+    SuperValueSpec(city_growth_plan.TASK, "SuperValueReturn/CityGrowthPlan/tab", ExactFlow(
+        claims=("SuperValueReturn/CityGrowthPlan/button_claim_all", "Common/button_claim_all_text"),
         # Screenshot supplied by the user belongs to this tab: require row 15
         # and its green claimed check in the same crop, not any earlier check.
-        done=("CityGrowthPlan/level_15_claimed",),
+        done=("SuperValueReturn/CityGrowthPlan/level_15_claimed",),
         scroll_claims=True)),
 )
 
@@ -51,7 +56,10 @@ def run_opened(bot, due_keys: set[str], *, handled: set[str] | None = None
     # Match Valuable Event: keep moving until two consecutive screenshots
     # prove each edge. There is no local swipe-count ceiling; bot.check()
     # provides the shared Stop/deadline guard.
-    for phase, start_x, end_x in (("rewind", 20, 85), ("scan", 85, 55)):
+    # MEmu 21513 ignores the old short 85%->55% drag even though the same
+    # gesture moves other emulators. Use a full carousel drag while retaining
+    # the two unchanged-Hamming confirmations at each real edge.
+    for phase, start_x, end_x in (("rewind", 20, 85), ("scan", 90, 10)):
         bot.record("Gift Claims: Super Value Return " +
                    ("đưa carousel về biên đầu" if phase == "rewind" else
                     "quét carousel từ đầu tới cuối"))
@@ -83,23 +91,36 @@ def run_opened(bot, due_keys: set[str], *, handled: set[str] | None = None
                 key = spec.task.key
                 bot.record(f"Gift Claims: Super Value Return mở {spec.task.label}")
                 bot.tap(*pos, delay=STEP_DELAY)
+                outcome = None
                 if key == login_gifts.KEY:
                     completed = login_gifts.claim_opened(bot)
                 elif key == refining_weekly_card.KEY:
-                    completed = refining_weekly_card.claim_opened(bot)
+                    outcome = refining_weekly_card.claim_opened(bot)
+                    completed = outcome == refining_weekly_card.DONE
+                elif key == hall_of_historic_generals.KEY:
+                    outcome = hall_of_historic_generals.claim_opened(bot)
+                    completed = outcome == hall_of_historic_generals.DONE
+                elif key == soul_of_spiritual_beast.KEY:
+                    outcome = soul_of_spiritual_beast.claim_opened(bot)
+                    completed = outcome == soul_of_spiritual_beast.DONE
                 else:
                     completed = process_exact(bot, spec.flow)
                 attempted_this_sweep.add(key)
-                results[key] = "done" if completed else "terminal_not_found"
+                results[key] = (outcome if outcome is not None else
+                                ("done" if completed else "terminal_not_found"))
                 if not completed:
-                    bot.record(f"Gift Claims: {spec.task.label} chưa đạt điều kiện DONE; "
-                               "giữ PENDING và tiếp tục nhiệm vụ kế tiếp")
+                    state = "DONE_1" if outcome == "done_1" else "PENDING"
+                    bot.record(f"Gift Claims: {spec.task.label} đạt {state}; "
+                               "tiếp tục nhiệm vụ kế tiếp")
                 else:
                     mark_task_done(bot, key)
                     handled.add(key)
                     pending.discard(key)
+                shown_state = ("DONE" if completed else
+                               ("DONE_1" if outcome == "done_1"
+                                else "PENDING"))
                 bot.record(f"Gift Claims: {spec.task.label} đã chốt trạng thái "
-                           f"{'DONE' if completed else 'PENDING'}; "
+                           f"{shown_state}; "
                            "chờ 1s rồi mới lướt carousel trên")
                 bot.sleep(STEP_DELAY)
 

@@ -9,6 +9,7 @@ from . import (blessing_of_pallas, dragon_battle, dwarfs_lucky_apple,
                eagle_of_freedom,
                giants_wisdom_temple, grace_of_star_trail, hypnos_dream,
                legion_hunting,
+               moment_of_glory,
                poseidons_day, precious_blazon_exchange, revelation_of_horus,
                sealed_imperial_treasury, wishful_windmill_festival)
 from ..common import (ClaimReport, GiftTask, TEXT_CLAIM_CONTROLS, back_if_close_x,
@@ -17,14 +18,22 @@ from ..common import (ClaimReport, GiftTask, TEXT_CLAIM_CONTROLS, back_if_close_
                      close_congratulations, find, find_all,
                      mark_task_done, open_event_center, return_home)
 from ..screens import GiftScreen, identify
+from ..valuable_event.named_flow import region_hamming_distance
 
 KEY = "gift_event_center_limited"
 PAGE = "EventCenter/title"
 DOT = "EventCenter/notification_dot"
-CONGRATULATIONS = "LoginGifts/congratulations"
-# At most four stable list positions. Each position is sampled twice before
-# moving, which is more reliable than nine rapid swipes on 30 emulators.
-MAX_SCROLLS = 3
+CONGRATULATIONS = "SuperValueReturn/LoginGifts/congratulations"
+# Event Center uses the same edge contract as Valuable Event: an edge is real
+# only after two consecutive settled swipes do not move the list.  There is no
+# local swipe ceiling; bot.check() owns Stop/deadline safety.
+LIST_EDGE_CONFIRMATIONS = 2
+# The Event Center rows animate their artwork, timers and marquee descriptions
+# even while the list is stationary.  Hash only the vertical row structure;
+# 16 consecutive live top-edge frames on emulator 21503 measured 0 changed
+# bits, while simulated list displacement measured 18..48 bits.
+LIST_SAME_DISTANCE = 8
+LIST_SIGNATURE_BITS = 96
 # Eagle of Freedom owns a vertically scrolling quest panel.  This limit is a
 # safety ceiling only; normal completion is detected from two no-movement
 # swipes at the real bottom, not from a fixed number of four content screens.
@@ -38,6 +47,15 @@ MAX_LEGION_CONTENT_SWIPES = 12
 MAX_LEGION_VERIFY_PASSES = 3
 MAX_LEGION_CLAIMS_PER_VIEW = 6
 LEGION_EDGE_CONFIRMATIONS = 2
+MOMENT_CONTENT_REGION = (1, 40, 99, 97)
+MOMENT_CLAIM_REGION = (62, 40, 100, 97)
+MOMENT_SCAN_SWIPE = (50, 90, 50, 48)
+MOMENT_RETURN_TOP_SWIPE = (50, 48, 50, 90)
+MOMENT_EDGE_CONFIRMATIONS = 2
+MOMENT_SAME_DISTANCE = 24
+MAX_MOMENT_CLAIMS_PER_VIEW = 12
+MOMENT_GREEN_MIN_RATIO = 0.20
+MOMENT_GRAY_MAX_RATIO = 0.45
 # Text controls such as Blessing of Pallas' green Claim sit as low as 91% of
 # the 396x704 frame.  Fixed text templates are safe to search down to the
 # bottom because they only match Claim/Free/Daily Free words.  Sparkle remains
@@ -80,7 +98,6 @@ LIST_SCROLL_SETTLE_SECONDS = 2.0
 # user requested instead of inheriting the conservative multi-device delay of
 # the animated Limited list.
 APPLE_LIST_SETTLE_SECONDS = 0.8
-APPLE_LIST_MAX_SWIPES = 12
 APPLE_LIST_EDGE_CONFIRMATIONS = 2
 WISHFUL_SETTLE_SECONDS = 1.0
 WISHFUL_CONFIRMATION_DELAY_SECONDS = 1.0
@@ -91,15 +108,15 @@ MAX_WISHFUL_CLAIMS = 30
 MAX_WISHFUL_TAPS_PER_CLAIM = 3
 WISHFUL_EDGE_CONFIRMATIONS = 2
 WISHFUL_DONE_ONE_LIMIT = (
-    "WishfulWindmillFestival/status_done_one_claim_limit", 0.84)
+    "EventCenter/WishfulWindmillFestival/status_done_one_claim_limit", 0.84)
 EMPTY_POSITION_CHECKS = 2
 APPLE_GREEN_ONCE_STATES = (
-    ("DwarfsLuckyApple/status_green_wish_once", 0.84),
-    ("DwarfsLuckyApple/status_green_wish_once_gray", 0.80),
+    ("EventCenter/DwarfsLuckyApple/status_green_wish_once", 0.84),
+    ("EventCenter/DwarfsLuckyApple/status_green_wish_once_gray", 0.80),
 )
 APPLE_RED_ONCE_STATES = (
-    ("DwarfsLuckyApple/status_red_wish_once", 0.84),
-    ("DwarfsLuckyApple/status_red_wish_once_gray", 0.80),
+    ("EventCenter/DwarfsLuckyApple/status_red_wish_once", 0.84),
+    ("EventCenter/DwarfsLuckyApple/status_red_wish_once_gray", 0.80),
 )
 CATEGORIES = (
     ("limited", 18),
@@ -158,6 +175,7 @@ EVENT_POLICIES = (
     dwarfs_lucky_apple.POLICY,
     eagle_of_freedom.POLICY,
     legion_hunting.POLICY,
+    moment_of_glory.POLICY,
     giants_wisdom_temple.POLICY,
     wishful_windmill_festival.POLICY,
     revelation_of_horus.POLICY,
@@ -171,38 +189,41 @@ SKIPPED_SCREENS = {policy.screen: policy for policy in EVENT_POLICIES
 FIXED_CLAIMS = TEXT_CLAIM_CONTROLS
 REWARD_NAVIGATION = grace_of_star_trail.POLICY.reward_navigation
 FORCED_LIMITED_ROWS = (
-    ("BlessingOfPallas/list_row", FORCED_EVENT_PREFIX + b"blessing_of_pallas",
+    ("EventCenter/BlessingOfPallas/list_row", FORCED_EVENT_PREFIX + b"blessing_of_pallas",
      None, "Blessing of Pallas", blessing_of_pallas.POLICY.key),
-    ("DragonBattle/list_row", FORCED_EVENT_PREFIX + b"dragon_battle",
+    ("EventCenter/DragonBattle/list_row", FORCED_EVENT_PREFIX + b"dragon_battle",
      GiftScreen.DRAGON_BATTLE, "Dragon Battle", dragon_battle.POLICY.key),
-    ("PreciousBlazonExchange/list_row",
+    ("EventCenter/PreciousBlazonExchange/list_row",
      FORCED_EVENT_PREFIX + b"precious_blazon_exchange",
      GiftScreen.PRECIOUS_BLAZON_EXCHANGE, "Precious Blazon Exchange",
      precious_blazon_exchange.POLICY.key),
-    ("GraceOfStarTrail/list_row", FORCED_EVENT_PREFIX + b"grace_of_star_trail",
+    ("EventCenter/GraceOfStarTrail/list_row", FORCED_EVENT_PREFIX + b"grace_of_star_trail",
      GiftScreen.GRACE_OF_STAR_TRAIL, "Grace of Star Trail",
      grace_of_star_trail.POLICY.key),
     # Dwarf's Treasure may lose its outer Event Center badge while the
     # Daily Free chest inside is still claimable.  Check the named row once
     # per daily run instead of using the outer badge as its source of truth.
-    ("DwarfsTreasure/list_row", FORCED_EVENT_PREFIX + b"dwarfs_treasure",
+    ("EventCenter/DwarfsTreasure/list_row", FORCED_EVENT_PREFIX + b"dwarfs_treasure",
      GiftScreen.DWARFS_TREASURE, "Dwarf's Treasure", dwarfs_treasure.POLICY.key),
-    ("GiantsWisdomTemple/list_row", FORCED_EVENT_PREFIX + b"giants_wisdom_temple",
+    ("EventCenter/GiantsWisdomTemple/list_row", FORCED_EVENT_PREFIX + b"giants_wisdom_temple",
      GiftScreen.GIANTS_WISDOM_TEMPLE, "Giant's Wisdom Temple",
      giants_wisdom_temple.POLICY.key),
-    ("WishfulWindmillFestival/list_row",
+    ("EventCenter/WishfulWindmillFestival/list_row",
      FORCED_EVENT_PREFIX + b"wishful_windmill_festival",
      GiftScreen.WISHFUL_WINDMILL_FESTIVAL, "Wishful Windmill Festival",
      wishful_windmill_festival.POLICY.key),
-    ("EagleOfFreedom/list_row", FORCED_EVENT_PREFIX + b"eagle_of_freedom",
+    ("EventCenter/EagleOfFreedom/list_row", FORCED_EVENT_PREFIX + b"eagle_of_freedom",
      GiftScreen.EAGLE_OF_FREEDOM, "Eagle of Freedom",
      eagle_of_freedom.POLICY.key),
-    ("LegionHunting/list_row", FORCED_EVENT_PREFIX + b"legion_hunting",
+    ("EventCenter/LegionHunting/list_row", FORCED_EVENT_PREFIX + b"legion_hunting",
      GiftScreen.LEGION_HUNTING, "Legion Hunting",
      legion_hunting.POLICY.key),
+    ("EventCenter/MomentOfGlory/list_row", FORCED_EVENT_PREFIX + b"moment_of_glory",
+     GiftScreen.MOMENT_OF_GLORY, "Moment of Glory",
+     moment_of_glory.POLICY.key),
 )
 FORCED_ACTIVITY_ROWS = (
-    ("DwarfsLuckyApple/list_row",
+    ("EventCenter/DwarfsLuckyApple/list_row",
      FORCED_EVENT_PREFIX + b"dwarfs_lucky_apple",
      GiftScreen.DWARFS_LUCKY_APPLE, "Dwarf's Lucky Apple",
      dwarfs_lucky_apple.POLICY.key),
@@ -253,7 +274,7 @@ def _close_exact_congratulations(bot) -> bool:
     if close_congratulations(bot, attempts=1):
         return True
     screen = bot.screenshot()
-    if find(bot, "PreciousBlazonExchange/popup_congratulations", screen,
+    if find(bot, "EventCenter/PreciousBlazonExchange/popup_congratulations", screen,
             threshold=0.72, region=(0, 35, 100, 65)) is None:
         return False
     bot.back(delay=UI_SETTLE_SECONDS)
@@ -327,10 +348,10 @@ def _handle_precious(bot):
     attempted = 0
     for attempt in range(4):
         screen = bot.screenshot()
-        if find(bot, "PreciousBlazonExchange/status_rewards_claimed", screen,
+        if find(bot, "EventCenter/PreciousBlazonExchange/status_rewards_claimed", screen,
                 threshold=0.68, region=(0, 12, 40, 48)) is not None:
             return ClaimReport(attempted, 1), True
-        rewards = find(bot, "PreciousBlazonExchange/button_rewards_text", screen,
+        rewards = find(bot, "EventCenter/PreciousBlazonExchange/button_rewards_text", screen,
                        threshold=0.62, region=(0, 12, 45, 48))
         if rewards is not None:
             attempted += 1
@@ -340,7 +361,7 @@ def _handle_precious(bot):
                 return ClaimReport(attempted, 1), True
         if attempt + 1 < 4:
             bot.sleep(UI_SETTLE_SECONDS)
-    done = _wait_for(bot, "PreciousBlazonExchange/status_rewards_claimed", attempts=2,
+    done = _wait_for(bot, "EventCenter/PreciousBlazonExchange/status_rewards_claimed", attempts=2,
                      threshold=0.68, region=(0, 12, 40, 48)) is not None
     return ClaimReport(attempted, int(done)), done
 
@@ -351,7 +372,7 @@ def _handle_hypnos(bot):
     # exact upper-right reward area means its chest/Rewards control is gone.
     for attempt in range(4):
         screen = bot.screenshot()
-        rewards = find(bot, "HypnosDream/button_rewards_text", screen,
+        rewards = find(bot, "EventCenter/HypnosDream/button_rewards_text", screen,
                        threshold=0.62, region=(65, 12, 100, 38))
         if rewards is None:
             if attempt + 1 < 4:
@@ -371,10 +392,10 @@ def _handle_poseidon(bot):
     attempted = 0
     for attempt in range(5):
         screen = bot.screenshot()
-        if find(bot, "PoseidonsDay/status_daily_free_claimed", screen, threshold=0.68,
+        if find(bot, "EventCenter/PoseidonsDay/status_daily_free_claimed", screen, threshold=0.68,
                 region=(65, 12, 100, 38)) is not None:
             return ClaimReport(attempted, 1), True
-        daily = find(bot, "PoseidonsDay/button_daily_free_text", screen,
+        daily = find(bot, "EventCenter/PoseidonsDay/button_daily_free_text", screen,
                      threshold=0.62, region=(65, 12, 100, 38))
         if daily is not None:
             attempted += 1
@@ -383,7 +404,7 @@ def _handle_poseidon(bot):
             if _close_exact_congratulations(bot):
                 return ClaimReport(attempted, 1), True
         elif attempt == 0:
-            package = find(bot, "PoseidonsDay/tab_packages_red_dot", screen,
+            package = find(bot, "EventCenter/PoseidonsDay/tab_packages_red_dot", screen,
                            threshold=0.68, region=(45, 5, 90, 18))
             if package is not None:
                 attempted += 1
@@ -391,7 +412,7 @@ def _handle_poseidon(bot):
                 bot.tap(*package, delay=UI_SETTLE_SECONDS)
         if attempt + 1 < 5:
             bot.sleep(UI_SETTLE_SECONDS)
-    done = _wait_for(bot, "PoseidonsDay/status_daily_free_claimed", attempts=2, threshold=0.68,
+    done = _wait_for(bot, "EventCenter/PoseidonsDay/status_daily_free_claimed", attempts=2, threshold=0.68,
                      region=(65, 12, 100, 38)) is not None
     return ClaimReport(attempted, int(done)), done
 
@@ -402,7 +423,7 @@ def _handle_grace(bot):
 
 
 def _handle_giant(bot):
-    ended = _wait_for(bot, "GiantsWisdomTemple/status_event_ended",
+    ended = _wait_for(bot, "EventCenter/GiantsWisdomTemple/status_event_ended",
                       attempts=2, threshold=0.70,
                       region=(0, 8, 100, 75))
     if ended is not None:
@@ -410,7 +431,7 @@ def _handle_giant(bot):
         return ClaimReport(0, 1), True
     if not _ensure_skip_animation(bot, "GiantsWisdomTemple"):
         return ClaimReport(), False
-    target = _wait_for(bot, "GiantsWisdomTemple/button_free_wisdom_tile", attempts=4,
+    target = _wait_for(bot, "EventCenter/GiantsWisdomTemple/button_free_wisdom_tile", attempts=4,
                        threshold=0.70, region=(0, 30, 100, 92))
     if target is None:
         return ClaimReport(), False
@@ -419,13 +440,13 @@ def _handle_giant(bot):
     bot.tap(*target, delay=LIST_SCROLL_SETTLE_SECONDS)
     if _close_exact_congratulations(bot):
         return ClaimReport(1, 1), True
-    ended = _wait_for(bot, "GiantsWisdomTemple/status_event_ended",
+    ended = _wait_for(bot, "EventCenter/GiantsWisdomTemple/status_event_ended",
                       attempts=4, threshold=0.70,
                       region=(0, 8, 100, 75))
     if ended is not None:
         bot.record("Gift Claims: Giant's Wisdom Temple nhận Event has ended; DONE")
         return ClaimReport(1, 1), True
-    done = _wait_for(bot, "GiantsWisdomTemple/message_not_enough_items", attempts=4,
+    done = _wait_for(bot, "EventCenter/GiantsWisdomTemple/message_not_enough_items", attempts=4,
                      threshold=0.70, region=(0, 15, 100, 45)) is not None
     return ClaimReport(1, int(done)), done
 
@@ -433,7 +454,7 @@ def _handle_giant(bot):
 def _handle_dwarf(bot):
     if not _ensure_skip_animation(bot, "DwarfsTreasure"):
         return ClaimReport(), False
-    daily = _wait_for(bot, "DwarfsTreasure/button_daily_free_chest", attempts=4,
+    daily = _wait_for(bot, "EventCenter/DwarfsTreasure/button_daily_free_chest", attempts=4,
                       threshold=0.66, region=(65, 12, 100, 38))
     if daily is None:
         # The exact Dwarf page and checked Skip-animation state prove that the
@@ -446,36 +467,21 @@ def _handle_dwarf(bot):
     bot.tap(*daily, delay=UI_SETTLE_SECONDS)
     if _close_exact_congratulations(bot):
         return ClaimReport(1, 1), True
-    gone = _wait_for(bot, "DwarfsTreasure/button_daily_free_chest", attempts=3,
+    gone = _wait_for(bot, "EventCenter/DwarfsTreasure/button_daily_free_chest", attempts=3,
                      threshold=0.66, region=(65, 12, 100, 38)) is None
     return ClaimReport(1, int(gone)), gone
 
 
 def _handle_dragon_battle(bot):
-    """No current claim button is DONE; a tap requires Congratulations."""
-    button = _wait_for(
-        bot, "DragonBattle/button_claim_015225", attempts=4, threshold=0.80,
-        region=(0, 15, 100, 95), delay=UI_SETTLE_SECONDS)
-    if button is None:
-        bot.record("Gift Claims: Dragon Battle không còn nút "
-                   "Screenshot_20261026-015225; DONE")
-        return ClaimReport(0, 1), True
-    bot.record("Gift Claims: Dragon Battle tap nút "
-               "Screenshot_20261026-015225")
-    bot.tap(*button, delay=UI_SETTLE_SECONDS)
-    if close_congratulations(bot, attempts=5):
-        bot.record("Gift Claims: Dragon Battle đã hiện Congratulations; DONE")
-        return ClaimReport(1, 1), True
-    bot.record("Gift Claims: Dragon Battle đã bấm nhưng chưa thấy "
-               "Congratulations; giữ PENDING")
-    return ClaimReport(1, 0), False
+    """Use Dragon Battle's exact chest and terminal-state contract."""
+    return dragon_battle.claim_opened(bot)
 
 
 def _wishful_panel_open(bot, *, attempts=5) -> bool:
     """Recognize either captured Wind Blessings title without leaving it."""
     variants = (
-        ("WishfulWindmillFestival/title_wind_blessings_text", 0.80),
-        ("WishfulWindmillFestival/title_wind_blessings", 0.68),
+        ("EventCenter/WishfulWindmillFestival/title_wind_blessings_text", 0.80),
+        ("EventCenter/WishfulWindmillFestival/title_wind_blessings", 0.68),
     )
     for attempt in range(attempts):
         screen = bot.screenshot()
@@ -491,13 +497,13 @@ def _wishful_panel_open(bot, *, attempts=5) -> bool:
 def _wishful_find_entry(bot, *, attempts=5):
     """Find a stable Wind Blessings launcher, including the new Wind chest."""
     variants = (
-        ("WishfulWindmillFestival/button_wind_blessings", 0.68,
+        ("EventCenter/WishfulWindmillFestival/button_wind_blessings", 0.68,
          "Wind Blessings"),
         # Screenshot_20261023-073758 includes the chest and its dark Wind
         # caption, making it safer than matching only the animated chest.
-        ("WishfulWindmillFestival/button_reward_chest_wind", 0.86,
+        ("EventCenter/WishfulWindmillFestival/button_reward_chest_wind", 0.86,
          "rương Wind Blessings"),
-        ("WishfulWindmillFestival/button_reward_chest", 0.82,
+        ("EventCenter/WishfulWindmillFestival/button_reward_chest", 0.82,
          "rương DONE 1"),
     )
     for attempt in range(attempts):
@@ -566,14 +572,14 @@ def _wishful_claims(bot, screen):
     """Claim thật, loại chữ Claim khớp lồng bên trong trạng thái Claimed."""
     claimed = _wishful_claimed(bot, screen)
     return [pos for pos in find_all(
-        bot, "WishfulWindmillFestival/button_claim", screen,
+        bot, "EventCenter/WishfulWindmillFestival/button_claim", screen,
         threshold=0.74, region=WISHFUL_CLAIM_REGION)
         if all(abs(pos[0] - done[0]) > 50 or abs(pos[1] - done[1]) > 22
                for done in claimed)]
 
 
 def _wishful_claimed(bot, screen):
-    return find_all(bot, "WishfulWindmillFestival/status_claimed", screen,
+    return find_all(bot, "EventCenter/WishfulWindmillFestival/status_claimed", screen,
                     threshold=0.82, region=WISHFUL_CLAIM_REGION)
 
 
@@ -596,7 +602,7 @@ def _close_wishful_congratulations(bot) -> bool:
         common_popup = find(bot, CONGRATULATIONS, screen, threshold=0.78,
                             region=(0, 38, 100, 62))
         exact_popup = find(
-            bot, "PreciousBlazonExchange/popup_congratulations", screen,
+            bot, "EventCenter/PreciousBlazonExchange/popup_congratulations", screen,
             threshold=0.72, region=(0, 35, 100, 65))
         if common_popup is not None or exact_popup is not None:
             height, width = screen.shape[:2]
@@ -773,7 +779,7 @@ def _handle_wishful(bot):
     # Leave the completed child panel once, then keep the second panel open
     # until every Challenge Quest Claim is exhausted.
     bot.back(delay=WISHFUL_SETTLE_SECONDS)
-    storage = _wait_for(bot, "WishfulWindmillFestival/tab_wind_power_storage",
+    storage = _wait_for(bot, "EventCenter/WishfulWindmillFestival/tab_wind_power_storage",
                         attempts=5, threshold=0.68, region=(0, 5, 100, 25),
                         delay=WISHFUL_SETTLE_SECONDS)
     if storage is None:
@@ -782,7 +788,7 @@ def _handle_wishful(bot):
         return first, False
     bot.record("Gift Claims: Wishful Windmill tap Wind Power Storage")
     bot.tap(*storage, delay=WISHFUL_SETTLE_SECONDS)
-    challenge = _wait_for(bot, "WishfulWindmillFestival/button_challenge_quest",
+    challenge = _wait_for(bot, "EventCenter/WishfulWindmillFestival/button_challenge_quest",
                           attempts=5, threshold=0.68,
                           region=(0, 10, 100, 95),
                           delay=WISHFUL_SETTLE_SECONDS)
@@ -938,7 +944,7 @@ def _apple_red_x10_post_tap_done(bot, screen) -> bool:
     and tapped red x10; it additionally requires an exact red Once state and
     a grey colour band at the weak x10 match.
     """
-    finished = "DwarfsLuckyApple/status_red_wish_x10_done"
+    finished = "EventCenter/DwarfsLuckyApple/status_red_wish_x10_done"
     done_template = _scaled_template(bot, finished, screen)
     done_score, done_pos = bot.best_match(
         done_template, screen=screen, region=(0, 15, 100, 98))
@@ -963,7 +969,7 @@ def _apple_red_x10_post_tap_done(bot, screen) -> bool:
 def _apple_congratulations_hit(bot, screen):
     """Return a Lucky Apple popup match without taking a second screenshot."""
     for template in (CONGRATULATIONS,
-                     "PreciousBlazonExchange/popup_congratulations"):
+                     "EventCenter/PreciousBlazonExchange/popup_congratulations"):
         hit = find(bot, template, screen, threshold=0.78,
                    region=(0, 35, 100, 65))
         if hit is not None:
@@ -1051,7 +1057,7 @@ def _apple_phase(bot, active: str, finished: str,
         if state == "done":
             return ClaimReport(attempted, attempted), True
         if (attempted > 0 and
-                active == "DwarfsLuckyApple/button_red_wish_x10" and
+                active == "EventCenter/DwarfsLuckyApple/button_red_wish_x10" and
                 _apple_red_x10_post_tap_done(bot, screen)):
             return ClaimReport(attempted, attempted), True
         if state != "active" or button is None:
@@ -1137,8 +1143,8 @@ def _handle_dwarfs_lucky_apple(bot):
     bot.sleep(UI_SETTLE_SECONDS)
     green = _wait_for_any(
         bot,
-        ("DwarfsLuckyApple/tab_green_apple",
-         "DwarfsLuckyApple/tab_green_apple_1"),
+        ("EventCenter/DwarfsLuckyApple/tab_green_apple",
+         "EventCenter/DwarfsLuckyApple/tab_green_apple_1"),
         attempts=4, threshold=0.70, region=(45, 40, 100, 68))
     if green is None:
         bot.record("Gift Claims: Dwarf's Lucky Apple không nhận diện được "
@@ -1147,14 +1153,14 @@ def _handle_dwarfs_lucky_apple(bot):
     bot.tap(*green, delay=UI_SETTLE_SECONDS)
 
     first, first_done, first_present = _run_optional_apple_phase(
-        bot, "DwarfsLuckyApple/button_green_wish_x100",
-        "DwarfsLuckyApple/status_green_wish_x100_done", "xanh x100")
+        bot, "EventCenter/DwarfsLuckyApple/button_green_wish_x100",
+        "EventCenter/DwarfsLuckyApple/status_green_wish_x100_done", "xanh x100")
     if not first_done:
         return first, False
 
     second, second_done, second_present = _run_optional_apple_phase(
-        bot, "DwarfsLuckyApple/button_green_wish_x10",
-        "DwarfsLuckyApple/status_green_wish_x10_done", "xanh x10")
+        bot, "EventCenter/DwarfsLuckyApple/button_green_wish_x10",
+        "EventCenter/DwarfsLuckyApple/status_green_wish_x10_done", "xanh x10")
     if not second_done:
         total = ClaimReport(first.attempted + second.attempted,
                             first.verified + second.verified)
@@ -1180,8 +1186,8 @@ def _handle_dwarfs_lucky_apple(bot):
 
     red = _wait_for_any(
         bot,
-        ("DwarfsLuckyApple/tab_red_apple",
-         "DwarfsLuckyApple/tab_red_apple_1"),
+        ("EventCenter/DwarfsLuckyApple/tab_red_apple",
+         "EventCenter/DwarfsLuckyApple/tab_red_apple_1"),
         attempts=4, threshold=0.70, region=(0, 40, 55, 68))
     if red is None:
         bot.record("Gift Claims: Dwarf's Lucky Apple không nhận diện được "
@@ -1191,8 +1197,8 @@ def _handle_dwarfs_lucky_apple(bot):
                "thời điểm này mới được xét DONE toàn nhiệm vụ")
     bot.tap(*red, delay=UI_SETTLE_SECONDS)
     third, third_done, third_present = _run_optional_apple_phase(
-        bot, "DwarfsLuckyApple/button_red_wish_x10",
-        "DwarfsLuckyApple/status_red_wish_x10_done", "đỏ x10")
+        bot, "EventCenter/DwarfsLuckyApple/button_red_wish_x10",
+        "EventCenter/DwarfsLuckyApple/status_red_wish_x10_done", "đỏ x10")
     final = ClaimReport(total.attempted + third.attempted,
                         total.verified + third.verified)
     if third_present and third_done:
@@ -1223,9 +1229,9 @@ def _eagle_active_claims(bot, screen):
     inside the longer word Claimed.  A captured Claimed marker therefore owns
     the nearby match and removes it from the actionable list.
     """
-    claimed = find_all(bot, "EagleOfFreedom/status_claimed", screen,
+    claimed = find_all(bot, "EventCenter/EagleOfFreedom/status_claimed", screen,
                        threshold=0.72, region=(55, 18, 100, 98))
-    claims = find_all(bot, "EagleOfFreedom/button_claim", screen,
+    claims = find_all(bot, "EventCenter/EagleOfFreedom/button_claim", screen,
                       threshold=0.68, region=(55, 18, 100, 98))
     return [
         pos for pos in claims
@@ -1333,7 +1339,7 @@ def _handle_eagle_of_freedom(bot):
 
 
 def _legion_claims(bot, screen):
-    return find_all(bot, "LegionHunting/button_claim", screen,
+    return find_all(bot, "EventCenter/LegionHunting/button_claim", screen,
                     threshold=0.78, region=LEGION_CLAIM_REGION)
 
 
@@ -1467,6 +1473,117 @@ def _handle_legion_hunting(bot):
     return total, False
 
 
+def _moment_claim_colour_ratios(screen, center) -> tuple[float, float]:
+    """Return green and low-saturation ratios around a Claim candidate."""
+    scale = screen.shape[1] / 396
+    width, height = max(1, round(82 * scale)), max(1, round(34 * scale))
+    left = max(0, center[0] - width // 2)
+    top = max(0, center[1] - height // 2)
+    crop = screen[top:min(screen.shape[0], top + height),
+                  left:min(screen.shape[1], left + width)]
+    if crop.size == 0:
+        return 0.0, 1.0
+    hsv = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
+    green = ((hsv[..., 0] >= 35) & (hsv[..., 0] <= 90) &
+             (hsv[..., 1] >= 60) & (hsv[..., 2] >= 50))
+    gray = ((hsv[..., 1] <= 70) & (hsv[..., 2] >= 50))
+    return float(green.mean()), float(gray.mean())
+
+
+def _moment_claims(bot, screen):
+    """Find green Claim only; reject the Claim prefix inside gray Claimed."""
+    candidates = find_all(bot, "Common/button_claim_text", screen,
+                          threshold=0.65, region=MOMENT_CLAIM_REGION)
+    return [point for point in candidates
+            if ((ratios := _moment_claim_colour_ratios(screen, point))[0]
+                >= MOMENT_GREEN_MIN_RATIO
+                and ratios[1] < MOMENT_GRAY_MAX_RATIO)]
+
+
+def _moment_swipe(bot, gesture, label: str) -> int:
+    before = bot.screenshot()
+    bot.swipe_percent(*gesture, duration=SWIPE_DURATION_SECONDS,
+                      delay=LIST_SCROLL_SETTLE_SECONDS)
+    after = bot.screenshot()
+    distance = region_hamming_distance(before, after, MOMENT_CONTENT_REGION)
+    bot.record(f"Gift Claims: Moment of Glory {label}, Hamming "
+               f"{distance}/{MOMENT_SAME_DISTANCE}")
+    return distance
+
+
+def _moment_swipe_to_top(bot) -> None:
+    unchanged = 0
+    while unchanged < MOMENT_EDGE_CONFIRMATIONS:
+        bot.check()
+        distance = _moment_swipe(bot, MOMENT_RETURN_TOP_SWIPE,
+                                 "đưa vùng xanh về đầu")
+        unchanged = unchanged + 1 if distance <= MOMENT_SAME_DISTANCE else 0
+        bot.record("Gift Claims: Moment of Glory biên đầu không đổi "
+                   f"{unchanged}/{MOMENT_EDGE_CONFIRMATIONS}")
+
+
+def _scan_moment_once(bot) -> tuple[ClaimReport, bool, bool]:
+    """Return report, reached_bottom and unresolved Claim for one full pass."""
+    attempted = verified = 0
+    bottom_checks = 0
+    while True:
+        blocked_positions = []
+        for _ in range(MAX_MOMENT_CLAIMS_PER_VIEW):
+            bot.check()
+            screen = bot.screenshot()
+            claim = next(
+                (pos for pos in _moment_claims(bot, screen)
+                 if all((pos[0] - old[0]) ** 2 + (pos[1] - old[1]) ** 2
+                        > 30 ** 2 for old in blocked_positions)),
+                None,
+            )
+            if claim is None:
+                break
+            blocked_positions.append(claim)
+            attempted += 1
+            bot.record(f"Gift Claims: Moment of Glory tap Claim tại {claim}")
+            bot.tap(*claim, delay=LIST_SCROLL_SETTLE_SECONDS)
+            close_congratulations(bot, attempts=2)
+            after = bot.screenshot()
+            if any(abs(pos[0] - claim[0]) <= 35 and
+                   abs(pos[1] - claim[1]) <= 30
+                   for pos in _moment_claims(bot, after)):
+                bot.record("Gift Claims: Moment of Glory Claim vẫn còn sau "
+                           "khi bấm; giữ PENDING")
+                return ClaimReport(attempted, verified), False, True
+            verified += 1
+
+        distance = _moment_swipe(bot, MOMENT_SCAN_SWIPE,
+                                 "quét xuống cuối vùng xanh")
+        bottom_checks = (bottom_checks + 1
+                         if distance <= MOMENT_SAME_DISTANCE else 0)
+        bot.record("Gift Claims: Moment of Glory biên cuối không đổi "
+                   f"{bottom_checks}/{MOMENT_EDGE_CONFIRMATIONS}")
+        if bottom_checks >= MOMENT_EDGE_CONFIRMATIONS:
+            final = bot.screenshot()
+            unresolved = bool(_moment_claims(bot, final))
+            return ClaimReport(attempted, verified), True, unresolved
+
+
+def _handle_moment_of_glory(bot):
+    """Claim all rows, then require one complete Claim-free pass for DONE."""
+    total = ClaimReport()
+    while True:
+        bot.check()
+        _moment_swipe_to_top(bot)
+        report, reached_bottom, unresolved = _scan_moment_once(bot)
+        total = ClaimReport(total.attempted + report.attempted,
+                            total.verified + report.verified)
+        if unresolved or not reached_bottom:
+            return total, False
+        if report.attempted == 0:
+            bot.record("Gift Claims: Moment of Glory đã quét từ đầu tới cuối "
+                       "không còn Claim; DONE")
+            return total, True
+        bot.record("Gift Claims: Moment of Glory vừa nhận Claim; quay lại đầu "
+                   "để quét xác nhận")
+
+
 EXACT_HANDLERS = {
     GiftScreen.DRAGON_BATTLE: _handle_dragon_battle,
     GiftScreen.PRECIOUS_BLAZON_EXCHANGE: _handle_precious,
@@ -1479,6 +1596,7 @@ EXACT_HANDLERS = {
     GiftScreen.DWARFS_LUCKY_APPLE: _handle_dwarfs_lucky_apple,
     GiftScreen.EAGLE_OF_FREEDOM: _handle_eagle_of_freedom,
     GiftScreen.LEGION_HUNTING: _handle_legion_hunting,
+    GiftScreen.MOMENT_OF_GLORY: _handle_moment_of_glory,
 }
 
 
@@ -1618,7 +1736,7 @@ def _tap_reward_navigation(bot) -> ClaimReport:
         attempted = 1
         for attempt in range(4):
             claim_screen = bot.screenshot()
-            claim = find(bot, "GraceOfStarTrail/button_claim", claim_screen,
+            claim = find(bot, "EventCenter/GraceOfStarTrail/button_claim", claim_screen,
                          threshold=0.70, region=REWARD_NAV_REGION)
             if claim is not None:
                 attempted += 1
@@ -1628,7 +1746,7 @@ def _tap_reward_navigation(bot) -> ClaimReport:
                     bot.record("Gift Claims: verified Star Trail coin Congratulations")
                     return ClaimReport(attempted, 1)
                 after = bot.screenshot()
-                if find(bot, "GraceOfStarTrail/button_claim", after,
+                if find(bot, "EventCenter/GraceOfStarTrail/button_claim", after,
                         threshold=0.70, region=REWARD_NAV_REGION) is None:
                     bot.record("Gift Claims: verified Star Trail coin Claim disappeared")
                     return ClaimReport(attempted, 1)
@@ -1744,7 +1862,7 @@ def _process_opened_event(bot):
     # slice.  Inspect the page body exactly once; its fixed Claim/Free controls
     # are still handled, but decorative red pixels can no longer drive taps.
     if name is None:
-        if find(bot, "BlessingOfPallas/status_claimed", opened, threshold=0.68,
+        if find(bot, "EventCenter/BlessingOfPallas/status_claimed", opened, threshold=0.68,
                 region=LOWER) is not None:
             bot.record("Gift Claims: Blessing of Pallas đã hiện Claimed")
             mark_task_done(bot, blessing_of_pallas.POLICY.key)
@@ -1753,7 +1871,7 @@ def _process_opened_event(bot):
                    "kiểm tra nội dung một lần, không quét dot trong artwork")
         report, _ = _process_current_event_content(bot)
         after = bot.screenshot()
-        if find(bot, "BlessingOfPallas/status_claimed", after, threshold=0.68,
+        if find(bot, "EventCenter/BlessingOfPallas/status_claimed", after, threshold=0.68,
                 region=LOWER) is not None:
             bot.record("Gift Claims: Blessing of Pallas xác minh Claim -> Claimed")
             mark_task_done(bot, blessing_of_pallas.POLICY.key)
@@ -1924,35 +2042,58 @@ def _select_category(bot, name: str, x_percent: int) -> bool:
 
 
 def _list_signature(screen) -> bytes:
-    """Stable list fingerprint excluding animated artwork on the right."""
+    """Hash vertical row structure, ignoring per-row animation and timers."""
     right = max(1, int(screen.shape[1] * 0.68))
-    patch = cv2.cvtColor(screen[95:, :right], cv2.COLOR_BGR2GRAY)
-    tiny = cv2.resize(patch, (32, 18), interpolation=cv2.INTER_AREA)
-    return np.packbits(tiny[:, 1:] > tiny[:, :-1]).tobytes()
+    top = max(0, int(screen.shape[0] * 0.14))
+    bottom = max(top + 1, int(screen.shape[0] * 0.98))
+    patch = cv2.cvtColor(screen[top:bottom, :right], cv2.COLOR_BGR2GRAY)
+    patch = cv2.GaussianBlur(patch, (5, 5), 0)
+    # Average each horizontal strip. Row dividers and title bands move when
+    # the list scrolls; animated pixels inside a row average away.
+    tiny = cv2.resize(
+        patch, (32, LIST_SIGNATURE_BITS), interpolation=cv2.INTER_AREA)
+    vertical_profile = tiny.mean(axis=1)
+    return np.packbits(
+        vertical_profile[1:] > vertical_profile[:-1]).tobytes()
 
 
-def _same_list_position(before: bytes, after: bytes, max_distance=18) -> bool:
+def _list_hamming_distance(before: bytes, after: bytes) -> int:
     old = np.frombuffer(before, dtype=np.uint8)
     new = np.frombuffer(after, dtype=np.uint8)
-    return old.shape == new.shape and int(
-        np.unpackbits(np.bitwise_xor(old, new)).sum()) <= max_distance
+    if old.shape != new.shape:
+        return LIST_SIGNATURE_BITS
+    return int(np.unpackbits(np.bitwise_xor(old, new)).sum())
 
 
-def _return_list_to_top(bot, category: str) -> None:
-    """Reset a category's remembered scroll position before top-down scan."""
+def _same_list_position(before: bytes, after: bytes,
+                        max_distance=LIST_SAME_DISTANCE) -> bool:
+    return _list_hamming_distance(before, after) <= max_distance
+
+
+def _return_list_to_top(bot, category: str) -> bool:
+    """Prove the real top with consecutive settled no-movement swipes."""
     bot.record(f"Gift Claims: Event Center/{category} đưa danh sách về đầu")
-    for step in range(MAX_SCROLLS):
+    unchanged = 0
+    step = 0
+    while True:
         bot.check()
+        step += 1
         before = _list_signature(bot.screenshot())
         bot.swipe_percent(50, 32, 50, 86,
                           duration=SWIPE_DURATION_SECONDS,
                           delay=LIST_SCROLL_SETTLE_SECONDS)
         after = _list_signature(bot.screenshot())
+        distance = _list_hamming_distance(before, after)
         bot.record(f"Gift Claims: Event Center/{category} dừng "
                    f"{LIST_SCROLL_SETTLE_SECONDS:.0f}s sau lướt về đầu "
-                   f"({step + 1}/{MAX_SCROLLS})")
-        if _same_list_position(before, after):
-            break
+                   f"(lần {step}), Hamming "
+                   f"{distance}/{LIST_SAME_DISTANCE}")
+        unchanged = (unchanged + 1
+                     if _same_list_position(before, after) else 0)
+        if unchanged >= LIST_EDGE_CONFIRMATIONS:
+            bot.record(f"Gift Claims: Event Center/{category} đã xác nhận "
+                       f"biên đầu sau {LIST_EDGE_CONFIRMATIONS} cú không đổi")
+            return True
 
 
 def _find_dwarfs_lucky_apple_row(bot) -> bool:
@@ -1963,12 +2104,14 @@ def _find_dwarfs_lucky_apple_row(bot) -> bool:
     descent.  This helper only locates the row; the caller re-finds the exact
     template before tapping it.
     """
-    template = "DwarfsLuckyApple/list_row"
+    template = "EventCenter/DwarfsLuckyApple/list_row"
 
     def swipe(start_y, end_y, direction, *, search: bool) -> bool | None:
         unchanged = 0
-        for step in range(1, APPLE_LIST_MAX_SWIPES + 1):
+        step = 0
+        while True:
             bot.check()
+            step += 1
             screen = bot.screenshot()
             if (search and find(bot, template, screen, threshold=0.90,
                                 region=(10, 15, 75, 98)) is not None):
@@ -1980,16 +2123,16 @@ def _find_dwarfs_lucky_apple_row(bot) -> bool:
                               duration=SWIPE_DURATION_SECONDS,
                               delay=APPLE_LIST_SETTLE_SECONDS)
             after = _list_signature(bot.screenshot())
+            distance = _list_hamming_distance(before, after)
             same = _same_list_position(before, after)
             unchanged = unchanged + 1 if same else 0
             bot.record("Gift Claims: Activities lướt " + direction +
                        f", chờ {APPLE_LIST_SETTLE_SECONDS:.1f}s rồi quét "
-                       f"({step}/{APPLE_LIST_MAX_SWIPES})")
+                       f"(lần {step}), Hamming "
+                       f"{distance}/{LIST_SAME_DISTANCE}")
             if unchanged >= APPLE_LIST_EDGE_CONFIRMATIONS:
                 bot.record(f"Gift Claims: Activities đã xác nhận tới {direction}")
                 return False
-        bot.record(f"Gift Claims: Activities chạm giới hạn lướt {direction}")
-        return None
 
     # First establish the real top.  Do not waste a 1.5 s duplicate probe at
     # each position: every swipe already settles for 0.8 s before the frame is
@@ -2037,20 +2180,28 @@ def _verify_clean(bot, category: str, ignored=()) -> bool:
         return True
     # Return to the top, then scan the complete vertical list once more.
     _return_list_to_top(bot, category)
-    for step in range(MAX_SCROLLS + 1):
+    bottom_checks = 0
+    while True:
         bot.check()
         screen = bot.screenshot()
         if any(not _category_seen(category, _row_signature(screen, y), ignored)
                for _, y in _row_dots(bot, screen)):
             return False
-        if step < MAX_SCROLLS:
-            before = _list_signature(screen)
-            bot.swipe_percent(50, 86, 50, 32,
-                              duration=SWIPE_DURATION_SECONDS,
-                              delay=LIST_SCROLL_SETTLE_SECONDS)
-            if _same_list_position(before, _list_signature(bot.screenshot())):
-                break
-    return True
+        before = _list_signature(screen)
+        bot.swipe_percent(50, 86, 50, 32,
+                          duration=SWIPE_DURATION_SECONDS,
+                          delay=LIST_SCROLL_SETTLE_SECONDS)
+        after = _list_signature(bot.screenshot())
+        distance = _list_hamming_distance(before, after)
+        same = _same_list_position(before, after)
+        bottom_checks = bottom_checks + 1 if same else 0
+        bot.record(f"Gift Claims: Event Center/{category} kiểm tra biên cuối, "
+                   f"Hamming {distance}/{LIST_SAME_DISTANCE}, không đổi "
+                   f"{bottom_checks}/{LIST_EDGE_CONFIRMATIONS}")
+        if bottom_checks >= LIST_EDGE_CONFIRMATIONS:
+            bot.record(f"Gift Claims: Event Center/{category} đã xác nhận "
+                       f"biên cuối sau {LIST_EDGE_CONFIRMATIONS} cú không đổi")
+            return True
 
 
 def _scan_category(bot, category: str, visited: set[bytes]) -> bool:
@@ -2071,26 +2222,29 @@ def _scan_category(bot, category: str, visited: set[bytes]) -> bool:
     pending_this_run = getattr(bot, PENDING_THIS_RUN_ATTR, None)
     if not isinstance(pending_this_run, set):
         pending_this_run = set()
-    # Activities has a dedicated bidirectional 0.8-second scan.  Limited keeps
-    # the conservative top-down cadence because it owns many animated rows.
+    # Activities has a dedicated bidirectional 0.8-second scan. Limited first
+    # proves its real top and then runs until the real bottom, with no local
+    # swipe-count ceiling, exactly like Valuable Event's edge traversal.
     if category == "activities":
         if not _find_dwarfs_lucky_apple_row(bot):
             _record_missing_event_policies(bot, seen_policy_keys, category)
             bot.record("Gift Claims: Activities đã quét từ đỉnh xuống đáy rồi "
                        "từ đáy lên đỉnh nhưng chưa thấy Dwarf's Lucky Apple")
             return True
-        scan_limit = 0
+        scan_to_bottom = False
         list_settle = APPLE_LIST_SETTLE_SECONDS
     else:
         # Evony remembers a separate vertical position for each category.
         _return_list_to_top(bot, category)
-        scan_limit = MAX_SCROLLS
+        scan_to_bottom = True
         list_settle = LIST_SCROLL_SETTLE_SECONDS
-    for scroll in range(scan_limit + 1):
+    scroll = 0
+    bottom_checks = 0
+    while True:
         bot.check()
         empty_checks = 0
         bot.record(f"Gift Claims: Event Center/{category} quét vị trí danh sách "
-                   f"{scroll + 1}/{scan_limit + 1}")
+                   f"{scroll + 1}")
         pending_labels = [
             policy.label for policy in EVENT_POLICIES
             if policy.key is not None
@@ -2279,16 +2433,26 @@ def _scan_category(bot, category: str, visited: set[bytes]) -> bool:
             if not _back_to_list(bot):
                 bot.log(f"Gift Claims: Event Center/{category} không quay lại được danh sách")
                 return False
-        if scroll < scan_limit:
-            before = _list_signature(bot.screenshot())
-            bot.swipe_percent(50, 86, 50, 32,
-                              duration=SWIPE_DURATION_SECONDS,
-                              delay=list_settle)
-            bot.record(f"Gift Claims: Event Center/{category} đã dừng "
-                       f"{list_settle:g}s sau lướt; bắt đầu quét")
-            if _same_list_position(before, _list_signature(bot.screenshot())):
-                bot.log(f"Gift Claims: Event Center/{category} đã tới cuối danh sách")
-                break
+        if not scan_to_bottom:
+            break
+        before = _list_signature(bot.screenshot())
+        bot.swipe_percent(50, 86, 50, 32,
+                          duration=SWIPE_DURATION_SECONDS,
+                          delay=list_settle)
+        bot.record(f"Gift Claims: Event Center/{category} đã dừng "
+                   f"{list_settle:g}s sau lướt; bắt đầu quét")
+        after = _list_signature(bot.screenshot())
+        distance = _list_hamming_distance(before, after)
+        same = _same_list_position(before, after)
+        bottom_checks = bottom_checks + 1 if same else 0
+        bot.record(f"Gift Claims: Event Center/{category} Hamming "
+                   f"{distance}/{LIST_SAME_DISTANCE}, không đổi "
+                   f"{bottom_checks}/{LIST_EDGE_CONFIRMATIONS}")
+        if bottom_checks >= LIST_EDGE_CONFIRMATIONS:
+            bot.log(f"Gift Claims: Event Center/{category} đã xác nhận cuối "
+                    f"danh sách sau {LIST_EDGE_CONFIRMATIONS} cú không đổi")
+            break
+        scroll += 1
 
     clean = _verify_clean(bot, category, visited) and not failed_forced
     has_checkpoint = any(item.startswith(category.encode("ascii") + b"\0")

@@ -27,6 +27,12 @@ FIXED_CONTROL_THRESHOLDS = {
     "Common/button_claim_all_text": 0.70,
 }
 
+# Stable 47x47 reward chest crop captured for Login Gifts. Keep this shared so
+# any gift flow can search either a caller-supplied rectangle or the full
+# screenshot without duplicating the template and matching threshold.
+REWARD_CHEST_TEMPLATE = "Common/button_reward_chest"
+REWARD_CHEST_THRESHOLD = 0.78
+
 TEXT_CLAIM_CONTROLS = (
     "Common/button_claim_text",
     "Common/button_claim_all_text",
@@ -55,13 +61,17 @@ VALUABLE_EVENT_THRESHOLDS = (0.90, 0.85, 0.80)
 # real tap target. No coordinate-only fallback is allowed.
 SUPER_VALUE_RETURN_REGION = (0, 68, 30, 96)
 SUPER_VALUE_RETURN_THRESHOLDS = (0.95, 0.90, 0.85)
+# The Empire Depot launcher has animated highlights. A fresh 50-frame capture
+# on emulator 21513 measured real matches at 0.6505..0.8369 (median 0.7897),
+# while the strongest match outside the precise launcher region was 0.5443.
+SUPER_VALUE_RETURN_EMPIRE_THRESHOLD = 0.62
 SUPER_VALUE_RETURN_LAUNCHERS = (
     ("SuperValueReturn/launcher_super_value_return_192710", 0),
     ("SuperValueReturn/launcher_first_purchase_median", 0),
     # Full 71x67 launcher median from 50 live frames; move from its centre
     # into the green icon body instead of tapping the caption below it.
     ("SuperValueReturn/launcher_login_gifts_median", -15),
-    ("EmpireDepot/launcher", -20),
+    ("SuperValueReturn/EmpireDepot/launcher", -20),
     ("SuperValueReturn/launcher_lucky_raffle", -20),
 )
 
@@ -130,6 +140,18 @@ def find(bot, name: str, screen=None, threshold: float = 0.82, region=None):
                     screen=screen, region=region)
 
 
+def find_reward_chest(bot, screen=None, region=None,
+                      threshold: float = REWARD_CHEST_THRESHOLD):
+    """Find the Login Gifts reward chest in ``region`` or the whole screen.
+
+    ``region`` uses the same percentage tuple as :func:`find`, for example
+    ``(2, 22, 18, 34)``. Leaving it as ``None`` searches the full screenshot.
+    A supplied screenshot is reused; otherwise a fresh one is captured.
+    """
+    return find(bot, REWARD_CHEST_TEMPLATE, screen=screen,
+                threshold=threshold, region=region)
+
+
 def find_valuable_event(bot, screen):
     """Find only the median ``Valuable Event`` name in a screenshot."""
     for threshold in VALUABLE_EVENT_THRESHOLDS:
@@ -174,6 +196,19 @@ def find_super_value_return(bot, screen):
             bot.log("Gift Claims: Super Value Return launcher "
                     f"{template} at threshold {threshold:.2f}")
             return target
+    # Only Empire Depot receives the measured animated fallback. Keep the
+    # same precise region and image-derived tap offset; this is not a fixed
+    # coordinate fallback and cannot match the right-side city launchers.
+    template, tap_dy = "SuperValueReturn/EmpireDepot/launcher", -20
+    pos = find(bot, template, screen=screen,
+               threshold=SUPER_VALUE_RETURN_EMPIRE_THRESHOLD,
+               region=SUPER_VALUE_RETURN_REGION)
+    if pos is not None:
+        target = (pos[0], max(0, pos[1] + round(tap_dy * scale)))
+        bot.log("Gift Claims: Super Value Return animated Empire Depot "
+                f"launcher at threshold "
+                f"{SUPER_VALUE_RETURN_EMPIRE_THRESHOLD:.2f}")
+        return target
     return None
 
 
@@ -363,12 +398,13 @@ def tap_claims(bot, templates: tuple[str, ...], *, max_taps: int = 6,
     return count
 
 
-def close_congratulations(bot, *, attempts: int = 3) -> bool:
+def close_congratulations(bot, *, attempts: int = 3,
+                          region=(0, 38, 100, 62)) -> bool:
     """Close the common reward popup and report a verified claim."""
     for attempt in range(attempts):
         screen = bot.screenshot()
-        if find(bot, "LoginGifts/congratulations", screen, threshold=0.78,
-                region=(0, 38, 100, 62)) is not None:
+        if find(bot, "SuperValueReturn/LoginGifts/congratulations", screen, threshold=0.78,
+                region=region) is not None:
             bot.back(delay=0.8)
             return True
         if attempt + 1 < attempts:

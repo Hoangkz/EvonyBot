@@ -82,11 +82,27 @@ class ResumeBot:
 
 class ResumeTests(unittest.TestCase):
     @mock.patch.object(run, "_claim_rewards", return_value=True)
+    @mock.patch.object(run, "_green_claims", return_value=[(330, 520)])
+    @mock.patch.object(run, "_gray_claim_visible", return_value=False)
+    @mock.patch.object(run, "_use_parade_masks")
+    @mock.patch.object(run, "_wait", return_value=(100, 20))
+    def test_green_claims_are_collected_before_touching_parade_mask(
+            self, _wait, use_masks, _gray, _green, claim_rewards):
+        bot = ResumeBot()
+        bot.screenshot = mock.Mock(return_value=object())
+        self.assertTrue(run._run_opened(bot))
+        use_masks.assert_not_called()
+        claim_rewards.assert_called_once_with(bot)
+
+    @mock.patch.object(run, "_claim_rewards", return_value=True)
     @mock.patch.object(run, "_use_parade_masks", return_value=True)
+    @mock.patch.object(run, "_green_claims", return_value=[])
+    @mock.patch.object(run, "_gray_claim_visible", return_value=True)
     @mock.patch.object(run, "_wait", return_value=(100, 20))
     def test_successful_use_is_saved_before_reward_scan(
-            self, _wait, use_masks, claim_rewards):
+            self, _wait, _gray, _green, use_masks, claim_rewards):
         bot = ResumeBot()
+        bot.screenshot = mock.Mock(return_value=object())
         self.assertTrue(run._run_opened(bot))
         self.assertIn(USE_DONE_KEY, bot.done)
         use_masks.assert_called_once_with(bot)
@@ -94,32 +110,40 @@ class ResumeTests(unittest.TestCase):
 
     @mock.patch.object(run, "_claim_rewards", return_value=True)
     @mock.patch.object(run, "_use_parade_masks")
+    @mock.patch.object(run, "_green_claims", return_value=[])
+    @mock.patch.object(run, "_gray_claim_visible", return_value=True)
     @mock.patch.object(run, "_wait", return_value=(100, 20))
     def test_retry_resumes_at_claims_when_use_is_already_in_db(
-            self, _wait, use_masks, claim_rewards):
+            self, _wait, _gray, _green, use_masks, claim_rewards):
         bot = ResumeBot(done=[USE_DONE_KEY])
+        bot.screenshot = mock.Mock(return_value=object())
         self.assertTrue(run._run_opened(bot))
         use_masks.assert_not_called()
         claim_rewards.assert_called_once_with(bot)
 
     @mock.patch.object(run, "_claim_rewards")
     @mock.patch.object(run, "_use_parade_masks", return_value=None)
+    @mock.patch.object(run, "_green_claims", return_value=[])
+    @mock.patch.object(run, "_gray_claim_visible", return_value=True)
     @mock.patch.object(run, "_wait", return_value=(100, 20))
-    def test_how_to_get_finishes_without_scanning_claims(
-            self, _wait, use_masks, claim_rewards):
+    def test_how_to_get_still_scans_claims_before_done(
+            self, _wait, _gray, _green, use_masks, claim_rewards):
         bot = ResumeBot()
+        bot.screenshot = mock.Mock(return_value=object())
+        claim_rewards.return_value = True
         self.assertTrue(run._run_opened(bot))
         use_masks.assert_called_once_with(bot)
-        claim_rewards.assert_not_called()
-        self.assertNotIn(USE_DONE_KEY, bot.done)
+        claim_rewards.assert_called_once_with(bot)
+        self.assertIn(USE_DONE_KEY, bot.done)
 
 
 class ParadeMaskFlowTests(unittest.TestCase):
+    @mock.patch.object(run, "_wait_after_congratulations", return_value=True)
     @mock.patch.object(run, "_wait", return_value=(100, 500))
     @mock.patch.object(run, "_select_max", return_value=True)
     @mock.patch.object(run, "_wait_mask_result", return_value=(None, None))
     def test_no_how_to_get_and_no_plus_still_continues_max_use(
-            self, wait_mask_result, select_max, wait):
+            self, wait_mask_result, select_max, wait, wait_after):
         bot = mock.Mock()
         bot.screenshot.return_value = object()
 
@@ -134,6 +158,8 @@ class ParadeMaskFlowTests(unittest.TestCase):
         self.assertTrue(run._use_parade_masks(bot))
         select_max.assert_called_once_with(bot, None)
         self.assertEqual(wait.call_count, 2)  # Use, then Congratulations
+        bot.back.assert_called_once()
+        wait_after.assert_called_once_with(bot)
 
 
 if __name__ == "__main__":

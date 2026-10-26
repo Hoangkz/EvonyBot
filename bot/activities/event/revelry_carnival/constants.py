@@ -1,11 +1,9 @@
 """Images and measured controls for Revelry Carnival."""
 
-from ..constants import EV
-
 KEY = "revelry_carnival"
 USE_DONE_KEY = "revelry_carnival_parade_masks_used"
 NAME = "Revelry Carnival"
-ROOT = f"{EV}/RevelryCarnival"
+ROOT = "GiftClaims/Event/RevelryCarnival"
 
 ICON = f"{ROOT}/icon.png"
 TITLE = f"{ROOT}/title.png"

@@ -136,6 +136,44 @@ def _green_claims(bot, screen):
     return [point for point in candidates if _green_claim(bot, screen, point)]
 
 
+def _gray_claim_visible(bot, screen) -> bool:
+    """True only for a grey Claim inside the user-approved reward frame."""
+    return bot.find(CLAIM_GRAY, threshold=CLAIM_THRESHOLD, screen=screen,
+                    region=REWARD_REGION) is not None
+
+
+def _wait_after_congratulations(bot, timeout=WAIT_TIMEOUT) -> bool:
+    """Wait after one Back until the reward page is no longer obscured.
+
+    The popup is closed exactly once.  Afterwards we wait for either its
+    disappearance or a crisp green/grey Claim control; we never press Back a
+    second time and accidentally leave Revelry Carnival.
+    """
+    end = time.monotonic() + timeout
+    while True:
+        screen = bot.screenshot()
+        popup = bot.find(CONGRATULATIONS, threshold=CONTROL_THRESHOLD,
+                         screen=screen)
+        claims_visible = bool(_green_claims(bot, screen) or
+                              _gray_claim_visible(bot, screen))
+        if popup is None or claims_visible:
+            bot.record(f"{NAME}: Congratulations đã đóng; danh sách quà đã rõ")
+            return True
+        if time.monotonic() >= end:
+            bot.record(f"{NAME}: Congratulations vẫn che danh sách sau khi Back; giữ PENDING")
+            return False
+        bot.sleep(min(1, max(0, end - time.monotonic())))
+
+
+def _close_congratulations_once(bot) -> bool:
+    """Press Back once for a visible Congratulations and wait for it to clear."""
+    if _wait(bot, CONGRATULATIONS, timeout=3) is None:
+        return False
+    bot.record(f"{NAME}: thấy Congratulations; Back đúng một lần")
+    bot.back(delay=STEP_DELAY)
+    return _wait_after_congratulations(bot)
+
+
 def _select_max(bot, plus=None) -> bool:
     """Use the Max button first, then Alliance VIP's slider-end fallback."""
     for attempt in range(1, MAX_SELECT_TRIES + 1):
@@ -190,12 +228,13 @@ def _select_max(bot, plus=None) -> bool:
 
 
 def _use_parade_masks(bot) -> bool | None:
-    """Use all masks; None means the explicit ``How to get`` DONE state."""
+    """Use all masks; None means there are no masks, not that rewards are DONE."""
     screen = bot.screenshot()
     if bot.find(CONGRATULATIONS, threshold=CONTROL_THRESHOLD,
                 screen=screen) is not None:
+        bot.record(f"{NAME}: còn Congratulations từ bước Use trước; Back đúng một lần")
         bot.back(delay=STEP_DELAY)
-        return True
+        return True if _wait_after_congratulations(bot) else False
 
     plus = bot.find(PLUS, threshold=CONTROL_THRESHOLD, screen=screen)
     if plus is None:
@@ -208,7 +247,7 @@ def _use_parade_masks(bot) -> bool | None:
         bot.tap(*mask, delay=STEP_DELAY)
         result, plus = _wait_mask_result(bot)
         if result == "how_to_get":
-            bot.record(f"{NAME}: thấy How to get; không còn Parade Mask để Use; DONE")
+            bot.record(f"{NAME}: thấy How to get; không còn Parade Mask để Use; tiếp tục quét Claim")
             bot.back(delay=STEP_DELAY)
             return None
         if result == "plus":
@@ -230,11 +269,9 @@ def _use_parade_masks(bot) -> bool | None:
         return False
     bot.record(f"{NAME}: tap Use")
     bot.tap(*use, delay=STEP_DELAY)
-    if _wait(bot, CONGRATULATIONS) is None:
+    if not _close_congratulations_once(bot):
         bot.record(f"{NAME}: chưa thấy Congratulations sau Use; giữ PENDING")
         return False
-    bot.record(f"{NAME}: Use thành công; Back một lần để đóng Congratulations")
-    bot.back(delay=STEP_DELAY)
     return True
 
 
@@ -288,8 +325,10 @@ def _claim_current_view(bot):
         bot.record(f"{NAME}: tap Claim xanh trong vùng giới hạn "
                    f"({tap_number}/{MAX_CLAIMS_PER_VIEW})")
         bot.tap(*point, delay=STEP_DELAY)
-        if _wait(bot, CONGRATULATIONS, timeout=3) is not None:
-            bot.back(delay=STEP_DELAY)
+        if not _close_congratulations_once(bot):
+            # A lagging button may disappear without the popup being matched.
+            # Re-scan a fresh frame, but do not blindly press the same point.
+            bot.record(f"{NAME}: chưa xác nhận được Congratulations sau Claim; chụp lại danh sách")
 
     remains = bool(_green_claims(bot, bot.screenshot()))
     return claimed, remains
@@ -346,27 +385,40 @@ def _run_opened(bot) -> bool:
         bot.back(delay=STEP_DELAY)
         return False
     bot.record(f"{NAME}: đã xác nhận đúng title")
-    if bot.is_daily_done(USE_DONE_KEY):
-        bot.log(f"{NAME}: Parade Mask đã Use thành công trong DB; tiếp tục nhận quà")
-    else:
+    screen = bot.screenshot()
+    green_claims = _green_claims(bot, screen)
+    gray_claim = _gray_claim_visible(bot, screen)
+
+    if green_claims:
+        bot.record(f"{NAME}: vùng quà đã có {len(green_claims)} Claim xanh; "
+                   "nhận quà trước, không bấm Parade Mask")
+    elif gray_claim and bot.is_daily_done(USE_DONE_KEY):
+        bot.log(f"{NAME}: chỉ thấy Claim xám nhưng Parade Mask đã xử lý trong DB; "
+                "tiếp tục quét đủ hai biên")
+    elif gray_claim:
+        bot.record(f"{NAME}: vùng quà chỉ có Claim xám; bắt đầu dùng Parade Mask")
         used = _use_parade_masks(bot)
-        if used is None:
-            return True
-        if not used:
+        if used is False:
             return False
-        # Save this irreversible step immediately. If a 120-second task slice
-        # ends while scanning rewards, the next slice resumes at Claim.
+        # Both a successful Use and the explicit How-to-get state mean there
+        # is no more mask work in this daily run. Neither one completes the
+        # task: every green Claim still has to be exhausted below.
         bot.mark_daily_done(USE_DONE_KEY)
         bot.record(f"{NAME}: DB DONE {USE_DONE_KEY}")
+    else:
+        bot.record(f"{NAME}: khung hiện tại chưa có Claim xanh/xám; "
+                   "vẫn quét từ biên đầu tới biên cuối")
     return _claim_rewards(bot)
 
 
 def run(bot, task: dict, state: EventState):
     def handle(action, pos, screen):
         if action == ON_HOW_TO_GET:
-            bot.record(f"{NAME}: thấy How to get; DONE")
+            bot.record(f"{NAME}: thấy How to get; đóng popup rồi tiếp tục quét Claim")
             bot.back(delay=STEP_DELAY)
-            mark_done(bot, KEY)
+            bot.mark_daily_done(USE_DONE_KEY)
+            if _run_opened(bot):
+                mark_done(bot, KEY)
             return STOP
         if action in (EVENT_OPENED, ON_EVENT):
             if _run_opened(bot):
