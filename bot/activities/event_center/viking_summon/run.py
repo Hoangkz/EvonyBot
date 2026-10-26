@@ -36,11 +36,13 @@ def run(bot, settings: dict) -> TaskResult:
     state = {"select_tries": 0, "congrats_tapped": False, "need_share": False, "share_tries": 0, "asked": False}
 
     def handle(action, pos, screen):
+        if action == c.ON_DEFEATED:   # popup boss bị hạ hiện ở bất cứ màn nào: xét trước mọi ảnh khác
+            return c.DONE if _defeated(bot, screen, state) else HANDLED
         if action != c.ON_VIKING:
             return None
         return c.DONE if _viking(bot, level, state) else HANDLED
 
-    run_task_with_retry(bot, NAME, ACTIVITIES, c.ICON, handle, targets=[(c.TITLE, c.ON_VIKING)],
+    run_task_with_retry(bot, NAME, ACTIVITIES, c.ICON, handle, targets=[(c.DEFEATED_TEXT, c.ON_DEFEATED), (c.TITLE, c.ON_VIKING)],
                         regions={c.TITLE: c.TITLE_REGION}, icon_threshold=c.ICON_THRESHOLD)
     return take(bot) or NOT_DONE
 
@@ -79,6 +81,25 @@ def _viking(bot, level: str, state: dict) -> bool:
             bot.sleep(c.WAIT_SECONDS)
     bot.record(f"{NAME}: stopped after {c.MAX_STEPS} steps")
     return True
+
+
+def _defeated(bot, screen, state: dict) -> bool:
+    """Popup "boss Viking đã bị hạ, tốn thể lực Summon cấp N?": bấm Summon, chờ về bản đồ, rồi như Summon ở màn Viking: boss mới thì Ask for Help +
+    chia sẻ từ đầu, đếm lại các lần kiểm tra từ 0. True khi xong lượt; False nếu chưa chia sẻ xong (quay lại màn Viking bấm Go)."""
+    pos = bot.find(c.DEFEATED_SUMMON, screen=screen)
+    if pos is None:
+        bot.log(f"{NAME}: defeated popup without Summon button, back")
+        bot.back(delay=1)
+        return False
+    bot.record(f"{NAME}: Viking defeated popup, Summon")
+    bot.tap(*pos, delay=0)
+    setattr(bot, c.CHECKS_ATTR, 0)   # boss cũ đã mất: đếm lại từ lần kiểm tra đầu
+    if not _wait_map(bot):
+        bot.record(f"{NAME}: world map not shown after Summon from popup")
+        return True
+    done(bot, label=c.TRIED_KEY)
+    state.update(need_share=True, share_tries=0, asked=False)
+    return _share(bot, state)
 
 
 def _wait(bot, template: str, region=None, *, gone: bool = False, tries: int = c.WAIT_TRIES):

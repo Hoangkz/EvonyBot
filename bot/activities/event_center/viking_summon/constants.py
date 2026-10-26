@@ -115,6 +115,15 @@ SHARE_TRIES = 3
 SHARE_AFTER_CHECKS = 4
 CHECKS_ATTR = "viking_checks"
 
+# ---- Popup "boss Viking đã bị hạ" ------------------------------------------------------------------------------
+# Boss Viking vừa bị hạ thì game hiện popup "Congratulations, the Viking you summoned has been defeated. Do you want to consume Stamina to summon
+# level N Viking now?" + nút Summon (18_viking_defeated_notice.png), hiện ở BẤT CỨ màn nào (ảnh mẫu chụp ở màn Alliance War). Thấy nó thì bấm Summon
+# ngay, rồi như Summon ở màn Viking: chờ về bản đồ, Ask for Help + chia sẻ boss mới, đếm lại các lần kiểm tra từ 0. Chữ dòng đầu 1,00 (cấp N ở dòng
+# sau nên không nằm trong ảnh), màn khác <= 0,32; nút Summon 1,00, màn khác <= 0,57 (chỉ tìm khi đã thấy chữ).
+DEFEATED_TEXT = f"{FOLDER}/defeatedText.png"
+DEFEATED_SUMMON = f"{FOLDER}/defeatedSummon.png"
+ON_DEFEATED = "on_defeated"
+
 # ---- Actions -----------------------------------------------------------
 ON_MAP, BACK, TAP = "on_map", "back", "tap"
 ON_VIKING = "on_viking"

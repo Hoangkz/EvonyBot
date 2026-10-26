@@ -227,6 +227,14 @@ class VikingSummonFlow(unittest.TestCase):
             sh.assert_called_once()
         self.assertFalse(state["need_share"])
 
+    def test_defeated_popup_summons_and_shares_new_boss(self):
+        """Popup "boss Viking đã bị hạ" (ảnh thật 18, ở màn Alliance War): bấm Summon trong popup -> về bản đồ -> Ask for Help + chia sẻ boss mới, bộ đếm
+        các lần kiểm tra về 0 (dù đang đếm dở)."""
+        flow = [Step("18_viking_defeated_notice.png", tap(c.DEFEATED_SUMMON)), Step("09_viking_map_0.png", end_())]
+        device = _flow(self, flow, {"viking_level": "Easy"}, setup=lambda ctx: setattr(ctx, c.CHECKS_ATTR, 2))
+        self.assertEqual(device.calls, ["ask", "share"])
+        self.assertEqual(getattr(device.ctx, c.CHECKS_ATTR), 0)
+
     def test_ask_for_help_flow(self):
         """Bấm boss -> menu nhanh: Attack -> cửa sổ boss: Ask for Help -> hộp thoại (tốn 1 Viking Poleaxe): Confirm -> nhãn thành "Asking for help"."""
         flow = [
@@ -291,9 +299,9 @@ class WindowTests(unittest.TestCase):
             clock.now.return_value = datetime(2026, 10, 27, 10)   # thứ 3
             self.assertTrue(viking._due(ctx, on))
             self.assertFalse(viking._due(ctx, off))
-            ctx.viking_last_check = datetime(2026, 10, 27, 9, 55)
-            self.assertFalse(viking._due(ctx, on))                # mới thử 5 phút trước (< 8)
-            ctx.viking_last_check = datetime(2026, 10, 27, 9, 45)
+            ctx.viking_last_check = datetime(2026, 10, 27, 10) - timedelta(minutes=c.INTERVAL_MINUTES) + timedelta(seconds=30)
+            self.assertFalse(viking._due(ctx, on))                # mới kiểm tra xong chưa đủ INTERVAL_MINUTES
+            ctx.viking_last_check = datetime(2026, 10, 27, 10) - timedelta(minutes=c.INTERVAL_MINUTES) - timedelta(seconds=30)
             self.assertTrue(viking._due(ctx, on))
             clock.now.return_value = datetime(2026, 10, 31, 10)   # thứ 7: ngoài cửa sổ
             self.assertFalse(viking._due(ctx, on))
