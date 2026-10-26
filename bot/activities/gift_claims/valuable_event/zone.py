@@ -16,7 +16,9 @@ import cv2
 from ....common import to_city
 from ....daily_reset import last_reset
 from ....ocr.find_valuable_event import find_valuable_event
-from ..common import REFERENCE_WIDTH, back_if_close_x, mark_task_done, on_main, return_home
+from ..common import (REFERENCE_WIDTH, back_if_close_x,
+                      find_valuable_event as find_valuable_event_median,
+                      mark_task_done, on_main, return_home)
 from ..screens import GiftScreen, identify
 from . import (
     active_monthly_card, ancient_dynasty_treasury, general_vault, golden_tree_rewards, limited_offer,
@@ -314,11 +316,26 @@ def open_valuable_event(bot) -> bool:
         bot.check()
         screen = bot.screenshot()
         if not on_main(bot, screen):
+            bot.record("Gift Claims: Valuable Event chưa ở màn chính; về thành "
+                       "rồi nhận diện lại launcher")
             return_home(bot)
         if to_city(bot):      # hoạt động này phải làm trong thành: đang ở bản đồ thế giới thì bấm nút toà thành
             bot.record("Gift Claims: đang ở bản đồ thế giới; đã chuyển vào thành")
         screen = bot.screenshot()
-        pos = find_valuable_event(screen) if on_main(bot, screen) else None
+        if on_main(bot, screen):
+            # OCR handles captions across the changing launcher art.  The
+            # supplied name-only median is a second independent signal for
+            # accounts whose bottom-caption font/effects make OCR miss.
+            pos = find_valuable_event(screen)
+            if pos is None:
+                pos = find_valuable_event_median(bot, screen)
+                if pos is not None:
+                    bot.record("Gift Claims: OCR không thấy caption Valuable "
+                               "Event; nhận diện bằng ảnh tên median")
+        else:
+            pos = None
+            bot.record("Gift Claims: Valuable Event chưa về màn chính sau khi "
+                       "chuyển thành; chưa tìm launcher ở khung này")
         if pos is None:
             bot.record(f"Gift Claims: không thấy nút Valuable Event ở màn chính (lần {attempt}/{OPEN_ATTEMPTS})")
             continue

@@ -7,9 +7,9 @@ Worker chạy nhóm quà sau khi hoàn thành các Daily Activities và ưu tiê
 thứ tự **Event Center -> Revelry Carnival -> Valuable Event -> Super Value Return** khi ô **Claim Event Gifts** ở tab Daily
 Activities được tích (`settings["General"]["gift_claims"]`, mặc định bật):
 
-Revelry Carnival chỉ trở thành nhiệm vụ tới lượt sau khi Event Center đã ghi
-key tổng `gift_event_center` DONE, không chạy chen vào lúc Event Center đang
-PENDING hoặc đang nghỉ giữa hai cửa sổ 120 giây.
+Sau một cửa sổ Event Center đã chạy và còn PENDING, Event Center nghỉ tới mốc
+120 giây tiếp theo; trong quãng chờ đó Revelry Carnival được mở khóa để làm
+tiếp. Khi hết mốc chờ, Event Center lại được xét trước theo thứ tự ưu tiên.
 
 Khu nào còn PENDING sau một lượt sẽ tạm nghỉ 120 giây thay vì chặn khu kế
 tiếp. Khi cửa sổ mới bắt đầu, thứ tự trên được áp dụng lại từ Event Center.
@@ -20,15 +20,15 @@ tiếp. Khi cửa sổ mới bắt đầu, thứ tự trên được áp dụng 
   `gift_super_value_return`.
 - `gift_claims.event_center.run`: Back to Territory (icon ngoài) + các event con trong danh sách Limited của Event
   Center. Key tổng `gift_event_center`.
-- Revelry Carnival: dùng toàn bộ Parade Mask rồi nhận mọi nút Claim xanh; dùng
-  key `revelry_carnival` và logic điều hướng event hiện có.
-  Khi mới vào, bot kiểm tra vùng danh sách quà: có Claim xanh thì nhận ngay;
-  chỉ có Claim xám thì mới bấm Parade Mask. `How to get` là DONE riêng cho
-  bước Parade Mask và được checkpoint bằng `revelry_carnival_parade_masks_used`,
-  nhưng chưa phải DONE toàn nhiệm vụ. Sau mỗi Claim/Use, nếu hiện
-  Congratulations thì Back đúng một lần và chờ popup biến mất hoặc nút Claim
-  hiện rõ. Toàn nhiệm vụ chỉ DONE sau một lượt quét đủ biên đầu-biên cuối mà
-  không còn Claim xanh.
+- Revelry Carnival: trước hết quét toàn bộ vùng xanh nhận quà từ đầu tới cuối
+  và nhận mọi Claim xanh. Chỉ sau một lượt đầy đủ không còn Claim xanh mới
+  bấm Parade Mask. Nếu sau cú bấm thấy ảnh `paradeMaskDone` (dòng "You can get
+  items from:") thì DONE ngay. Nếu Mask mở popup số lượng thì chọn Max, Use,
+  nhận hết Claim mới sinh ra, rồi bấm Parade Mask lần nữa; chỉ ảnh
+  `paradeMaskDone` ở lần kiểm tra này mới DONE toàn nhiệm vụ. Key
+  `revelry_carnival_parade_masks_used` chỉ checkpoint việc đã Use khi bị ngắt,
+  không phải DONE. Sau mỗi Claim/Use, nếu hiện Congratulations thì Back đúng
+  một lần và chờ popup biến mất hoặc nút Claim hiện rõ.
 
 Mỗi nhiệm vụ con có key `daily_done` riêng (ví dụ `gift_limited_offer`). DB lưu timestamp ISO;
 `BotWorker.is_daily_done()` so với lần reset server gần nhất (mặc định 14:00, lấy từ DB settings): 15:00 ngày 15/10 thì

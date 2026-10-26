@@ -14,19 +14,24 @@ MAX_SELECTED = f"{ROOT}/maxSelected.png"
 USE_BUTTON = f"{ROOT}/use.png"
 CONGRATULATIONS = f"{ROOT}/congratulations.png"
 HOW_TO_GET = f"{ROOT}/howToGet.png"
+# Exact supplied marker shown after tapping Parade Mask when no mask remains.
+# This—not an empty reward list—is the terminal signal for Revelry Carnival.
+PARADE_MASK_DONE = f"{ROOT}/paradeMaskDone.png"
 CLAIM_GREEN = f"{ROOT}/claimGreen.png"
 CLAIM_GRAY = f"{ROOT}/claimGray.png"
 
 TITLE_REGION = (15, 0, 85, 8)
 HOW_TO_GET_REGION = (15, 0, 85, 8)
-REWARD_REGION = (2, 66, 98, 98)
+PARADE_MASK_DONE_REGION = (0, 12, 100, 90)
+REWARD_REGION = (2, 67, 98, 98)
 
-# Every list gesture stays inside the green rectangle supplied by the user.
-SCAN_SWIPE = (50, 94, 50, 73)
-RETURN_TOP_SWIPE = (50, 73, 50, 94)
+# Every endpoint stays strictly inside the user-marked green reward frame:
+# x=2..98%, y=67..98% on the 396x704 reference screenshot.  Do not start a
+# swipe over the Parade Mask controls or end it on the level/progress strip.
+SCAN_SWIPE = (50, 95, 50, 71)
+RETURN_TOP_SWIPE = (50, 71, 50, 95)
 SLOW_SWIPE_DURATION = 1.0
 STEP_DELAY = 1.0
-MAX_SCROLLS = 12
 EDGE_CONFIRMATIONS = 2
 MAX_FULL_PASSES = 3
 MAX_CLAIMS_PER_VIEW = 6

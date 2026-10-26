@@ -33,11 +33,12 @@ from .constants import (
     MAX_CROP_HALF_HEIGHT,
     MAX_CROP_LEFT,
     MAX_FULL_PASSES,
-    MAX_SCROLLS,
     MAX_SELECTED,
     MAX_SELECT_TRIES,
     NAME,
     PARADE_MASK,
+    PARADE_MASK_DONE,
+    PARADE_MASK_DONE_REGION,
     PLUS,
     RETURN_TOP_SWIPE,
     REWARD_REGION,
@@ -54,6 +55,7 @@ from .constants import (
 
 ON_EVENT = "on_revelry_carnival"
 ON_HOW_TO_GET = "on_how_to_get"
+ON_PARADE_MASK_DONE = "on_parade_mask_done"
 
 
 def _wait(bot, template, *, threshold=CONTROL_THRESHOLD,
@@ -69,9 +71,14 @@ def _wait(bot, template, *, threshold=CONTROL_THRESHOLD,
 
 
 def _wait_mask_result(bot):
-    """Prefer ``How to get``; otherwise return '+' only as a slider anchor."""
+    """Wait for the exact exhausted marker or the quantity-popup anchor."""
     end = time.monotonic() + WAIT_TIMEOUT
     while True:
+        screen = bot.screenshot()
+        exhausted = bot.find(PARADE_MASK_DONE, threshold=TITLE_THRESHOLD,
+                             screen=screen, region=PARADE_MASK_DONE_REGION)
+        if exhausted is not None:
+            return "done", exhausted
         plus = bot.find(PLUS, threshold=CONTROL_THRESHOLD)
         if plus is not None:
             return "plus", plus
@@ -82,6 +89,12 @@ def _wait_mask_result(bot):
         if time.monotonic() >= end:
             return None, None
         bot.sleep(min(1, max(0, end - time.monotonic())))
+
+
+def _parade_mask_done_visible(bot, screen) -> bool:
+    """True only for the supplied post-tap exhausted-Parade-Mask marker."""
+    return bot.find(PARADE_MASK_DONE, threshold=TITLE_THRESHOLD,
+                    screen=screen, region=PARADE_MASK_DONE_REGION) is not None
 
 
 def _template_matches(bot, screen, template, *, threshold, region):
@@ -227,29 +240,36 @@ def _select_max(bot, plus=None) -> bool:
     return False
 
 
-def _use_parade_masks(bot) -> bool | None:
-    """Use all masks; None means there are no masks, not that rewards are DONE."""
+def _use_parade_masks(bot) -> str:
+    """Tap Parade Mask once: return ``done``, ``used`` or ``pending``.
+
+    A clear reward list never completes Revelry.  Only the exact exhausted
+    marker shown after this tap completes the task.
+    """
     screen = bot.screenshot()
     if bot.find(CONGRATULATIONS, threshold=CONTROL_THRESHOLD,
                 screen=screen) is not None:
         bot.record(f"{NAME}: còn Congratulations từ bước Use trước; Back đúng một lần")
         bot.back(delay=STEP_DELAY)
-        return True if _wait_after_congratulations(bot) else False
+        return "used" if _wait_after_congratulations(bot) else "pending"
 
     plus = bot.find(PLUS, threshold=CONTROL_THRESHOLD, screen=screen)
     if plus is None:
         mask = bot.find(PARADE_MASK, threshold=CONTROL_THRESHOLD,
                         screen=screen)
         if mask is None:
-            bot.record(f"{NAME}: không thấy Parade Mask; giữ PENDING")
-            return False
+            bot.record(f"{NAME}: không thấy Parade Mask để kiểm tra dấu DONE; giữ PENDING")
+            return "pending"
         bot.record(f"{NAME}: tap Parade Mask")
         bot.tap(*mask, delay=STEP_DELAY)
         result, plus = _wait_mask_result(bot)
+        if result == "done":
+            bot.record(f"{NAME}: sau khi bấm Parade Mask thấy dấu hết Mask; DONE")
+            return "done"
         if result == "how_to_get":
-            bot.record(f"{NAME}: thấy How to get; không còn Parade Mask để Use; tiếp tục quét Claim")
+            bot.record(f"{NAME}: chỉ thấy title How to get nhưng chưa thấy ảnh dấu DONE; giữ PENDING")
             bot.back(delay=STEP_DELAY)
-            return None
+            return "pending"
         if result == "plus":
             bot.record(f"{NAME}: popup số lượng đã mở (thấy dấu +)")
         else:
@@ -261,50 +281,86 @@ def _use_parade_masks(bot) -> bool | None:
     if not _select_max(bot, plus):
         bot.record(f"{NAME}: chưa xác nhận được mức tối đa; giữ PENDING")
         bot.back(delay=STEP_DELAY)
-        return False
+        return "pending"
     use = _wait(bot, USE_BUTTON)
     if use is None:
         bot.record(f"{NAME}: không thấy nút Use sau khi chọn tối đa; giữ PENDING")
         bot.back(delay=STEP_DELAY)
-        return False
+        return "pending"
     bot.record(f"{NAME}: tap Use")
     bot.tap(*use, delay=STEP_DELAY)
     if not _close_congratulations_once(bot):
         bot.record(f"{NAME}: chưa thấy Congratulations sau Use; giữ PENDING")
+        return "pending"
+    return "used"
+
+
+def _check_parade_mask_done(bot) -> bool:
+    """Re-open Parade Mask after rewards and require the supplied DONE image."""
+    screen = bot.screenshot()
+    mask = bot.find(PARADE_MASK, threshold=CONTROL_THRESHOLD, screen=screen)
+    if mask is None:
+        bot.record(f"{NAME}: không thấy Parade Mask để kiểm tra dấu DONE; giữ PENDING")
         return False
-    return True
+    bot.record(f"{NAME}: quà đã sạch; bấm lại Parade Mask để xác nhận DONE")
+    bot.tap(*mask, delay=STEP_DELAY)
+    result, _pos = _wait_mask_result(bot)
+    if result == "done":
+        bot.record(f"{NAME}: thấy ảnh dấu hết Parade Mask sau lượt Claim; DONE")
+        return True
+    bot.record(f"{NAME}: bấm lại Parade Mask nhưng chưa thấy ảnh dấu DONE; giữ PENDING")
+    bot.back(delay=STEP_DELAY)
+    return False
 
 
 def _reward_signature(screen) -> bytes:
-    """Animation-tolerant dHash of only the green reward-list frame."""
+    """Animation-tolerant two-axis dHash of only the green reward frame.
+
+    The previous horizontal-only hash could remain nearly identical when two
+    visually similar reward rows moved vertically.  Including vertical
+    gradients makes a real vertical scroll distinguishable from a stable
+    frame, while keeping animated colour changes out of the comparison.
+    """
     height, width = screen.shape[:2]
     x0, y0, x1, y1 = REWARD_REGION
     patch = screen[round(height * y0 / 100):round(height * y1 / 100),
                    round(width * x0 / 100):round(width * x1 / 100)]
     gray = cv2.cvtColor(patch, cv2.COLOR_BGR2GRAY)
-    tiny = cv2.resize(gray, (49, 12), interpolation=cv2.INTER_AREA)
-    return np.packbits(tiny[:, 1:] > tiny[:, :-1]).tobytes()
+    tiny = cv2.resize(gray, (49, 24), interpolation=cv2.INTER_AREA)
+    horizontal = tiny[:, 1:] > tiny[:, :-1]
+    vertical = tiny[1:, :] > tiny[:-1, :]
+    return np.packbits(np.concatenate((horizontal.ravel(), vertical.ravel()))).tobytes()
+
+
+def _reward_hamming_distance(before, after) -> int:
+    old = np.frombuffer(_reward_signature(before), dtype=np.uint8)
+    new = np.frombuffer(_reward_signature(after), dtype=np.uint8)
+    if old.shape != new.shape:
+        return LIST_HASH_DISTANCE + 1
+    return int(np.unpackbits(np.bitwise_xor(old, new)).sum())
 
 
 def _same_reward_position(before, after) -> bool:
-    old = np.frombuffer(_reward_signature(before), dtype=np.uint8)
-    new = np.frombuffer(_reward_signature(after), dtype=np.uint8)
-    return old.shape == new.shape and int(
-        np.unpackbits(np.bitwise_xor(old, new)).sum()) <= LIST_HASH_DISTANCE
+    return _reward_hamming_distance(before, after) <= LIST_HASH_DISTANCE
 
 
 def _swipe_to_top(bot) -> bool:
     unchanged = 0
-    for _ in range(MAX_SCROLLS):
+    swipe = 0
+    while unchanged < EDGE_CONFIRMATIONS:
+        bot.check()
+        swipe += 1
         before = bot.screenshot()
         bot.swipe_percent(*RETURN_TOP_SWIPE,
                           duration=SLOW_SWIPE_DURATION, delay=STEP_DELAY)
         after = bot.screenshot()
-        unchanged = unchanged + 1 if _same_reward_position(before, after) else 0
-        if unchanged >= EDGE_CONFIRMATIONS:
-            return True
-    bot.record(f"{NAME}: chưa xác nhận được đầu danh sách quà")
-    return False
+        distance = _reward_hamming_distance(before, after)
+        unchanged = unchanged + 1 if distance <= LIST_HASH_DISTANCE else 0
+        bot.record(f"{NAME}: lướt lên trong khung quà {RETURN_TOP_SWIPE}, "
+                   f"Hamming {distance}/{LIST_HASH_DISTANCE}, không đổi "
+                   f"{unchanged}/{EDGE_CONFIRMATIONS} (cú {swipe})")
+    bot.record(f"{NAME}: đã xác nhận đầu danh sách quà")
+    return True
 
 
 def _claim_current_view(bot):
@@ -337,27 +393,30 @@ def _claim_current_view(bot):
 def _scan_full_list(bot):
     saw_claim = False
     unchanged = 0
-    for position in range(MAX_SCROLLS + 1):
-        bot.record(f"{NAME}: quét vùng quà vị trí "
-                   f"{position + 1}/{MAX_SCROLLS + 1}")
+    position = 0
+    while True:
+        bot.check()
+        position += 1
+        bot.record(f"{NAME}: quét vùng quà vị trí {position}")
         claimed, stuck = _claim_current_view(bot)
         saw_claim = saw_claim or claimed
         if stuck:
             return saw_claim, True, False
-        if position >= MAX_SCROLLS:
-            break
         before = bot.screenshot()
         bot.swipe_percent(*SCAN_SWIPE,
                           duration=SLOW_SWIPE_DURATION, delay=STEP_DELAY)
         after = bot.screenshot()
-        unchanged = unchanged + 1 if _same_reward_position(before, after) else 0
+        distance = _reward_hamming_distance(before, after)
+        unchanged = unchanged + 1 if distance <= LIST_HASH_DISTANCE else 0
+        bot.record(f"{NAME}: lướt xuống trong khung quà {SCAN_SWIPE}, "
+                   f"Hamming {distance}/{LIST_HASH_DISTANCE}, không đổi "
+                   f"{unchanged}/{EDGE_CONFIRMATIONS}")
         if unchanged >= EDGE_CONFIRMATIONS:
             return saw_claim, False, True
-    return saw_claim, False, False
 
 
 def _claim_rewards(bot) -> bool:
-    """DONE only after a complete top-to-bottom pass with no green Claim."""
+    """Return only when a complete pass has no green Claim; not task DONE."""
     for pass_number in range(1, MAX_FULL_PASSES + 1):
         bot.record(f"{NAME}: bắt đầu lượt quét quà đầy đủ "
                    f"{pass_number}/{MAX_FULL_PASSES}")
@@ -371,7 +430,8 @@ def _claim_rewards(bot) -> bool:
             bot.record(f"{NAME}: chưa xác nhận được cuối danh sách quà; giữ PENDING")
             return False
         if not saw_claim:
-            bot.record(f"{NAME}: đã quét từ đầu tới cuối, không còn Claim xanh; DONE")
+            bot.record(f"{NAME}: đã quét từ đầu tới cuối, không còn Claim xanh; "
+                       "tiếp tục kiểm tra Parade Mask")
             return True
         bot.record(f"{NAME}: vừa nhận quà; quét lại toàn bộ trước khi DONE")
     bot.record(f"{NAME}: chưa có lượt quét sạch Claim xanh; giữ PENDING")
@@ -385,40 +445,42 @@ def _run_opened(bot) -> bool:
         bot.back(delay=STEP_DELAY)
         return False
     bot.record(f"{NAME}: đã xác nhận đúng title")
-    screen = bot.screenshot()
-    green_claims = _green_claims(bot, screen)
-    gray_claim = _gray_claim_visible(bot, screen)
+    # Always sweep the complete green reward frame first.  A grey button in
+    # the first viewport does not prove there is no green Claim farther down.
+    if not _claim_rewards(bot):
+        return False
 
-    if green_claims:
-        bot.record(f"{NAME}: vùng quà đã có {len(green_claims)} Claim xanh; "
-                   "nhận quà trước, không bấm Parade Mask")
-    elif gray_claim and bot.is_daily_done(USE_DONE_KEY):
-        bot.log(f"{NAME}: chỉ thấy Claim xám nhưng Parade Mask đã xử lý trong DB; "
-                "tiếp tục quét đủ hai biên")
-    elif gray_claim:
-        bot.record(f"{NAME}: vùng quà chỉ có Claim xám; bắt đầu dùng Parade Mask")
-        used = _use_parade_masks(bot)
-        if used is False:
-            return False
-        # Both a successful Use and the explicit How-to-get state mean there
-        # is no more mask work in this daily run. Neither one completes the
-        # task: every green Claim still has to be exhausted below.
-        bot.mark_daily_done(USE_DONE_KEY)
-        bot.record(f"{NAME}: DB DONE {USE_DONE_KEY}")
-    else:
-        bot.record(f"{NAME}: khung hiện tại chưa có Claim xanh/xám; "
-                   "vẫn quét từ biên đầu tới biên cuối")
-    return _claim_rewards(bot)
+    if bot.is_daily_done(USE_DONE_KEY):
+        return _check_parade_mask_done(bot)
+
+    outcome = _use_parade_masks(bot)
+    if outcome == "done":
+        return True
+    if outcome != "used":
+        return False
+    bot.mark_daily_done(USE_DONE_KEY)
+    bot.record(f"{NAME}: DB DONE {USE_DONE_KEY}")
+
+    # A successful Max/Use can reveal rewards farther down.  Exhaust them
+    # before tapping Parade Mask again for the only terminal marker.
+    if not _claim_rewards(bot):
+        return False
+    return _check_parade_mask_done(bot)
 
 
 def run(bot, task: dict, state: EventState):
     def handle(action, pos, screen):
+        if action == ON_PARADE_MASK_DONE:
+            bot.record(f"{NAME}: thấy ảnh dấu hết Parade Mask; DONE")
+            mark_done(bot, KEY)
+            return STOP
         if action == ON_HOW_TO_GET:
-            bot.record(f"{NAME}: thấy How to get; đóng popup rồi tiếp tục quét Claim")
-            bot.back(delay=STEP_DELAY)
-            bot.mark_daily_done(USE_DONE_KEY)
-            if _run_opened(bot):
+            if _parade_mask_done_visible(bot, screen):
+                bot.record(f"{NAME}: How to get có kèm ảnh dấu hết Mask; DONE")
                 mark_done(bot, KEY)
+                return STOP
+            bot.record(f"{NAME}: title How to get không đủ để DONE; đóng popup và giữ PENDING")
+            bot.back(delay=STEP_DELAY)
             return STOP
         if action in (EVENT_OPENED, ON_EVENT):
             if _run_opened(bot):
@@ -427,7 +489,10 @@ def run(bot, task: dict, state: EventState):
         return None
 
     run_task(bot, state, NAME, ICON, handle,
-             targets=[(HOW_TO_GET, ON_HOW_TO_GET), (TITLE, ON_EVENT)],
-             regions={HOW_TO_GET: HOW_TO_GET_REGION, TITLE: TITLE_REGION},
-             thresholds={HOW_TO_GET: TITLE_THRESHOLD, TITLE: TITLE_THRESHOLD})
+             targets=[(PARADE_MASK_DONE, ON_PARADE_MASK_DONE),
+                      (HOW_TO_GET, ON_HOW_TO_GET), (TITLE, ON_EVENT)],
+             regions={PARADE_MASK_DONE: PARADE_MASK_DONE_REGION,
+                      HOW_TO_GET: HOW_TO_GET_REGION, TITLE: TITLE_REGION},
+             thresholds={PARADE_MASK_DONE: TITLE_THRESHOLD,
+                         HOW_TO_GET: TITLE_THRESHOLD, TITLE: TITLE_THRESHOLD})
 

@@ -655,6 +655,25 @@ class FixedGiftFlowTests(unittest.TestCase):
         self.assertEqual(3, bot.sleep.call_count)
         bot.swipe_percent.assert_not_called()              # kéo dài nằm trong search_pass, sau khi làm event đang thấy
 
+    def test_open_valuable_event_uses_name_median_when_ocr_misses(self):
+        bot = mock.Mock()
+        screen = np.zeros((704, 396, 3), dtype=np.uint8)
+        bot.screenshot.return_value = screen
+        with (mock.patch.object(valuable_event_zone, "on_main", return_value=True),
+              mock.patch.object(valuable_event_zone, "to_city", return_value=False),
+              mock.patch.object(valuable_event_zone, "find_valuable_event",
+                                return_value=None),
+              mock.patch.object(valuable_event_zone, "find_valuable_event_median",
+                                return_value=(260, 590)) as median,
+              mock.patch.object(valuable_event_zone, "identify",
+                                return_value=GiftScreen.VALUABLE_EVENT)):
+            self.assertTrue(valuable_event_zone.open_valuable_event(bot))
+
+        median.assert_called_once_with(bot, screen)
+        bot.tap.assert_called_once_with(260, 560)
+        self.assertTrue(any("ảnh tên median" in call.args[0]
+                            for call in bot.record.call_args_list))
+
     def test_swipe_to_left_edge_stops_when_cut_icon_is_still_visible(self):
         # Cú 1 -> khung A; cú 2 -> hàng tab khác hẳn (icon cắt từ A mất): kéo tiếp; cú 3 -> hàng tab chỉ dịch 10 px (icon cắt
         # từ B vẫn thấy, lệch chỗ cũng được) = giới hạn.
@@ -3035,14 +3054,43 @@ class FixedGiftFlowTests(unittest.TestCase):
         self.assertEqual(2, bot.swipe_percent.call_count)
         bot.back.assert_not_called()
 
+    def test_wishful_claim_all_is_tapped_for_done_one(self):
+        bot = mock.Mock()
+        with (mock.patch.object(event_center, "_wait_for", return_value=(310, 610)) as wait,
+              mock.patch.object(event_center, "_close_wishful_congratulations") as close):
+            report, done = event_center._claim_wishful_claim_all(bot)
+
+        self.assertTrue(done)
+        self.assertEqual(common.ClaimReport(1, 1), report)
+        self.assertEqual(
+            mock.call(bot, event_center.WISHFUL_CLAIM_ALL, attempts=3,
+                      threshold=0.76, region=event_center.WISHFUL_CLAIM_ALL_REGION,
+                      delay=event_center.WISHFUL_SETTLE_SECONDS),
+            wait.call_args)
+        bot.tap.assert_called_once_with(
+            310, 610, delay=event_center.WISHFUL_SETTLE_SECONDS)
+        close.assert_called_once_with(bot)
+
+    def test_wishful_no_claim_all_is_done_one_without_scrolling_claims(self):
+        bot = mock.Mock()
+        with mock.patch.object(event_center, "_wait_for", return_value=None):
+            report, done = event_center._claim_wishful_claim_all(bot)
+
+        self.assertTrue(done)
+        self.assertEqual(common.ClaimReport(), report)
+        bot.tap.assert_not_called()
+        bot.swipe_percent.assert_not_called()
+
     def test_wishful_handle_finishes_each_panel_before_next_phase(self):
         bot = mock.Mock()
         first = common.ClaimReport(2, 2)
         second = common.ClaimReport(3, 3)
         with (mock.patch.object(event_center, "_wishful_open_blessings",
                                 return_value=True) as open_first,
+              mock.patch.object(event_center, "_claim_wishful_claim_all",
+                                return_value=(first, True)) as claim_all,
               mock.patch.object(event_center, "_claim_wishful_panel",
-                                side_effect=((first, True), (second, True))) as claim,
+                                return_value=(second, True)) as claim,
               mock.patch.object(event_center, "_claim_wishful_done_two_chest",
                                 return_value=(common.ClaimReport(1, 1), True)) as chest,
               mock.patch.object(event_center, "_wait_for",
@@ -3052,9 +3100,8 @@ class FixedGiftFlowTests(unittest.TestCase):
         self.assertTrue(done)
         self.assertEqual(common.ClaimReport(6, 6), report)
         open_first.assert_called_once_with(bot)
-        self.assertEqual([mock.call(bot, "DONE 1"),
-                          mock.call(bot, "Challenge Quest")],
-                         claim.call_args_list)
+        claim_all.assert_called_once_with(bot)
+        claim.assert_called_once_with(bot, "Challenge Quest")
         chest.assert_called_once_with(bot)
         self.assertEqual(
             [mock.call(delay=event_center.WISHFUL_SETTLE_SECONDS)] * 2,
@@ -3066,8 +3113,10 @@ class FixedGiftFlowTests(unittest.TestCase):
         second = common.ClaimReport(0, 1)
         with (mock.patch.object(event_center, "_wishful_open_blessings",
                                 return_value=True),
+              mock.patch.object(event_center, "_claim_wishful_claim_all",
+                                return_value=(first, True)),
               mock.patch.object(event_center, "_claim_wishful_panel",
-                                side_effect=((first, True), (second, True))),
+                                return_value=(second, True)),
               mock.patch.object(event_center, "_claim_wishful_done_two_chest") as chest,
               mock.patch.object(event_center, "_wait_for",
                                 side_effect=((190, 80), (198, 620)))):
@@ -3085,8 +3134,10 @@ class FixedGiftFlowTests(unittest.TestCase):
         second = common.ClaimReport(3, 0)
         with (mock.patch.object(event_center, "_wishful_open_blessings",
                                 return_value=True),
+              mock.patch.object(event_center, "_claim_wishful_claim_all",
+                                return_value=(first, True)),
               mock.patch.object(event_center, "_claim_wishful_panel",
-                                side_effect=((first, True), (second, False))),
+                                return_value=(second, False)),
               mock.patch.object(event_center, "_claim_wishful_done_two_chest") as chest,
               mock.patch.object(event_center, "_wait_for",
                                 side_effect=((190, 80), (198, 620)))):
@@ -3237,6 +3288,33 @@ class FixedGiftFlowTests(unittest.TestCase):
 
         self.assertEqual("active", state)
         self.assertEqual((300, 620), position)
+
+    def test_lucky_apple_multiplier_rejects_a_low_score_match_at_wish_once(self):
+        bot = mock.Mock()
+        screen = np.zeros((704, 396, 3), dtype=np.uint8)
+        # x100 only weakly matches the yellow Wish Once button.  The exact
+        # Once crop is strong at that same position, so this must be absent,
+        # not an endless sequence of x100 taps.
+        bot.best_match.side_effect = (
+            (0.475, (200, 620)),  # x100 active
+            (0.321, (200, 620)),  # x100 done
+            (0.960, (200, 620)),  # Wish Once active
+            (0.330, (200, 620)),  # Wish Once gray
+            (0.960, (200, 620)),  # Wish Once active (DONE candidate)
+            (0.330, (200, 620)),  # Wish Once gray (DONE candidate)
+        )
+        with (mock.patch.object(event_center, "_scaled_template",
+                                side_effect=lambda _bot, name, _screen: name),
+              mock.patch.object(event_center, "_apple_button_color_band",
+                                return_value=(184.6, 0.80))):
+            state, position = event_center._apple_button_state(
+                bot, screen,
+                "EventCenter/DwarfsLuckyApple/button_green_wish_x100",
+                "EventCenter/DwarfsLuckyApple/status_green_wish_x100_done",
+                exclude_once=True)
+
+        self.assertIsNone(state)
+        self.assertIsNone(position)
 
     def test_lucky_apple_disabled_button_requires_clear_score_margin(self):
         bot = mock.Mock()
@@ -3685,12 +3763,35 @@ class FixedGiftFlowTests(unittest.TestCase):
                                 side_effect=(
                                     (common.ClaimReport(2, 2), True, True),
                                     (common.ClaimReport(3, 3), True, True),
+                                    (common.ClaimReport(), True, False),
                                 )) as phase):
             report, done = event_center._handle_dwarfs_lucky_apple(bot)
 
         self.assertTrue(done)
         self.assertEqual(common.ClaimReport(5, 5), report)
-        self.assertEqual(2, phase.call_count)
+        self.assertEqual(3, phase.call_count)
+
+    def test_lucky_apple_red_x10_gray_is_done_before_once_shortcut(self):
+        bot = mock.Mock()
+        bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
+        with (mock.patch.object(event_center, "_wait_for_any",
+                                side_effect=((300, 300), (100, 300))),
+              mock.patch.object(event_center, "_wait_apple_special_state",
+                                return_value=("green-once", (250, 540))),
+              mock.patch.object(event_center, "_apple_red_multipliers_gray")
+              as both_gray,
+              mock.patch.object(event_center, "_run_optional_apple_phase",
+                                side_effect=(
+                                    (common.ClaimReport(), True, False),
+                                    (common.ClaimReport(), True, False),
+                                    (common.ClaimReport(1, 1), True, True),
+                                )) as phase):
+            report, done = event_center._handle_dwarfs_lucky_apple(bot)
+
+        self.assertTrue(done)
+        self.assertEqual(common.ClaimReport(1, 1), report)
+        self.assertEqual(3, phase.call_count)
+        both_gray.assert_not_called()
 
     def test_lucky_apple_only_once_on_both_tabs_is_done(self):
         bot = mock.Mock()

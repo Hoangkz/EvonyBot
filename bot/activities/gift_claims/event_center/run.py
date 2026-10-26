@@ -88,6 +88,12 @@ APPLE_RED_POST_TAP_GRAY_LOCATE_THRESHOLD = 0.45
 APPLE_RED_X10_DISTINCT_DISTANCE = 45
 APPLE_RED_MULTIPLIER_DONE_THRESHOLD = 0.80
 APPLE_RED_MULTIPLIER_DISTINCT_DISTANCE = 45
+# A loose multiplier threshold is necessary on lagged devices, but the exact
+# Wish Once crop still scores much higher at its own location.  Do not let
+# that yellow/grey Once button impersonate x100/x10 merely because their
+# ornaments overlap visually.
+APPLE_ONCE_EXCLUSION_THRESHOLD = 0.70
+APPLE_ONCE_EXCLUSION_DISTANCE = 45
 MAX_APPLE_TAPS_PER_PHASE = 100
 APPLE_STATE_MISS_RETRIES = 3
 # MEmu can become noticeably slower when the worker controls many devices at
@@ -109,6 +115,8 @@ WISHFUL_SETTLE_SECONDS = 1.0
 WISHFUL_CONFIRMATION_DELAY_SECONDS = 1.0
 WISHFUL_CONTENT_REGION = (3, 26, 97, 88)
 WISHFUL_CLAIM_REGION = (65, 26, 98, 88)
+WISHFUL_CLAIM_ALL = "EventCenter/WishfulWindmillFestival/button_claim_all"
+WISHFUL_CLAIM_ALL_REGION = (0, 26, 100, 100)
 MAX_WISHFUL_CONTENT_SWIPES = 12
 MAX_WISHFUL_CLAIMS = 30
 MAX_WISHFUL_TAPS_PER_CLAIM = 3
@@ -588,6 +596,23 @@ def _wishful_done_one_limit(bot, screen) -> bool:
                 region=(0, 5, 100, 95)) is not None
 
 
+def _claim_wishful_claim_all(bot) -> tuple[ClaimReport, bool]:
+    """DONE 1 is controlled solely by Wind Blessings' Claim All button."""
+    claim_all = _wait_for(
+        bot, WISHFUL_CLAIM_ALL, attempts=3, threshold=0.76,
+        region=WISHFUL_CLAIM_ALL_REGION, delay=WISHFUL_SETTLE_SECONDS,
+    )
+    if claim_all is None:
+        bot.record("Gift Claims: Wishful Windmill không có Claim All trong "
+                   "Wind Blessings; DONE 1")
+        return ClaimReport(), True
+    bot.record("Gift Claims: Wishful Windmill thấy Claim All trong Wind "
+               "Blessings; tap")
+    bot.tap(*claim_all, delay=WISHFUL_SETTLE_SECONDS)
+    _close_wishful_congratulations(bot)
+    return ClaimReport(1, 1), True
+
+
 def _close_wishful_congratulations(bot) -> bool:
     """Dismiss Congratulations by the user's fixed tap, never with Back."""
     for attempt in range(3):
@@ -792,12 +817,11 @@ def _wait_event_row_open(bot, expected_screen=None, *, delay=UI_SETTLE_SECONDS):
 
 
 def _handle_wishful(bot):
-    bot.record("Gift Claims: Wishful Windmill tìm và tap rương ngay; "
-               "mỗi thao tác chỉ chờ 1s; chỉ nhận Claim, không "
-               "dùng Claim All")
+    bot.record("Gift Claims: Wishful Windmill mở Wind Blessings và kiểm tra "
+               "Claim All cho DONE 1")
     if not _wishful_open_blessings(bot):
         return ClaimReport(), False
-    first, first_done = _claim_wishful_panel(bot, "DONE 1")
+    first, first_done = _claim_wishful_claim_all(bot)
     if not first_done:
         return first, False
 
@@ -897,8 +921,42 @@ def _apple_button_color_band(screen, center) -> tuple[float, float]:
             float(np.mean(saturation >= APPLE_COLOR_SATURATION_CUTOFF)))
 
 
+def _apple_once_states_for_multiplier(active: str):
+    """Exact Once states that must not satisfy a multiplier template."""
+    if active in (
+            "EventCenter/DwarfsLuckyApple/button_green_wish_x100",
+            "EventCenter/DwarfsLuckyApple/button_green_wish_x10"):
+        return APPLE_GREEN_ONCE_STATES
+    if active == "EventCenter/DwarfsLuckyApple/button_red_wish_x10":
+        return APPLE_RED_ONCE_STATES
+    return ()
+
+
+def _apple_multiplier_is_once(bot, screen, active: str, position,
+                              *, region) -> bool:
+    """Whether ``position`` is an exact Wish Once control, not x100/x10."""
+    if position is None:
+        return False
+    for template_name, _threshold in _apple_once_states_for_multiplier(active):
+        template = _scaled_template(bot, template_name, screen)
+        score, once_position = bot.best_match(template, screen=screen,
+                                              region=region)
+        if (once_position is None or
+                score < APPLE_ONCE_EXCLUSION_THRESHOLD):
+            continue
+        distance_sq = ((position[0] - once_position[0]) ** 2 +
+                       (position[1] - once_position[1]) ** 2)
+        if distance_sq <= APPLE_ONCE_EXCLUSION_DISTANCE ** 2:
+            bot.record("Gift Claims: Dwarf's Lucky Apple template multiplier "
+                       f"đang khớp vào Wish Once ({template_name}, "
+                       f"score={score:.3f}, vị trí={once_position}); loại "
+                       "kết quả để không bấm nhầm")
+            return True
+    return False
+
+
 def _apple_button_state(bot, screen, active: str, finished: str,
-                        region=(0, 15, 100, 98)):
+                        region=(0, 15, 100, 98), *, exclude_once=False):
     """Distinguish the orange active button from the grey disabled button.
 
     Their wording and coin icon are nearly identical, so testing the disabled
@@ -918,14 +976,21 @@ def _apple_button_state(bot, screen, active: str, finished: str,
     done_color = (_apple_button_color_band(screen, done_pos)
                   if done_pos is not None else (0.0, 0.0))
     bot.record(f"Gift Claims: Dwarf's Lucky Apple dải màu "
-               f"ACTIVE score={active_score:.3f}, S={active_color[0]:.1f}, "
+               f"ACTIVE score={active_score:.3f} tại {active_pos}, S={active_color[0]:.1f}, "
                f"tỷ lệ vàng={active_color[1]:.2f}; DONE score={done_score:.3f}, "
-               f"S={done_color[0]:.1f}, tỷ lệ vàng={done_color[1]:.2f}")
+               f"tại {done_pos}, S={done_color[0]:.1f}, tỷ lệ vàng={done_color[1]:.2f}")
+
+    active_is_once = (exclude_once and
+                      _apple_multiplier_is_once(bot, screen, active,
+                                                 active_pos, region=region))
+    done_is_once = (exclude_once and
+                    _apple_multiplier_is_once(bot, screen, active,
+                                               done_pos, region=region))
 
     done_is_gray = (done_color[0] <= APPLE_DONE_SATURATION_MAX and
                     done_color[1] <= APPLE_DONE_COLOR_RATIO_MAX)
     if (done_pos is not None and done_score >= APPLE_STATE_THRESHOLD
-            and done_is_gray):
+            and done_is_gray and not done_is_once):
         ornament_ok, ornament_scores = _apple_done_ornament_matches(
             screen, done_template, done_pos)
         bot.record("Gift Claims: Dwarf's Lucky Apple kiểm tra hoa văn DONE "
@@ -950,7 +1015,8 @@ def _apple_button_state(bot, screen, active: str, finished: str,
         locate_color[1] >= APPLE_ACTIVE_COLOR_RATIO_MIN)
     if (locate_pos is not None and
             locate_score >= APPLE_COLOR_LOCATE_THRESHOLD and
-            active_is_yellow):
+            active_is_yellow and not (active_is_once if locate_pos == active_pos
+                                       else done_is_once)):
         bot.record("Gift Claims: Dwarf's Lucky Apple dải vàng đạt chuẩn; "
                    "xác nhận nút ACTIVE và tiếp tục bấm")
         return "active", locate_pos
@@ -967,7 +1033,8 @@ def _apple_button_state(bot, screen, active: str, finished: str,
         locate_color[1] <= APPLE_DONE_COLOR_RATIO_MAX)
     if (locate_pos is not None and
             locate_score >= APPLE_COLOR_LOCATE_THRESHOLD and
-            located_is_gray):
+            located_is_gray and not (active_is_once if locate_pos == active_pos
+                                      else done_is_once)):
         bot.record("Gift Claims: Dwarf's Lucky Apple đã định vị đúng nút và "
                    "dải màu đã xám; xác nhận DONE không chờ template/hoa văn")
         return "done", locate_pos
@@ -1170,7 +1237,8 @@ def _apple_phase(bot, active: str, finished: str,
                 active == "EventCenter/DwarfsLuckyApple/button_red_wish_x10" and
                 _apple_red_x10_post_tap_done(bot, screen)):
             return ClaimReport(attempted, attempted), True
-        state, button = _apple_button_state(bot, screen, active, finished)
+        state, button = _apple_button_state(bot, screen, active, finished,
+                                            exclude_once=True)
         if state == "done":
             return ClaimReport(attempted, attempted), True
         if state != "active" or button is None:
@@ -1228,7 +1296,8 @@ def _probe_optional_apple_phase(bot, active: str, finished: str,
             _close_apple_congratulations(bot, attempts=1)
             bot.sleep(UI_SETTLE_SECONDS)
             continue
-        state, _button = _apple_button_state(bot, screen, active, finished)
+        state, _button = _apple_button_state(bot, screen, active, finished,
+                                              exclude_once=True)
         if state is not None:
             bot.record("Gift Claims: Dwarf's Lucky Apple "
                        f"{label} xuất hiện ({state.upper()})")
@@ -1323,8 +1392,9 @@ def _handle_dwarfs_lucky_apple(bot):
     bot.record("Gift Claims: Dwarf's Lucky Apple bấm tab táo đỏ; chỉ từ "
                "thời điểm này mới được xét DONE toàn nhiệm vụ")
     bot.tap(*red, delay=UI_SETTLE_SECONDS)
-    if _apple_red_multipliers_gray(bot):
-        return ClaimReport(total.attempted, max(1, total.verified)), True
+    # A grey red x10 is the primary terminal state.  Check it before every
+    # shortcut involving Wish Once: Once may coexist with x10, and looking at
+    # it earlier would incorrectly skip an already exhausted multiplier.
     third, third_done, third_present = _run_optional_apple_phase(
         bot, "EventCenter/DwarfsLuckyApple/button_red_wish_x10",
         "EventCenter/DwarfsLuckyApple/status_red_wish_x10_done", "đỏ x10")
@@ -1336,6 +1406,12 @@ def _handle_dwarfs_lucky_apple(bot):
         return final, True
     if not third_done:
         return final, False
+
+    # x10 was not readable/present in the regular phase probe.  Retain the
+    # stricter two-control visual fallback for the supplied grey x100+x10
+    # layout before considering the Once-only terminal state.
+    if _apple_red_multipliers_gray(bot):
+        return ClaimReport(final.attempted, max(1, final.verified)), True
 
     # Red x10 is genuinely absent.  Only now may Once (active or grey) finish
     # the task; checking it earlier would incorrectly skip an actionable x10.
