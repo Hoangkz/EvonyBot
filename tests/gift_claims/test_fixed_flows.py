@@ -645,6 +645,8 @@ class FixedGiftFlowTests(unittest.TestCase):
         bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
         with (mock.patch.object(valuable_event_zone, "on_main", return_value=True),
               mock.patch.object(valuable_event_zone, "to_city", return_value=False),
+              mock.patch.object(valuable_event_zone, "find_valuable_event_median",
+                                return_value=None),
               mock.patch.object(valuable_event_zone, "find_valuable_event",
                                 return_value=(260, 590)),
               mock.patch.object(valuable_event_zone, "identify",
@@ -655,14 +657,14 @@ class FixedGiftFlowTests(unittest.TestCase):
         self.assertEqual(3, bot.sleep.call_count)
         bot.swipe_percent.assert_not_called()              # kéo dài nằm trong search_pass, sau khi làm event đang thấy
 
-    def test_open_valuable_event_uses_name_median_when_ocr_misses(self):
+    def test_open_valuable_event_uses_name_median_before_ocr(self):
         bot = mock.Mock()
         screen = np.zeros((704, 396, 3), dtype=np.uint8)
         bot.screenshot.return_value = screen
         with (mock.patch.object(valuable_event_zone, "on_main", return_value=True),
               mock.patch.object(valuable_event_zone, "to_city", return_value=False),
               mock.patch.object(valuable_event_zone, "find_valuable_event",
-                                return_value=None),
+                                return_value=None) as ocr,
               mock.patch.object(valuable_event_zone, "find_valuable_event_median",
                                 return_value=(260, 590)) as median,
               mock.patch.object(valuable_event_zone, "identify",
@@ -670,9 +672,8 @@ class FixedGiftFlowTests(unittest.TestCase):
             self.assertTrue(valuable_event_zone.open_valuable_event(bot))
 
         median.assert_called_once_with(bot, screen)
+        ocr.assert_not_called()
         bot.tap.assert_called_once_with(260, 560)
-        self.assertTrue(any("ảnh tên median" in call.args[0]
-                            for call in bot.record.call_args_list))
 
     def test_swipe_to_left_edge_stops_when_cut_icon_is_still_visible(self):
         # Cú 1 -> khung A; cú 2 -> hàng tab khác hẳn (icon cắt từ A mất): kéo tiếp; cú 3 -> hàng tab chỉ dịch 10 px (icon cắt
@@ -742,6 +743,8 @@ class FixedGiftFlowTests(unittest.TestCase):
         bot.is_daily_done.return_value = False
         with (mock.patch.object(valuable_event_zone, "on_main", return_value=True),
               mock.patch.object(valuable_event_zone, "to_city", return_value=False),
+              mock.patch.object(valuable_event_zone, "find_valuable_event_median",
+                                return_value=None),
               mock.patch.object(valuable_event_zone, "find_valuable_event",
                                 return_value=(260, 590)),
               mock.patch.object(valuable_event_zone, "identify", return_value=None)):
@@ -3054,43 +3057,14 @@ class FixedGiftFlowTests(unittest.TestCase):
         self.assertEqual(2, bot.swipe_percent.call_count)
         bot.back.assert_not_called()
 
-    def test_wishful_claim_all_is_tapped_for_done_one(self):
-        bot = mock.Mock()
-        with (mock.patch.object(event_center, "_wait_for", return_value=(310, 610)) as wait,
-              mock.patch.object(event_center, "_close_wishful_congratulations") as close):
-            report, done = event_center._claim_wishful_claim_all(bot)
-
-        self.assertTrue(done)
-        self.assertEqual(common.ClaimReport(1, 1), report)
-        self.assertEqual(
-            mock.call(bot, event_center.WISHFUL_CLAIM_ALL, attempts=3,
-                      threshold=0.76, region=event_center.WISHFUL_CLAIM_ALL_REGION,
-                      delay=event_center.WISHFUL_SETTLE_SECONDS),
-            wait.call_args)
-        bot.tap.assert_called_once_with(
-            310, 610, delay=event_center.WISHFUL_SETTLE_SECONDS)
-        close.assert_called_once_with(bot)
-
-    def test_wishful_no_claim_all_is_done_one_without_scrolling_claims(self):
-        bot = mock.Mock()
-        with mock.patch.object(event_center, "_wait_for", return_value=None):
-            report, done = event_center._claim_wishful_claim_all(bot)
-
-        self.assertTrue(done)
-        self.assertEqual(common.ClaimReport(), report)
-        bot.tap.assert_not_called()
-        bot.swipe_percent.assert_not_called()
-
     def test_wishful_handle_finishes_each_panel_before_next_phase(self):
         bot = mock.Mock()
         first = common.ClaimReport(2, 2)
         second = common.ClaimReport(3, 3)
         with (mock.patch.object(event_center, "_wishful_open_blessings",
                                 return_value=True) as open_first,
-              mock.patch.object(event_center, "_claim_wishful_claim_all",
-                                return_value=(first, True)) as claim_all,
               mock.patch.object(event_center, "_claim_wishful_panel",
-                                return_value=(second, True)) as claim,
+                                side_effect=((first, True), (second, True))) as claim,
               mock.patch.object(event_center, "_claim_wishful_done_two_chest",
                                 return_value=(common.ClaimReport(1, 1), True)) as chest,
               mock.patch.object(event_center, "_wait_for",
@@ -3100,8 +3074,9 @@ class FixedGiftFlowTests(unittest.TestCase):
         self.assertTrue(done)
         self.assertEqual(common.ClaimReport(6, 6), report)
         open_first.assert_called_once_with(bot)
-        claim_all.assert_called_once_with(bot)
-        claim.assert_called_once_with(bot, "Challenge Quest")
+        self.assertEqual([mock.call(bot, "DONE 1"),
+                          mock.call(bot, "Challenge Quest")],
+                         claim.call_args_list)
         chest.assert_called_once_with(bot)
         self.assertEqual(
             [mock.call(delay=event_center.WISHFUL_SETTLE_SECONDS)] * 2,
@@ -3113,10 +3088,8 @@ class FixedGiftFlowTests(unittest.TestCase):
         second = common.ClaimReport(0, 1)
         with (mock.patch.object(event_center, "_wishful_open_blessings",
                                 return_value=True),
-              mock.patch.object(event_center, "_claim_wishful_claim_all",
-                                return_value=(first, True)),
               mock.patch.object(event_center, "_claim_wishful_panel",
-                                return_value=(second, True)),
+                                side_effect=((first, True), (second, True))),
               mock.patch.object(event_center, "_claim_wishful_done_two_chest") as chest,
               mock.patch.object(event_center, "_wait_for",
                                 side_effect=((190, 80), (198, 620)))):
@@ -3134,10 +3107,8 @@ class FixedGiftFlowTests(unittest.TestCase):
         second = common.ClaimReport(3, 0)
         with (mock.patch.object(event_center, "_wishful_open_blessings",
                                 return_value=True),
-              mock.patch.object(event_center, "_claim_wishful_claim_all",
-                                return_value=(first, True)),
               mock.patch.object(event_center, "_claim_wishful_panel",
-                                return_value=(second, False)),
+                                side_effect=((first, True), (second, False))),
               mock.patch.object(event_center, "_claim_wishful_done_two_chest") as chest,
               mock.patch.object(event_center, "_wait_for",
                                 side_effect=((190, 80), (198, 620)))):

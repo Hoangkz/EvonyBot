@@ -115,8 +115,6 @@ WISHFUL_SETTLE_SECONDS = 1.0
 WISHFUL_CONFIRMATION_DELAY_SECONDS = 1.0
 WISHFUL_CONTENT_REGION = (3, 26, 97, 88)
 WISHFUL_CLAIM_REGION = (65, 26, 98, 88)
-WISHFUL_CLAIM_ALL = "EventCenter/WishfulWindmillFestival/button_claim_all"
-WISHFUL_CLAIM_ALL_REGION = (0, 26, 100, 100)
 MAX_WISHFUL_CONTENT_SWIPES = 12
 MAX_WISHFUL_CLAIMS = 30
 MAX_WISHFUL_TAPS_PER_CLAIM = 3
@@ -596,23 +594,6 @@ def _wishful_done_one_limit(bot, screen) -> bool:
                 region=(0, 5, 100, 95)) is not None
 
 
-def _claim_wishful_claim_all(bot) -> tuple[ClaimReport, bool]:
-    """DONE 1 is controlled solely by Wind Blessings' Claim All button."""
-    claim_all = _wait_for(
-        bot, WISHFUL_CLAIM_ALL, attempts=3, threshold=0.76,
-        region=WISHFUL_CLAIM_ALL_REGION, delay=WISHFUL_SETTLE_SECONDS,
-    )
-    if claim_all is None:
-        bot.record("Gift Claims: Wishful Windmill không có Claim All trong "
-                   "Wind Blessings; DONE 1")
-        return ClaimReport(), True
-    bot.record("Gift Claims: Wishful Windmill thấy Claim All trong Wind "
-               "Blessings; tap")
-    bot.tap(*claim_all, delay=WISHFUL_SETTLE_SECONDS)
-    _close_wishful_congratulations(bot)
-    return ClaimReport(1, 1), True
-
-
 def _close_wishful_congratulations(bot) -> bool:
     """Dismiss Congratulations by the user's fixed tap, never with Back."""
     for attempt in range(3):
@@ -817,11 +798,12 @@ def _wait_event_row_open(bot, expected_screen=None, *, delay=UI_SETTLE_SECONDS):
 
 
 def _handle_wishful(bot):
-    bot.record("Gift Claims: Wishful Windmill mở Wind Blessings và kiểm tra "
-               "Claim All cho DONE 1")
+    bot.record("Gift Claims: Wishful Windmill tìm và tap rương ngay; "
+               "mỗi thao tác chỉ chờ 1s; chỉ nhận Claim, không "
+               "dùng Claim All")
     if not _wishful_open_blessings(bot):
         return ClaimReport(), False
-    first, first_done = _claim_wishful_claim_all(bot)
+    first, first_done = _claim_wishful_panel(bot, "DONE 1")
     if not first_done:
         return first, False
 
