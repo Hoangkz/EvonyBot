@@ -6,7 +6,7 @@ requires a later full pass where every recognized row is yellow Continue.
 """
 import cv2
 
-from ...common import (GiftTask, close_congratulations, find_all,
+from ...common import (GiftTask, _scaled_template, close_congratulations, find_all,
                        return_home, select_carousel_tab)
 from ...lobby import open_named
 from ...screens import GiftScreen
@@ -44,10 +44,13 @@ FLOW = ExactFlow(claims=(CLAIM,), scroll_claims=True)
 
 
 def _button_crop(bot, screen, center, template_name):
-    template = bot._template(template_name)
-    scale = screen.shape[1] / 396
-    width = max(1, round(template.shape[1] * scale))
-    height = max(1, round(template.shape[0] * scale))
+    # Gift Claim template names are relative to Images/GiftClaims and omit the
+    # .png suffix. Going straight through bot._template() bypasses that path
+    # expansion and makes packed releases look for the invalid path
+    # images.dat:SuperValueReturn/... instead of
+    # images.dat:GiftClaims/SuperValueReturn/....
+    template = _scaled_template(bot, template_name, screen)
+    height, width = template.shape[:2]
     left = max(0, center[0] - width // 2)
     top = max(0, center[1] - height // 2)
     return screen[top:min(screen.shape[0], top + height),

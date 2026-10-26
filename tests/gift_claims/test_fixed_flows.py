@@ -2014,6 +2014,18 @@ class FixedGiftFlowTests(unittest.TestCase):
         self.assertEqual((refining_weekly_card.CLAIM,),
                          refining_weekly_card.FLOW.claims)
 
+    def test_refining_weekly_card_colour_crop_uses_gift_claims_pack_path(self):
+        bot = mock.Mock()
+        bot._template.return_value = np.zeros((26, 62, 3), dtype=np.uint8)
+        screen = np.zeros((704, 396, 3), dtype=np.uint8)
+
+        crop = refining_weekly_card._button_crop(
+            bot, screen, (200, 500), refining_weekly_card.CLAIM)
+
+        bot._template.assert_called_once_with(
+            "GiftClaims/SuperValueReturn/RefiningWeeklyCard/button_claim.png")
+        self.assertEqual((26, 62, 3), crop.shape)
+
     def test_refining_weekly_card_swipes_only_inside_green_reward_frame(self):
         bot = mock.Mock()
         screen = np.zeros((704, 396, 3), dtype=np.uint8)
@@ -2241,6 +2253,56 @@ class FixedGiftFlowTests(unittest.TestCase):
         self.assertTrue(flow.confirm_scroll_edges)
         self.assertEqual(24, flow.scroll_same_distance)
         self.assertEqual(2, flow.scroll_edge_confirmations)
+
+    def test_active_monthly_card_without_chest_scans_to_bottom_and_claims(self):
+        bot = mock.Mock()
+        bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
+        flow = active_monthly_card.FLOW
+        downward_swipes = [0]
+
+        def swipe(_bot, _flow, *, toward_start):
+            if not toward_start:
+                downward_swipes[0] += 1
+                return 40 if downward_swipes[0] == 1 else 0
+            return 0
+
+        def find_state(_bot, templates, screen=None, *, region, threshold):
+            if templates == flow.opened:
+                return (flow.opened[0], (100, 100))
+            if templates == flow.navigation:
+                self.assertEqual(flow.navigation_region, region)
+                return None
+            if templates == flow.claims:
+                self.assertEqual(flow.claim_region, region)
+                if downward_swipes[0] and not bot.tap.called:
+                    return (flow.claims[0], (320, 500))
+            return None
+
+        with (mock.patch.object(valuable_named_flow, "find_any", side_effect=find_state),
+              mock.patch.object(valuable_named_flow, "_swipe_vertical", side_effect=swipe),
+              mock.patch.object(valuable_named_flow, "close_congratulations", return_value=True)):
+            self.assertTrue(valuable_named_flow.process_exact(bot, flow))
+
+        bot.tap.assert_called_once_with(320, 500, delay=valuable_named_flow.STEP_DELAY)
+        self.assertGreaterEqual(downward_swipes[0], 3)
+
+    def test_active_monthly_card_without_chest_or_claim_is_done_after_edges(self):
+        bot = mock.Mock()
+        bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
+        flow = active_monthly_card.FLOW
+
+        def find_state(_bot, templates, screen=None, *, region, threshold):
+            if templates == flow.opened:
+                return (flow.opened[0], (100, 100))
+            return None
+
+        with (mock.patch.object(valuable_named_flow, "find_any", side_effect=find_state),
+              mock.patch.object(valuable_named_flow, "_swipe_vertical", return_value=0) as swipe):
+            self.assertTrue(valuable_named_flow.process_exact(bot, flow))
+
+        bot.tap.assert_not_called()
+        self.assertEqual(2, sum(call.kwargs["toward_start"] for call in swipe.call_args_list))
+        self.assertEqual(2, sum(not call.kwargs["toward_start"] for call in swipe.call_args_list))
 
     def test_super_value_weekly_card_uses_same_vertical_green_frame_edges(self):
         flow = super_value_weekly_card.FLOW
