@@ -2,7 +2,7 @@
 import cv2
 
 from ...common import (GiftTask, close_congratulations, find, find_all,
-                       find_reward_chest, return_home, select_carousel_tab)
+                       return_home, select_carousel_tab)
 from ...lobby import open_named
 from ...screens import GiftScreen
 from ...super_value_return.login_gifts.run import CONGRATULATIONS
@@ -22,6 +22,12 @@ GO = "ValuableEvent/SuperValueWeeklyCard/button_go"
 
 # Main-page chest rectangle from the second supplied 396x704 screenshot.
 MAIN_CHEST_REGION = (1, 22, 34, 40)
+# Median from 50 stable ADB frames on 21513 (2026-10-27): genuine scores
+# 0.8323..0.9834 and the strongest other match in this green rectangle was
+# 0.2027.  0.65 retains a generous live-animation margin without allowing a
+# background match to be treated as a chest.
+MAIN_CHEST = "SuperValueReturn/SoulOfSpiritualBeast/button_reward_chest_median"
+MAIN_CHEST_THRESHOLD = 0.65
 # Quest-list rectangle from the first supplied 396x704 screenshot.
 QUEST_REGION = (5, 34, 97, 82)
 SCAN_SWIPE = (50, 78, 50, 43)
@@ -95,14 +101,26 @@ def _main_open(bot, screen=None) -> bool:
                 region=(55, 30, 100, 55)) is not None
 
 
+def _find_main_chest(bot, screen):
+    """Find only the 21513-calibrated Soul Beast chest in its green frame."""
+    return find(bot, MAIN_CHEST, screen, threshold=MAIN_CHEST_THRESHOLD,
+                region=MAIN_CHEST_REGION)
+
+
 def _confirm_main_chest_absent(bot) -> bool:
     """Confirm on fresh main-page frames that the reward chest is gone."""
     absent = 0
     for attempt in range(CHEST_ABSENCE_CONFIRMATIONS + 2):
         screen = bot.screenshot()
         on_main = _main_open(bot, screen)
-        chest = find_reward_chest(bot, screen, region=MAIN_CHEST_REGION)
+        chest = _find_main_chest(bot, screen)
         absent = absent + 1 if on_main and chest is None else 0
+        bot.record(
+            "Gift Claims: Soul Beast kiểm tra lại rương sau tap "
+            f"({attempt + 1}/{CHEST_ABSENCE_CONFIRMATIONS}); "
+            + ("không thấy rương" if on_main and chest is None
+               else "rương vẫn còn hoặc chưa ở màn Challenge Quest")
+        )
         if absent >= CHEST_ABSENCE_CONFIRMATIONS:
             return True
         if attempt + 1 < CHEST_ABSENCE_CONFIRMATIONS + 2:
@@ -118,8 +136,10 @@ def _claim_main_chests(bot) -> bool:
         if not _main_open(bot, screen):
             bot.record("Gift Claims: Soul Beast chưa xác nhận màn chính")
             return False
-        chest = find_reward_chest(bot, screen, region=MAIN_CHEST_REGION)
+        chest = _find_main_chest(bot, screen)
         if chest is None:
+            bot.record("Gift Claims: Soul Beast quét vùng rương xanh: "
+                       "không thấy rương")
             return True
         bot.record("Gift Claims: Soul Beast thấy rương trong vùng xanh; tap")
         bot.tap(*chest, delay=STEP_DELAY)

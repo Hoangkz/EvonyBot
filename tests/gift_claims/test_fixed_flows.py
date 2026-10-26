@@ -1882,7 +1882,7 @@ class FixedGiftFlowTests(unittest.TestCase):
         with (mock.patch.object(soul_of_spiritual_beast, "_main_open",
                                 return_value=True),
               mock.patch.object(soul_of_spiritual_beast,
-                                "find_reward_chest",
+                                "_find_main_chest",
                                 side_effect=[(40, 198), None, None]),
               mock.patch.object(soul_of_spiritual_beast, "find",
                                 return_value=None)):
@@ -1891,6 +1891,20 @@ class FixedGiftFlowTests(unittest.TestCase):
         self.assertTrue(complete)
         bot.tap.assert_called_once_with(40, 198,
                                         delay=soul_of_spiritual_beast.STEP_DELAY)
+
+    def test_soul_main_chest_uses_its_calibrated_template_and_threshold(self):
+        bot = mock.Mock()
+        screen = np.zeros((704, 396, 3), dtype=np.uint8)
+        with mock.patch.object(soul_of_spiritual_beast, "find",
+                               return_value=(31, 225)) as find_chest:
+            chest = soul_of_spiritual_beast._find_main_chest(bot, screen)
+
+        self.assertEqual((31, 225), chest)
+        find_chest.assert_called_once_with(
+            bot, soul_of_spiritual_beast.MAIN_CHEST, screen,
+            threshold=soul_of_spiritual_beast.MAIN_CHEST_THRESHOLD,
+            region=soul_of_spiritual_beast.MAIN_CHEST_REGION,
+        )
 
     def test_soul_done_1_is_not_written_as_db_done(self):
         bot = mock.Mock()
