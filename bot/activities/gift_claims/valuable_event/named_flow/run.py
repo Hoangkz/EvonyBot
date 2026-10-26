@@ -148,6 +148,8 @@ class ExactFlow:
     skip: bool = False
     # Optional page-specific setup which must be verified before claims.
     prepare: Callable[[object], bool] | None = None
+    # Event có luật nhận riêng: process_exact chỉ gọi handler(bot) (True = DONE), bỏ qua các bước chung.
+    handler: Callable[[object], bool] | None = None
 
 
 def find_any(bot, templates: tuple[str, ...], screen=None, *,
@@ -302,6 +304,8 @@ def process_exact(bot, flow: ExactFlow) -> bool:
     if flow.skip:
         bot.record("Gift Claims: sự kiện được cấu hình bỏ qua; DONE hôm nay")
         return True
+    if flow.handler is not None:
+        return bool(flow.handler(bot))
 
     opened_missing = bool(flow.opened and
                           _wait_any(bot, flow.opened, attempts=4) is None)

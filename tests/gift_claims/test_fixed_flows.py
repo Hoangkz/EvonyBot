@@ -1,6 +1,7 @@
 import unittest
 from importlib import import_module
 from pathlib import Path
+from types import SimpleNamespace
 from unittest import mock
 
 import cv2
@@ -23,9 +24,10 @@ ancient_dynasty_treasury = import_module(
     "bot.activities.gift_claims.valuable_event.ancient_dynasty_treasury.run")
 back_to_territory = import_module(
     "bot.activities.gift_claims.back_to_territory.run")
-empire_depot = import_module("bot.activities.gift_claims.valuable_event.empire_depot.run")
+empire_depot = import_module("bot.activities.gift_claims.super_value_return.empire_depot.run")
 limited_offer = import_module("bot.activities.gift_claims.valuable_event.limited_offer.run")
-login_gifts = import_module("bot.activities.gift_claims.valuable_event.login_gifts.run")
+general_vault = import_module("bot.activities.gift_claims.valuable_event.general_vault.run")
+login_gifts = import_module("bot.activities.gift_claims.super_value_return.login_gifts.run")
 resource_consumption_sprint = import_module(
     "bot.activities.gift_claims.valuable_event.resource_consumption_sprint.run")
 super_blazon_sale = import_module(
@@ -38,8 +40,10 @@ speedup_sprint = import_module(
     "bot.activities.gift_claims.valuable_event.speedup_sprint.run")
 wheel_of_dragon_war = import_module(
     "bot.activities.gift_claims.valuable_event.wheel_of_dragon_war.run")
+golden_tree_rewards = import_module(
+    "bot.activities.gift_claims.valuable_event.golden_tree_rewards.run")
 refining_weekly_card = import_module(
-    "bot.activities.gift_claims.valuable_event.refining_weekly_card.run")
+    "bot.activities.gift_claims.super_value_return.refining_weekly_card.run")
 active_monthly_card = import_module(
     "bot.activities.gift_claims.valuable_event.active_monthly_card.run")
 hall_of_historic_generals = import_module(
@@ -49,9 +53,9 @@ soul_of_spiritual_beast = import_module(
 super_value_weekly_card = import_module(
     "bot.activities.gift_claims.valuable_event.super_value_weekly_card.run")
 super_value_return = import_module(
-    "bot.activities.gift_claims.valuable_event.super_value_return.run")
+    "bot.activities.gift_claims.super_value_return.run")
 super_value_zone = import_module(
-    "bot.activities.gift_claims.valuable_event.super_value_return.zone")
+    "bot.activities.gift_claims.super_value_return.zone")
 
 
 ROOT = Path(__file__).parents[2]
@@ -99,10 +103,10 @@ class FixedGiftFlowTests(unittest.TestCase):
         self.assertEqual(17, len([
             path for path in (root / "EventCenter").iterdir()
             if path.is_dir()]))
-        self.assertEqual(16, len([
+        self.assertEqual(18, len([
             path for path in (root / "ValuableEvent").iterdir()
             if path.is_dir()]))
-        self.assertEqual(7, len([
+        self.assertEqual(8, len([
             path for path in (root / "SuperValueReturn").iterdir()
             if path.is_dir()]))
 
@@ -231,6 +235,13 @@ class FixedGiftFlowTests(unittest.TestCase):
             (232 + width // 2, 577 + height // 2),
             common.find_valuable_event(self.bot, screen))
 
+    def test_lobby_valuable_event_finder_uses_ocr_caption(self):
+        # Hàm cũ (ảnh launcher_*) đã xoá: lobby dùng bot/ocr/find_valuable_event, quy về chỗ cao hơn tâm chữ "Event" 10 px.
+        screen = cv2.imread(str(Path(__file__).parent / "screens" / "lobby_valuable_event_done.png"))
+        x, y = lobby.find_valuable_event(self.bot, screen)
+        self.assertAlmostEqual(260, x, delta=4)
+        self.assertAlmostEqual(580, y, delta=4)
+
     def test_valuable_event_launcher_template_contains_only_name(self):
         template = cv2.imread(str(
             IMAGES / "GiftClaims" / "ValuableEvent" /
@@ -357,22 +368,368 @@ class FixedGiftFlowTests(unittest.TestCase):
             "đã chuyển SuperValueReturn -> ValuableEvent" in call.args[0]
             for call in bot.record.call_args_list))
 
-    def test_valuable_zone_always_opens_parent_to_check_inner_tasks(self):
+    @staticmethod
+    def _daily_bot():
+        done = {}
+        bot = mock.Mock()
+        bot.is_daily_done.side_effect = done.__contains__
+        bot.mark_daily_done.side_effect = lambda key: done.__setitem__(key, "now")
+        bot.done_at.side_effect = done.get
+        bot.forget_daily.side_effect = lambda key: done.pop(key, None)
+        return bot, done
+
+    @staticmethod
+    def _passes_seeing(*per_pass):
+        """search_pass giả: lượt thứ i coi như thấy (bấm vào) các event per_pass[i]."""
+        passes = iter(per_pass)
+
+        def search(_bot, _pending, attempted):
+            attempted.update(next(passes, ()))
+            return True
+        return search
+
+    def test_valuable_zone_new_event_resets_pass_count(self):
+        # Lượt 1 không thấy gì; lượt 2 thấy A (mới) -> lượt 2 tính lại là lượt 1; thêm 2 lượt trống nữa mới đủ 3.
+        bot, done = self._daily_bot()
+        with (mock.patch.object(valuable_event_zone, "search_pass",
+                                side_effect=self._passes_seeing((), ("A",), (), ())) as search,
+              mock.patch.object(valuable_event_zone, "return_home", return_value=True)):
+            self.assertTrue(valuable_event_zone.run(bot))
+        self.assertEqual(4, search.call_count)
+        self.assertIn(valuable_event_zone.KEY, done)
+
+    def test_valuable_zone_remembers_seen_events_after_interruption(self):
+        # Lần chạy 1: lượt 1 thấy A, lượt 2 trống, lượt 3 dở (bị ngắt). Lần chạy 2 thấy lại A: A đã thấy hôm nay (nhớ trên
+        # context) nên không reset, xong lượt 3 luôn.
+        bot, done = self._daily_bot()
+        bot.server_time.return_value = "14:00"
+        sees = iter([("A",), (), None, ("A",)])
+
+        def search(_bot, _pending, attempted):
+            seen = next(sees)
+            if seen is None:
+                return False
+            attempted.update(seen)
+            return True
+        with (mock.patch.object(valuable_event_zone, "search_pass", side_effect=search) as search_pass,
+              mock.patch.object(valuable_event_zone, "return_home", return_value=True)):
+            self.assertFalse(valuable_event_zone.run(bot))
+            self.assertTrue(valuable_event_zone.run(bot))
+        self.assertEqual(4, search_pass.call_count)
+        self.assertIn(valuable_event_zone.KEY, done)
+
+    def test_seen_today_lives_on_context_and_clears_at_new_reset(self):
+        bot = mock.Mock()
+        bot.server_time.return_value = "14:00"
+        valuable_event_zone.seen_today(bot).add("A")
+        self.assertIn("A", valuable_event_zone.seen_today(bot))
+        with mock.patch.object(valuable_event_zone, "last_reset", return_value="ngày mới"):
+            self.assertEqual(set(), valuable_event_zone.seen_today(bot))
+
+    def test_valuable_zone_same_event_every_pass_resets_only_once(self):
+        # A lượt nào cũng thấy mà chưa DONE: chỉ reset lần đầu thấy, không lặp mãi.
+        bot, done = self._daily_bot()
+        with (mock.patch.object(valuable_event_zone, "search_pass",
+                                side_effect=self._passes_seeing(("A",), ("A",), ("A",))) as search,
+              mock.patch.object(valuable_event_zone, "return_home", return_value=True)):
+            self.assertTrue(valuable_event_zone.run(bot))
+        self.assertEqual(3, search.call_count)
+
+    def test_valuable_zone_three_passes_then_marks_every_event_done(self):
+        bot, done = self._daily_bot()
+        with (mock.patch.object(valuable_event_zone, "search_pass", return_value=True) as search,
+              mock.patch.object(valuable_event_zone, "return_home", return_value=True)):
+            self.assertTrue(valuable_event_zone.run(bot))
+
+        self.assertEqual(3, search.call_count)
+        self.assertEqual(3, bot.back.call_count)          # Back sau mỗi lượt rồi làm lại từ màn chính
+        for number in (1, 2, 3):
+            self.assertIn(f"gift_valuable_event_pass_{number}", done)
+        for task in valuable_event_zone.TASKS:
+            self.assertIn(task.key, done)
+        self.assertIn(valuable_event_zone.KEY, done)
+
+    def test_valuable_zone_continues_counting_passes_from_db(self):
+        bot, done = self._daily_bot()
+        done.update({"gift_valuable_event_pass_1": "x", "gift_valuable_event_pass_2": "x"})
+        with (mock.patch.object(valuable_event_zone, "search_pass", return_value=True) as search,
+              mock.patch.object(valuable_event_zone, "return_home", return_value=True)):
+            self.assertTrue(valuable_event_zone.run(bot))
+        self.assertEqual(1, search.call_count)
+
+    def test_valuable_zone_unfinished_pass_is_not_counted(self):
+        bot, done = self._daily_bot()
+        with (mock.patch.object(valuable_event_zone, "search_pass", return_value=False),
+              mock.patch.object(valuable_event_zone, "return_home", return_value=True)):
+            self.assertFalse(valuable_event_zone.run(bot))
+        self.assertNotIn("gift_valuable_event_pass_1", done)
+        self.assertNotIn(valuable_event_zone.KEY, done)
+
+    def _visible_spec_patches(self, spec, opened):
+        return (mock.patch.object(valuable_event_zone, "back_if_close_x", return_value=False),
+                mock.patch.object(valuable_event_zone, "_tab",
+                                  side_effect=lambda _b, s, _screen: (120, 80) if s is spec else None),
+                mock.patch.object(valuable_event_zone, "open_tab", return_value=opened),
+                mock.patch.object(valuable_event_zone, "process_exact", return_value=True))
+
+    def test_do_visible_opens_tab_then_runs_event_flow(self):
+        bot, done = self._daily_bot()
+        bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
+        spec = valuable_event_zone.SPECS[0]
+        back, tab, opened, flow = self._visible_spec_patches(spec, opened=True)
+        with back, tab, opened as open_tab, flow as process:
+            valuable_event_zone.do_visible(bot, {spec.task.key}, set())
+        open_tab.assert_called_once_with(bot, (120, 80))
+        process.assert_called_once_with(bot, spec.flow)
+        self.assertIn(spec.task.key, done)
+
+    def test_do_visible_skips_event_when_tab_never_opens(self):
+        bot, done = self._daily_bot()
+        bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
+        spec = valuable_event_zone.SPECS[0]
+        pending, attempted = {spec.task.key}, set()
+        back, tab, opened, flow = self._visible_spec_patches(spec, opened=False)
+        with back, tab, opened, flow as process:
+            valuable_event_zone.do_visible(bot, pending, attempted)
+        process.assert_not_called()
+        self.assertIn(spec.task.key, pending)       # vẫn PENDING: lượt sau làm tiếp
+        self.assertIn(spec.task.key, attempted)     # không bấm lại trong lượt này
+        self.assertNotIn(spec.task.key, done)
+
+    def test_open_tab_taps_tab_waits_for_page_change_then_taps_title(self):
+        rng = np.random.default_rng(4)
+        same = rng.integers(0, 255, (704, 396, 3), dtype=np.uint8)
+        changed = same.copy()
+        changed[140:211, 8:118] = rng.integers(0, 255, (71, 110, 3), dtype=np.uint8)   # ô PAGE_PROBE đổi
+        bot = mock.Mock()
+        calls = []
+        bot.tap.side_effect = lambda *a, **k: calls.append(("tap", a))
+        bot.tap_percent.side_effect = lambda *a, **k: calls.append(("tap_percent", a))
+        bot.screenshot.side_effect = (same, same, same, changed)     # trước bấm, 1s, 2s, 3s đã sang
+        with mock.patch.object(valuable_event_zone, "tab_selected", return_value=False):
+            self.assertTrue(valuable_event_zone.open_tab(bot, (120, 80)))
+        self.assertEqual([("tap", (120, 92)), ("tap_percent", (50, 5))], calls)   # bấm tab ở y 13% (92 / 704), không ở tâm icon
+        self.assertEqual(3 + 1, bot.sleep.call_count)                 # chờ sang trang 3 x 1s, bấm tiêu đề rồi nghỉ 1s
+
+    def test_tab_uses_text_free_icon_or_text_for_events_without_icon(self):
+        icon_spec = next(s for s in valuable_event.SPECS if "/LimitedOffer/" in s.tab)
+        text_spec = next(s for s in valuable_event.SPECS if "/TombExpedition/" in s.tab)
+        self.assertEqual("ValuableEvent/LimitedOffer/tab_icon", icon_spec.tab)
+        self.assertEqual("ValuableEvent/TombExpedition/tab", text_spec.tab)     # chưa có icon: ảnh có chữ
+        calls = []
+
+        def find(_b, name, _screen, threshold, region):
+            calls.append((name, threshold))
+            return (178, 77)
+        with mock.patch.object(valuable_event, "find", side_effect=find):
+            self.assertEqual((178, 77), valuable_event._tab(self.bot, icon_spec, None))
+            self.assertEqual((178, 77), valuable_event._tab(self.bot, text_spec, None))
+        self.assertEqual([("ValuableEvent/LimitedOffer/tab_icon", valuable_event.ICON_TAB_THRESHOLD),
+                          ("ValuableEvent/TombExpedition/tab", valuable_event.TASK_TAB_THRESHOLD)], calls)
+
+    def test_every_specs_tab_image_exists(self):
+        for spec in valuable_event.SPECS:
+            with self.subTest(tab=spec.tab):
+                self.assertTrue((IMAGES / "GiftClaims" / f"{spec.tab}.png").exists())
+
+    def test_super_blazon_icon_needs_its_label_in_same_column(self):
+        # Icon Super Blazon Sale giống hệt Journey to Glory: chỉ nhận khi chữ tên Super Blazon nằm cùng cột.
+        spec = next(s for s in valuable_event.SPECS if "/SuperBlazonSale/" in s.tab)
+        screen = np.zeros((704, 396, 3), dtype=np.uint8)
+        for label, expected in (((221, 85), (221, 77)), (None, None), ((90, 85), None)):
+            hits = {"ValuableEvent/SuperBlazonSale/tab_icon": (221, 77),
+                    "ValuableEvent/SuperBlazonSale/tab_current": label}
+            with self.subTest(label=label), mock.patch.object(
+                    valuable_event, "find", side_effect=lambda _b, name, *a, **k: hits.get(name)):
+                self.assertEqual(expected, valuable_event._tab(self.bot, spec, screen))
+
+    def test_find_notice_x_only_on_marquee_close_button(self):
+        screens = Path(__file__).parent / "screens"
+        marquee = cv2.imread(str(screens / "valuable_event_notice_marquee.png"))
+        x, y = valuable_event_zone.find_notice_x(marquee)
+        self.assertAlmostEqual(321, x, delta=3)
+        self.assertAlmostEqual(104, y, delta=3)
+        for clean in ("valuable_event_tab_limited_offer_selected.png", "valuable_event_tab_general_vault_selected.png",
+                      "lobby_valuable_event_done.png"):
+            with self.subTest(screen=clean):
+                self.assertIsNone(valuable_event_zone.find_notice_x(cv2.imread(str(screens / clean))))
+
+    def test_settled_screenshot_taps_notice_x_after_swipe(self):
+        marquee = cv2.imread(str(Path(__file__).parent / "screens" / "valuable_event_notice_marquee.png"))
+        cleared = np.zeros_like(marquee)
+        bot = mock.Mock()
+        bot.screenshot.side_effect = (marquee, cleared)
+        self.assertIs(cleared, valuable_event_zone._settled_screenshot(bot))
+        (x, y), _ = bot.tap.call_args
+        self.assertAlmostEqual(321, x, delta=3)
+        self.assertEqual(2, bot.sleep.call_count)                 # nghỉ 1s sau cú kéo + 1s sau khi bấm X
+
+    def test_tab_selected_reads_lighter_background_on_real_screens(self):
+        screens = Path(__file__).parent / "screens"
+        limited = cv2.imread(str(screens / "valuable_event_tab_limited_offer_selected.png"))
+        vault = cv2.imread(str(screens / "valuable_event_tab_general_vault_selected.png"))
+        self.assertTrue(valuable_event_zone.tab_selected(limited, (174, 85)))      # Limited Offer đang chọn
+        self.assertFalse(valuable_event_zone.tab_selected(limited, (72, 94)))      # Speedup Sprint
+        self.assertTrue(valuable_event_zone.tab_selected(vault, (310, 85)))        # General Vault đang chọn
+        self.assertFalse(valuable_event_zone.tab_selected(vault, (210, 85)))       # All-Out Preparation
+
+    def test_open_tab_does_not_tap_already_selected_tab_but_taps_title(self):
+        screen = cv2.imread(str(Path(__file__).parent / "screens" /
+                                "valuable_event_tab_limited_offer_selected.png"))
+        bot = mock.Mock()
+        bot.screenshot.return_value = screen
+        self.assertTrue(valuable_event_zone.open_tab(bot, (174, 85)))
+        bot.tap.assert_not_called()
+        bot.tap_percent.assert_called_once_with(50, 5)
+        bot.sleep.assert_called_once_with(1)
+
+    def test_open_tab_retaps_once_then_gives_up(self):
+        same = np.random.default_rng(5).integers(0, 255, (704, 396, 3), dtype=np.uint8)
+        bot = mock.Mock()
+        bot.screenshot.return_value = same
+        with mock.patch.object(valuable_event_zone, "tab_selected", return_value=False):
+            self.assertFalse(valuable_event_zone.open_tab(bot, (120, 80)))
+        self.assertEqual(2, bot.tap.call_count)                       # bấm + bấm lại 1 lần
+        bot.tap_percent.assert_not_called()                           # chưa sang trang: không bấm tiêu đề
+        self.assertEqual(2 * 5, bot.sleep.call_count)                 # mỗi lần chờ tối đa 5 x 1s
+
+    def test_search_pass_order_visible_then_long_swipe_then_short_scan(self):
+        bot = mock.Mock()
+        calls = []
+        with (mock.patch.object(valuable_event_zone, "open_valuable_event",
+                                side_effect=lambda b: calls.append("open") or True),
+              mock.patch.object(valuable_event_zone, "capture_title",
+                                side_effect=lambda b: calls.append("title")),
+              mock.patch.object(valuable_event_zone, "do_visible",
+                                side_effect=lambda *a: calls.append("visible")),
+              mock.patch.object(valuable_event_zone, "swipe_to_left_edge",
+                                side_effect=lambda *a: calls.append("long") or True),
+              mock.patch.object(valuable_event_zone, "scan_to_right_edge",
+                                side_effect=lambda *a: calls.append("short") or True)):
+            self.assertTrue(valuable_event_zone.search_pass(bot, {"gift_limited_offer"}, set()))
+        # Vừa vào màn thì cắt thanh tiêu đề làm mốc, trước mọi cú kéo.
+        self.assertEqual(["open", "title", "visible", "long", "visible", "short"], calls)
+
+    def test_scan_to_right_edge_stops_only_when_leftmost_icon_stays_in_place(self):
+        # Mỗi cú: (chụp trước, chụp sau). Cú 1: khác hẳn -> kéo tiếp; cú 2: chỉ dịch 10 px (icon ĐỔI CHỖ) -> chưa phải giới hạn;
+        # cú 3, 4: đứng nguyên chỗ 2 cú liên tiếp -> chạm bên phải.
+        rng = np.random.default_rng(3)
+        frame_a = rng.integers(0, 255, (704, 396, 3), dtype=np.uint8)
+        frame_b = rng.integers(0, 255, (704, 396, 3), dtype=np.uint8)
+        frame_c = np.roll(frame_b, 10, axis=1)
+        bot = mock.Mock()
+        bot.screenshot.side_effect = (frame_a, frame_b, frame_b, frame_c, frame_c, frame_c, frame_c, frame_c)
+        with (mock.patch.object(valuable_event_zone, "do_visible") as visible,
+              mock.patch.object(valuable_event_zone, "wait_title_clear", return_value=True) as clear):
+            self.assertTrue(valuable_event_zone.scan_to_right_edge(bot, set(), set(), np.zeros((42, 396, 3), dtype=np.uint8)))
+        self.assertEqual(4, bot.swipe_percent.call_count)
+        bot.swipe_percent.assert_called_with(
+            60, 12, 5, 12, duration=valuable_event_zone.SLOW_SWIPE_DURATION)
+        self.assertEqual(5, visible.call_count)            # trước mỗi cú + một lần ở biên phải
+        self.assertEqual(4, clear.call_count)              # chờ tiêu đề rõ trước mỗi cú
+
+    def test_scan_to_right_edge_one_stuck_swipe_is_not_the_edge(self):
+        # Cú 1 không dịch (VD popup sau khi nhận quà chặn), cú 2 lại dịch: chưa phải biên, quét tiếp; cú 3, 4 không dịch -> biên.
+        rng = np.random.default_rng(6)
+        frame_a = rng.integers(0, 255, (704, 396, 3), dtype=np.uint8)
+        frame_b = rng.integers(0, 255, (704, 396, 3), dtype=np.uint8)
+        bot = mock.Mock()
+        bot.screenshot.side_effect = (frame_a, frame_a, frame_a, frame_b, frame_b, frame_b, frame_b, frame_b)
+        with (mock.patch.object(valuable_event_zone, "do_visible"),
+              mock.patch.object(valuable_event_zone, "wait_title_clear", return_value=True)):
+            self.assertTrue(valuable_event_zone.scan_to_right_edge(bot, set(), set(), np.zeros((42, 396, 3), dtype=np.uint8)))
+        self.assertEqual(4, bot.swipe_percent.call_count)
+
+    def test_open_valuable_event_taps_found_caption_and_waits_for_title(self):
         bot = mock.Mock()
         bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
-        task = valuable_event_zone.TASKS[0]
-        with (mock.patch.object(valuable_event_zone, "identify",
-                                return_value=GiftScreen.UNKNOWN),
-              mock.patch.object(valuable_event_zone, "return_home",
-                                return_value=True),
-              mock.patch.object(valuable_event_zone, "open_named",
-                                return_value=True) as opened,
-              mock.patch.object(valuable_event_zone, "run_valuable_opened",
-                                return_value=({task.key: "not_present"}, True))):
-            inspected = valuable_event_zone._sweep(bot, [task.key])
+        with (mock.patch.object(valuable_event_zone, "on_main", return_value=True),
+              mock.patch.object(valuable_event_zone, "to_city", return_value=False),
+              mock.patch.object(valuable_event_zone, "find_valuable_event",
+                                return_value=(260, 590)),
+              mock.patch.object(valuable_event_zone, "identify",
+                                side_effect=(None, None, GiftScreen.VALUABLE_EVENT))):
+            self.assertTrue(valuable_event_zone.open_valuable_event(bot))
 
-        opened.assert_called_once_with(bot, GiftScreen.VALUABLE_EVENT)
-        self.assertEqual({task.key}, inspected)
+        bot.tap.assert_called_once_with(260, 560)
+        self.assertEqual(3, bot.sleep.call_count)
+        bot.swipe_percent.assert_not_called()              # kéo dài nằm trong search_pass, sau khi làm event đang thấy
+
+    def test_swipe_to_left_edge_stops_when_cut_icon_is_still_visible(self):
+        # Cú 1 -> khung A; cú 2 -> hàng tab khác hẳn (icon cắt từ A mất): kéo tiếp; cú 3 -> hàng tab chỉ dịch 10 px (icon cắt
+        # từ B vẫn thấy, lệch chỗ cũng được) = giới hạn.
+        rng = np.random.default_rng(1)
+        frame_a = rng.integers(0, 255, (704, 396, 3), dtype=np.uint8)
+        frame_b = rng.integers(0, 255, (704, 396, 3), dtype=np.uint8)
+        bot = mock.Mock()
+        bot.screenshot.side_effect = (frame_a, frame_b, np.roll(frame_b, 10, axis=1))
+        with mock.patch.object(valuable_event_zone, "wait_title_clear", return_value=True):
+            self.assertTrue(valuable_event_zone.swipe_to_left_edge(bot, np.zeros((42, 396, 3), dtype=np.uint8)))
+        duration = valuable_event_zone.SLOW_SWIPE_DURATION
+        # Cú đầu kéo dài 5% -> 1000%, từ cú thứ 2 kéo ngắn 5% -> 95%.
+        self.assertEqual([mock.call(5, 12, 1000, 12, duration=duration),
+                          mock.call(5, 12, 95, 12, duration=duration),
+                          mock.call(5, 12, 95, 12, duration=duration)],
+                         bot.swipe_percent.call_args_list)
+        # Mỗi cú kéo nghỉ 1s rồi mới chụp cắt / kiểm tra icon.
+        self.assertEqual([mock.call(1.0)] * 3, bot.sleep.call_args_list)
+
+    def test_swipe_to_left_edge_gives_up_after_eight_swipes(self):
+        rng = np.random.default_rng(2)
+        bot = mock.Mock()
+        bot.screenshot.side_effect = [rng.integers(0, 255, (704, 396, 3), dtype=np.uint8) for _ in range(8)]
+        with mock.patch.object(valuable_event_zone, "wait_title_clear", return_value=True):
+            self.assertFalse(valuable_event_zone.swipe_to_left_edge(bot, np.zeros((42, 396, 3), dtype=np.uint8)))
+        self.assertEqual(8, bot.swipe_percent.call_count)
+
+    def test_title_matches_captured_title_but_not_dark_overlay(self):
+        screens = Path(__file__).parent / "screens"
+        entered = cv2.imread(str(screens / "valuable_event_tab_general_vault_selected.png"))
+        later = cv2.imread(str(screens / "valuable_event_tab_limited_offer_selected.png"))   # tab khác, lúc khác
+        bot = SimpleNamespace()
+        title = valuable_event_zone.capture_title(bot, entered)
+        self.assertFalse(hasattr(bot, "_valuable_event_title"))   # chỉ là biến của lượt, không gắn lên bot
+        self.assertTrue(valuable_event_zone.title_matches(later, title))
+        # Phủ tối chỉ 10% đã không khớp (so chênh lệch điểm ảnh, nhạy độ sáng).
+        dimmed = (later.astype(np.float32) * 0.9).astype(np.uint8)
+        self.assertFalse(valuable_event_zone.title_matches(dimmed, title))
+
+    def test_wait_title_clear_waits_up_to_five_seconds_without_back(self):
+        bot = mock.Mock()
+        bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
+        with mock.patch.object(valuable_event_zone, "title_matches", side_effect=(False, False, True)):
+            self.assertTrue(valuable_event_zone.wait_title_clear(bot, None))
+        self.assertEqual(2, bot.sleep.call_count)
+        bot.back.assert_not_called()
+
+    def test_wait_title_clear_backs_after_five_misses(self):
+        bot = mock.Mock()
+        bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
+        with mock.patch.object(valuable_event_zone, "title_matches", side_effect=[False] * 5 + [True]):
+            self.assertTrue(valuable_event_zone.wait_title_clear(bot, None))
+        self.assertEqual(5, bot.sleep.call_count)
+        bot.back.assert_called_once()
+
+    def test_scan_to_right_edge_stops_pass_when_title_stays_covered(self):
+        bot = mock.Mock()
+        with (mock.patch.object(valuable_event_zone, "do_visible"),
+              mock.patch.object(valuable_event_zone, "wait_title_clear", return_value=False)):
+            self.assertFalse(valuable_event_zone.scan_to_right_edge(bot, set(), set(), np.zeros((42, 396, 3), dtype=np.uint8)))
+        bot.swipe_percent.assert_not_called()
+
+    def test_open_valuable_event_gives_up_after_three_tries(self):
+        bot = mock.Mock(spec=["screenshot", "tap", "sleep", "check", "record", "is_daily_done"])
+        bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
+        bot.is_daily_done.return_value = False
+        with (mock.patch.object(valuable_event_zone, "on_main", return_value=True),
+              mock.patch.object(valuable_event_zone, "to_city", return_value=False),
+              mock.patch.object(valuable_event_zone, "find_valuable_event",
+                                return_value=(260, 590)),
+              mock.patch.object(valuable_event_zone, "identify", return_value=None)):
+            self.assertFalse(valuable_event_zone.open_valuable_event(bot))
+
+        self.assertEqual(3, bot.tap.call_count)
+        self.assertEqual(3 * 8, bot.sleep.call_count)
 
     def test_zone_marks_absent_db_task_done_only_after_three_full_sweeps(self):
         done = set()
@@ -454,7 +811,7 @@ class FixedGiftFlowTests(unittest.TestCase):
         self.assertEqual(4, len(swipes))
         self.assertTrue(all(call.args[:4] == (20, 14, 85, 14)
                             for call in swipes[:2]))
-        self.assertTrue(all(call.args[:4] == (90, 14, 10, 14)
+        self.assertTrue(all(call.args[:4] == (85, 14, 55, 14)
                             for call in swipes[2:]))
 
     def test_lobby_skips_facebook_follow_us_before_opening_next_dot(self):
@@ -518,10 +875,10 @@ class FixedGiftFlowTests(unittest.TestCase):
             "gift_general_vault",
             "gift_refining_stone_sprint", "gift_strategic_stockpile",
             "gift_limited_offer", "gift_speedup_sprint", "gift_super_blazon_sale",
-            "gift_sulis_wishing", "gift_super_value_weekly_card",
+            "gift_super_value_weekly_card",
             "gift_successive_purchase_benefits", "gift_optional_package",
             "gift_active_monthly_card", "gift_tomb_expedition",
-            "gift_wheel_of_dragon_war",
+            "gift_wheel_of_dragon_war", "gift_golden_tree_rewards",
         }
         self.assertEqual(expected, valuable_event.KEYS)
         self.assertTrue(all(spec.tab.split("/", 1)[0] for spec in valuable_event.SPECS))
@@ -767,6 +1124,41 @@ class FixedGiftFlowTests(unittest.TestCase):
         self.assertIn("ValuableEvent/ResourceConsumptionSprint/sold_out",
                       by_key[resource_consumption_sprint.KEY].done)
 
+    def test_general_vault_no_button_in_upper_half_is_done(self):
+        bot = mock.Mock()
+        with mock.patch.object(general_vault, "find_any", return_value=None) as find_any:
+            self.assertTrue(general_vault.claim_daily_free(bot))
+        self.assertEqual((0, 18, 100, 50), find_any.call_args.kwargs["region"])
+        bot.tap.assert_not_called()
+
+    def test_general_vault_taps_then_waits_for_congratulations(self):
+        bot = mock.Mock()
+        with (mock.patch.object(general_vault, "find_any",
+                                return_value=("ValuableEvent/GeneralVault/button_daily_free", (200, 300))),
+              mock.patch.object(general_vault, "close_congratulations",
+                                side_effect=(False, False, True)) as congrats):
+            self.assertTrue(general_vault.claim_daily_free(bot))
+        bot.tap.assert_called_once_with(200, 300)
+        self.assertEqual(3, congrats.call_count)            # 1s, 2s, 3s: thấy Congratulations
+        self.assertEqual(3, bot.sleep.call_count)
+
+    def test_general_vault_retries_once_then_pending(self):
+        bot = mock.Mock()
+        with (mock.patch.object(general_vault, "find_any",
+                                return_value=("ValuableEvent/GeneralVault/button_daily_free", (200, 300))),
+              mock.patch.object(general_vault, "close_congratulations", return_value=False)):
+            self.assertFalse(general_vault.claim_daily_free(bot))
+        self.assertEqual(2, bot.tap.call_count)              # bước 3 tối đa 2 lần
+        self.assertEqual(2 * 5, bot.sleep.call_count)        # mỗi lần chờ Congratulations tối đa 5 x 1s
+
+    def test_general_vault_button_gone_after_first_tap_is_done(self):
+        bot = mock.Mock()
+        with (mock.patch.object(general_vault, "find_any",
+                                side_effect=(("ValuableEvent/GeneralVault/button_daily_free", (200, 300)), None)),
+              mock.patch.object(general_vault, "close_congratulations", return_value=False)):
+            self.assertTrue(general_vault.claim_daily_free(bot))
+        bot.tap.assert_called_once_with(200, 300)
+
     def test_strict_terminal_tasks_never_finish_from_missing_claim_button(self):
         valuable = {spec.task.key: spec.flow for spec in valuable_event.SPECS}
         super_value = {spec.task.key: spec.flow
@@ -776,7 +1168,6 @@ class FixedGiftFlowTests(unittest.TestCase):
             "gift_optional_package": valuable,
             "gift_successive_purchase_benefits": valuable,
             "gift_tomb_expedition": valuable,
-            "gift_general_vault": valuable,
             "gift_empire_depot": super_value,
             "gift_lucky_raffle": super_value,
         }
@@ -790,7 +1181,7 @@ class FixedGiftFlowTests(unittest.TestCase):
                          valuable["gift_successive_purchase_benefits"].done)
         self.assertEqual(("ValuableEvent/TombExpedition/quests_done",),
                          valuable["gift_tomb_expedition"].done)
-        self.assertTrue(valuable["gift_general_vault"].congratulations_done)
+        self.assertIs(general_vault.claim_daily_free, valuable["gift_general_vault"].handler)
         self.assertEqual(("SuperValueReturn/EmpireDepot/chest_open",),
                          super_value["gift_empire_depot"].done)
         self.assertTrue(super_value["gift_lucky_raffle"].congratulations_done)
@@ -892,6 +1283,177 @@ class FixedGiftFlowTests(unittest.TestCase):
         self.assertTrue(flow.absence_done)
         self.assertEqual(0.86, flow.claim_threshold)
 
+    @staticmethod
+    def _golden_tree_screens():
+        screens = Path(__file__).parent / "screens"
+        page = cv2.imread(str(screens / "valuable_event_golden_tree_rewards.png"))        # chưa chọn quà, đã tích Skip
+        popup = cv2.imread(str(screens / "valuable_event_golden_tree_rewards_popup.png"))
+        chosen = page.copy()                                    # đã chọn vàng: ô quà mục tiêu hết dấu +
+        chosen[244:282, 34:76] = popup[222:260, 76:118]
+        unchecked = page.copy()                                 # chưa tích Skip animation
+        unchecked[562:584, 279:304] = 30
+        return page, popup, chosen, unchecked
+
+    @staticmethod
+    def _golden_tree_congrats(screen):
+        """`screen` có popup chữ "Congratulations!" (Images/Event/congratulations.png) giữa màn."""
+        out = screen.copy()
+        text = cv2.imread(str(IMAGES / "Event" / "congratulations.png"))
+        out[300:300 + text.shape[0], 132:132 + text.shape[1]] = text
+        return out
+
+    @staticmethod
+    def _golden_tree_bot(screen, on_tap=None):
+        bot = CvBot()
+        bot.current = screen
+        bot.screenshot = lambda: bot.current
+        bot.sleep = mock.Mock()
+        bot.check = mock.Mock()
+        bot.record = mock.Mock()
+        bot.back = mock.Mock()
+        bot.tap = mock.Mock(side_effect=on_tap)
+        return bot
+
+    def test_golden_tree_rewards_tab_found_on_real_screen(self):
+        page, _popup, _chosen, _unchecked = self._golden_tree_screens()
+        spec = next(s for s in valuable_event.SPECS if s.task.key == golden_tree_rewards.KEY)
+        self.assertIs(golden_tree_rewards.claim, spec.flow.handler)
+        pos = valuable_event._tab(self._golden_tree_bot(page), spec, page)
+        self.assertIsNotNone(pos)
+        self.assertAlmostEqual(185, pos[0], delta=3)
+
+    def test_golden_tree_rewards_ticks_skip_then_selects_gold(self):
+        page, popup, chosen, unchecked = self._golden_tree_screens()
+
+        def on_tap(x, y, **_kwargs):
+            if bot.current is unchecked and abs(x - 291) <= 3 and abs(y - 573) <= 3:
+                bot.current = page                              # tích Skip animation
+            elif bot.current is page and abs(x - 55) <= 5 and abs(y - 263) <= 5:
+                bot.current = popup                             # dấu + -> popup Rewards
+            elif bot.current is popup and abs(x - 198) <= 5 and abs(y - 552) <= 5:
+                bot.current = chosen                            # Confirm -> về trang
+
+        bot = self._golden_tree_bot(unchecked, on_tap)
+        self.assertTrue(golden_tree_rewards.claim(bot))
+        taps = [call.args for call in bot.tap.call_args_list]
+        self.assertEqual(4, len(taps))                          # Skip, dấu +, vàng, Confirm
+        self.assertAlmostEqual(100, taps[2][0], delta=5)        # ô vàng 1M
+        self.assertAlmostEqual(242, taps[2][1], delta=5)
+        bot.back.assert_not_called()
+
+    def test_golden_tree_rewards_already_chosen_is_done_without_tapping(self):
+        _page, _popup, chosen, _unchecked = self._golden_tree_screens()
+        bot = self._golden_tree_bot(chosen)
+        self.assertTrue(valuable_named_flow.process_exact(bot, golden_tree_rewards.FLOW))
+        bot.tap.assert_not_called()
+
+    @staticmethod
+    def _golden_tree_whiten(screen, *xs):
+        """Số giá dưới các nút tâm `xs` thành màu trắng (đủ xu)."""
+        out = screen.copy()
+        for x in xs:
+            area = out[640:657, x - 12:x + 12]
+            hsv = cv2.cvtColor(area, cv2.COLOR_BGR2HSV)
+            red = ((hsv[..., 0] <= 10) | (hsv[..., 0] >= 170)) & (hsv[..., 1] > 120) & (hsv[..., 2] > 90)
+            area[red] = 255
+        return out
+
+    def test_golden_tree_rewards_numbers_red_at_zero_coins(self):
+        _page, _popup, chosen, _unchecked = self._golden_tree_screens()
+        self.assertIsNone(golden_tree_rewards.affordable(chosen))
+        self.assertEqual((5, 199), golden_tree_rewards.affordable(self._golden_tree_whiten(chosen, 199, 73)))
+        self.assertEqual((10, 325), golden_tree_rewards.affordable(self._golden_tree_whiten(chosen, 325, 199, 73)))
+
+    def test_golden_tree_rewards_real_screen_with_5_coins_taps_pest_control(self):
+        # Screenshot_20261025-224503: 5 xu, đã chọn vàng; số 1 và 5 trắng, số 10 đỏ.
+        screens = Path(__file__).parent / "screens"
+        rich = cv2.imread(str(screens / "valuable_event_golden_tree_rewards_coins_5.png"))
+        _page, _popup, chosen, _unchecked = self._golden_tree_screens()
+        self.assertEqual((5, 199), golden_tree_rewards.affordable(rich))
+        spec = next(s for s in valuable_event.SPECS if s.task.key == golden_tree_rewards.KEY)
+        self.assertIsNotNone(valuable_event._tab(self._golden_tree_bot(rich), spec, rich))   # có chấm đỏ thông báo
+
+        def on_tap(x, y, **_kwargs):
+            bot.current = self._golden_tree_congrats(rich)      # bấm nút xu -> popup Congratulations
+
+        bot = self._golden_tree_bot(rich, on_tap)
+        bot.back.side_effect = lambda **_kwargs: setattr(bot, "current", chosen)   # Back đóng popup; hết xu
+        self.assertTrue(golden_tree_rewards.claim(bot))
+        bot.tap.assert_called_once_with(199, 620)               # không bấm Skip / dấu +, chỉ bấm Pest Control
+        bot.back.assert_called_once()
+
+    def test_golden_tree_rewards_spends_big_to_small_until_all_red(self):
+        _page, _popup, chosen, _unchecked = self._golden_tree_screens()
+        # Đủ xu cho 10 và 5: bấm 10 -> còn 5 -> bấm 5 -> hết (cả ba đỏ).
+        rich = self._golden_tree_whiten(chosen, 325, 199, 73)
+        some = self._golden_tree_whiten(chosen, 199, 73)
+        left = self._golden_tree_whiten(chosen, 73)
+        after = {325: some, 199: left, 73: chosen}
+        closed = []
+
+        def on_tap(x, y, **_kwargs):
+            self.assertEqual(620, y)
+            closed.append(after[x])
+            bot.current = self._golden_tree_congrats(after[x])  # mỗi lần bấm ra popup Congratulations
+
+        bot = self._golden_tree_bot(rich, on_tap)
+        bot.back.side_effect = lambda **_kwargs: setattr(bot, "current", closed[-1])
+        self.assertTrue(golden_tree_rewards.spend_coins(bot))
+        self.assertEqual([325, 199, 73], [call.args[0] for call in bot.tap.call_args_list])
+        self.assertEqual(3, bot.back.call_count)                # Back đóng popup sau mỗi lần bấm
+
+    def test_golden_tree_rewards_no_popup_goes_back_to_search_without_back(self):
+        _page, _popup, chosen, _unchecked = self._golden_tree_screens()
+        rich = self._golden_tree_whiten(chosen, 199)
+
+        def on_tap(x, y, **_kwargs):
+            bot.current = chosen                                # không ra popup, số đã đỏ
+
+        bot = self._golden_tree_bot(rich, on_tap)
+        self.assertTrue(golden_tree_rewards.spend_coins(bot))
+        bot.tap.assert_called_once_with(199, 620)
+        self.assertEqual(golden_tree_rewards.WAITS, bot.sleep.call_count)   # chờ popup 1s x 5 rồi quay lại bước tìm
+        bot.back.assert_not_called()
+
+    def test_golden_tree_rewards_one_coin_waits_three_times_for_popup(self):
+        _page, _popup, chosen, _unchecked = self._golden_tree_screens()
+        rich = self._golden_tree_whiten(chosen, 73)
+
+        def on_tap(x, y, **_kwargs):
+            bot.current = chosen                                # không ra popup, số đã đỏ
+
+        bot = self._golden_tree_bot(rich, on_tap)
+        self.assertTrue(golden_tree_rewards.spend_coins(bot))
+        bot.tap.assert_called_once_with(73, 620)
+        self.assertEqual(3, bot.sleep.call_count)               # nút 1 xu: chờ popup 1s x 3 rồi quay lại bước tìm
+        bot.back.assert_not_called()
+
+    def test_golden_tree_rewards_ticks_skip_on_real_unchecked_screen(self):
+        # Ảnh máy 21913: ô Skip animation chưa tích.
+        unchecked = cv2.imread(str(Path(__file__).parent / "screens" /
+                                   "valuable_event_golden_tree_rewards_skip_unchecked.png"))
+        page = self._golden_tree_screens()[0]
+        bot = self._golden_tree_bot(unchecked, lambda x, y, **_kwargs: setattr(bot, "current", page))
+        self.assertTrue(wheel_of_dragon_war.ensure_skip_animation(
+            bot, golden_tree_rewards.SKIP_TAP, golden_tree_rewards.SKIP_BOX, "Golden Tree Rewards"))
+        bot.tap.assert_called_once_with(291, 573, delay=1.0)
+
+    def test_golden_tree_rewards_restarts_when_popup_never_opens(self):
+        page, _popup, _chosen, _unchecked = self._golden_tree_screens()
+        bot = self._golden_tree_bot(page)
+        self.assertFalse(golden_tree_rewards.select_reward(bot))
+        # Mỗi lượt bấm dấu + rồi chờ 5 lần; không thấy popup thì làm lại từ đầu, tối đa 3 lượt.
+        self.assertEqual(golden_tree_rewards.ATTEMPTS, bot.tap.call_count)
+        self.assertEqual(golden_tree_rewards.ATTEMPTS * golden_tree_rewards.WAITS, bot.sleep.call_count)
+
+    def test_golden_tree_rewards_stays_pending_off_its_page(self):
+        screen = cv2.imread(str(Path(__file__).parent / "screens" /
+                                "valuable_event_tab_limited_offer_selected.png"))
+        bot = self._golden_tree_bot(screen)
+        spec = next(s for s in valuable_event.SPECS if s.task.key == golden_tree_rewards.KEY)
+        self.assertIsNone(valuable_event._tab(bot, spec, screen))
+        self.assertFalse(valuable_named_flow.process_exact(bot, golden_tree_rewards.FLOW))
+
     def test_wheel_skip_animation_taps_and_verifies_green_check(self):
         blank = np.zeros((704, 396, 3), dtype=np.uint8)
         checked = blank.copy()
@@ -981,7 +1543,7 @@ class FixedGiftFlowTests(unittest.TestCase):
         self.assertEqual(4, len(swipes))
         self.assertTrue(all(call.args[:4] == (20, 14, 85, 14)
                             for call in swipes[:2]))
-        self.assertTrue(all(call.args[:4] == (90, 14, 10, 14)
+        self.assertTrue(all(call.args[:4] == (85, 14, 55, 14)
                             for call in swipes[2:]))
 
     def test_super_value_return_has_one_standard_spec_per_child_module(self):
@@ -1331,49 +1893,85 @@ class FixedGiftFlowTests(unittest.TestCase):
                          results[soul_of_spiritual_beast.KEY])
         mark.assert_not_called()
 
-    def test_super_value_settles_lower_task_before_scrolling_to_next_tab(self):
+    def test_super_value_search_pass_order_visible_then_long_swipe_then_short_scan(self):
         bot = mock.Mock()
-        bot.is_daily_done.return_value = False
-        screen = np.zeros((704, 396, 3), dtype=np.uint8)
-        bot.screenshot.return_value = screen
-        first = super_value_return.SPECS[0]
-        second = next(spec for spec in super_value_return.SPECS
-                      if spec.task.key == "gift_lucky_raffle")
-        events = []
+        calls = []
+        with (mock.patch.object(super_value_zone, "open_super_value_return",
+                                side_effect=lambda b: calls.append("open") or True),
+              mock.patch.object(super_value_zone, "capture_title",
+                                side_effect=lambda b: calls.append("title")),
+              mock.patch.object(super_value_zone, "do_visible",
+                                side_effect=lambda *a: calls.append("visible")),
+              mock.patch.object(super_value_zone, "swipe_to_left_edge",
+                                side_effect=lambda *a: calls.append("long") or True),
+              mock.patch.object(super_value_zone, "scan_to_right_edge",
+                                side_effect=lambda *a: calls.append("short") or True)):
+            self.assertTrue(super_value_zone.search_pass(bot, {"gift_lucky_raffle"}, set()))
+        self.assertEqual(["open", "title", "visible", "long", "visible", "short"], calls)
 
-        def find_named(_bot, name, *_args, **_kwargs):
-            if name == super_value_return.PAGE:
-                return (198, 25)
-            if name == first.tab:
-                return (70, 70)
-            if name == second.tab:
-                return (170, 70)
-            return None
+    def test_super_value_first_swipe_is_500_percent(self):
+        self.assertEqual((5, 12, 500, 12), super_value_zone.FIRST_SWIPE)
 
-        def process(_bot, flow):
-            events.append("first" if flow is first.flow else "second")
-            return flow is second.flow
+    def test_super_value_three_passes_then_marks_every_event_done(self):
+        bot, done = self._daily_bot()
+        with (mock.patch.object(super_value_zone, "search_pass", return_value=True) as search,
+              mock.patch.object(super_value_zone, "return_home", return_value=True)):
+            self.assertTrue(super_value_zone.run(bot))
+        self.assertEqual(3, search.call_count)
+        for number in (1, 2, 3):
+            self.assertIn(f"gift_super_value_return_pass_{number}", done)
+        for task in super_value_zone.TASKS:
+            self.assertIn(task.key, done)
+        self.assertIn(super_value_zone.KEY, done)
 
-        bot.sleep.side_effect = lambda *_args, **_kwargs: events.append("settle")
-        bot.swipe_percent.side_effect = (
-            lambda *_args, **_kwargs: events.append("swipe"))
-        with (mock.patch.object(super_value_return, "SPECS", (first, second)),
-              mock.patch.object(super_value_return, "find",
-                                side_effect=find_named),
-              mock.patch.object(super_value_return, "process_exact",
-                                side_effect=process),
-              mock.patch.object(super_value_return, "carousel_moved",
-                                return_value=False),
-              mock.patch.object(super_value_return, "mark_task_done")):
-            results, clean = super_value_return.run_opened(
-                bot, {first.task.key, second.task.key})
+    def test_super_value_new_event_resets_pass_count(self):
+        bot, done = self._daily_bot()
+        with (mock.patch.object(super_value_zone, "search_pass",
+                                side_effect=self._passes_seeing((), ("A",), (), ())) as search,
+              mock.patch.object(super_value_zone, "return_home", return_value=True)):
+            self.assertTrue(super_value_zone.run(bot))
+        self.assertEqual(4, search.call_count)
 
-        self.assertTrue(clean)
-        self.assertEqual("terminal_not_found", results[first.task.key])
-        self.assertEqual("done", results[second.task.key])
-        self.assertLess(events.index("first"), events.index("settle"))
-        self.assertLess(events.index("settle"), events.index("swipe"))
-        self.assertLess(events.index("swipe"), events.index("second"))
+    def test_super_value_open_fail_keeps_pass(self):
+        bot, done = self._daily_bot()
+        with (mock.patch.object(super_value_zone, "search_pass", return_value=False),
+              mock.patch.object(super_value_zone, "return_home", return_value=True)):
+            self.assertFalse(super_value_zone.run(bot))
+        self.assertNotIn("gift_super_value_return_pass_1", done)
+        self.assertNotIn(super_value_zone.KEY, done)
+
+    def test_super_value_do_visible_runs_leftmost_tab_then_marks_done(self):
+        bot, done = self._daily_bot()
+        bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
+        lucky = next(s for s in super_value_return.SPECS if s.task.key == "gift_lucky_raffle")
+        empire = next(s for s in super_value_return.SPECS if s.task.key == "gift_empire_depot")
+        positions = {lucky.tab: (250, 80), empire.tab: (120, 80)}
+        order = []
+        with (mock.patch.object(super_value_zone, "close_popup", return_value=False),
+              mock.patch.object(super_value_zone, "find_tab",
+                                side_effect=lambda _b, spec, _s: positions.get(spec.tab)),
+              mock.patch.object(super_value_zone, "open_tab", return_value=True),
+              mock.patch.object(super_value_zone, "run_event",
+                                side_effect=lambda _b, spec: order.append(spec.task.key) or True)):
+            pending = {lucky.task.key, empire.task.key}
+            super_value_zone.do_visible(bot, pending, set())
+        self.assertEqual(["gift_empire_depot", "gift_lucky_raffle"], order)   # tab bên trái trước
+        self.assertEqual(set(), pending)
+        self.assertIn("gift_empire_depot", done)
+        self.assertIn("gift_lucky_raffle", done)
+
+    def test_super_value_run_event_uses_own_claim_for_login_gifts_and_refining(self):
+        bot = mock.Mock()
+        specs = {s.task.key: s for s in super_value_return.SPECS}
+        with (mock.patch.object(super_value_zone.login_gifts, "claim_opened", return_value=True) as login,
+              mock.patch.object(super_value_zone.refining_weekly_card, "claim_opened", return_value=False) as refining,
+              mock.patch.object(super_value_zone, "process_exact", return_value=True) as exact):
+            self.assertTrue(super_value_zone.run_event(bot, specs["gift_login_gifts"]))
+            self.assertFalse(super_value_zone.run_event(bot, specs["gift_refining_weekly_card"]))
+            self.assertTrue(super_value_zone.run_event(bot, specs["gift_lucky_raffle"]))
+        login.assert_called_once_with(bot)
+        refining.assert_called_once_with(bot)
+        exact.assert_called_once_with(bot, specs["gift_lucky_raffle"].flow)
 
     def test_super_value_confirms_both_edges_before_full_scan(self):
         bot = mock.Mock()
@@ -1403,8 +2001,7 @@ class FixedGiftFlowTests(unittest.TestCase):
 
     def test_city_growth_done_requires_level_15_and_claimed_tick_crop(self):
         marker = cv2.imread(str(IMAGES / "GiftClaims" /
-                                "SuperValueReturn" /
-                                "CityGrowthPlan" /
+                                "SuperValueReturn" / "CityGrowthPlan" /
                                 "level_15_claimed.png"))
         self.assertIsNotNone(marker)
         self.assertGreater(marker.shape[1], 100)
@@ -1551,6 +2148,17 @@ class FixedGiftFlowTests(unittest.TestCase):
             self.assertTrue(login_gifts.claim_opened(bot))
 
         tap.assert_not_called()
+        bot.tap.assert_not_called()
+
+
+    def test_login_gifts_real_screen_without_reward_button_is_done(self):
+        # Màn Login Gifts kiểu danh sách ngày (không có hộp quà phát sáng): không bấm gì, DONE.
+        bot = mock.Mock()
+        bot.screenshot.return_value = cv2.imread(
+            str(Path(__file__).parent / "screens" / "super_value_return_login_gifts_no_button.png"))
+        bot.find.side_effect = self.bot.find
+        bot._template.side_effect = self.bot._template
+        self.assertTrue(login_gifts.claim_opened(bot))
         bot.tap.assert_not_called()
 
     def test_login_gifts_uses_captured_reward_button(self):
@@ -2680,8 +3288,7 @@ class FixedGiftFlowTests(unittest.TestCase):
 
     def test_lucky_apple_ornament_check_uses_both_template_edges(self):
         template = cv2.imread(str(IMAGES / "GiftClaims" /
-                                  "EventCenter" /
-                                "DwarfsLuckyApple" /
+                                  "EventCenter" / "DwarfsLuckyApple" /
                                   "status_red_wish_x10_done.png"))
         screen = np.zeros((704, 396, 3), dtype=np.uint8)
         top, left = 500, 140
@@ -2697,8 +3304,7 @@ class FixedGiftFlowTests(unittest.TestCase):
 
     def test_lucky_apple_ornament_check_reverses_odd_template_center_exactly(self):
         template = cv2.imread(str(IMAGES / "GiftClaims" /
-                                  "EventCenter" /
-                                "DwarfsLuckyApple" /
+                                  "EventCenter" / "DwarfsLuckyApple" /
                                   "status_green_wish_x10_done.png"))
         self.assertEqual(1, template.shape[1] % 2)
         screen = np.zeros((704, 396, 3), dtype=np.uint8)
@@ -3247,14 +3853,11 @@ class FixedGiftFlowTests(unittest.TestCase):
 
     def test_event_center_special_templates_are_tightly_cropped(self):
         rewards = cv2.imread(str(IMAGES / "GiftClaims" /
-                                 "EventCenter" /
-                                "PreciousBlazonExchange" / "button_rewards_text.png"))
+                                 "EventCenter" / "PreciousBlazonExchange" / "button_rewards_text.png"))
         daily = cv2.imread(str(IMAGES / "GiftClaims" /
-                               "EventCenter" /
-                                "DwarfsTreasure" / "button_daily_free_chest.png"))
+                               "EventCenter" / "DwarfsTreasure" / "button_daily_free_chest.png"))
         hypnos = cv2.imread(str(IMAGES / "GiftClaims" /
-                                "EventCenter" /
-                                "HypnosDream" / "button_rewards_text.png"))
+                                "EventCenter" / "HypnosDream" / "button_rewards_text.png"))
         self.assertLessEqual(rewards.shape[0], 22)
         self.assertLessEqual(hypnos.shape[0], 18)
         self.assertLessEqual(daily.shape[0], 50)
@@ -3348,7 +3951,6 @@ class FixedGiftFlowTests(unittest.TestCase):
             self.bot, "Common/button_claim_text", screen, threshold=0.76))
 
         for collection in (valuable_event.COMMON_LOWER_CLAIMS,
-                           super_value_return.COMMON_LOWER_CLAIMS,
                            event_center.FIXED_CLAIMS,
                            back_to_territory.FIXED_CLAIMS):
             self.assertIn("Common/button_claim_text", collection)

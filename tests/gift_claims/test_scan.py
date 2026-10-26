@@ -5,7 +5,7 @@ from unittest import mock
 from types import SimpleNamespace
 
 from bot.activities import gift_claims
-from bot.activities.gift_claims import scan
+from bot.activities.gift_claims import common, scan
 from bot.activities.gift_claims.common import mark_task_done
 from bot.activities.gift_claims.event_center import zone as event_center_zone
 
@@ -30,6 +30,21 @@ TASKS = [("a", "A"), ("b", "B")]
 
 
 class ScanTest(unittest.TestCase):
+    def test_job_runs_when_checked_and_is_done_by_zone_key(self):
+        bot = FakeBot()
+        zone = SimpleNamespace(KEY="gift_zone", run=mock.Mock(return_value=True))
+        job = gift_claims.job(zone)
+
+        self.assertTrue(job["enabled"]({}))
+        self.assertTrue(job["enabled"]({"General": {"gift_claims": True}}))
+        self.assertFalse(job["enabled"]({"General": {"gift_claims": False}}))
+        self.assertFalse(job["done"](bot, {}))
+        self.assertTrue(job["run"](bot, {}))
+        zone.run.assert_called_once_with(bot)
+        self.assertFalse(job["done"](bot, {}))
+        bot.mark_daily_done("gift_zone")
+        self.assertTrue(job["done"](bot, {}))
+
     def test_zone_pending_waits_for_next_120_second_window(self):
         bot = FakeBot()
         zone = SimpleNamespace(KEY="gift_zone", run=mock.Mock(return_value=False))
@@ -43,6 +58,14 @@ class ScanTest(unittest.TestCase):
 
         zone.run.assert_called_once_with(bot)
         self.assertTrue(any("120s kế tiếp" in line for line in bot.log))
+
+    def test_job_skipped_for_run_counts_as_done_until_next_start(self):
+        bot = FakeBot()
+        job = gift_claims.job(SimpleNamespace(KEY="gift_zone", run=mock.Mock()))
+        common.skip_for_run(bot, "gift_zone")
+        self.assertTrue(job["done"](bot, {}))          # worker loại khỏi danh sách trong lần Start này
+        self.assertFalse(job["done"](FakeBot(), {}))   # Start lại: context mới, làm lại
+        self.assertNotIn("gift_zone", bot.done)        # không ghi DB
 
     def test_three_misses_mark_done(self):
         bot, calls = FakeBot(), []

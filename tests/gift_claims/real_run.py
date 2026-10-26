@@ -20,7 +20,7 @@ import cv2
 from bot.activities import gift_claims
 from bot.activities.gift_claims.event_center import zone as event_center_zone
 from bot.activities.gift_claims.valuable_event import zone as valuable_event_zone
-from bot.activities.gift_claims.valuable_event.super_value_return import zone as super_value_return_zone
+from bot.activities.gift_claims.super_value_return import zone as super_value_return_zone
 from bot.context import BotContext
 from bot.context import BotInterrupted
 

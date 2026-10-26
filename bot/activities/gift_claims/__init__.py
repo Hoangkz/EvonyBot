@@ -8,21 +8,20 @@
 Mỗi hoạt động có danh sách nhiệm vụ (key trong ``daily_done``); vòng kiểm tra 3 lần nằm ở ``scan.py``. Worker ưu tiên
 Event Center trước Revelry Carnival, Valuable Event và Super Value Return
 (``bot/worker/priority.py``, nhóm "Gift Claims"), khi ô
-"Claim Event Gifts" ở tab Daily Activities được tích (``settings["General"]["gift_claims"]`, mặc định bật).
+"Claim Event Gifts" ở tab Daily Activities được tích (``settings["General"]["gift_claims"]``, mặc định bật).
 """
 from importlib import import_module
 import time
 
-from . import event_center, valuable_event
-from .valuable_event import super_value_return
-# Lối tắt cho nơi từng import một luồng quà cụ thể từ ``gift_claims``; phần cài đặt nằm ở ``valuable_event/``.
+from . import event_center, super_value_return, valuable_event
+# Lối tắt cho nơi từng import một luồng quà cụ thể từ ``gift_claims``; phần cài đặt nằm ở ``valuable_event/`` và ``super_value_return/``.
 back_to_territory = import_module(f"{__name__}.back_to_territory.run")
-empire_depot = import_module(f"{__name__}.valuable_event.empire_depot.run")
+empire_depot = import_module(f"{__name__}.super_value_return.empire_depot.run")
 limited_offer = import_module(f"{__name__}.valuable_event.limited_offer.run")
-login_gifts = import_module(f"{__name__}.valuable_event.login_gifts.run")
+login_gifts = import_module(f"{__name__}.super_value_return.login_gifts.run")
 from .common import (TEXT_CLAIM_CONTROLS, back_if_close_x,
                      claim_fixed_controls, claim_sparkles, mark_task_done,
-                     return_home)
+                     return_home, skipped_for_run)
 from .screens import GiftScreen
 
 RETRY_WINDOW_SECONDS = 120.0
@@ -30,7 +29,7 @@ RETRY_AFTER_ATTR = "_gift_claims_zone_retry_after"
 
 
 def enabled(settings: dict) -> bool:
-    """Ô chung ``Claim Event Gifts`` điều khiển mọi tail task nhận quà."""
+    """Ô "Claim Event Gifts" ở tab Daily Activities được tích (mặc định bật): chung cho mọi hoạt động Gift Claims."""
     return bool((settings.get("General") or {}).get("gift_claims", True))
 
 
@@ -43,7 +42,7 @@ def _retry_after(ctx) -> dict[str, float]:
 
 
 def job(zone) -> dict:
-    """Dòng nhiệm vụ cho bảng ``priority.py``: chạy ``zone.run`` khi ô nhận quà được tích; xong khi key tổng của zone có trong DB."""
+    """Dòng nhiệm vụ cho bảng ``priority.py``: chạy ``zone.run`` khi ô nhận quà được tích; xong khi key tổng của zone có trong DB hoặc bị skip."""
     def run(ctx, _settings):
         window_started = time.monotonic()
         completed = bool(zone.run(ctx))
@@ -59,7 +58,7 @@ def job(zone) -> dict:
         return completed
 
     def done(ctx, _settings):
-        if ctx.is_daily_done(zone.KEY):
+        if ctx.is_daily_done(zone.KEY) or skipped_for_run(ctx, zone.KEY):
             return True
         return time.monotonic() < _retry_after(ctx).get(zone.KEY, 0.0)
 

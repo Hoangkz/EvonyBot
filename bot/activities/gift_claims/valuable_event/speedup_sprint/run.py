@@ -21,7 +21,7 @@ def run(bot):
         bot,
         GiftScreen.VALUABLE_EVENT,
         "ValuableEvent/title",
-        "ValuableEvent/SpeedupSprint/tab",
+        "ValuableEvent/SpeedupSprint/tab_icon",
         FLOW,
     )
 

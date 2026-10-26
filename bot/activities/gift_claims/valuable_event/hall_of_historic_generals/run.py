@@ -5,7 +5,7 @@ from ...common import (GiftTask, close_congratulations, find, find_all,
                        find_reward_chest, return_home, select_carousel_tab)
 from ...lobby import open_named
 from ...screens import GiftScreen
-from ..login_gifts.run import CONGRATULATIONS
+from ...super_value_return.login_gifts.run import CONGRATULATIONS
 from ..named_flow import (ExactFlow, SLOW_SWIPE_DURATION, STEP_DELAY,
                           region_hamming_distance)
 

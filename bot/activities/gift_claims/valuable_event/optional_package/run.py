@@ -12,7 +12,7 @@ FLOW = ExactFlow(
 
 def run(bot):
     return run_carousel_exact(bot, GiftScreen.VALUABLE_EVENT,
-                              "ValuableEvent/title", "ValuableEvent/OptionalPackage/tab", FLOW)
+                              "ValuableEvent/title", "ValuableEvent/OptionalPackage/tab_icon", FLOW)
 
 
 TASK = GiftTask(KEY, "Optional Package", run)

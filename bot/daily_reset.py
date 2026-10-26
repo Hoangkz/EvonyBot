@@ -37,6 +37,20 @@ def last_reset(server_time: str, now: datetime | None = None) -> datetime:
     return today if today <= now else today - DAY
 
 
+def future_keys(daily_done: dict, now: datetime | None = None) -> list[str]:
+    """Các khoá daily_done có ngày lưu lớn hơn bây giờ hơn 1 ngày: đồng hồ máy từng nhảy tới tương lai rồi quay về. Để lại thì
+    việc đó bị coi là xong mỗi ngày (done_today) và việc theo giờ không bao giờ tới giờ (số giờ âm) cho tới ngày đó."""
+    limit = (now or datetime.now()) + DAY
+    keys = []
+    for key, done_at in daily_done.items():
+        try:
+            if datetime.fromisoformat(done_at) > limit:
+                keys.append(key)
+        except (TypeError, ValueError):
+            pass
+    return keys
+
+
 def done_today(done_at: str | None, server_time: str, now: datetime | None = None) -> bool:
     """done_at (ISO) nằm sau mốc reset gần nhất -> đã làm trong ngày hiện tại."""
     if not done_at:

@@ -81,6 +81,9 @@ flowchart TD
   lượt mà chưa xong mới xuống cuối danh sách).
 - **Xong hay chưa** do `Task.done` quyết định (đọc daily_done). Nhiệm vụ không có dấu trong DB (`done` = None: Alliance Capacity,
   Black Market) coi là xong hôm nay khi đã chạy hết một lượt.
+- **Dấu có ngày ở tương lai**: đầu mỗi vòng lặp, dấu daily_done nào có ngày lớn hơn bây giờ hơn 1 ngày (đồng hồ máy từng nhảy tới
+  tương lai rồi quay về) thì xoá khỏi DB và ghi một dòng History (`daily_reset.future_keys`). Để lại thì việc đó bị coi là xong mỗi
+  ngày và việc theo giờ không bao giờ tới giờ.
 - **Sang ngày mới** (qua mốc reset server, chọn ở màn Home, mặc định 14:00) thì đưa lại mọi nhiệm vụ vào danh sách; nhiệm vụ
   `once` (Black Market) đã chạy xong thì không đưa lại, chỉ chạy lại khi Stop rồi Start.
 - **Đúng giờ reset thì tắt game bật lại**: `Guards` hẹn `ctx` ngắt (`ResetDue`) đúng mốc reset kế tiếp, kể cả khi đang chạy nhiệm vụ

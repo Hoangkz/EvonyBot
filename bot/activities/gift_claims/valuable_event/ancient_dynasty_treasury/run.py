@@ -22,7 +22,7 @@ def run(bot):
         bot,
         GiftScreen.VALUABLE_EVENT,
         "ValuableEvent/title",
-        "ValuableEvent/AncientDynastyTreasury/tab",
+        "ValuableEvent/AncientDynastyTreasury/tab_icon",
         FLOW,
     )
 

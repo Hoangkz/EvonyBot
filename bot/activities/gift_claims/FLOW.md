@@ -40,12 +40,14 @@ bản ghi 21:05 ngày 14/10 là **chưa làm**, 13:59 thì vẫn **đã làm**. 
 gift_claims/
 ├── scan.py                      # vòng kiểm tra 3 lần dùng chung cho cả hai hoạt động
 ├── valuable_event/
-│   ├── zone.py                  # run(bot) của hoạt động Valuable Event
-│   ├── run.py                   # quét carousel (dấu đỏ) dùng bởi từng tab
+│   ├── zone.py                  # run(bot) của hoạt động Valuable Event (3 lượt tìm)
+│   ├── run.py                   # SPECS: ảnh tab + flow của từng event
+│   ├── named_flow/              # ExactFlow / process_exact dùng chung (cả super_value_return)
 │   └── <từng event>/run.py      # TASK = GiftTask(key, nhãn, run)
-├── super_value_return/
-│   ├── zone.py
-│   └── run.py
+├── super_value_return/          # key tổng gift_super_value_return
+│   ├── zone.py                  # run(bot) của hoạt động Super Value Return
+│   ├── run.py                   # quét carousel Super Value Return
+│   └── login_gifts/, empire_depot/, lucky_raffle/, city_growth_plan/, refining_weekly_card/
 ├── back_to_territory/           # Thanh phải ngoài thành, tính vào hoạt động Event Center
 │   └── run.py
 └── event_center/
@@ -86,6 +88,43 @@ Mỗi vị trí carousel chỉ xử lý một tab từ một ảnh chụp: hoàn
 vùng dưới, chốt DONE/PENDING, nghỉ 1 giây, chụp lại rồi mới lướt vùng trên.
 Không tái sử dụng tọa độ của các tab còn lại từ ảnh cũ. Carousel lướt trong 1
 giây và chờ 1 giây để các máy chạy đồng thời có thời gian ổn định giao diện.
+
+## Valuable Event (`valuable_event/zone.py`)
+
+Không dùng `scan.run_zone` / đếm "không thấy" từng event: đếm theo LƯỢT TÌM, tối đa 3 lượt mỗi ngày (key DB
+`gift_valuable_event_pass_1..3`, hết hạn theo mốc reset; Start lại vẫn đếm tiếp).
+
+Một lượt tìm (`search_pass`):
+
+1. Mở từ màn chính (`open_valuable_event`): ở màn chính (có nút •••; không ở đó thì `return_home`) truyền ảnh vào
+   `bot/ocr/find_valuable_event.py` `find_valuable_event` (so mẫu chữ "Event" trong `Images/GiftClaims/ValuableEvent/event_text/`,
+   không khớp thì OCR). Thấy thì bấm icon (cao hơn tâm chữ "Event" 30 px), cứ 1 giây chụp kiểm tra tiêu đề `ValuableEvent/title`,
+   tối đa 8 lần. Không thấy nút / 8 lần chưa vào: làm lại, tối đa 3 lần; vẫn chưa vào thì trả False
+   (key tổng chưa có trong DB: worker gọi lại lần sau).
+2. `do_visible`: làm các event cần làm đang thấy ở hàng tab (`run.py` `_tab`: ưu tiên ảnh icon KHÔNG chữ `<Event>/tab_icon.png` — dải thông báo chạy chữ hay đè lên dòng tên tab — ngưỡng 0.8; chưa có icon thì dùng ảnh có chữ trong `SPECS`; Super Blazon Sale có icon giống hệt Journey to Glory nên phải khớp thêm chữ tên cùng cột): bấm tab bên trái nhất (`open_tab`: tab đã được chọn sẵn (nền sáng: dải y 16.4-17.1% dưới chữ tên tab, độ sáng TB >= 60, tab thường ~33) thì không bấm tab, chỉ bấm x 50% y 5% (chỗ tiêu đề) rồi nghỉ 1s; còn lại trước khi bấm cắt ô x 2-30% y 20-30% dưới hàng tab; bấm vào chính giữa ô tab (x của tab tìm được, y 13% màn: ô tab y 62-122 trên màn 704; bấm vào tâm icon y ~75 thì Optional Package không nhận); cứ 1s kiểm tra ô đó đã đổi chưa (khớp < 0.9 = đã sang event; sang rồi thì bấm x 50% y 5% (chỗ tiêu đề), nghỉ 1s), tối đa 5 lần; chưa thì bấm lại tab 1 lần, chờ tiếp 5 lần; vẫn chưa thì bỏ qua event trong lượt này, lượt sau làm tiếp), chạy flow riêng
+   (`process_exact`), xong thì DONE, chưa xong thì giữ PENDING và không thử lại trong lượt; chụp lại, lặp tới khi không còn.
+3. `swipe_to_left_edge` (một lần mỗi lượt), tối đa 8 cú: cú đầu kéo dài x 5% -> 1000%, từ cú thứ 2 kéo ngắn x 5% -> 95%, y 12%;
+   sau mỗi cú nghỉ 1s rồi cắt một icon ở hàng tab; sau cú kế tiếp icon đó vẫn thấy (khớp >= 0.8) và lệch <= 20 px = đã tới giới
+   hạn bên trái. Rồi `do_visible`.
+4. `scan_to_right_edge`: kéo ngắn x 60% -> 5%, y 12% (phải sang trái), tối đa 30 cú, mỗi chỗ `do_visible`; trước mỗi cú cắt icon
+   ngoài cùng bên trái, kéo xong nghỉ 1s icon đó vẫn đứng nguyên chỗ (khớp >= 0.8, lệch <= 2 px; đổi chỗ thì chưa phải) = hàng tab không dịch; phải 2 cú liên tiếp không dịch mới là chạm bên phải (popup sau khi nhận quà phủ lên làm cú kéo không dịch, từng làm bot báo chạm phải khi mới tới Super Blazon Sale). 95% -> 5% dịch ~4 tab một
+   cú nên sót tab; 60% -> 5% đi hết 12 cú, mọi tab đều hiện đủ (thử trên 21913). Icon tab có khung cánh vàng giống nhau nên phải
+   xét cả độ lệch, không chỉ "còn thấy".
+   Sau MỖI cú kéo (dài / ngắn), nghỉ 1s rồi chụp: thấy dấu X đỏ của dải thông báo chạy chữ (y 92-116) thì bấm tắt
+   (`find_notice_x`: chỉ nhận hình dấu X — cụm đỏ nét mảnh, phủ cả hai đường chéo — không đọc chữ thông báo vì mỗi lần mỗi khác).
+   Trước MỌI cú kéo (cả kéo về trái lẫn kéo ngắn): `wait_title_clear` — thanh tiêu đề (y 0-6%) phải khớp ảnh cắt lúc vừa vào màn
+   (`capture_title`, mỗi lượt cắt lại; chỉ là biến truyền giữa các hàm của lượt, không gắn lên bot — hết lượt / sang nhiệm vụ khác là không còn) ở ngưỡng 0.99, so chênh lệch điểm ảnh (1 - chênh lệch TB / 255) để nhạy cả lớp phủ tối
+   (chụp lúc khác nhau giống 1.0; phủ tối 10% -> 0.978). Không khớp thì chờ 1s, tối đa 5 lần; vẫn không khớp thì Back rồi kiểm tra
+   lại; vẫn không khớp thì dừng lượt (không tính).
+5. Chạm bên phải (hoặc mọi event cần làm đã xong): ghi `gift_valuable_event_pass_N`, bấm Back, lượt mới làm lại từ bước 1.
+   Lượt nào thấy event MỚI (chưa thấy ở các lượt trước của lần chạy này) thì đếm lại: xoá các key lượt, lượt đó tính là lượt 1
+   (VD lượt 1 không thấy A, lượt 2 thấy A -> lượt 2 là lượt 1). Event lượt nào cũng thấy mà chưa DONE chỉ reset lần đầu, không lặp mãi.
+   Lưu ở đâu: số lượt ghi DB (`gift_valuable_event_pass_N`, còn qua Stop/Start, tự hết hạn theo mốc reset); event đã thấy hôm nay
+   để trên context (`seen_today`, còn qua các lần bị ngắt trong lần Start, Start lại / qua mốc reset thì rỗng); event đã thử trong
+   lượt (`attempted`) chỉ là biến của lượt đó.
+   Lượt chưa đi hết (không mở được / 30 cú chưa chạm phải) không được tính; lần chạy sau làm lại.
+
+Đủ 3 lượt (hoặc mọi event đã xong): ghi DONE mọi event của hoạt động và key tổng `gift_valuable_event`.
 
 ## Trong từng trang con
 

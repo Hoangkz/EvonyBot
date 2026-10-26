@@ -13,10 +13,10 @@ SKIP_BOX = (250, 568, 284, 601)
 SKIP_CHECK_ATTEMPTS = 3
 
 
-def _skip_checked(screen: np.ndarray) -> bool:
-    """Recognise the green check only inside Wheel's Skip-animation box."""
+def _skip_checked(screen: np.ndarray, box=SKIP_BOX) -> bool:
+    """Recognise the green check only inside the Skip-animation `box` (Wheel's by default)."""
     scale = screen.shape[1] / REFERENCE_WIDTH
-    x0, y0, x1, y1 = (round(value * scale) for value in SKIP_BOX)
+    x0, y0, x1, y1 = (round(value * scale) for value in box)
     area = screen[max(0, y0):min(screen.shape[0], y1),
                   max(0, x0):min(screen.shape[1], x1)]
     if area.size == 0:
@@ -27,26 +27,28 @@ def _skip_checked(screen: np.ndarray) -> bool:
     return int(cv2.countNonZero(green)) >= round(12 * scale * scale)
 
 
-def ensure_skip_animation(bot) -> bool:
-    """Enable Skip animation and require its green checked state."""
+def ensure_skip_animation(bot, tap=SKIP_TAP, box=SKIP_BOX,
+                          label="Wheel of Dragon War") -> bool:
+    """Enable Skip animation and require its green checked state. Other
+    events pass their own checkbox `tap` point and `box`."""
     for attempt in range(2):
-        if _skip_checked(bot.screenshot()):
-            bot.record("Gift Claims: Wheel of Dragon War đã bật Skip animation")
+        if _skip_checked(bot.screenshot(), box):
+            bot.record(f"Gift Claims: {label} đã bật Skip animation")
             return True
         if attempt == 0:
             bot.sleep(STEP_DELAY)
 
     screen = bot.screenshot()
     scale = screen.shape[1] / REFERENCE_WIDTH
-    bot.record("Gift Claims: Wheel of Dragon War bật Skip animation")
-    bot.tap(round(SKIP_TAP[0] * scale), round(SKIP_TAP[1] * scale),
+    bot.record(f"Gift Claims: {label} bật Skip animation")
+    bot.tap(round(tap[0] * scale), round(tap[1] * scale),
             delay=STEP_DELAY)
     for attempt in range(SKIP_CHECK_ATTEMPTS):
-        if _skip_checked(bot.screenshot()):
+        if _skip_checked(bot.screenshot(), box):
             return True
         if attempt + 1 < SKIP_CHECK_ATTEMPTS:
             bot.sleep(STEP_DELAY)
-    bot.record("Gift Claims: Wheel of Dragon War không xác minh được Skip animation")
+    bot.record(f"Gift Claims: {label} không xác minh được Skip animation")
     return False
 
 
@@ -64,7 +66,7 @@ def run(bot):
         bot,
         GiftScreen.VALUABLE_EVENT,
         "ValuableEvent/title",
-        "ValuableEvent/WheelOfDragonWar/tab",
+        "ValuableEvent/WheelOfDragonWar/tab_icon",
         FLOW,
     )
 

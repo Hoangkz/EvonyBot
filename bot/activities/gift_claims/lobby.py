@@ -2,8 +2,9 @@
 import cv2
 import numpy as np
 
+from ...ocr.find_valuable_event import find_valuable_event as find_valuable_caption
 from .common import (REFERENCE_WIDTH, find, find_all, find_super_value_return,
-                     find_valuable_event, return_home, swipe_around)
+                     return_home, swipe_around)
 from .screens import GiftScreen, identify
 
 BOTTOM = "bottom"
@@ -32,7 +33,8 @@ FIXED_PARENT_LAUNCHERS = {
 }
 PARENT_ANCHOR_TABS = {
     GiftScreen.VALUABLE_EVENT: (
-        "ValuableEvent/ResourceConsumptionSprint/tab", "ValuableEvent/LimitedOffer/tab"),
+        "ValuableEvent/ResourceConsumptionSprint/tab", "ValuableEvent/LimitedOffer/tab_icon"),
+    GiftScreen.SUPER_VALUE_RETURN: ("SuperValueReturn/EmpireDepot/tab_current", "SuperValueReturn/EmpireDepot/tab"),
 }
 
 
@@ -225,7 +227,7 @@ def open_next(bot, boundary: str, attempted: list[tuple[int, int]]):
     if not return_home(bot):
         bot.record("Gift Claims: không về được màn chính; chưa được coi là hết vùng")
         return None
-    bot.sleep(0.7)
+    bot.sleep(1)
     screen = bot.screenshot()
     dots = red_dots(screen, boundary)
     ignored = _ignored_right_dots(bot, screen) if boundary == RIGHT else set()
@@ -265,6 +267,13 @@ def open_next(bot, boundary: str, attempted: list[tuple[int, int]]):
     name = name or GiftScreen.UNKNOWN
     bot.log(f"Gift Claims: vùng {boundary}, chấm đỏ {dot} mở {name.value}")
     return name
+
+
+def find_valuable_event(bot, screen):
+    """Chỗ chữ "Valuable Event" dưới nút ở màn chính (bot/ocr/find_valuable_event: mẫu chữ "Event" rồi OCR), quy về cùng chỗ hàm
+    cũ trả: cao hơn tâm chữ "Event" 10 px; nơi gọi bấm cao hơn 20 px nữa = lên icon."""
+    pos = find_valuable_caption(screen)
+    return None if pos is None else (pos[0], pos[1] - round(10 * screen.shape[1] / REFERENCE_WIDTH))
 
 
 def open_named(bot, expected):
