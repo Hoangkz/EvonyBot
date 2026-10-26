@@ -227,7 +227,7 @@ class BotWorker(QThread):
     def _run_tasks(self):
         """Vòng lặp chính (xem docstring đầu file) cho tới khi Stop."""
         boss = JOIN_BOSS in self.activities
-        tasks = build_tasks(self.activities, {JOIN_BOSS}, self.settings)   # đã xếp theo độ ưu tiên
+        tasks = build_tasks(self.activities, set(), self.settings)   # đã xếp theo độ ưu tiên
         if boss and not tasks:
             self._run_once([JOIN_BOSS])   # chỉ Join Boss: chạy liên tục như trước
             return
