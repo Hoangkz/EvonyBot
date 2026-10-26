@@ -41,8 +41,14 @@ POPUP_LEVEL_THRESHOLD = 0.92
 # Chờ một thứ hiện ra: mỗi lần 1 giây, tối đa WAIT_TRIES lần; không ra mới làm lại bước trước.
 WAIT_SECONDS = 1
 WAIT_TRIES = 5
-# Bấm Summon / Go xong game về bản đồ thế giới khá lâu: chờ rời màn Viking mỗi lần 1 giây, tối đa MAP_WAIT_TRIES lần.
-MAP_WAIT_TRIES = 10
+# Bấm Summon / Go xong game về bản đồ thế giới: từ thành ra thế giới thì có màn trắng rồi lớp sương / mây phủ kín (07_after_summon_1..3.png), đã ở thế
+# giới thì không có. Tiêu đề Viking mất ngay ở màn trắng nên không dùng làm mốc. Mốc "về tới bản đồ" là nút "•••" bên phải (MAP_READY, dùng chung
+# với màn chính: 0,97 trên bản đồ; màn trắng / sương / màn Viking / hộp thoại <= 0,6). Trong lúc chờ, thấy ảnh trong Images/click thì bấm, thấy ảnh
+# trong Images/exit thì Back (ưu tiên hơn "•••", như run_task), tới khi thấy "•••" mới tìm boss; thấy "•••" luôn thì tìm boss luôn.
+# Mỗi bước nhìn màn hình một lần, không thấy gì thì chờ 1 giây; tối đa MAP_READY_STEPS bước.
+MAP_READY = "Server/listActivity.png"
+MAP_READY_THRESHOLD = 0.9
+MAP_READY_STEPS = 20
 # Số lần chọn độ khó (bấm huy hiệu -> Confirm -> hộp thoại đúng độ khó) thử lại trước khi bỏ cuộc.
 SELECT_TRIES = 3
 # Xác nhận độ khó xong hiện "Congratulations!" (nhận Viking Poleaxe) che nửa trên màn; bấm vào chính nó để đóng, vẫn còn thì BACK.
@@ -68,9 +74,10 @@ MAX_STEPS = 15
 # Summon chỉ dùng được từ giờ reset (mặc định 14:00) thứ 2 tới giờ reset thứ 5 (3 ngày).
 WINDOW_START_WEEKDAY = 0   # thứ 2
 WINDOW_DAYS = 3
-# Chạy lại mỗi INTERVAL_MINUTES phút trong cửa sổ (boss bị hạ thì nút Summon hiện ngay).
-INTERVAL_MINUTES = 10
-TRIED_KEY = "viking_summon_tried"    # daily_done: lúc thử gần nhất
+# Kiểm tra boss Viking một lần, xong lượt kiểm tra mới đếm INTERVAL_MINUTES phút tới lần kế (giờ kiểm tra xong lưu trên BotContext, thuộc tính TRIED_ATTR: KHÔNG lưu DB, Start lại là kiểm tra ngay) trong cửa sổ.
+INTERVAL_MINUTES = 8
+TRIED_ATTR = "viking_last_check"    # BotContext: datetime lúc kiểm tra xong gần nhất (trong bộ nhớ, mất khi Start lại)
+TRIED_KEY = "viking_summon_tried"    # nhãn của kết quả báo lên (TaskResult.label), không lưu DB
 ERROR_KEY = "viking_summon"          # save_errors
 
 # ---- Sau Summon ----------------------------------------------------------------------------------------------
@@ -83,10 +90,32 @@ ERROR_KEY = "viking_summon"          # save_errors
 BOSS_ICON = f"{FOLDER}/bossIcon.png"
 BOSS_ICON_THRESHOLD = 0.75
 BOSS_NAME = f"{FOLDER}/bossName.png"
-BOSS_NAME_THRESHOLD = 0.85
+BOSS_NAME_THRESHOLD = 0.8   # nhãn đã "Viking(Asking for help)" khớp 0,85; màn khác <= 0,53
 BOSS_NAME_TRIES = 3   # tìm nhãn: mỗi lần 1 giây (bản đồ còn đang tải sau Summon); không thấy cả 3 lần thì bấm giữa màn hình (boss ở giữa)
 VIKING_NAME = "Viking"
 
+# ---- Ask for Help (trước khi chia sẻ) --------------------------------------------------------------------------
+# Bấm boss -> menu nhanh -> Attack -> cửa sổ boss (Attack / Ask for Help) -> Ask for Help (tốn 1 Viking Poleaxe) -> hộp thoại "It costs
+# a Viking Poleaxe to ask for help from your Alliance members. Continue?" -> Confirm. Xong nhãn boss đổi thành "Viking(Asking for help)":
+# đó là dấu đã nhờ rồi (không nhờ lại: mỗi lần tốn 1 Poleaxe). Đoạn "(Asking for help)": 1,00 trên nhãn đã nhờ (0,80 khi menu nhanh che
+# một phần); nhãn chưa nhờ / màn khác <= 0,51 -> 0,75. Chỉ tính nhãn nằm gần nhãn "Viking" đang xử lý (ASKING_NEAR px).
+ASKING = f"{FOLDER}/asking.png"
+ASKING_THRESHOLD = 0.75
+ASKING_NEAR = 100
+ASK_FOR_HELP = f"{FOLDER}/askForHelp.png"   # nút trong cửa sổ boss: 1,00; màn khác <= 0,32
+ASK_DIALOG = f"{FOLDER}/askDialog.png"      # chữ của hộp thoại xác nhận: 1,00; màn khác <= 0,20 (nút Confirm dùng lại POPUP_CONFIRM)
+
+# Chia sẻ chưa được (không thấy nút Share, hộp chọn kênh...): về lại bản đồ sạch (như sau Summon) rồi tìm boss và chia sẻ lại, tối đa SHARE_TRIES lần.
+SHARE_TRIES = 3
+
+# ---- Chia sẻ lại boss đang sống -----------------------------------------------------------------------------------
+# Boss vừa Summon thì chia sẻ ngay. Boss đang sống (nút Go) đã chia sẻ rồi thì các lần kiểm tra sau chỉ xem; tới lần kiểm tra thứ
+# SHARE_AFTER_CHECKS sau lần chia sẻ thì bấm Go và chia sẻ lại. Số lần kiểm tra đếm trên BotContext (thuộc tính CHECKS_ATTR, chỉ trong lượt
+# chạy này; None = chưa chia sẻ lần nào -> chia sẻ ngay).
+SHARE_AFTER_CHECKS = 4
+CHECKS_ATTR = "viking_checks"
+
 # ---- Actions -----------------------------------------------------------
+ON_MAP, BACK, TAP = "on_map", "back", "tap"
 ON_VIKING = "on_viking"
 DONE = "done"

@@ -1,10 +1,10 @@
 # Flow: Greet Champion
 
-Nhiệm vụ Daily Activities "Greet the Champion 2 time(s)." (ô tích **Greet Champion** ở tab Daily Activities, ưu tiên
+Nhiệm vụ Daily Activities "Greet the Champion" (bot chào đủ 5 lần mới tính xong) (ô tích **Greet Champion** ở tab Daily Activities, ưu tiên
 385). Ảnh / hằng số: [constants.py](constants.py), code: [run.py](run.py). Phần chung (mở Quests → Activity, tìm
 dòng, bấm Go): [../OPEN_TASK.md](../OPEN_TASK.md).
 
-Chào cho đủ **10/10** (không chỉ 2 lần). Cả nhiệm vụ không chờ giây nào, **trừ 3 s sau khi bấm mũi tên** đổi mỹ nữ.
+Chào cho đủ **10/10** (không chỉ 5 lần). Cả nhiệm vụ không chờ giây nào, **trừ 3 s sau khi bấm mũi tên** đổi mỹ nữ.
 
 ```mermaid
 flowchart TD
@@ -40,7 +40,7 @@ flowchart TD
 - `_leave`: Back một lần rồi chờ tới khi thấy "•••" (tối đa `SCREEN_WAIT`) mới Back tiếp. Trước đây thấy màn Champion vừa mất là
   Back thêm ngay, màn thành chưa vẽ xong "•••" -> Back ở màn thành sạch -> hỏi thoát game (gặp khi chạy thật 21913).
 - Flow test: [tests/daily_activities/greet_champion/test_flow.py](../../../../tests/daily_activities/greet_champion/test_flow.py).
-- Đủ `GREET_REQUIRED` = 2 lần chào (bot đếm `daily_greet_champion_greet_<n>` trong DB): **lưu ngay "xong hôm nay"** rồi chào tiếp tới 10/10 / hết mỹ nữ / bị ngắt; hai trường hợp đầu lưu thêm `daily_greet_champion_more`. Không còn `must_finish`.
+- Đủ `GREET_REQUIRED` = 5 lần chào (bot đếm `daily_greet_champion_greet_<n>` trong DB): **lưu ngay "xong hôm nay"** rồi chào tiếp tới 10/10 / hết mỹ nữ / bị ngắt; hai trường hợp đầu lưu thêm `daily_greet_champion_more`. Không còn `must_finish`.
 - Việc nối tiếp `daily_greet_champion_more` (`run.MORE_JOB`, ưu tiên 385, không đi qua Go): bỏ qua khi Daily Greet chưa xong / đã lưu more / đủ 10 lần; chạy: về thành → tới Keep (`city_map.reach_building`: thấy Keep thì làm luôn; có route thì `goto`; chưa có route thì `scan_city` tìm và lưu DB rồi `goto`) → trái tim hoặc Keep → Champion → cùng vòng chào → lưu `daily_greet_champion_more`.
 - Giới hạn cả nhiệm vụ `TASK_MAX_SECONDS` = 600 s (10 lần Greet ~ 10 phút).
 - Giao diện Activity **bản cũ** (lưới thẻ): không làm nhiệm vụ này. Không có `Card.png` nên `open_task` trả TASK_UNKNOWN, bỏ qua, không đánh dấu.

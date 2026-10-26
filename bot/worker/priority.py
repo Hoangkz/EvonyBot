@@ -63,6 +63,7 @@ from ..activities.daily_activities.common import daily_job, hourly_job
 from ..activities.event.run import claim_job, event_job
 from ..activities.event_center.crazy_eggs.run import JOB as crazy_eggs
 from ..activities.event_center.three_day.run import JOB as three_day_event
+from ..activities.event_center.viking_summon.run import JOB as viking_summon
 from ..activities.open_gift_box.run import run as open_gift_box
 from ..activities.find_boss import JOB as find_boss_job
 from ..activities.craft import JOB as craft_job
@@ -85,7 +86,15 @@ DATA ={
             "handler": join_monster_war.run,
             "label": "Join Monster War",
             "priority": 9999,
-}
+},
+        {
+            "key": "viking_summon",
+            "run": viking_summon,
+            "label": "Viking Summon: gọi boss Viking, nhờ giúp, chia sẻ liên minh",
+            "priority": 9998,
+            "must_finish": True,   # phải chia sẻ xong mới thôi: không bị Join Boss, bong bóng... ngắt (trừ Stop)
+            "note": "Cần tích boss Viking + Summon ở tab Join Monster War; chỉ từ giờ reset thứ 2 tới giờ reset thứ 5; kiểm tra boss, xong mới đếm 8 phút tới lần kế",
+        }
     ],
     "Crazy Eggs": [
         { 
@@ -346,14 +355,14 @@ DATA ={
             "run": daily_job(daily_greet_champion, after_go=greet_champion_after_go),
             "label": "Greet Champion",
             "priority": 384, 
-            "note": "Về thành: bấm trái tim trên Keep (hoặc Keep -> Champion), chào 2 lần",
+            "note": "Về thành: bấm trái tim trên Keep (hoặc Keep -> Champion), chào 5 lần",
         },
         {
             "key": "daily_greet_champion_more",
             "run": daily_greet_champion_more_job,
             "label": "Greet Champion (more)",
             "priority": 384,
-            "note": "Sau khi Daily Greet xong (đủ 2 lần): tìm thành -> trái tim / Keep -> Champion, chào tiếp tới 10/10, không đi qua Go",
+            "note": "Sau khi Daily Greet xong (đủ 5 lần): tìm thành -> trái tim / Keep -> Champion, chào tiếp tới 10/10, không đi qua Go",
         },
         {
             "key": "daily_ranger_knight",

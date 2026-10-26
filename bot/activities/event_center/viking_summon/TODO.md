@@ -12,7 +12,6 @@ Cập nhật: 2026-10-26. Flow hiện tại: [FLOW.md](FLOW.md). Xong mục nào
 
 ## Code
 
-- [ ] Nối vào worker: dòng `viking_summon` trong priority.py + gỡ việc bỏ nhóm Join Monster War ở `build_tasks(...)` (bot_worker.py). Chưa làm vì người dùng không muốn sửa phần khác.
 - [ ] Level 50: dừng summon (cần biết màn level 50).
 - [ ] Log `bot.record` cho từng lần Summon / chia sẻ đã có; xem lại sau khi chạy thật cả ngày.
 - [ ] Chạy thật qua worker (`poe dev`) cả cửa sổ thứ 2–5: Summon xen kẽ Join Boss.

@@ -1,5 +1,5 @@
 """
-greet_champion — Daily Activities: Greet the Champion 2 time(s).
+greet_champion — Daily Activities: Greet the Champion (bot chào đủ 5 lần mới tính xong).
 
 - run.py:       `after_go(bot)` + `TASK` (common.Task)
 - constants.py: ảnh riêng của nhiệm vụ
