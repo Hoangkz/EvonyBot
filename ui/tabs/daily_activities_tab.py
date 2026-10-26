@@ -107,7 +107,7 @@ class DailyActivitiesTab(BaseTab):
         # Nhận quà event (Gift Claims): mặc định tích. Nằm trong General nên không bị tính là một việc Daily đã tích.
         self.gift_claims = QCheckBox("Claim Event Gifts")
         self.gift_claims.setChecked(True)
-        self.gift_claims.setToolTip("Claim gifts in Valuable Event, Super Value Return, Back to Territory and Event Center.")
+        self.gift_claims.setToolTip("Claim gifts in Event Center, Revelry Carnival, Valuable Event, Super Value Return and Back to Territory.")
         general_grid.addWidget(self.gift_claims, 0, 6)
         general_grid.setColumnStretch(7, 1)
         self.add_row(general)

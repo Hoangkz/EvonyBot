@@ -1,134 +1,203 @@
 """Claim every available row in Refining Weekly Card.
 
-Only the green reward-list frame is searched and scrolled. ``Go`` and
-``Continue`` are ordinary row states; neither proves that every claim in the
-list has been collected.
+Only the user-marked green reward frame is searched and scrolled. A clean
+post-claim pass is ``DONE_1`` for the current 120-second window; durable DONE
+requires a later full pass where every recognized row is yellow Continue.
 """
 import cv2
 
-from ...common import (GiftTask, close_congratulations, find, return_home,
-                       select_carousel_tab)
+from ...common import (GiftTask, close_congratulations, find_all,
+                       return_home, select_carousel_tab)
 from ...lobby import open_named
 from ...screens import GiftScreen
-from ...valuable_event.named_flow import ExactFlow, SLOW_SWIPE_DURATION, STEP_DELAY
+from ...valuable_event.named_flow import (ExactFlow, SLOW_SWIPE_DURATION,
+                                          STEP_DELAY, region_hamming_distance)
 
 KEY = "gift_refining_weekly_card"
 PAGE = "SuperValueReturn/title"
 TAB = "SuperValueReturn/RefiningWeeklyCard/tab"
 CLAIM = "SuperValueReturn/RefiningWeeklyCard/button_claim"
+CONTINUE = "SuperValueReturn/RefiningWeeklyCard/button_continue"
 
 # The user-marked green frame in the 396x704 reference screenshot is roughly
 # x=10..380, y=474..689. Keep both search and every touch inside that frame.
 REWARD_REGION = (2, 67, 98, 98)
 SCAN_SWIPE = (50, 93, 50, 73)
 RETURN_TOP_SWIPE = (50, 73, 50, 93)
-MAX_SCROLLS = 8
-MAX_FULL_PASSES = 3
-MAX_CLAIMS_PER_VIEW = 6
+MAX_CLAIMS_PER_VIEW = 12
 CLAIM_THRESHOLD = 0.76
+CONTINUE_THRESHOLD = 0.76
 EDGE_CONFIRMATIONS = 2
+SAME_DISTANCE = 24
+GREEN_MIN_RATIO = 0.25
+YELLOW_MIN_RATIO = 0.30
 
-# Metadata for the zone registry. Completion belongs to claim_opened(); Go and
-# Continue are deliberately absent from the DONE markers.
+# Outcomes consumed by the parent Super Value Return zone. DONE_1 is not
+# persisted and defers this task only for the current 120-second invocation.
+DONE = "done"
+DONE_1 = "done_1"
+PENDING = "pending"
+
+# Metadata for the zone registry. Completion belongs to claim_opened();
+# Continue is deliberately absent from the generic DONE markers.
 FLOW = ExactFlow(claims=(CLAIM,), scroll_claims=True)
 
 
-def _reward_crop(screen):
-    height, width = screen.shape[:2]
-    x0, y0, x1, y1 = REWARD_REGION
-    return screen[round(height * y0 / 100):round(height * y1 / 100),
-                  round(width * x0 / 100):round(width * x1 / 100)]
+def _button_crop(bot, screen, center, template_name):
+    template = bot._template(template_name)
+    scale = screen.shape[1] / 396
+    width = max(1, round(template.shape[1] * scale))
+    height = max(1, round(template.shape[0] * scale))
+    left = max(0, center[0] - width // 2)
+    top = max(0, center[1] - height // 2)
+    return screen[top:min(screen.shape[0], top + height),
+                  left:min(screen.shape[1], left + width)]
 
 
-def _same_list_position(before, after) -> bool:
-    """Compare only the green reward frame, ignoring animation above it."""
-    old = _reward_crop(before)
-    new = _reward_crop(after)
-    return (old.shape == new.shape and
-            float(cv2.absdiff(old, new).mean()) < 0.5)
+def _colour_ratios(crop) -> tuple[float, float]:
+    """Return green and yellow/orange band ratios for a button crop."""
+    if crop.size == 0:
+        return 0.0, 0.0
+    hsv = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
+    green = ((hsv[..., 0] >= 35) & (hsv[..., 0] <= 90) &
+             (hsv[..., 1] >= 60) & (hsv[..., 2] >= 50))
+    yellow = ((hsv[..., 0] >= 5) & (hsv[..., 0] <= 35) &
+              (hsv[..., 1] >= 60) & (hsv[..., 2] >= 50))
+    return float(green.mean()), float(yellow.mean())
+
+
+def _is_green_claim(bot, screen, center) -> bool:
+    green, _ = _colour_ratios(_button_crop(bot, screen, center, CLAIM))
+    return green >= GREEN_MIN_RATIO
+
+
+def _is_yellow_continue(bot, screen, center) -> bool:
+    _, yellow = _colour_ratios(_button_crop(bot, screen, center, CONTINUE))
+    return yellow >= YELLOW_MIN_RATIO
+
+
+def _green_claims(bot, screen) -> list[tuple[int, int]]:
+    return [point for point in find_all(
+        bot, CLAIM, screen, threshold=CLAIM_THRESHOLD, region=REWARD_REGION)
+            if _is_green_claim(bot, screen, point)]
+
+
+def _yellow_continues(bot, screen) -> list[tuple[int, int]]:
+    return [point for point in find_all(
+        bot, CONTINUE, screen, threshold=CONTINUE_THRESHOLD,
+        region=REWARD_REGION)
+            if _is_yellow_continue(bot, screen, point)]
+
+
+def _swipe(bot, gesture) -> int:
+    before = bot.screenshot()
+    bot.swipe_percent(*gesture,
+                      duration=SLOW_SWIPE_DURATION, delay=STEP_DELAY)
+    after = bot.screenshot()
+    return region_hamming_distance(before, after, REWARD_REGION)
 
 
 def _swipe_to_top(bot) -> None:
     unchanged = 0
-    for _ in range(MAX_SCROLLS):
-        before = bot.screenshot()
-        bot.swipe_percent(*RETURN_TOP_SWIPE,
-                          duration=SLOW_SWIPE_DURATION, delay=STEP_DELAY)
-        after = bot.screenshot()
-        unchanged = unchanged + 1 if _same_list_position(before, after) else 0
-        if unchanged >= EDGE_CONFIRMATIONS:
-            break
+    while unchanged < EDGE_CONFIRMATIONS:
+        bot.check()
+        distance = _swipe(bot, RETURN_TOP_SWIPE)
+        unchanged = unchanged + 1 if distance <= SAME_DISTANCE else 0
+        bot.record("Gift Claims: Refining Weekly Card về đầu vùng xanh, "
+                   f"Hamming {distance}/{SAME_DISTANCE}, không đổi "
+                   f"{unchanged}/{EDGE_CONFIRMATIONS}")
 
 
-def _claim_current_view(bot) -> tuple[bool, bool]:
-    """Return (claimed_something, stuck_claim) for one list position."""
+def _claim_current_view(bot) -> tuple[bool, bool, bool]:
+    """Return claimed, stuck, saw_yellow_continue."""
     claimed = False
-    for tap_number in range(1, MAX_CLAIMS_PER_VIEW + 1):
+    blocked: list[tuple[int, int]] = []
+    for _ in range(MAX_CLAIMS_PER_VIEW):
         bot.check()
         screen = bot.screenshot()
-        pos = find(bot, CLAIM, screen, threshold=CLAIM_THRESHOLD,
-                   region=REWARD_REGION)
-        if pos is None:
-            return claimed, False
+        green_claims = _green_claims(bot, screen)
+        candidates = [point for point in green_claims
+                      if all((point[0] - old[0]) ** 2 +
+                             (point[1] - old[1]) ** 2 > 30 ** 2
+                             for old in blocked)]
+        if not candidates:
+            final = bot.screenshot()
+            return (claimed, bool(green_claims),
+                    bool(_yellow_continues(bot, final)))
+        pos = candidates[0]
         claimed = True
-        bot.record("Gift Claims: Refining Weekly Card thấy Claim trong khung "
-                   f"xanh; tap ({tap_number}/{MAX_CLAIMS_PER_VIEW})")
+        bot.record("Gift Claims: Refining Weekly Card thấy Claim có dải xanh; tap nhận")
         bot.tap(*pos, delay=STEP_DELAY)
         close_congratulations(bot, attempts=2)
-
-    # Never turn an unresponsive Claim into DONE merely because the local tap
-    # guard was reached.
-    remains = find(bot, CLAIM, bot.screenshot(), threshold=CLAIM_THRESHOLD,
-                   region=REWARD_REGION) is not None
-    return claimed, remains
-
-
-def _scan_full_list(bot) -> tuple[bool, bool]:
-    """Scan top-to-bottom once; return (saw_claim, stuck_claim)."""
-    saw_claim = False
-    unchanged = 0
-    for position in range(MAX_SCROLLS + 1):
-        bot.record("Gift Claims: Refining Weekly Card quét vùng xanh "
-                   f"vị trí {position + 1}/{MAX_SCROLLS + 1}")
-        claimed, stuck = _claim_current_view(bot)
-        saw_claim = saw_claim or claimed
-        if stuck:
-            return saw_claim, True
-        if position >= MAX_SCROLLS:
-            break
-
-        before = bot.screenshot()
-        bot.swipe_percent(*SCAN_SWIPE,
-                          duration=SLOW_SWIPE_DURATION, delay=STEP_DELAY)
         after = bot.screenshot()
-        unchanged = unchanged + 1 if _same_list_position(before, after) else 0
-        if unchanged >= EDGE_CONFIRMATIONS:
-            break
-    return saw_claim, False
+        if any((point[0] - pos[0]) ** 2 + (point[1] - pos[1]) ** 2 <= 30 ** 2
+               for point in _green_claims(bot, after)):
+            blocked.append(pos)
+
+    remains = bool(_green_claims(bot, bot.screenshot()))
+    return claimed, remains, False
 
 
-def claim_opened(bot) -> bool:
-    """Claim the list and prove DONE with one complete Claim-free pass."""
-    for pass_number in range(1, MAX_FULL_PASSES + 1):
-        bot.record("Gift Claims: Refining Weekly Card bắt đầu lượt quét đầy đủ "
-                   f"{pass_number}/{MAX_FULL_PASSES}")
-        _swipe_to_top(bot)
-        saw_claim, stuck = _scan_full_list(bot)
+def _scan_full_list(bot) -> tuple[bool, bool, bool]:
+    """Scan one full pass; return claimed, stuck, saw_continue."""
+    _swipe_to_top(bot)
+    saw_claim = saw_continue = False
+    unchanged = 0
+    position = 0
+    while True:
+        bot.check()
+        position += 1
+        bot.record(f"Gift Claims: Refining Weekly Card quét vùng xanh vị trí {position}")
+        claimed, stuck, continues = _claim_current_view(bot)
+        saw_claim = saw_claim or claimed
+        saw_continue = saw_continue or continues
+        if stuck:
+            return saw_claim, True, saw_continue
+        if claimed:
+            unchanged = 0
+
+        distance = _swipe(bot, SCAN_SWIPE)
+        unchanged = unchanged + 1 if distance <= SAME_DISTANCE else 0
+        bot.record("Gift Claims: Refining Weekly Card quét xuống đáy vùng xanh, "
+                   f"Hamming {distance}/{SAME_DISTANCE}, không đổi "
+                   f"{unchanged}/{EDGE_CONFIRMATIONS}")
+        if unchanged < EDGE_CONFIRMATIONS:
+            continue
+
+        # Re-read the final viewport after the second no-movement swipe.
+        claimed, stuck, continues = _claim_current_view(bot)
+        saw_claim = saw_claim or claimed
+        saw_continue = saw_continue or continues
+        if stuck:
+            return saw_claim, True, saw_continue
+        if claimed:
+            unchanged = 0
+            continue
+        return saw_claim, False, saw_continue
+
+
+def claim_opened(bot) -> str:
+    """Return DONE, DONE_1 or PENDING for an already selected card tab."""
+    while True:
+        bot.check()
+        saw_claim, stuck, saw_continue = _scan_full_list(bot)
         if stuck:
             bot.record("Gift Claims: Refining Weekly Card vẫn còn Claim không "
                        "bấm được; giữ PENDING")
-            return False
-        if not saw_claim:
-            bot.record("Gift Claims: Refining Weekly Card đã lướt hết khung "
-                       "xanh và không còn Claim; DONE")
-            return True
-        bot.record("Gift Claims: Refining Weekly Card vừa nhận được quà; chụp "
-                   "lại và quét toàn bộ lần nữa trước khi kết luận DONE")
-        bot.sleep(STEP_DELAY)
-
-    bot.record("Gift Claims: Refining Weekly Card chưa có một lượt quét sạch "
-               "Claim; giữ PENDING")
-    return False
+            return PENDING
+        if saw_claim:
+            bot.record("Gift Claims: Refining Weekly Card vừa nhận hết Claim xanh; "
+                       "quay lại biên đầu để kiểm tra trạng thái sau nhận")
+            continue
+        if saw_continue:
+            bot.record("Gift Claims: Refining Weekly Card không còn Claim và "
+                       "toàn bộ trạng thái nhận diện được là Continue dải vàng; "
+                       "DONE")
+            return DONE
+        bot.record("Gift Claims: Refining Weekly Card không còn Claim nhưng chưa "
+                   "thấy toàn bộ Continue dải vàng; DONE_1, chuyển nhiệm vụ khác "
+                   "và kiểm tra lại ở chu kỳ 120s sau")
+        return DONE_1
 
 
 def run(bot):
@@ -137,7 +206,7 @@ def run(bot):
     if not select_carousel_tab(bot, PAGE, TAB):
         return_home(bot)
         return False
-    completed = claim_opened(bot)
+    completed = claim_opened(bot) == DONE
     return_home(bot)
     return completed
 

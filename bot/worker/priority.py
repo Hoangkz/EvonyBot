@@ -46,6 +46,7 @@ from ..activities.event.kings_path.heal.run import run as kings_path_heal
 from ..activities.event.kings_path.wheel.run import run as kings_path_wheel
 from ..activities.event.kings_path.refine.run import run as kings_path_refine
 from ..activities.event.kings_path.black_market.run import run as kings_path_black_market
+from ..activities.event.revelry_carnival.run import run as revelry_carnival
 from ..activities.alliance_capacity.run import run as alliance_capacity
 from ..activities.black_market.run import run as black_market_market
 from ..activities.daily_activities.alliance_donation import TASK as alliance_donation_task
@@ -419,9 +420,20 @@ DATA ={
         }
     ],
     # Nhận quà event: chạy sau các Daily Activities; Event Center luôn đứng
-    # trước hai khu quà ngoài thành. Thuộc nhóm Daily Activities. Dựng giống
-    # daily_job: gift_claims.job(zone) = chung ô "Claim Event Gifts", xong khi key của zone có trong DB.
+    # trước Revelry Carnival và hai khu quà ngoài thành. Thuộc nhóm Daily Activities: ô tích
+    # "Claim Event Gifts" ở tab đó (settings["General"]["gift_claims"]).
     "Gift Claims": [
+        {
+            "key": "revelry_carnival",
+            "group": "Daily Activities",
+            "run": gift_claims.task(
+                event_job("revelry_carnival", revelry_carnival),
+                after=gift_claims.event_center.KEY,
+            ),
+            "label": "Gift Claims: Revelry Carnival (Parade Mask + Claim xanh)",
+            "priority": 3,
+            "tail": True,
+        },
         {
             "key": gift_claims.valuable_event.KEY,
             "group": "Daily Activities",
@@ -443,7 +455,7 @@ DATA ={
             "group": "Daily Activities",
             "run": gift_claims.job(gift_claims.event_center),
             "label": "Gift Claims: Event Center",
-            "priority": 3,
+            "priority": 4,
             "tail": True,
         },
     ],

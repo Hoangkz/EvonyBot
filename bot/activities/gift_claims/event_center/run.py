@@ -9,6 +9,7 @@ from . import (blessing_of_pallas, dragon_battle, dwarfs_lucky_apple,
                eagle_of_freedom,
                giants_wisdom_temple, grace_of_star_trail, hypnos_dream,
                legion_hunting,
+               moment_of_glory,
                poseidons_day, precious_blazon_exchange, revelation_of_horus,
                sealed_imperial_treasury, wishful_windmill_festival)
 from ..common import (ClaimReport, GiftTask, TEXT_CLAIM_CONTROLS, back_if_close_x,
@@ -17,14 +18,22 @@ from ..common import (ClaimReport, GiftTask, TEXT_CLAIM_CONTROLS, back_if_close_
                      close_congratulations, find, find_all,
                      mark_task_done, open_event_center, return_home)
 from ..screens import GiftScreen, identify
+from ..valuable_event.named_flow import region_hamming_distance
 
 KEY = "gift_event_center_limited"
 PAGE = "EventCenter/title"
 DOT = "EventCenter/notification_dot"
 CONGRATULATIONS = "SuperValueReturn/LoginGifts/congratulations"
-# At most four stable list positions. Each position is sampled twice before
-# moving, which is more reliable than nine rapid swipes on 30 emulators.
-MAX_SCROLLS = 3
+# Event Center uses the same edge contract as Valuable Event: an edge is real
+# only after two consecutive settled swipes do not move the list.  There is no
+# local swipe ceiling; bot.check() owns Stop/deadline safety.
+LIST_EDGE_CONFIRMATIONS = 2
+# The Event Center rows animate their artwork, timers and marquee descriptions
+# even while the list is stationary.  Hash only the vertical row structure;
+# 16 consecutive live top-edge frames on emulator 21503 measured 0 changed
+# bits, while simulated list displacement measured 18..48 bits.
+LIST_SAME_DISTANCE = 8
+LIST_SIGNATURE_BITS = 96
 # Eagle of Freedom owns a vertically scrolling quest panel.  This limit is a
 # safety ceiling only; normal completion is detected from two no-movement
 # swipes at the real bottom, not from a fixed number of four content screens.
@@ -38,6 +47,15 @@ MAX_LEGION_CONTENT_SWIPES = 12
 MAX_LEGION_VERIFY_PASSES = 3
 MAX_LEGION_CLAIMS_PER_VIEW = 6
 LEGION_EDGE_CONFIRMATIONS = 2
+MOMENT_CONTENT_REGION = (1, 40, 99, 97)
+MOMENT_CLAIM_REGION = (62, 40, 100, 97)
+MOMENT_SCAN_SWIPE = (50, 90, 50, 48)
+MOMENT_RETURN_TOP_SWIPE = (50, 48, 50, 90)
+MOMENT_EDGE_CONFIRMATIONS = 2
+MOMENT_SAME_DISTANCE = 24
+MAX_MOMENT_CLAIMS_PER_VIEW = 12
+MOMENT_GREEN_MIN_RATIO = 0.20
+MOMENT_GRAY_MAX_RATIO = 0.45
 # Text controls such as Blessing of Pallas' green Claim sit as low as 91% of
 # the 396x704 frame.  Fixed text templates are safe to search down to the
 # bottom because they only match Claim/Free/Daily Free words.  Sparkle remains
@@ -80,7 +98,6 @@ LIST_SCROLL_SETTLE_SECONDS = 2.0
 # user requested instead of inheriting the conservative multi-device delay of
 # the animated Limited list.
 APPLE_LIST_SETTLE_SECONDS = 0.8
-APPLE_LIST_MAX_SWIPES = 12
 APPLE_LIST_EDGE_CONFIRMATIONS = 2
 WISHFUL_SETTLE_SECONDS = 1.0
 WISHFUL_CONFIRMATION_DELAY_SECONDS = 1.0
@@ -112,6 +129,40 @@ SEEN_POLICIES_ATTR = "_gift_claims_event_center_seen_policies"
 SCAN_COMPLETE_ATTR = "_gift_claims_event_center_scan_complete"
 SCANNED_CATEGORIES_ATTR = "_gift_claims_event_center_scanned_categories"
 PENDING_THIS_RUN_ATTR = "_gift_claims_event_center_pending_this_run"
+CATEGORY_RESUME_KEYS = {
+    "limited": "gift_event_center_resume_limited",
+    "activities": "gift_event_center_resume_activities",
+}
+
+
+def _ordered_categories(bot):
+    """Put the durable resume category first for the next 120-second window."""
+    preferred = next((category for category, _ in CATEGORIES
+                      if bot.is_daily_done(CATEGORY_RESUME_KEYS[category])), None)
+    if preferred is None:
+        return CATEGORIES
+    return tuple(item for item in CATEGORIES if item[0] == preferred) + tuple(
+        item for item in CATEGORIES if item[0] != preferred)
+
+
+def _set_resume_category(bot, category: str) -> None:
+    """Persist which category must run first after a timeout or boss yield."""
+    wanted = CATEGORY_RESUME_KEYS[category]
+    for key in CATEGORY_RESUME_KEYS.values():
+        if key == wanted:
+            if not bot.is_daily_done(key):
+                bot.mark_daily_done(key)
+        elif bot.done_at(key) is not None:
+            bot.forget_daily(key)
+    bot.record(f"Gift Claims: lượt Event Center kế tiếp bắt đầu từ {category}")
+
+
+def clear_resume_category(bot) -> None:
+    for key in CATEGORY_RESUME_KEYS.values():
+        if bot.done_at(key) is not None:
+            bot.forget_daily(key)
+
+
 EVENT_POLICIES = (
     blessing_of_pallas.POLICY,
     dragon_battle.POLICY,
@@ -124,6 +175,7 @@ EVENT_POLICIES = (
     dwarfs_lucky_apple.POLICY,
     eagle_of_freedom.POLICY,
     legion_hunting.POLICY,
+    moment_of_glory.POLICY,
     giants_wisdom_temple.POLICY,
     wishful_windmill_festival.POLICY,
     revelation_of_horus.POLICY,
@@ -166,6 +218,9 @@ FORCED_LIMITED_ROWS = (
     ("EventCenter/LegionHunting/list_row", FORCED_EVENT_PREFIX + b"legion_hunting",
      GiftScreen.LEGION_HUNTING, "Legion Hunting",
      legion_hunting.POLICY.key),
+    ("EventCenter/MomentOfGlory/list_row", FORCED_EVENT_PREFIX + b"moment_of_glory",
+     GiftScreen.MOMENT_OF_GLORY, "Moment of Glory",
+     moment_of_glory.POLICY.key),
 )
 FORCED_ACTIVITY_ROWS = (
     ("EventCenter/DwarfsLuckyApple/list_row",
@@ -418,37 +473,8 @@ def _handle_dwarf(bot):
 
 
 def _handle_dragon_battle(bot):
-    """Tap the exact Dragon chest; Congratulations or the claimed chest is DONE."""
-    already_done = _wait_for(
-        bot, "EventCenter/DragonBattle/status_reward_claimed", attempts=2, threshold=0.82,
-        region=(0, 15, 100, 95), delay=UI_SETTLE_SECONDS)
-    if already_done is not None:
-        bot.record("Gift Claims: Dragon Battle đã thấy rương trạng thái "
-                   "Screenshot_20261025-012404; DONE")
-        return ClaimReport(0, 1), True
-    reward = _wait_for(
-        bot, "EventCenter/DragonBattle/reward_230317", attempts=4, threshold=0.80,
-        region=(0, 15, 100, 95), delay=UI_SETTLE_SECONDS)
-    if reward is None:
-        bot.record("Gift Claims: Dragon Battle không thấy rương "
-                   "Screenshot_20261023-230317; giữ PENDING")
-        return ClaimReport(), False
-    bot.record("Gift Claims: Dragon Battle tap rương "
-               "Screenshot_20261023-230317")
-    bot.tap(*reward, delay=UI_SETTLE_SECONDS)
-    if close_congratulations(bot, attempts=5):
-        bot.record("Gift Claims: Dragon Battle đã hiện Congratulations; DONE")
-        return ClaimReport(1, 1), True
-    claimed = _wait_for(
-        bot, "EventCenter/DragonBattle/status_reward_claimed", attempts=3, threshold=0.82,
-        region=(0, 15, 100, 95), delay=UI_SETTLE_SECONDS)
-    if claimed is not None:
-        bot.record("Gift Claims: Dragon Battle rương đã đổi sang trạng thái "
-                   "Screenshot_20261025-012404; DONE")
-        return ClaimReport(1, 1), True
-    bot.record("Gift Claims: Dragon Battle bấm rương nhưng chưa thấy "
-               "Congratulations; giữ PENDING")
-    return ClaimReport(1, 0), False
+    """Use Dragon Battle's exact chest and terminal-state contract."""
+    return dragon_battle.claim_opened(bot)
 
 
 def _wishful_panel_open(bot, *, attempts=5) -> bool:
@@ -1447,6 +1473,117 @@ def _handle_legion_hunting(bot):
     return total, False
 
 
+def _moment_claim_colour_ratios(screen, center) -> tuple[float, float]:
+    """Return green and low-saturation ratios around a Claim candidate."""
+    scale = screen.shape[1] / 396
+    width, height = max(1, round(82 * scale)), max(1, round(34 * scale))
+    left = max(0, center[0] - width // 2)
+    top = max(0, center[1] - height // 2)
+    crop = screen[top:min(screen.shape[0], top + height),
+                  left:min(screen.shape[1], left + width)]
+    if crop.size == 0:
+        return 0.0, 1.0
+    hsv = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
+    green = ((hsv[..., 0] >= 35) & (hsv[..., 0] <= 90) &
+             (hsv[..., 1] >= 60) & (hsv[..., 2] >= 50))
+    gray = ((hsv[..., 1] <= 70) & (hsv[..., 2] >= 50))
+    return float(green.mean()), float(gray.mean())
+
+
+def _moment_claims(bot, screen):
+    """Find green Claim only; reject the Claim prefix inside gray Claimed."""
+    candidates = find_all(bot, "Common/button_claim_text", screen,
+                          threshold=0.65, region=MOMENT_CLAIM_REGION)
+    return [point for point in candidates
+            if ((ratios := _moment_claim_colour_ratios(screen, point))[0]
+                >= MOMENT_GREEN_MIN_RATIO
+                and ratios[1] < MOMENT_GRAY_MAX_RATIO)]
+
+
+def _moment_swipe(bot, gesture, label: str) -> int:
+    before = bot.screenshot()
+    bot.swipe_percent(*gesture, duration=SWIPE_DURATION_SECONDS,
+                      delay=LIST_SCROLL_SETTLE_SECONDS)
+    after = bot.screenshot()
+    distance = region_hamming_distance(before, after, MOMENT_CONTENT_REGION)
+    bot.record(f"Gift Claims: Moment of Glory {label}, Hamming "
+               f"{distance}/{MOMENT_SAME_DISTANCE}")
+    return distance
+
+
+def _moment_swipe_to_top(bot) -> None:
+    unchanged = 0
+    while unchanged < MOMENT_EDGE_CONFIRMATIONS:
+        bot.check()
+        distance = _moment_swipe(bot, MOMENT_RETURN_TOP_SWIPE,
+                                 "đưa vùng xanh về đầu")
+        unchanged = unchanged + 1 if distance <= MOMENT_SAME_DISTANCE else 0
+        bot.record("Gift Claims: Moment of Glory biên đầu không đổi "
+                   f"{unchanged}/{MOMENT_EDGE_CONFIRMATIONS}")
+
+
+def _scan_moment_once(bot) -> tuple[ClaimReport, bool, bool]:
+    """Return report, reached_bottom and unresolved Claim for one full pass."""
+    attempted = verified = 0
+    bottom_checks = 0
+    while True:
+        blocked_positions = []
+        for _ in range(MAX_MOMENT_CLAIMS_PER_VIEW):
+            bot.check()
+            screen = bot.screenshot()
+            claim = next(
+                (pos for pos in _moment_claims(bot, screen)
+                 if all((pos[0] - old[0]) ** 2 + (pos[1] - old[1]) ** 2
+                        > 30 ** 2 for old in blocked_positions)),
+                None,
+            )
+            if claim is None:
+                break
+            blocked_positions.append(claim)
+            attempted += 1
+            bot.record(f"Gift Claims: Moment of Glory tap Claim tại {claim}")
+            bot.tap(*claim, delay=LIST_SCROLL_SETTLE_SECONDS)
+            close_congratulations(bot, attempts=2)
+            after = bot.screenshot()
+            if any(abs(pos[0] - claim[0]) <= 35 and
+                   abs(pos[1] - claim[1]) <= 30
+                   for pos in _moment_claims(bot, after)):
+                bot.record("Gift Claims: Moment of Glory Claim vẫn còn sau "
+                           "khi bấm; giữ PENDING")
+                return ClaimReport(attempted, verified), False, True
+            verified += 1
+
+        distance = _moment_swipe(bot, MOMENT_SCAN_SWIPE,
+                                 "quét xuống cuối vùng xanh")
+        bottom_checks = (bottom_checks + 1
+                         if distance <= MOMENT_SAME_DISTANCE else 0)
+        bot.record("Gift Claims: Moment of Glory biên cuối không đổi "
+                   f"{bottom_checks}/{MOMENT_EDGE_CONFIRMATIONS}")
+        if bottom_checks >= MOMENT_EDGE_CONFIRMATIONS:
+            final = bot.screenshot()
+            unresolved = bool(_moment_claims(bot, final))
+            return ClaimReport(attempted, verified), True, unresolved
+
+
+def _handle_moment_of_glory(bot):
+    """Claim all rows, then require one complete Claim-free pass for DONE."""
+    total = ClaimReport()
+    while True:
+        bot.check()
+        _moment_swipe_to_top(bot)
+        report, reached_bottom, unresolved = _scan_moment_once(bot)
+        total = ClaimReport(total.attempted + report.attempted,
+                            total.verified + report.verified)
+        if unresolved or not reached_bottom:
+            return total, False
+        if report.attempted == 0:
+            bot.record("Gift Claims: Moment of Glory đã quét từ đầu tới cuối "
+                       "không còn Claim; DONE")
+            return total, True
+        bot.record("Gift Claims: Moment of Glory vừa nhận Claim; quay lại đầu "
+                   "để quét xác nhận")
+
+
 EXACT_HANDLERS = {
     GiftScreen.DRAGON_BATTLE: _handle_dragon_battle,
     GiftScreen.PRECIOUS_BLAZON_EXCHANGE: _handle_precious,
@@ -1459,6 +1596,7 @@ EXACT_HANDLERS = {
     GiftScreen.DWARFS_LUCKY_APPLE: _handle_dwarfs_lucky_apple,
     GiftScreen.EAGLE_OF_FREEDOM: _handle_eagle_of_freedom,
     GiftScreen.LEGION_HUNTING: _handle_legion_hunting,
+    GiftScreen.MOMENT_OF_GLORY: _handle_moment_of_glory,
 }
 
 
@@ -1904,35 +2042,58 @@ def _select_category(bot, name: str, x_percent: int) -> bool:
 
 
 def _list_signature(screen) -> bytes:
-    """Stable list fingerprint excluding animated artwork on the right."""
+    """Hash vertical row structure, ignoring per-row animation and timers."""
     right = max(1, int(screen.shape[1] * 0.68))
-    patch = cv2.cvtColor(screen[95:, :right], cv2.COLOR_BGR2GRAY)
-    tiny = cv2.resize(patch, (32, 18), interpolation=cv2.INTER_AREA)
-    return np.packbits(tiny[:, 1:] > tiny[:, :-1]).tobytes()
+    top = max(0, int(screen.shape[0] * 0.14))
+    bottom = max(top + 1, int(screen.shape[0] * 0.98))
+    patch = cv2.cvtColor(screen[top:bottom, :right], cv2.COLOR_BGR2GRAY)
+    patch = cv2.GaussianBlur(patch, (5, 5), 0)
+    # Average each horizontal strip. Row dividers and title bands move when
+    # the list scrolls; animated pixels inside a row average away.
+    tiny = cv2.resize(
+        patch, (32, LIST_SIGNATURE_BITS), interpolation=cv2.INTER_AREA)
+    vertical_profile = tiny.mean(axis=1)
+    return np.packbits(
+        vertical_profile[1:] > vertical_profile[:-1]).tobytes()
 
 
-def _same_list_position(before: bytes, after: bytes, max_distance=18) -> bool:
+def _list_hamming_distance(before: bytes, after: bytes) -> int:
     old = np.frombuffer(before, dtype=np.uint8)
     new = np.frombuffer(after, dtype=np.uint8)
-    return old.shape == new.shape and int(
-        np.unpackbits(np.bitwise_xor(old, new)).sum()) <= max_distance
+    if old.shape != new.shape:
+        return LIST_SIGNATURE_BITS
+    return int(np.unpackbits(np.bitwise_xor(old, new)).sum())
 
 
-def _return_list_to_top(bot, category: str) -> None:
-    """Reset a category's remembered scroll position before top-down scan."""
+def _same_list_position(before: bytes, after: bytes,
+                        max_distance=LIST_SAME_DISTANCE) -> bool:
+    return _list_hamming_distance(before, after) <= max_distance
+
+
+def _return_list_to_top(bot, category: str) -> bool:
+    """Prove the real top with consecutive settled no-movement swipes."""
     bot.record(f"Gift Claims: Event Center/{category} đưa danh sách về đầu")
-    for step in range(MAX_SCROLLS):
+    unchanged = 0
+    step = 0
+    while True:
         bot.check()
+        step += 1
         before = _list_signature(bot.screenshot())
         bot.swipe_percent(50, 32, 50, 86,
                           duration=SWIPE_DURATION_SECONDS,
                           delay=LIST_SCROLL_SETTLE_SECONDS)
         after = _list_signature(bot.screenshot())
+        distance = _list_hamming_distance(before, after)
         bot.record(f"Gift Claims: Event Center/{category} dừng "
                    f"{LIST_SCROLL_SETTLE_SECONDS:.0f}s sau lướt về đầu "
-                   f"({step + 1}/{MAX_SCROLLS})")
-        if _same_list_position(before, after):
-            break
+                   f"(lần {step}), Hamming "
+                   f"{distance}/{LIST_SAME_DISTANCE}")
+        unchanged = (unchanged + 1
+                     if _same_list_position(before, after) else 0)
+        if unchanged >= LIST_EDGE_CONFIRMATIONS:
+            bot.record(f"Gift Claims: Event Center/{category} đã xác nhận "
+                       f"biên đầu sau {LIST_EDGE_CONFIRMATIONS} cú không đổi")
+            return True
 
 
 def _find_dwarfs_lucky_apple_row(bot) -> bool:
@@ -1947,8 +2108,10 @@ def _find_dwarfs_lucky_apple_row(bot) -> bool:
 
     def swipe(start_y, end_y, direction, *, search: bool) -> bool | None:
         unchanged = 0
-        for step in range(1, APPLE_LIST_MAX_SWIPES + 1):
+        step = 0
+        while True:
             bot.check()
+            step += 1
             screen = bot.screenshot()
             if (search and find(bot, template, screen, threshold=0.90,
                                 region=(10, 15, 75, 98)) is not None):
@@ -1960,16 +2123,16 @@ def _find_dwarfs_lucky_apple_row(bot) -> bool:
                               duration=SWIPE_DURATION_SECONDS,
                               delay=APPLE_LIST_SETTLE_SECONDS)
             after = _list_signature(bot.screenshot())
+            distance = _list_hamming_distance(before, after)
             same = _same_list_position(before, after)
             unchanged = unchanged + 1 if same else 0
             bot.record("Gift Claims: Activities lướt " + direction +
                        f", chờ {APPLE_LIST_SETTLE_SECONDS:.1f}s rồi quét "
-                       f"({step}/{APPLE_LIST_MAX_SWIPES})")
+                       f"(lần {step}), Hamming "
+                       f"{distance}/{LIST_SAME_DISTANCE}")
             if unchanged >= APPLE_LIST_EDGE_CONFIRMATIONS:
                 bot.record(f"Gift Claims: Activities đã xác nhận tới {direction}")
                 return False
-        bot.record(f"Gift Claims: Activities chạm giới hạn lướt {direction}")
-        return None
 
     # First establish the real top.  Do not waste a 1.5 s duplicate probe at
     # each position: every swipe already settles for 0.8 s before the frame is
@@ -2017,20 +2180,28 @@ def _verify_clean(bot, category: str, ignored=()) -> bool:
         return True
     # Return to the top, then scan the complete vertical list once more.
     _return_list_to_top(bot, category)
-    for step in range(MAX_SCROLLS + 1):
+    bottom_checks = 0
+    while True:
         bot.check()
         screen = bot.screenshot()
         if any(not _category_seen(category, _row_signature(screen, y), ignored)
                for _, y in _row_dots(bot, screen)):
             return False
-        if step < MAX_SCROLLS:
-            before = _list_signature(screen)
-            bot.swipe_percent(50, 86, 50, 32,
-                              duration=SWIPE_DURATION_SECONDS,
-                              delay=LIST_SCROLL_SETTLE_SECONDS)
-            if _same_list_position(before, _list_signature(bot.screenshot())):
-                break
-    return True
+        before = _list_signature(screen)
+        bot.swipe_percent(50, 86, 50, 32,
+                          duration=SWIPE_DURATION_SECONDS,
+                          delay=LIST_SCROLL_SETTLE_SECONDS)
+        after = _list_signature(bot.screenshot())
+        distance = _list_hamming_distance(before, after)
+        same = _same_list_position(before, after)
+        bottom_checks = bottom_checks + 1 if same else 0
+        bot.record(f"Gift Claims: Event Center/{category} kiểm tra biên cuối, "
+                   f"Hamming {distance}/{LIST_SAME_DISTANCE}, không đổi "
+                   f"{bottom_checks}/{LIST_EDGE_CONFIRMATIONS}")
+        if bottom_checks >= LIST_EDGE_CONFIRMATIONS:
+            bot.record(f"Gift Claims: Event Center/{category} đã xác nhận "
+                       f"biên cuối sau {LIST_EDGE_CONFIRMATIONS} cú không đổi")
+            return True
 
 
 def _scan_category(bot, category: str, visited: set[bytes]) -> bool:
@@ -2051,26 +2222,29 @@ def _scan_category(bot, category: str, visited: set[bytes]) -> bool:
     pending_this_run = getattr(bot, PENDING_THIS_RUN_ATTR, None)
     if not isinstance(pending_this_run, set):
         pending_this_run = set()
-    # Activities has a dedicated bidirectional 0.8-second scan.  Limited keeps
-    # the conservative top-down cadence because it owns many animated rows.
+    # Activities has a dedicated bidirectional 0.8-second scan. Limited first
+    # proves its real top and then runs until the real bottom, with no local
+    # swipe-count ceiling, exactly like Valuable Event's edge traversal.
     if category == "activities":
         if not _find_dwarfs_lucky_apple_row(bot):
             _record_missing_event_policies(bot, seen_policy_keys, category)
             bot.record("Gift Claims: Activities đã quét từ đỉnh xuống đáy rồi "
                        "từ đáy lên đỉnh nhưng chưa thấy Dwarf's Lucky Apple")
             return True
-        scan_limit = 0
+        scan_to_bottom = False
         list_settle = APPLE_LIST_SETTLE_SECONDS
     else:
         # Evony remembers a separate vertical position for each category.
         _return_list_to_top(bot, category)
-        scan_limit = MAX_SCROLLS
+        scan_to_bottom = True
         list_settle = LIST_SCROLL_SETTLE_SECONDS
-    for scroll in range(scan_limit + 1):
+    scroll = 0
+    bottom_checks = 0
+    while True:
         bot.check()
         empty_checks = 0
         bot.record(f"Gift Claims: Event Center/{category} quét vị trí danh sách "
-                   f"{scroll + 1}/{scan_limit + 1}")
+                   f"{scroll + 1}")
         pending_labels = [
             policy.label for policy in EVENT_POLICIES
             if policy.key is not None
@@ -2259,16 +2433,26 @@ def _scan_category(bot, category: str, visited: set[bytes]) -> bool:
             if not _back_to_list(bot):
                 bot.log(f"Gift Claims: Event Center/{category} không quay lại được danh sách")
                 return False
-        if scroll < scan_limit:
-            before = _list_signature(bot.screenshot())
-            bot.swipe_percent(50, 86, 50, 32,
-                              duration=SWIPE_DURATION_SECONDS,
-                              delay=list_settle)
-            bot.record(f"Gift Claims: Event Center/{category} đã dừng "
-                       f"{list_settle:g}s sau lướt; bắt đầu quét")
-            if _same_list_position(before, _list_signature(bot.screenshot())):
-                bot.log(f"Gift Claims: Event Center/{category} đã tới cuối danh sách")
-                break
+        if not scan_to_bottom:
+            break
+        before = _list_signature(bot.screenshot())
+        bot.swipe_percent(50, 86, 50, 32,
+                          duration=SWIPE_DURATION_SECONDS,
+                          delay=list_settle)
+        bot.record(f"Gift Claims: Event Center/{category} đã dừng "
+                   f"{list_settle:g}s sau lướt; bắt đầu quét")
+        after = _list_signature(bot.screenshot())
+        distance = _list_hamming_distance(before, after)
+        same = _same_list_position(before, after)
+        bottom_checks = bottom_checks + 1 if same else 0
+        bot.record(f"Gift Claims: Event Center/{category} Hamming "
+                   f"{distance}/{LIST_SAME_DISTANCE}, không đổi "
+                   f"{bottom_checks}/{LIST_EDGE_CONFIRMATIONS}")
+        if bottom_checks >= LIST_EDGE_CONFIRMATIONS:
+            bot.log(f"Gift Claims: Event Center/{category} đã xác nhận cuối "
+                    f"danh sách sau {LIST_EDGE_CONFIRMATIONS} cú không đổi")
+            break
+        scroll += 1
 
     clean = _verify_clean(bot, category, visited) and not failed_forced
     has_checkpoint = any(item.startswith(category.encode("ascii") + b"\0")
@@ -2299,7 +2483,10 @@ def run_opened(bot, handled=None):
 
     visited = handled if handled is not None else set()
     all_clean = True
-    for category, x_percent in CATEGORIES:
+    categories = _ordered_categories(bot)
+    bot.record("Gift Claims: thứ tự Event Center lượt này: "
+               + " -> ".join(category for category, _ in categories))
+    for category, x_percent in categories:
         bot.check()
         if _category_db_done(bot, category):
             bot.record(f"Gift Claims: Event Center/{category} toàn bộ key đã "
@@ -2321,6 +2508,9 @@ def run_opened(bot, handled=None):
                 scanned_categories = set()
                 setattr(bot, SCANNED_CATEGORIES_ATTR, scanned_categories)
             scanned_categories.add(category)
+            next_category = ("activities" if category == "limited"
+                             else "limited")
+            _set_resume_category(bot, next_category)
         category_done = scanned_clean and _category_db_done(bot, category)
         if category_done:
             # Persist category completion in the same in-memory checkpoint set

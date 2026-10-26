@@ -95,8 +95,9 @@ flowchart TD
   lần thì bỏ khỏi danh sách tới ngày mới. Bị ngắt giữa chừng (hết 120 giây, có boss) không tính là một lần thử.
 - **Cả danh sách đều chưa xong** (hoặc danh sách rỗng): nghỉ `IDLE_WAIT` = 5 giây rồi xét lại, không chạy liên tục. Thread vẫn
   sống tới khi Stop.
-- **Gift Claims** là ba tail task của nhóm Daily Activities, lần lượt có
-  priority `3 / 2 / 1`: Event Center, Valuable Event, Super Value Return. Chúng
+- **Gift Claims** là bốn tail task của nhóm Daily Activities, lần lượt có
+  priority `4 / 3 / 2 / 1`: Event Center, Revelry Carnival, Valuable Event,
+  Super Value Return. Chúng
   chạy sau `daily_rewards`, không `must_finish`; khi có Join Boss thì bị ngắt ở
   120 giây/có boss mới, sau đó chạy lại từ các key DB chưa DONE.
 - **Nhiệm vụ `must_finish`** (priority.py): đã bắt đầu thì chạy tới xong; Bubble / Auto Times Out / boss mới / 120 giây không

@@ -22,8 +22,9 @@ from ..valuable_event.named_flow import (SLOW_SWIPE_DURATION, STEP_DELAY, TASK_T
                                          process_exact)
 from . import (city_growth_plan, empire_depot, login_gifts, lucky_raffle,
                 refining_weekly_card)
+from ..valuable_event import hall_of_historic_generals, soul_of_spiritual_beast
 from .launcher import find_super_value_return
-from .run import SPECS
+from .run import SPECS, run_opened
 
 KEY = "gift_super_value_return"
 NAME = "Super Value Return"
@@ -67,6 +68,8 @@ DEPOT_POPUP_REGION = (80, 5, 100, 20)
 TASKS = (
     login_gifts.TASK,
     empire_depot.TASK,
+    hall_of_historic_generals.TASK,
+    soul_of_spiritual_beast.TASK,
     lucky_raffle.TASK,
     city_growth_plan.TASK,
     refining_weekly_card.TASK,
@@ -244,9 +247,16 @@ def find_tab(bot, spec, screen):
 def run_event(bot, spec) -> bool:
     """Đã ở trang event: chạy flow riêng; True = DONE. Login Gifts và Refining Weekly Card có hàm nhận riêng."""
     if spec.task.key == login_gifts.KEY:
-        return login_gifts.claim_opened(bot)
+        return bool(login_gifts.claim_opened(bot))
     if spec.task.key == refining_weekly_card.KEY:
-        return refining_weekly_card.claim_opened(bot)
+        outcome = refining_weekly_card.claim_opened(bot)
+        return outcome is True or outcome == refining_weekly_card.DONE
+    if spec.task.key == hall_of_historic_generals.KEY:
+        outcome = hall_of_historic_generals.claim_opened(bot)
+        return outcome is True or outcome == hall_of_historic_generals.DONE
+    if spec.task.key == soul_of_spiritual_beast.KEY:
+        outcome = soul_of_spiritual_beast.claim_opened(bot)
+        return outcome is True or outcome == soul_of_spiritual_beast.DONE
     return process_exact(bot, spec.flow)
 
 
@@ -419,3 +429,22 @@ def run(bot) -> bool:
     bot.record(f"Gift Claims: {NAME} đủ {PASSES} lượt tìm; mọi event của hoạt động xong hôm nay")
     return_home(bot)
     return True
+
+
+def _sweep(bot, pending: list[str], deferred: set[str] | None = None) -> set[str]:
+    todo = [task for task in TASKS if task.key in pending and (deferred is None or task.key not in deferred)]
+    if not todo:
+        return set()
+    if identify(bot, bot.screenshot()) != GiftScreen.SUPER_VALUE_RETURN:
+        if not open_super_value_return(bot):
+            bot.record("Gift Claims: không mở được Super Value Return; "
+                       "chưa tính là không thấy")
+            return set()
+    results, scanned_all = run_opened(bot, {task.key for task in todo})
+    if not scanned_all:
+        return set()
+    if deferred is not None:
+        for k, v in results.items():
+            if v == "done_1":
+                deferred.add(k)
+    return {key for key, state in results.items() if state == "not_present"}

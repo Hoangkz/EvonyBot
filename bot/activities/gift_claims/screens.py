@@ -25,6 +25,7 @@ class GiftScreen(str, Enum):
     WISHFUL_WINDMILL_FESTIVAL = "WishfulWindmillFestival"
     EAGLE_OF_FREEDOM = "EagleOfFreedom"
     LEGION_HUNTING = "LegionHunting"
+    MOMENT_OF_GLORY = "MomentOfGlory"
 
 
 TITLE_TEMPLATES = {
@@ -36,6 +37,7 @@ TITLE_TEMPLATES = {
     # against each other, while Eagle's supplied title is an exact 1.0 match.
     GiftScreen.EAGLE_OF_FREEDOM: "EventCenter/EagleOfFreedom/title",
     GiftScreen.LEGION_HUNTING: "EventCenter/LegionHunting/title",
+    GiftScreen.MOMENT_OF_GLORY: "EventCenter/MomentOfGlory/title",
     GiftScreen.GRACE_OF_STAR_TRAIL: "EventCenter/GraceOfStarTrail/title",
     GiftScreen.BACCHUS_TAVERN: "EventCenter/BacchusTavern/title",
     GiftScreen.BACK_TO_TERRITORY: "EventCenter/BackToTerritory/title",

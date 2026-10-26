@@ -2,10 +2,14 @@
 
 ## Phạm vi
 
-Gift Claims gồm **ba hoạt động độc lập**, mỗi hoạt động có hàm `run(bot)` riêng.
+Gift Claims gồm **ba khu độc lập và nhiệm vụ Revelry Carnival**.
 Worker chạy nhóm quà sau khi hoàn thành các Daily Activities và ưu tiên theo
-thứ tự **Event Center -> Valuable Event -> Super Value Return** khi ô **Claim Event Gifts** ở tab Daily
+thứ tự **Event Center -> Revelry Carnival -> Valuable Event -> Super Value Return** khi ô **Claim Event Gifts** ở tab Daily
 Activities được tích (`settings["General"]["gift_claims"]`, mặc định bật):
+
+Revelry Carnival chỉ trở thành nhiệm vụ tới lượt sau khi Event Center đã ghi
+key tổng `gift_event_center` DONE, không chạy chen vào lúc Event Center đang
+PENDING hoặc đang nghỉ giữa hai cửa sổ 120 giây.
 
 Khu nào còn PENDING sau một lượt sẽ tạm nghỉ 120 giây thay vì chặn khu kế
 tiếp. Khi cửa sổ mới bắt đầu, thứ tự trên được áp dụng lại từ Event Center.
@@ -16,6 +20,15 @@ tiếp. Khi cửa sổ mới bắt đầu, thứ tự trên được áp dụng 
   `gift_super_value_return`.
 - `gift_claims.event_center.run`: Back to Territory (icon ngoài) + các event con trong danh sách Limited của Event
   Center. Key tổng `gift_event_center`.
+- Revelry Carnival: dùng toàn bộ Parade Mask rồi nhận mọi nút Claim xanh; dùng
+  key `revelry_carnival` và logic điều hướng event hiện có.
+  Khi mới vào, bot kiểm tra vùng danh sách quà: có Claim xanh thì nhận ngay;
+  chỉ có Claim xám thì mới bấm Parade Mask. `How to get` là DONE riêng cho
+  bước Parade Mask và được checkpoint bằng `revelry_carnival_parade_masks_used`,
+  nhưng chưa phải DONE toàn nhiệm vụ. Sau mỗi Claim/Use, nếu hiện
+  Congratulations thì Back đúng một lần và chờ popup biến mất hoặc nút Claim
+  hiện rõ. Toàn nhiệm vụ chỉ DONE sau một lượt quét đủ biên đầu-biên cuối mà
+  không còn Claim xanh.
 
 Mỗi nhiệm vụ con có key `daily_done` riêng (ví dụ `gift_limited_offer`). DB lưu timestamp ISO;
 `BotWorker.is_daily_done()` so với lần reset server gần nhất (mặc định 14:00, lấy từ DB settings): 15:00 ngày 15/10 thì
@@ -49,8 +62,15 @@ gift_claims/
 2. Một **lượt** = tìm từng event còn lại (mở trang cha bằng vị trí/launcher cố định, không dựa vào chấm đỏ):
    - Thấy: nhận quà theo quy tắc nhóm bên dưới, ghi key xong của event đó, đưa số lần "không thấy" về 0.
    - Không thấy: back về màn chính, ghi thêm một lần "không thấy" (key `<key>_miss_1..3`).
-3. Chạy tối đa 3 lượt liên tiếp. Event không thấy cả 3 lần = hôm nay không có, ghi key xong. Thấy ở bất kỳ lượt nào thì
-   đã xong và đếm về 0.
+3. Mỗi cửa sổ chạy Event Center ghi tối đa một lượt `miss` cho từng category đã
+   quét đủ. Lượt kế tiếp sau 120 giây đọc lại `miss_1/2/3` từ DB; event không
+   thấy trong đủ 3 lượt = hôm nay không có, ghi key xong. Nếu Limited đã quét
+   đủ nhưng timeout xảy ra trong Activities, checkpoint Limited vẫn được giữ.
+   Đồng thời DB lưu category cần chạy trước: Limited xong thì lượt kế tiếp ưu
+   tiên Activities; Activities xong thì chuyển lại Limited. Vì vậy một category
+   dài không thể chiếm đầu mọi cửa sổ 120 giây.
+   Valuable Event và Super Value Return cũng dùng các key `miss_1/2/3`; thấy
+   event ở bất kỳ lượt nào thì đưa bộ đếm không thấy về 0.
 4. Không mở được trang cha (launcher/Event Center không hiện) **không** tính là "không thấy": lượt đó dừng, chờ lần chạy sau.
 5. Mọi nhiệm vụ con xong thì ghi key tổng của hoạt động.
 6. Số lần "không thấy" lưu trong DB nên nhường Join Boss hay khởi động lại vẫn đếm tiếp. Hết giới hạn 120 giây hoặc có
@@ -135,14 +155,20 @@ Một lượt tìm (`search_pass`):
   sau một lượt quét đầy đủ chỉ ghi `miss 1/3`; đủ ba lượt quét đầy đủ không
   thấy mới ghi task đó DONE. Không còn chấm đỏ trong một lượt cũng không được
   bỏ qua quy tắc ba lượt này.
-- Super Value Return: luôn kiểm tra Login Gifts một lần; Empire Depot và Lucky
-  Raffle dùng Claimable; City Growth Plan ưu tiên Claim All rồi chỉ nhận cột
-  miễn phí bên trái.
-- Login Gifts: tìm đúng ảnh `button_reward_chest`; nếu không thấy thì bấm điểm
-  dự phòng `(45, 190)`. Không dùng chấm đỏ hay quét rương theo từng hàng. Sau
-  khi bấm phải chụp màn hình mới: thấy Congratulations **hoặc** trang Login
-  Gifts vẫn mở nhưng không còn nút rương thì DONE; rương vẫn còn mà không có
-  Congratulations thì giữ PENDING.
+- Super Value Return: thấy tab nào thì xử lý tab đó, không ưu tiên theo danh
+  sách. Empire Depot và Lucky Raffle dùng Claimable; City Growth Plan ưu tiên
+  Claim All rồi chỉ nhận cột miễn phí bên trái. Hall of Historic Generals dùng
+  chữ + dải màu để tách Claim xanh khỏi Claimed xám và chỉ ghi DB DONE sau một
+  lượt xác nhận toàn bộ Claimed. Soul of Spiritual Beast quét dọc riêng hai tab
+  Daily Tasks và Seasonal trong vùng nhiệm vụ; có Claim trong lượt thì nhận hết,
+  quay lại màn Challenge Quest và vét rương. Rương biến mất là điều kiện kết
+  thúc kể cả khi Congratulations không xuất hiện. Lượt có nhận chỉ ghi DONE_1;
+  chỉ khi cả hai tab đã toàn bộ Claimed mới ghi DONE tổng.
+- Login Gifts: chỉ bấm khi tìm đúng ảnh `button_reward_chest`; nếu không thấy
+  thì giữ PENDING, không dùng tọa độ dự phòng. Không dùng chấm đỏ hay quét rương theo từng hàng. Sau
+  khi bấm phải chờ và đóng Congratulations nếu có, sau đó chụp lại. Chỉ khi
+  trang Login Gifts vẫn mở và hai frame liên tiếp không còn nút rương mới DONE;
+  Congratulations một mình không đủ điều kiện.
 - Back to Territory nằm ở thanh phải cùng vùng ngoài thành với Event Center,
   nhưng là màn ngang cấp và không phải event con của Event Center. Với mỗi tab
   đỏ trên carousel, duyệt tiếp toàn bộ badge đỏ
@@ -154,7 +180,11 @@ Một lượt tìm (`search_pass`):
   Activities; không vào Competition. Một nhiệm vụ đã thấy nhưng chạy hết flow
   riêng mà chưa DONE được giữ PENDING và không được mở lại trong cùng lượt
   120 giây. Mỗi nhóm
-  chỉ duyệt tối đa bốn vị trí danh sách (vị trí đầu và ba lần lướt chậm). Ở
+  đưa danh sách về biên đầu rồi quét đến biên cuối, mỗi biên chỉ được xác nhận
+  sau hai cú lướt ổn định liên tiếp không làm danh sách di chuyển. Event Center
+  dùng Hamming trên cấu trúc dọc 96 dải của phần trái danh sách, ngưỡng `8/96`,
+  để bỏ qua artwork, đồng hồ và dòng mô tả động. Không có
+  giới hạn cứng số vị trí; Stop/deadline 120 giây là giới hạn an toàn. Ở
   từng vị trí bot log rõ danh sách tên nhiệm vụ còn pending trước khi dò và
   bấm. Event không xuất hiện trong một lượt quét đầy đủ được log `lần 1/3`,
   `2/3`, `3/3`; sau ba lượt mới coi là hôm nay không có và ghi DONE.
