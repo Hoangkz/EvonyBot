@@ -99,7 +99,10 @@ flowchart TD
   priority `4 / 3 / 2 / 1`: Event Center, Revelry Carnival, Valuable Event,
   Super Value Return. Chúng
   chạy sau `daily_rewards`, không `must_finish`; khi có Join Boss thì bị ngắt ở
-  120 giây/có boss mới, sau đó chạy lại từ các key DB chưa DONE.
+  120 giây/có boss mới, sau đó chạy lại từ các key DB chưa DONE. Sau mỗi cửa sổ
+  Event Center, kể cả còn nhiệm vụ PENDING chờ lượt 120 giây sau, Revelry
+  Carnival được mở khóa để chạy tiếp; khi hết cooldown, Event Center vẫn có
+  ưu tiên cao hơn và được chạy trước ở chu kỳ kế tiếp.
 - **Nhiệm vụ `must_finish`** (priority.py): đã bắt đầu thì chạy tới xong; Bubble / Auto Times Out / boss mới / 120 giây không
   ngắt (chỉ Stop); xong rồi mới tới Bubble, Auto Times Out và Join Boss. Gift
   Claims là ngoại lệ có chủ ý để xen kẽ lại Join Boss sau mỗi 120 giây.

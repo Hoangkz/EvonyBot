@@ -1229,7 +1229,7 @@ class FixedGiftFlowTests(unittest.TestCase):
             {"General": {"gift_claims": False},
              "revelry_carnival": {"enabled": True}}))
 
-    def test_revelry_waits_until_event_center_is_fully_done(self):
+    def test_revelry_runs_after_one_event_center_window(self):
         from bot.worker.priority import DATA
 
         row = next(item for item in DATA["Gift Claims"]
@@ -1237,11 +1237,19 @@ class FixedGiftFlowTests(unittest.TestCase):
         bot = mock.Mock()
         bot.done_at.return_value = None
         bot.daily_keys.return_value = []
-        bot.is_daily_done.side_effect = lambda key: key == "gift_event_center"
-        self.assertFalse(row["run"]["done"](bot, {}))
         bot.is_daily_done.return_value = False
-        bot.is_daily_done.side_effect = None
-        self.assertTrue(row["run"]["done"](bot, {}))
+        with mock.patch.object(gift_claims.time, "monotonic", return_value=100.0):
+            # Event Center has not run yet: Revelry remains locked.
+            self.assertTrue(row["run"]["done"](bot, {}))
+            setattr(bot, gift_claims.RETRY_AFTER_ATTR,
+                    {gift_claims.event_center.KEY: 220.0})
+            # Event Center just yielded PENDING for 120 seconds: Revelry is
+            # now the next eligible Gift Claims task.
+            self.assertFalse(row["run"]["done"](bot, {}))
+
+        bot.is_daily_done.side_effect = (
+            lambda key: key == gift_claims.event_center.KEY)
+        self.assertFalse(row["run"]["done"](bot, {}))
 
     def test_gift_zones_are_tail_tasks_after_all_daily_work(self):
         from bot.worker.priority import DATA
@@ -3311,6 +3319,34 @@ class FixedGiftFlowTests(unittest.TestCase):
 
         self.assertFalse(done)
 
+    def test_lucky_apple_red_both_gray_multipliers_are_done(self):
+        bot = mock.Mock()
+        bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
+        bot.best_match.side_effect = ((0.96, (250, 510)),
+                                      (0.94, (250, 610)))
+        with (mock.patch.object(event_center, "_scaled_template",
+                                return_value=np.zeros((35, 153, 3),
+                                                      dtype=np.uint8)),
+              mock.patch.object(event_center, "_apple_button_color_band",
+                                return_value=(22.0, 0.05))):
+            done = event_center._apple_red_multipliers_gray(bot)
+
+        self.assertTrue(done)
+
+    def test_lucky_apple_red_gray_templates_must_be_distinct(self):
+        bot = mock.Mock()
+        bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
+        bot.best_match.side_effect = ((0.96, (250, 610)),
+                                      (0.94, (250, 610)))
+        with (mock.patch.object(event_center, "_scaled_template",
+                                return_value=np.zeros((35, 153, 3),
+                                                      dtype=np.uint8)),
+              mock.patch.object(event_center, "_apple_button_color_band",
+                                return_value=(22.0, 0.05))):
+            done = event_center._apple_red_multipliers_gray(bot)
+
+        self.assertFalse(done)
+
     def test_lucky_apple_red_phase_uses_gray_fallback_only_after_tap(self):
         bot = mock.Mock()
         bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
@@ -3636,6 +3672,26 @@ class FixedGiftFlowTests(unittest.TestCase):
             [call.args[1:3] for call in phase.call_args_list])
         self.assertEqual(2, bot.tap.call_count)
 
+    def test_lucky_apple_red_both_gray_shortcuts_red_claim_phase(self):
+        bot = mock.Mock()
+        bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
+        with (mock.patch.object(event_center, "_wait_for_any",
+                                side_effect=((300, 300), (100, 300))),
+              mock.patch.object(event_center, "_wait_apple_special_state",
+                                return_value=("green-once", (250, 540))),
+              mock.patch.object(event_center, "_apple_red_multipliers_gray",
+                                return_value=True),
+              mock.patch.object(event_center, "_run_optional_apple_phase",
+                                side_effect=(
+                                    (common.ClaimReport(2, 2), True, True),
+                                    (common.ClaimReport(3, 3), True, True),
+                                )) as phase):
+            report, done = event_center._handle_dwarfs_lucky_apple(bot)
+
+        self.assertTrue(done)
+        self.assertEqual(common.ClaimReport(5, 5), report)
+        self.assertEqual(2, phase.call_count)
+
     def test_lucky_apple_only_once_on_both_tabs_is_done(self):
         bot = mock.Mock()
         bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
@@ -3703,6 +3759,8 @@ class FixedGiftFlowTests(unittest.TestCase):
             folder / "status_red_wish_once.png")).shape[:2])
         self.assertEqual((41, 154), cv2.imread(str(
             folder / "status_red_wish_once_gray.png")).shape[:2])
+        self.assertEqual((40, 112), cv2.imread(str(
+            folder / "status_red_wish_x100_done.png")).shape[:2])
 
     def test_lucky_apple_green_done_never_finishes_whole_task(self):
         bot = mock.Mock()
@@ -4033,7 +4091,8 @@ class FixedGiftFlowTests(unittest.TestCase):
 
         self.assertNotIn(dragon, inspected)
         self.assertNotIn(apple, inspected)
-        bot.mark_daily_done.assert_called_once_with(f"{dragon}_miss_1")
+        bot.mark_daily_done.assert_called_once_with(
+            f"{dragon}_miss_done_1")
 
     def test_event_center_skips_categories_completed_before_boss_yield(self):
         bot = mock.Mock()

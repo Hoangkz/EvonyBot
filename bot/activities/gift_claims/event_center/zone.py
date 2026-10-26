@@ -12,6 +12,29 @@ TASKS = ((back_to_territory.KEY, back_to_territory.TASK.label),
          *((policy.key, policy.label) for policy in EVENT_POLICIES))
 
 
+def _limited_miss_keys(key: str) -> list[str]:
+    """Durable absence checkpoints owned only by Event Center/Limited."""
+    return [f"{key}_miss_done_{index}"
+            for index in range(1, scan.MAX_MISSES + 1)]
+
+
+def _limited_misses(bot, key: str) -> int:
+    return sum(bot.is_daily_done(miss_key)
+               for miss_key in _limited_miss_keys(key))
+
+
+def _add_limited_miss(bot, key: str) -> int:
+    count = min(_limited_misses(bot, key) + 1, scan.MAX_MISSES)
+    bot.mark_daily_done(_limited_miss_keys(key)[count - 1])
+    return count
+
+
+def _reset_limited_misses(bot, key: str) -> None:
+    for miss_key in _limited_miss_keys(key):
+        if bot.done_at(miss_key) is not None:
+            bot.forget_daily(miss_key)
+
+
 def _handled(bot) -> set[bytes]:
     """Rows already scanned in the current worker, retained across Boss yields."""
     handled = getattr(bot, HANDLED_ATTR, None)
@@ -26,9 +49,10 @@ def _checkpoint_categories(bot, pending: list[str]) -> None:
 
     ``run_opened`` updates ``SCANNED_CATEGORIES_ATTR`` immediately after a
     category reaches its verified edge.  Reading it in ``finally`` means a
-    completed Limited pass still writes miss 1/3 even if Activities is then
-    interrupted. Seen rows reset old absence counters; only unseen rows accrue
-    one durable miss for this pass.
+    completed Limited pass still writes one ``miss_done_*`` checkpoint even
+    if Activities is then interrupted.  Activities never uses this absence
+    rule. Seen Limited rows reset old absence counters; only unseen rows accrue
+    exactly one durable miss in this 120-second window.
     """
     scanned = getattr(bot, SCANNED_CATEGORIES_ATTR, set())
     seen = getattr(bot, SEEN_POLICIES_ATTR, set())
@@ -39,18 +63,20 @@ def _checkpoint_categories(bot, pending: list[str]) -> None:
         if key == back_to_territory.KEY:
             continue
         category = POLICY_CATEGORIES.get(key, "limited")
+        if category != "limited":
+            continue
         if category not in scanned:
             continue
         if bot.is_daily_done(key) or key in seen:
-            scan.reset_misses(bot, key)
+            _reset_limited_misses(bot, key)
             continue
         label = labels.get(key, key)
-        attempt = min(scan.misses(bot, key) + 1, scan.MAX_MISSES)
+        attempt = min(_limited_misses(bot, key) + 1, scan.MAX_MISSES)
         bot.record(f"Gift Claims: kiểm tra {label} không xuất hiện "
                    f"(lượt {attempt}/{scan.MAX_MISSES})")
-        count = scan.add_miss(bot, key)
+        count = _add_limited_miss(bot, key)
         bot.record(f"Gift Claims: không thấy {label} "
-                   f"(lần {count}/{scan.MAX_MISSES})")
+                   f"(miss_done_{count}/{scan.MAX_MISSES})")
         if count >= scan.MAX_MISSES:
             bot.record(f"Gift Claims: {label} không có hôm nay; đánh dấu xong")
             mark_task_done(bot, key)

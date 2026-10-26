@@ -1,16 +1,18 @@
 # Flow: Super Value Return (hoạt động độc lập)
 
 1. Mở Super Value Return (`zone.open_super_value_return`): ở màn thành chính có nút ••• (đang ở bản đồ thế giới thì vào thành
-   trước), tìm nút vào bằng `launcher.find_super_value_return`, xét theo thứ tự ưu tiên:
-   - TH1: icon Login Gifts góc trên bên phải (`login_gifts_top`, vùng x 70-100% y 10-50%).
-   - TH2: một icon trong `Images/GiftClaims/SuperValueReturn/launcher_icons/` ở vùng x 0-50% y 70-88%. Ảnh mẫu chỉ là vùng
+   trước), tìm nút vào bằng `launcher.find_super_value_return`. Đây là các **phương án thay thế** của cùng một nút vào: mỗi
+   lần chỉ chọn phương án nhận diện được đầu tiên và không chạy lần lượt các phương án khác.
+   - Icon Login Gifts góc trên bên phải (`login_gifts_top`, vùng x 70-100% y 10-50%).
+   - Một icon trong `Images/GiftClaims/SuperValueReturn/launcher_icons/` ở vùng x 0-50% y 70-88%. Ảnh mẫu chỉ là vùng
      nhỏ trong icon, không có chữ, không chạm chấm đỏ. Nhiều chỗ khớp thì lấy chỗ có x bé nhất.
-   - TH3: mũi tên đi lên (`arrow_up`, vùng x 0-30% y 70-88%): nút vào nằm ngay dưới, thấp hơn tâm mũi tên 40 px.
-   - TH4: mũi tên đi xuống (`arrow_down`, vùng x 0-30% y 55-80%): bấm vào, nghỉ 1s cho thành mũi tên đi lên, rồi xét TH3.
-   - TH5: lấy y của icon Valuable Event (`find_valuable_event`, cao hơn chữ "Event" 30 px), x = 40.
+   - Mũi tên đi lên (`arrow_up`, vùng x 0-30% y 70-88%): nút vào nằm ngay dưới, thấp hơn tâm mũi tên 40 px.
+   - Mũi tên đi xuống (`arrow_down`, vùng x 0-30% y 55-80%): đây là một phương án vào; bấm nó để lộ nút, nghỉ 1s, rồi lấy
+     nút vừa lộ.
+   - Cùng hàng Valuable Event: lấy y của icon (`find_valuable_event`, cao hơn chữ "Event" 30 px), x = 40.
    Bấm rồi cứ 1s xem có tiêu đề Super Value Return chưa, tối đa 8 lần:
    - Vào được màn có tiêu đề Super Value Return: đúng, làm tiếp.
-   - Vẫn ở màn thành: bấm lại nút đó 1 lần, chờ như trên; vẫn không vào thì bỏ Super Value Return khỏi danh sách nhiệm vụ
+   - Vẫn ở màn thành: bấm lại đúng nút đã chọn 1 lần, chờ như trên; không chuyển sang phương án vào khác. Vẫn không vào thì bỏ Super Value Return khỏi danh sách nhiệm vụ
      tới khi bấm Start lại.
    - Sang màn khác: về thành, bỏ Super Value Return khỏi danh sách nhiệm vụ tới khi bấm Start lại.
    Bỏ qua = `skip_for_run` ghi trên context (không ghi DB); `gift_claims.job` coi là xong trong lần Start này.

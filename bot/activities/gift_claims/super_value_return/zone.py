@@ -2,7 +2,7 @@
 
 Một LƯỢT TÌM (tối đa PASSES lượt mỗi ngày, số lượt đã xong lưu DB key ``gift_super_value_return_pass_1..3``):
 
-1. Từ màn thành bấm vào Super Value Return (open_super_value_return; tìm nút: launcher.py TH1-TH5).
+1. Từ màn thành bấm vào Super Value Return (open_super_value_return; chọn một lối vào thay thế trong launcher.py).
 2. Làm các event cần làm đang thấy ở hàng tab: bấm giữa ô tab, chờ sang trang, bấm chỗ tiêu đề rồi chạy flow riêng (do_visible).
 3. Kéo dài về giới hạn bên trái (swipe_to_left_edge), một lần mỗi lượt; làm tiếp các event cần làm vừa hiện ra.
 4. Kéo ngắn từ phải sang trái từng cú, mỗi chỗ làm các event cần làm đang thấy; icon ngoài cùng bên trái đứng nguyên chỗ 2 cú
@@ -320,9 +320,9 @@ def scan_to_right_edge(bot, pending: set[str], attempted: set[str], title) -> bo
 
 def open_super_value_return(bot) -> bool:
     """Từ màn thành chính (có nút •••; đang ở bản đồ thế giới thì to_city vào thành trước) tìm nút vào bằng
-    find_super_value_return (TH1-TH5, launcher.py) rồi bấm; cứ 1s xem có tiêu đề Super Value Return chưa, tối đa OPEN_WAITS lần.
+    find_super_value_return (các lối vào thay thế trong launcher.py) rồi bấm; cứ 1s xem có tiêu đề Super Value Return chưa, tối đa OPEN_WAITS lần.
     - Vào được: True.
-    - Vẫn ở màn thành: bấm lại nút đó (tổng OPEN_TAPS lần); vẫn không vào thì bỏ hoạt động tới khi Start lại (skip_for_run).
+    - Vẫn ở màn thành: bấm lại đúng nút đã chọn (tổng OPEN_TAPS lần), không thử các lối vào khác; vẫn không vào thì bỏ hoạt động tới khi Start lại (skip_for_run).
     - Sang màn khác: về thành, bỏ hoạt động tới khi Start lại.
     Không ở màn thành / không thấy nút: False (worker thử lại lần sau)."""
     bot.check()
