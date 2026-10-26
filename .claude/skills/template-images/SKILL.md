@@ -17,6 +17,9 @@ description: Chụp màn hình giả lập, cắt ảnh template vào Images/ v�
   - `Images/OCR/` — mẫu chữ số cho OCR (xem skill `ocr-samples`), **không** phải template nút
 - `images_in(folder)` lấy mọi `.png` trong thư mục, sắp theo tên → thêm file vào thư mục là tự được dùng; đặt tên có số (`1.png`, `2.png`) nếu thứ tự quan trọng.
 
+## Icon có hiệu ứng chạy liên tục
+Icon nút event có ánh sáng chạy nên cắt tay dễ khớp thấp: dùng [scripts/find_icon.py](scripts/find_icon.py), tự chụp nhiều khung và chọn ít ảnh nhất. Xem [FIND_ICON.md](FIND_ICON.md).
+
 ## Công cụ: scripts/probe.py
 
 [scripts/probe.py](scripts/probe.py) chạy bằng venv của project, dùng adbutils có sẵn (không cần adb trong PATH):
