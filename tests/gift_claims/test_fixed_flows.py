@@ -640,13 +640,13 @@ class FixedGiftFlowTests(unittest.TestCase):
             self.assertTrue(valuable_event_zone.scan_to_right_edge(bot, set(), set(), np.zeros((42, 396, 3), dtype=np.uint8)))
         self.assertEqual(4, bot.swipe_percent.call_count)
 
-    def test_open_valuable_event_taps_found_caption_and_waits_for_title(self):
+    def test_open_valuable_event_falls_back_to_ocr_when_name_median_is_missing(self):
         bot = mock.Mock()
         bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
         with (mock.patch.object(valuable_event_zone, "on_main", return_value=True),
               mock.patch.object(valuable_event_zone, "to_city", return_value=False),
               mock.patch.object(valuable_event_zone, "find_valuable_event_median",
-                                return_value=None),
+                                return_value=None) as median,
               mock.patch.object(valuable_event_zone, "find_valuable_event",
                                 return_value=(260, 590)),
               mock.patch.object(valuable_event_zone, "identify",
@@ -654,6 +654,7 @@ class FixedGiftFlowTests(unittest.TestCase):
             self.assertTrue(valuable_event_zone.open_valuable_event(bot))
 
         bot.tap.assert_called_once_with(260, 560)
+        median.assert_called_once_with(bot, bot.screenshot.return_value)
         self.assertEqual(3, bot.sleep.call_count)
         bot.swipe_percent.assert_not_called()              # kéo dài nằm trong search_pass, sau khi làm event đang thấy
 
