@@ -43,18 +43,18 @@ TEXT_CLAIM_CONTROLS = (
 )
 
 # Median of the launcher name only, rebuilt from 50 stable live frames on
-# emulator 21513 on 2026-10-27. Genuine scores were 0.9372..0.9941 (median
-# 0.9843); the strongest unrelated match in the same launcher region was
-# 0.4068. 0.80 leaves a wide margin on both sides. Do not include changing
-# chest artwork, badges, or city background.
+# emulator 21513 on 2026-10-27.  A fresh independent 50-frame measurement
+# later that day scored the genuine caption at 0.8090..0.8469 (median
+# 0.8333), while the strongest unrelated crop in this region was 0.4965.
+# Its midpoint is 0.6527.  Use the same descending ladder as Event Center;
+# 0.65 is the lowest safe measured fallback.  Do not include changing chest
+# artwork, badges, or city background.
 VALUABLE_EVENT_LABELS = (
     "ValuableEvent/launcher_name_median",
 )
 VALUABLE_EVENT_REGION = (40, 68, 88, 96)
 VALUABLE_EVENT_WIDE_REGION = (15, 50, 100, 100)
-# Across the 50 source frames the real name scores 0.9268..0.9948, while the
-# strongest unrelated match is 0.3988. Keep 0.80 as a conservative floor.
-VALUABLE_EVENT_THRESHOLDS = (0.80,)
+VALUABLE_EVENT_THRESHOLDS = (0.80, 0.75, 0.70, 0.65)
 
 # Super Value Return can be represented by its own gold artwork or different
 # named launchers (First Purchase, Empire Depot, Login Gifts, Lucky Raffle).

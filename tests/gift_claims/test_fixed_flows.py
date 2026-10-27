@@ -676,7 +676,7 @@ class FixedGiftFlowTests(unittest.TestCase):
         ocr.assert_not_called()
         bot.tap.assert_called_once_with(260, 560)
 
-    def test_open_valuable_event_uses_user_fallback_when_no_image_matches(self):
+    def test_open_valuable_event_repositions_before_user_fallback_when_no_image_matches(self):
         bot = mock.Mock()
         bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
         with (mock.patch.object(valuable_event_zone, "on_main", return_value=True),
@@ -685,10 +685,14 @@ class FixedGiftFlowTests(unittest.TestCase):
                                 return_value=None),
               mock.patch.object(valuable_event_zone, "find_valuable_event",
                                 return_value=None),
+              mock.patch.object(valuable_event_zone, "swipe_around") as reposition,
               mock.patch.object(valuable_event_zone, "identify",
                                 return_value=GiftScreen.VALUABLE_EVENT)):
             self.assertTrue(valuable_event_zone.open_valuable_event(bot))
 
+        # Like Event Center, two missed screenshots pan the city before the
+        # coordinate fallback is permitted on the final attempt.
+        reposition.assert_has_calls([mock.call(bot), mock.call(bot)])
         bot.tap.assert_called_once_with(256, 260)
 
     def test_swipe_to_left_edge_stops_when_cut_icon_is_still_visible(self):
