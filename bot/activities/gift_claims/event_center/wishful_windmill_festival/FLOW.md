@@ -27,11 +27,13 @@
    DONE 2, bất kể lượt đó có Claim mới hay chỉ có Claimed.
 8. Sau khi quét sạch Challenge Quest, **luôn** Back về Wind Power Storage, tìm
    rương cuối bằng ảnh median 40x40 trong vùng `(2,15,28,35)` ở ngưỡng `0.70`,
-   rồi bấm rương. Chỉ khi rương hiện `Congratulations!`, hoặc không có popup
-   nhưng rương đã biến mất khỏi đúng vùng, mới ghi DONE 2.
+   rồi bấm rương. Nếu **không có rương** sau toàn bộ lượt tìm ở vùng này thì
+   cũng ghi DONE 2. Nếu có rương, bot luôn tìm lại đúng ảnh và bấm tiếp cho
+   tới khi rương biến mất khỏi đúng vùng. `Congratulations!` chỉ là dấu hiệu
+   nhận quà; vẫn phải quét lại để xác nhận rương đã mất rồi mới ghi DONE 2.
 9. Ảnh rương cuối đo từ 60 frame thật trên 21513: điểm thấp nhất/trung vị/cao
    nhất `0.7728/0.9442/0.9736`, nhiễu ngoài vùng cao nhất `0.2478`.
 10. Không có giới hạn cứng số lượt lướt; biên dùng hai khung Hamming liên tiếp
-    không di chuyển. Còn Claim chưa xác minh, thiếu rương cuối, hoặc bấm xong
-    không có Congratulations và rương vẫn còn thì giữ PENDING.
+    không di chuyển. Còn Claim chưa xác minh, hoặc bấm rương xong không có
+    Congratulations và rương vẫn còn thì giữ PENDING.
 11. Chờ 1 giây sau thao tác/popup trước khi chụp và xác minh khung mới.

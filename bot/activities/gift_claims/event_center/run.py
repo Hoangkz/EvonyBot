@@ -809,7 +809,15 @@ def _claim_wishful_panel(bot, phase: str) -> tuple[ClaimReport, bool]:
 
 
 def _claim_wishful_done_two_chest(bot) -> tuple[ClaimReport, bool]:
-    """Claim the final chest; verify Congratulations or its disappearance."""
+    """Finish DONE 2 from the outer chest after the full green-panel scan.
+
+    No chest in the measured outer region is also terminal: Challenge Quest
+    was already scanned to its confirmed edge, so there is no remaining outer
+    reward to collect.  A chest which *is* visible is repeatedly found again
+    and tapped until it disappears.  A Congratulations popup is closed, but
+    is not sufficient by itself: the outer region is checked again before
+    DONE 2 is accepted.
+    """
     template, threshold = WISHFUL_DONE_TWO_CHEST
     chest = _wait_for(
         bot, template, attempts=5, threshold=threshold,
@@ -817,27 +825,40 @@ def _claim_wishful_done_two_chest(bot) -> tuple[ClaimReport, bool]:
         delay=WISHFUL_SETTLE_SECONDS,
     )
     if chest is None:
-        bot.record("Gift Claims: Wishful Windmill đã nhận Claim DONE 2 nhưng "
-                   "chưa thấy rương cuối; giữ PENDING")
-        return ClaimReport(), False
-    bot.record(f"Gift Claims: Wishful Windmill thấy rương cuối tại {chest}; tap")
-    bot.tap(*chest, delay=WISHFUL_SETTLE_SECONDS)
-    if close_congratulations(bot, attempts=8, region=(0, 18, 100, 65)):
-        bot.record("Gift Claims: Wishful Windmill rương cuối hiện "
-                   "Congratulations; DONE")
-        return ClaimReport(1, 1), True
-    remaining = _wait_for(
-        bot, template, attempts=2, threshold=threshold,
-        region=WISHFUL_DONE_TWO_CHEST_REGION,
-        delay=WISHFUL_SETTLE_SECONDS,
-    )
-    if remaining is None:
-        bot.record("Gift Claims: Wishful Windmill không thấy Congratulations "
-                   "nhưng rương cuối đã biến mất khỏi đúng vùng; DONE")
-        return ClaimReport(1, 1), True
-    bot.record("Gift Claims: Wishful Windmill đã bấm rương cuối nhưng chưa "
-               "thấy Congratulations và rương vẫn còn; giữ PENDING")
-    return ClaimReport(1, 0), False
+        bot.record("Gift Claims: Wishful Windmill đã quét xong Claim DONE 2 "
+                   "và không có rương ngoài để nhận; DONE")
+        return ClaimReport(0, 1), True
+    attempted = 0
+    while chest is not None:
+        # There is deliberately no tap-count ceiling here.  A live chest is
+        # a pending reward, not a reason to conclude DONE/PENDING and leave
+        # it behind.  BotContext.check() still yields safely at the worker's
+        # normal 120-second/boss boundary.
+        bot.check()
+        attempted += 1
+        bot.record(f"Gift Claims: Wishful Windmill thấy rương cuối tại {chest}; "
+                   f"tap ({attempted})")
+        bot.tap(*chest, delay=WISHFUL_SETTLE_SECONDS)
+        saw_congratulations = close_congratulations(
+            bot, attempts=8, region=(0, 18, 100, 65))
+        chest = _wait_for(
+            bot, template, attempts=3, threshold=threshold,
+            region=WISHFUL_DONE_TWO_CHEST_REGION,
+            delay=WISHFUL_SETTLE_SECONDS,
+        )
+        if chest is None:
+            if saw_congratulations:
+                bot.record("Gift Claims: Wishful Windmill rương cuối đã hiện "
+                           "Congratulations và biến mất; DONE")
+            else:
+                bot.record("Gift Claims: Wishful Windmill rương cuối đã biến "
+                           "mất khỏi đúng vùng; DONE")
+            return ClaimReport(attempted, 1), True
+        bot.record("Gift Claims: Wishful Windmill rương cuối vẫn còn; tìm lại "
+                   "đúng ảnh và tap tiếp")
+
+    # Kept for static type checkers; the loop returns when chest becomes None.
+    return ClaimReport(attempted, 1), True
 
 
 def _wait_event_row_open(bot, expected_screen=None, *, delay=UI_SETTLE_SECONDS):

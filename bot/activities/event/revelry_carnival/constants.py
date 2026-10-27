@@ -36,8 +36,25 @@ REWARD_REGION = (4, 70, 96, 95)
 # 21503 device, the former 147 px gesture (y=93 -> 72%) did not move the list;
 # the measured 170 px gesture from y=94.5 -> 70.5% does.  Do not start over
 # Parade Mask controls or finish on the level/progress strip or green border.
+#
+# On 21513 at LV7/8, the centre path could be swallowed by a reward row and
+# produce two identical frames even though levels remained below.  The user
+# selected x=45 px (11.36%) for the left fallback: y=665 -> 496 px remains
+# exactly inside the green frame.  The right and slightly-raised centre paths
+# are retained as later probes.  They are fallback probes, not extra broad
+# gestures: every endpoint remains within this green frame.
 SCAN_SWIPE = (50, 94.5, 50, 70.5)
 RETURN_TOP_SWIPE = (50, 70.5, 50, 94.5)
+SCAN_SWIPE_FALLBACKS = (
+    (11.36, 94.5, 11.36, 70.5),  # (45, 665) -> (45, 496) at 396x704
+    (80, 94.5, 80, 70.5),
+    (50, 93.5, 50, 70.5),
+)
+RETURN_TOP_SWIPE_FALLBACKS = (
+    (11.36, 70.5, 11.36, 94.5),  # (45, 496) -> (45, 665) at 396x704
+    (80, 70.5, 80, 94.5),
+    (50, 70.5, 50, 93.5),
+)
 SLOW_SWIPE_DURATION = 1.2
 STEP_DELAY = 1.0
 # The game may take a moment to open the Mask quantity panel.  Do not decide

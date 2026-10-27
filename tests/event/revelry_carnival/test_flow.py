@@ -66,9 +66,12 @@ class ClaimColourTests(unittest.TestCase):
 
     def test_all_reward_swipe_endpoints_stay_inside_green_frame(self):
         from bot.activities.event.revelry_carnival.constants import (
-            RETURN_TOP_SWIPE, SCAN_SWIPE)
+            RETURN_TOP_SWIPE, RETURN_TOP_SWIPE_FALLBACKS,
+            SCAN_SWIPE, SCAN_SWIPE_FALLBACKS)
         x0, y0, x1, y1 = REWARD_REGION
-        for gesture in (SCAN_SWIPE, RETURN_TOP_SWIPE):
+        for gesture in (SCAN_SWIPE, RETURN_TOP_SWIPE,
+                        *SCAN_SWIPE_FALLBACKS,
+                        *RETURN_TOP_SWIPE_FALLBACKS):
             with self.subTest(gesture=gesture):
                 self.assertTrue(x0 < gesture[0] < x1)
                 self.assertTrue(y0 < gesture[1] < y1)
@@ -104,6 +107,22 @@ class ClaimColourTests(unittest.TestCase):
                           mock.call(*second, delay=run.STEP_DELAY)],
                          bot.tap.call_args_list)
         bot.swipe_percent.assert_not_called()
+
+    def test_stationary_centre_swipe_tries_green_frame_fallback_before_edge(self):
+        bot = mock.Mock()
+        bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
+        with mock.patch.object(run, "_reward_hamming_distance",
+                               side_effect=(0, 533)):
+            moved = run._scroll_reward_frame(
+                bot, "xuống", run.SCAN_SWIPE, run.SCAN_SWIPE_FALLBACKS)
+
+        self.assertTrue(moved)
+        self.assertEqual(
+            [mock.call(*run.SCAN_SWIPE,
+                       duration=run.SLOW_SWIPE_DURATION, delay=run.STEP_DELAY),
+             mock.call(*run.SCAN_SWIPE_FALLBACKS[0],
+                       duration=run.SLOW_SWIPE_DURATION, delay=run.STEP_DELAY)],
+            bot.swipe_percent.call_args_list)
 
 
 class ResumeBot:

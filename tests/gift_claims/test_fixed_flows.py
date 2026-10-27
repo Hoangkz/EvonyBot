@@ -225,15 +225,15 @@ class FixedGiftFlowTests(unittest.TestCase):
         self.assertEqual(100, lobby.REGIONS[lobby.RIGHT][2])
 
     def test_valuable_event_finder_accepts_name_median(self):
-        template = cv2.imread(str(
-            IMAGES / "GiftClaims" / "ValuableEvent" /
-            "launcher_name_median.png"))
-        screen = np.zeros((704, 396, 3), dtype=np.uint8)
-        height, width = template.shape[:2]
-        screen[577:577 + height, 232:232 + width] = template
-        self.assertEqual(
-            (232 + width // 2, 577 + height // 2),
-            common.find_valuable_event(self.bot, screen))
+        for label in common.VALUABLE_EVENT_LABELS:
+            with self.subTest(label=label):
+                template = cv2.imread(str(IMAGES / "GiftClaims" / f"{label}.png"))
+                screen = np.zeros((704, 396, 3), dtype=np.uint8)
+                height, width = template.shape[:2]
+                screen[577:577 + height, 232:232 + width] = template
+                self.assertEqual(
+                    (232 + width // 2, 577 + height // 2),
+                    common.find_valuable_event(self.bot, screen))
 
     def test_lobby_valuable_event_finder_uses_ocr_caption(self):
         # Hàm cũ (ảnh launcher_*) đã xoá: lobby dùng bot/ocr/find_valuable_event, quy về chỗ cao hơn tâm chữ "Event" 10 px.
@@ -693,7 +693,7 @@ class FixedGiftFlowTests(unittest.TestCase):
         # Like Event Center, two missed screenshots pan the city before the
         # coordinate fallback is permitted on the final attempt.
         reposition.assert_has_calls([mock.call(bot), mock.call(bot)])
-        bot.tap.assert_called_once_with(256, 260)
+        bot.tap.assert_called_once_with(260, 560)
 
     def test_swipe_to_left_edge_stops_when_cut_icon_is_still_visible(self):
         # Cú 1 -> khung A; cú 2 -> hàng tab khác hẳn (icon cắt từ A mất): kéo tiếp; cú 3 -> hàng tab chỉ dịch 10 px (icon cắt
@@ -3331,21 +3331,19 @@ class FixedGiftFlowTests(unittest.TestCase):
         self.assertEqual(common.ClaimReport(4, 1), report)
         chest.assert_not_called()
 
-    def test_wishful_done_two_final_chest_requires_congratulations(self):
+    def test_wishful_done_two_retries_visible_chest_until_it_disappears(self):
         bot = mock.Mock()
         with (mock.patch.object(event_center, "_wait_for",
-                                return_value=(39, 157)),
+                                side_effect=((39, 157), (40, 158), None)),
               mock.patch.object(event_center, "close_congratulations",
                                 side_effect=(True, False))):
-            claimed, done = event_center._claim_wishful_done_two_chest(bot)
-            pending, pending_done = event_center._claim_wishful_done_two_chest(bot)
+            report, done = event_center._claim_wishful_done_two_chest(bot)
 
         self.assertTrue(done)
-        self.assertEqual(common.ClaimReport(1, 1), claimed)
-        self.assertFalse(pending_done)
-        self.assertEqual(common.ClaimReport(1, 0), pending)
+        self.assertEqual(common.ClaimReport(2, 1), report)
         self.assertEqual(
-            [mock.call(39, 157, delay=event_center.WISHFUL_SETTLE_SECONDS)] * 2,
+            [mock.call(39, 157, delay=event_center.WISHFUL_SETTLE_SECONDS),
+             mock.call(40, 158, delay=event_center.WISHFUL_SETTLE_SECONDS)],
             bot.tap.call_args_list)
 
     def test_wishful_done_two_final_chest_disappearance_is_done(self):
@@ -3361,6 +3359,18 @@ class FixedGiftFlowTests(unittest.TestCase):
         self.assertEqual(2, wait.call_count)
         bot.tap.assert_called_once_with(
             39, 157, delay=event_center.WISHFUL_SETTLE_SECONDS)
+
+    def test_wishful_done_two_without_outer_chest_is_done(self):
+        bot = mock.Mock()
+        with mock.patch.object(event_center, "_wait_for", return_value=None) as wait:
+            report, done = event_center._claim_wishful_done_two_chest(bot)
+
+        # Challenge Quest was already scanned to its confirmed edge.  Thus an
+        # absent outer chest is a valid DONE 2 state, not a retry loop.
+        self.assertTrue(done)
+        self.assertEqual(common.ClaimReport(0, 1), report)
+        wait.assert_called_once()
+        bot.tap.assert_not_called()
 
     def test_event_row_wait_does_not_treat_loading_frame_as_opened(self):
         bot = mock.Mock()

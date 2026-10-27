@@ -43,8 +43,10 @@ from .constants import (
     PARADE_MASK_OPEN_DELAY,
     PLUS,
     RETURN_TOP_SWIPE,
+    RETURN_TOP_SWIPE_FALLBACKS,
     REWARD_REGION,
     SCAN_SWIPE,
+    SCAN_SWIPE_FALLBACKS,
     SLOW_SWIPE_DURATION,
     STEP_DELAY,
     TITLE,
@@ -348,21 +350,42 @@ def _same_reward_position(before, after) -> bool:
     return _reward_hamming_distance(before, after) <= LIST_HASH_DISTANCE
 
 
+def _scroll_reward_frame(bot, direction: str, primary, fallbacks) -> bool:
+    """Scroll inside the green frame; recover from a swallowed centre swipe.
+
+    A stationary primary gesture alone is not an edge.  Some Revelry rows
+    intercept the finger at x=50 on particular levels, even though the list
+    below remains scrollable.  Test each measured alternate path in the same
+    green frame before reporting that this one edge-check did not move.
+    """
+    gestures = (primary, *fallbacks)
+    for probe, gesture in enumerate(gestures, 1):
+        bot.check()
+        before = bot.screenshot()
+        bot.swipe_percent(*gesture, duration=SLOW_SWIPE_DURATION,
+                          delay=STEP_DELAY)
+        after = bot.screenshot()
+        distance = _reward_hamming_distance(before, after)
+        moved = distance > LIST_HASH_DISTANCE
+        bot.record(f"{NAME}: lướt {direction} trong khung quà {gesture}, "
+                   f"Hamming {distance}/{LIST_HASH_DISTANCE}, đường "
+                   f"{probe}/{len(gestures)} {'đã di chuyển' if moved else 'không đổi'}")
+        if moved:
+            return True
+    return False
+
+
 def _swipe_to_top(bot) -> bool:
     unchanged = 0
     swipe = 0
     while unchanged < EDGE_CONFIRMATIONS:
         bot.check()
         swipe += 1
-        before = bot.screenshot()
-        bot.swipe_percent(*RETURN_TOP_SWIPE,
-                          duration=SLOW_SWIPE_DURATION, delay=STEP_DELAY)
-        after = bot.screenshot()
-        distance = _reward_hamming_distance(before, after)
-        unchanged = unchanged + 1 if distance <= LIST_HASH_DISTANCE else 0
-        bot.record(f"{NAME}: lướt lên trong khung quà {RETURN_TOP_SWIPE}, "
-                   f"Hamming {distance}/{LIST_HASH_DISTANCE}, không đổi "
-                   f"{unchanged}/{EDGE_CONFIRMATIONS} (cú {swipe})")
+        moved = _scroll_reward_frame(
+            bot, "lên", RETURN_TOP_SWIPE, RETURN_TOP_SWIPE_FALLBACKS)
+        unchanged = 0 if moved else unchanged + 1
+        bot.record(f"{NAME}: kiểm tra đầu danh sách lần {swipe}; không đổi "
+                   f"{unchanged}/{EDGE_CONFIRMATIONS}")
     bot.record(f"{NAME}: đã xác nhận đầu danh sách quà")
     return True
 
@@ -406,14 +429,10 @@ def _scan_full_list(bot):
         saw_claim = saw_claim or claimed
         if stuck:
             return saw_claim, True, False
-        before = bot.screenshot()
-        bot.swipe_percent(*SCAN_SWIPE,
-                          duration=SLOW_SWIPE_DURATION, delay=STEP_DELAY)
-        after = bot.screenshot()
-        distance = _reward_hamming_distance(before, after)
-        unchanged = unchanged + 1 if distance <= LIST_HASH_DISTANCE else 0
-        bot.record(f"{NAME}: lướt xuống trong khung quà {SCAN_SWIPE}, "
-                   f"Hamming {distance}/{LIST_HASH_DISTANCE}, không đổi "
+        moved = _scroll_reward_frame(
+            bot, "xuống", SCAN_SWIPE, SCAN_SWIPE_FALLBACKS)
+        unchanged = 0 if moved else unchanged + 1
+        bot.record(f"{NAME}: kiểm tra cuối danh sách; không đổi "
                    f"{unchanged}/{EDGE_CONFIRMATIONS}")
         if unchanged >= EDGE_CONFIRMATIONS:
             return saw_claim, False, True
