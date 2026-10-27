@@ -180,8 +180,8 @@ def find_valuable_event(bot, screen):
                        region=VALUABLE_EVENT_REGION)
             if pos is not None:
                 bot.log(
-                    "Gift Claims: Valuable Event name median at threshold "
-                    f"{threshold}")
+                    "Gift Claims: Valuable Event name median "
+                    f"{label} at threshold {threshold}")
                 return pos
     # Search a wider lower-half region only after the precise caption search
     # failed. The same name-only template is used; changing artwork is never a
@@ -192,8 +192,8 @@ def find_valuable_event(bot, screen):
                        region=VALUABLE_EVENT_WIDE_REGION)
             if pos is not None:
                 bot.log(
-                    "Gift Claims: Valuable Event name median ở vùng tìm rộng "
-                    f"tại threshold {threshold}")
+                    "Gift Claims: Valuable Event name median "
+                    f"{label} ở vùng tìm rộng tại threshold {threshold}")
                 return pos
     return None
 

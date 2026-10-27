@@ -36,8 +36,11 @@ PASSES = 3              # số lượt tìm mỗi ngày; đủ thì mọi event 
 SEEN_ATTR = "_valuable_event_seen"   # thuộc tính trên context: (mốc reset, event đã thấy) — xem seen_today
 OPEN_ATTEMPTS = 3       # số vị trí màn thành để tìm launcher; hai lần không thấy đầu sẽ kéo quanh thành, lần cuối mới được fallback
 OPEN_WAITS = 8          # sau khi bấm: chụp kiểm tra màn Valuable Event tối đa chừng này lần, mỗi lần chờ 1s
-LAUNCHER_FALLBACK = (260, 560)  # user-supplied 396x704 target; title must verify
-ICON_ABOVE = 30         # px (màn rộng 396): find_valuable_event trả về tâm chữ "Event", bấm lên icon phía trên
+LAUNCHER_FALLBACK = (260, 585)  # user-supplied 396x704 target; title must verify
+# Both name-only medians are centred at y~589 on the 396x704 city screen.
+# The launcher accepts taps in the lower icon/caption band at y~585; the old
+# -30 px adjustment clicked y~559 and missed the launcher altogether.
+LAUNCHER_TAP_DY = -5
 # % màn: tìm thấy tab thì bấm vào chính giữa ô tab. Ô tab cao y 62-122 trên màn 704 -> giữa y 92 (13%); icon nằm giữa ô theo
 # chiều ngang nên x lấy theo tab tìm được. Tâm icon (y ~75) chỉ là nửa trên ô: Optional Package bấm ở đó game không nhận.
 TAB_TAP_Y = 13
@@ -351,11 +354,11 @@ def open_valuable_event(bot) -> bool:
             scale = screen.shape[1] / REFERENCE_WIDTH
             target = tuple(round(value * scale) for value in LAUNCHER_FALLBACK)
             bot.record("Gift Claims: không thấy nút Valuable Event; "
-                       "đã kéo tìm ở mọi vị trí; bấm fallback x=260 y=560")
+                       "đã kéo tìm ở mọi vị trí; bấm fallback x=260 y=585")
         else:
-            above = round(ICON_ABOVE * screen.shape[1] / REFERENCE_WIDTH)
-            target = (pos[0], max(0, pos[1] - above))
-            bot.record(f"Gift Claims: bấm nút Valuable Event tại {pos} "
+            dy = round(LAUNCHER_TAP_DY * screen.shape[1] / REFERENCE_WIDTH)
+            target = (pos[0], max(0, pos[1] + dy))
+            bot.record(f"Gift Claims: bấm nút Valuable Event tại {target} "
                        f"(lần {attempt}/{OPEN_ATTEMPTS})")
         bot.tap(*target)
         for _ in range(OPEN_WAITS):
