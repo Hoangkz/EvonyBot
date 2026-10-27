@@ -653,7 +653,7 @@ class FixedGiftFlowTests(unittest.TestCase):
                                 side_effect=(None, None, GiftScreen.VALUABLE_EVENT))):
             self.assertTrue(valuable_event_zone.open_valuable_event(bot))
 
-        bot.tap.assert_called_once_with(260, 560)
+        bot.tap.assert_called_once_with(260, 590)
         median.assert_called_once_with(bot, bot.screenshot.return_value)
         self.assertEqual(3, bot.sleep.call_count)
         bot.swipe_percent.assert_not_called()              # kéo dài nằm trong search_pass, sau khi làm event đang thấy
@@ -674,7 +674,7 @@ class FixedGiftFlowTests(unittest.TestCase):
 
         median.assert_called_once_with(bot, screen)
         ocr.assert_not_called()
-        bot.tap.assert_called_once_with(260, 560)
+        bot.tap.assert_called_once_with(260, 590)
 
     def test_open_valuable_event_repositions_before_user_fallback_when_no_image_matches(self):
         bot = mock.Mock()
@@ -693,7 +693,20 @@ class FixedGiftFlowTests(unittest.TestCase):
         # Like Event Center, two missed screenshots pan the city before the
         # coordinate fallback is permitted on the final attempt.
         reposition.assert_has_calls([mock.call(bot), mock.call(bot)])
-        bot.tap.assert_called_once_with(260, 560)
+        bot.tap.assert_called_once_with(260, 585)
+
+    def test_open_valuable_event_never_falls_back_outside_verified_city(self):
+        bot = mock.Mock()
+        bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
+        with (mock.patch.object(valuable_event_zone, "OPEN_ATTEMPTS", 1),
+              mock.patch.object(valuable_event_zone, "on_main", return_value=False),
+              mock.patch.object(valuable_event_zone, "return_home", return_value=True),
+              mock.patch.object(valuable_event_zone, "to_city", return_value=False),
+              mock.patch.object(valuable_event_zone, "find_valuable_event_median") as median):
+            self.assertFalse(valuable_event_zone.open_valuable_event(bot))
+
+        median.assert_not_called()
+        bot.tap.assert_not_called()
 
     def test_swipe_to_left_edge_stops_when_cut_icon_is_still_visible(self):
         # Cú 1 -> khung A; cú 2 -> hàng tab khác hẳn (icon cắt từ A mất): kéo tiếp; cú 3 -> hàng tab chỉ dịch 10 px (icon cắt
