@@ -1,17 +1,16 @@
 """
-refine_equipment_tab.py — tab "Refine Equipment": group "General" (ô tích tướng yêu thích + loại tướng) và 6 group trang bị. Mỗi group có ô
-"Max refines (per equipment)" và nút "+ Add line": mỗi lần bấm thêm một dòng cần có (tối đa 4, vì trang bị chỉ có 4 dòng tinh luyện). Mỗi dòng chọn
-một thuộc tính trong danh mục của trang bị đó, màu tối thiểu (Orange / Gold), ô "Lock" (khoá dòng lại khi đã ra đúng) và nút xoá. Hai dòng có thể
-cùng thuộc tính (game có thể ra trùng).
+refine_equipment_tab.py — tab "Refine Equipment": group "General" (ô tích tướng yêu thích + loại tướng) và 6 group trang bị. Mỗi trang bị có 4 dòng tinh luyện,
+mỗi dòng ra ngẫu nhiên một trong nhiều loại thuộc tính, nên group liệt kê MỌI thuộc tính của trang bị đó thành lưới ô có viền 2 cột để tích nhiều
+thuộc tính cần: mỗi ô gồm ô tích, tên, màu tối thiểu (Orange / Gold) và ô "Lock" (khoá dòng lại khi đã ra đúng). Đầu group có hai ô cho RIÊNG trang bị đó:
+"Max refines" (số lần Refine tối đa) và "Stop when" (khi nào dừng: số dòng vàng / cam trong 4 dòng New).
 
 Settings (cột `refine_equipment` của DB):
 {"favorite": false, "general_type": "all",
- "slots": {"weapon": {"lines": [{"attribute": "Ground Troop Attack", "color": "gold", "lock": true}, {"attribute": "Ranged Troop Attack", "color": "gold", "lock": false}],
-                      "max_refines": 100}, ...}}
+ "slots": {"weapon": {"lines": [{"attribute": "Ground Troop Attack", "color": "gold", "kind": "percent", "lock": true}], "max_refines": 100, "stop": {"gold": 1, "orange": 0}}, ...}}
 """
-from PyQt5.QtCore import QSize, Qt
+from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
-    QCheckBox, QComboBox, QFrame, QGroupBox, QHBoxLayout, QLabel, QPushButton, QScrollArea, QSizePolicy, QVBoxLayout,
+    QCheckBox, QComboBox, QFrame, QGridLayout, QGroupBox, QHBoxLayout, QLabel, QScrollArea, QSizePolicy,
 )
 
 from bot.activities.refine_equipment.constants import (
@@ -20,149 +19,165 @@ from bot.activities.refine_equipment.constants import (
     COLORS,
     DEFAULT_COLOR,
     DEFAULT_GENERAL_TYPE,
+    DEFAULT_MAX_REFINES,
+    DEFAULT_KIND,
+    DEFAULT_STOP,
     FAVORITE_KEY,
     GENERAL_TYPE_KEY,
     GENERAL_TYPES,
-    DEFAULT_MAX_REFINES,
+    KIND_KEY,
+    KINDS,
     LINES_KEY,
     LOCK_KEY,
-    MAX_LINES,
     MAX_REFINES_KEY,
     MAX_REFINES_OPTIONS,
     SLOTS,
     SLOTS_KEY,
+    STOP_KEY,
+    STOP_OPTIONS,
+    stop_label,
 )
 
-from .constants import PROFILE_BUTTON_HEIGHT
-from .initialization_tab import _trash_icon
 from .tab_placeholder import BaseTab
 
-COLOR_WIDTH = 70
+COLUMNS = 2          # số cột thuộc tính trong một group trang bị
+NAME_WIDTH = 92      # bề rộng tối thiểu của tên thuộc tính (ô rộng hơn thì tên giãn thêm, xuống dòng khi dài)
+NAME_PADDING = 6     # chừa thêm cho dòng cuối (heightForWidth tính sát chữ)
+NAME_HEIGHT = 36     # chiều cao tối thiểu của tên (2 dòng); tên dài hơn tự cao thêm
+COLOR_WIDTH = 66
+KIND_WIDTH = 60
+MAX_REFINES_WIDTH = 80
+STOP_WIDTH = 170           # đủ chữ dài nhất ("1 gold + 3 orange")
 GENERAL_TYPE_WIDTH = 170   # đủ chữ dài nhất ("Hammer (Development)")
-ATTRIBUTE_CHARS = 24       # bề rộng tối thiểu của ô thuộc tính, tính theo số ký tự
-ATTRIBUTE_POPUP_WIDTH = 340   # danh sách xổ ra rộng đủ tên dài nhất
-BORDER = "#c7ccd4"
-ROW_STYLE = "QFrame#RefineRow {{ border: 1px solid {color}; border-radius: 6px; }}"
+BORDER, BORDER_ON = "#c7ccd4", "#2563eb"     # viền ô: thường / đã tích
+CELL_STYLE = "QFrame#RefineCell {{ border: 1px solid {color}; border-radius: 6px; }}"
 
 
-class _LineRow(QFrame):
-    """Một dòng cần có (một hàng có viền): ô chọn thuộc tính, màu tối thiểu, Lock, nút xoá."""
+class _LineRow:
+    """Một thuộc tính = một ô có viền (xanh khi đã tích): ô tích, tên, màu tối thiểu, Lock. Màu và Lock chỉ chỉnh được khi đã tích."""
 
-    def __init__(self, catalog: tuple, on_change, on_remove, parent=None):
-        super().__init__(parent)
-        self.setObjectName("RefineRow")
-        self.setStyleSheet(ROW_STYLE.format(color=BORDER))
-        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        self.attribute = QComboBox()
-        for name in catalog:
-            self.attribute.addItem(name, name)
-        self.attribute.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        self.attribute.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)   # không giãn theo tên dài nhất; danh sách xổ ra vẫn hiện đủ tên
-        self.attribute.setMinimumContentsLength(ATTRIBUTE_CHARS)
-        self.attribute.view().setMinimumWidth(ATTRIBUTE_POPUP_WIDTH)
+    def __init__(self, name: str, on_toggle, on_change):
+        self.name = name
+        self.cell = QFrame()
+        self.cell.setObjectName("RefineCell")
+        self.cell.setStyleSheet(CELL_STYLE.format(color=BORDER))
+        self.box = QCheckBox()
+        label = QLabel(name)              # bấm vào tên cũng tích / bỏ tích
+        label.setWordWrap(True)
+        label.setMinimumWidth(NAME_WIDTH)
+        # Chiều cao tối thiểu = số dòng khi tên xuống dòng ở bề rộng hẹp nhất (NAME_WIDTH); ô rộng hơn chỉ ít dòng hơn nên không bị cắt, và không
+        # phụ thuộc kích thước cửa sổ (đổi chiều cao theo bề rộng thật làm thanh cuộn dọc nhảy qua lại).
+        label.setMinimumHeight(max(label.heightForWidth(NAME_WIDTH) + NAME_PADDING, NAME_HEIGHT))
+        label.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
+        label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.MinimumExpanding)   # tên chiếm hết phần dư của ô
+        label.setToolTip(name)
+        label.mousePressEvent = lambda event, b=self.box: b.click()
         self.color = QComboBox()
         for color_id, text in COLORS:
             self.color.addItem(text, color_id)
         self.color.setCurrentIndex(max(0, self.color.findData(DEFAULT_COLOR)))
         self.color.setFixedWidth(COLOR_WIDTH)
+        self.kind = QComboBox()        # tăng % hay tăng chỉ số (hay cả hai) của dòng
+        for kind_id, text in KINDS:
+            self.kind.addItem(text, kind_id)
+        self.kind.setCurrentIndex(max(0, self.kind.findData(DEFAULT_KIND)))
+        self.kind.setFixedWidth(KIND_WIDTH)
+        self.kind.setToolTip("All: cả tăng % lẫn tăng chỉ số | %: chỉ dòng tăng % (+3.9%) | Flat: chỉ dòng tăng chỉ số (+128)")
         self.lock = QCheckBox("Lock")
         self.lock.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)   # rộng đúng bằng ô tích + chữ "Lock" theo font thật, không cắt chữ
         self.lock.setToolTip("Khoá dòng này lại khi đã ra đúng thuộc tính và màu")
-        remove = QPushButton()      # nút thùng rác giống nút xoá hồ sơ ở tab Initialization
-        remove.setFixedSize(PROFILE_BUTTON_HEIGHT + 12, PROFILE_BUTTON_HEIGHT)
-        remove.setStyleSheet("padding: 0px;")
-        remove.setIcon(_trash_icon())
-        remove.setIconSize(QSize(14, 14))
-        remove.setToolTip("Delete this line")
-        row = QHBoxLayout(self)
-        row.setContentsMargins(6, 4, 6, 4)
-        row.setSpacing(8)
-        row.addWidget(self.attribute, 1)
+        for widget in (self.color, self.kind, self.lock):
+            widget.setEnabled(False)
+        row = QHBoxLayout(self.cell)
+        row.setContentsMargins(4, 4, 4, 4)
+        row.setSpacing(4)
+        self.cell.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)   # ô giãn đều theo cột; cao theo tên
+        row.addWidget(self.box)
+        row.addWidget(label, 1)            # tên giãn hết phần dư của ô; màu / Lock luôn sát mép phải
         row.addWidget(self.color)
+        row.addWidget(self.kind)
         row.addWidget(self.lock)
-        row.addWidget(remove)
-        self.attribute.currentIndexChanged.connect(lambda _=0: on_change())
+        self.box.toggled.connect(lambda on: on_toggle(self, on))
         self.color.currentIndexChanged.connect(lambda _=0: on_change())
+        self.kind.currentIndexChanged.connect(lambda _=0: on_change())
         self.lock.toggled.connect(lambda _=False: on_change())
-        remove.clicked.connect(lambda _=False: on_remove(self))
+
+    def set_ticked(self, on: bool):
+        self.color.setEnabled(on)
+        self.kind.setEnabled(on)
+        self.lock.setEnabled(on)
+        self.cell.setStyleSheet(CELL_STYLE.format(color=BORDER_ON if on else BORDER))
 
     def value(self) -> dict:
-        return {ATTRIBUTE_KEY: self.attribute.currentData(), COLOR_KEY: self.color.currentData(), LOCK_KEY: self.lock.isChecked()}
+        return {ATTRIBUTE_KEY: self.name, COLOR_KEY: self.color.currentData(), KIND_KEY: self.kind.currentData(), LOCK_KEY: self.lock.isChecked()}
 
-    def set_value(self, data: dict):
-        self.attribute.setCurrentIndex(max(0, self.attribute.findData(data.get(ATTRIBUTE_KEY))))
+    def set_value(self, data: dict | None):
+        self.box.setChecked(data is not None)
+        data = data or {}
         self.color.setCurrentIndex(max(0, self.color.findData(data.get(COLOR_KEY, DEFAULT_COLOR))))
+        self.kind.setCurrentIndex(max(0, self.kind.findData(data.get(KIND_KEY, DEFAULT_KIND))))
         self.lock.setChecked(bool(data.get(LOCK_KEY)))
 
 
 class _SlotGroup(QGroupBox):
-    """Một trang bị: ô số lần Refine tối đa, các dòng cần có (thêm bằng nút +, tối đa MAX_LINES) và nút "+ Add line"."""
+    """Một trang bị: hàng đầu là ô Max refines + ô Stop when, dưới là bảng COLUMNS cột các thuộc tính (tích bao nhiêu cũng được)."""
 
     def __init__(self, label: str, catalog: tuple, on_change, parent=None):
         super().__init__(label, parent)
-        self._catalog = catalog
         self._on_change = on_change
-        self.rows: list[_LineRow] = []
-        layout = QVBoxLayout(self)
-        layout.setSpacing(6)
+        grid = QGridLayout(self)
+        grid.setSpacing(6)
         # Số lần Refine tối đa của TRANG BỊ NÀY mỗi lượt (100 .. 1000 hoặc ALL = tới khi đạt); mỗi trang bị một ô riêng.
         self.max_refines = QComboBox()
         for option in MAX_REFINES_OPTIONS:
             self.max_refines.addItem(str(option), option)
+        self.max_refines.setFixedWidth(MAX_REFINES_WIDTH)
         self.max_refines.setCurrentIndex(self.max_refines.findData(DEFAULT_MAX_REFINES))
         self.max_refines.currentIndexChanged.connect(lambda _=0: on_change())
-        header = QHBoxLayout()
-        header.addWidget(QLabel(f"Max refines (per equipment: {label})"))
+        # Khi nào dừng (Confirm) của TRANG BỊ NÀY: số dòng vàng / cam tối thiểu trong 4 dòng New. Dữ liệu của mục là chỉ số trong STOP_OPTIONS
+        # (Qt không tìm lại được dữ liệu dạng tuple bằng findData).
+        self.stop = QComboBox()
+        for index, (gold, orange) in enumerate(STOP_OPTIONS):
+            self.stop.addItem(stop_label(gold, orange), index)
+        self.stop.setFixedWidth(STOP_WIDTH)
+        self.stop.setCurrentIndex(STOP_OPTIONS.index(DEFAULT_STOP))
+        self.stop.currentIndexChanged.connect(lambda _=0: on_change())
+        header = QHBoxLayout()      # Max refines và Stop when cùng một hàng
+        header.addWidget(QLabel("Max refines (per equipment)"))
         header.addWidget(self.max_refines)
+        header.addSpacing(16)
+        header.addWidget(QLabel("Stop when (per equipment)"))
+        header.addWidget(self.stop)
         header.addStretch(1)
-        layout.addLayout(header)
-        self._rows_layout = QVBoxLayout()
-        self._rows_layout.setSpacing(6)
-        layout.addLayout(self._rows_layout)
-        self.add_button = QPushButton("+ Add line")
-        self.add_button.clicked.connect(lambda _=False: self._add_row(notify=True))
-        buttons = QHBoxLayout()
-        buttons.addWidget(self.add_button)
-        buttons.addStretch(1)
-        layout.addLayout(buttons)
+        grid.addLayout(header, 0, 0, 1, COLUMNS)
+        grid.setAlignment(Qt.AlignTop)
+        for column in range(COLUMNS):
+            grid.setColumnStretch(column, 1)       # 2 cột chia đều bề ngang
+        self.rows: dict[str, _LineRow] = {}
+        for i, name in enumerate(catalog):
+            row = _LineRow(name, self._toggled, on_change)
+            self.rows[name] = row
+            grid.addWidget(row.cell, 1 + i // COLUMNS, i % COLUMNS)
 
-    def _add_row(self, data: dict | None = None, notify: bool = False):
-        if len(self.rows) >= MAX_LINES:      # trang bị chỉ có MAX_LINES dòng tinh luyện
-            return
-        row = _LineRow(self._catalog, self._on_change, self._remove_row)
-        if data:
-            row.set_value(data)
-        self.rows.append(row)
-        self._rows_layout.addWidget(row)
-        self._refresh()
-        if notify:
-            self._on_change()
-
-    def _remove_row(self, row: _LineRow):
-        self.rows.remove(row)
-        self._rows_layout.removeWidget(row)
-        row.deleteLater()
-        self._refresh()
+    def _toggled(self, row: _LineRow, on: bool):
+        row.set_ticked(on)
         self._on_change()
 
-    def _refresh(self):
-        self.add_button.setEnabled(len(self.rows) < MAX_LINES)
-
     def chosen(self) -> list[dict]:
-        return [row.value() for row in self.rows]
+        return [row.value() for row in self.rows.values() if row.box.isChecked()]
 
     def value(self) -> dict:
-        return {LINES_KEY: self.chosen(), MAX_REFINES_KEY: self.max_refines.currentData()}
+        gold, orange = STOP_OPTIONS[self.stop.currentData()]
+        return {LINES_KEY: self.chosen(), MAX_REFINES_KEY: self.max_refines.currentData(), STOP_KEY: {"gold": gold, "orange": orange}}
 
     def set_value(self, data: dict):
-        for row in list(self.rows):
-            self._rows_layout.removeWidget(row)
-            row.deleteLater()
-        self.rows.clear()
-        for line in (data.get(LINES_KEY) or [])[:MAX_LINES]:
-            self._add_row(line)
-        self._refresh()
+        saved = {line.get(ATTRIBUTE_KEY): line for line in data.get(LINES_KEY) or []}
+        for name, row in self.rows.items():
+            row.set_value(saved.get(name))
         self.max_refines.setCurrentIndex(max(0, self.max_refines.findData(data.get(MAX_REFINES_KEY, DEFAULT_MAX_REFINES))))
+        stop = data.get(STOP_KEY) or {}
+        pair = (stop.get("gold"), stop.get("orange"))
+        self.stop.setCurrentIndex(STOP_OPTIONS.index(pair) if pair in STOP_OPTIONS else STOP_OPTIONS.index(DEFAULT_STOP))
 
 
 class RefineEquipmentTab(BaseTab):
