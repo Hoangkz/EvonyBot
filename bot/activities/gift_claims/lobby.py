@@ -23,6 +23,10 @@ VALUABLE_LAUNCH_ATTEMPTS = 3
 # sample a full ten-second window instead of treating four frames as absence.
 SUPER_VALUE_LAUNCH_ATTEMPTS = 50
 SUPER_VALUE_LAUNCH_INTERVAL = 0.2
+# User-supplied fallback targets on the 396x704 city screen. A coordinate tap
+# is never accepted as success without the destination title being identified.
+VALUABLE_EVENT_FALLBACK = (256, 260)
+SUPER_VALUE_RETURN_FALLBACK = (35, 560)
 PARENT_EDGE_CONFIRMATIONS = 2
 PARENT_SAME_DISTANCE = 16
 IGNORED_RIGHT_LAUNCHERS = ("FollowUs/facebook_icon",)
@@ -277,7 +281,7 @@ def find_valuable_event(bot, screen):
 
 
 def open_named(bot, expected):
-    """Open a named parent through image recognition, never a fixed position."""
+    """Open a named parent by image, then a verified user-supplied fallback."""
     if not return_home(bot):
         return False
     launcher = None
@@ -300,14 +304,14 @@ def open_named(bot, expected):
                     f"{VALUABLE_LAUNCH_ATTEMPTS - 1})")
                 swipe_around(bot)
         if launcher is None:
-            # Approved city-layout fallback for the 396x704 reference screen.
             # Verify the inner title after tapping; a coordinate tap alone is
             # never accepted as proof that the correct page opened.
             scale = screen.shape[1] / REFERENCE_WIDTH
-            fixed_target = (round(255 * scale), round(566 * scale))
+            fixed_target = tuple(round(value * scale)
+                                 for value in VALUABLE_EVENT_FALLBACK)
             bot.record(
                 "Gift Claims: không thấy launcher ValuableEvent; "
-                "bấm fallback x=255 y=566")
+                "bấm fallback x=256 y=260")
             bot.tap(*fixed_target, delay=1)
             for attempt in range(OPEN_WAIT_ATTEMPTS):
                 if identify(bot, bot.screenshot()) == expected:
@@ -315,7 +319,7 @@ def open_named(bot, expected):
                 if attempt + 1 < OPEN_WAIT_ATTEMPTS:
                     bot.sleep(1)
             bot.record(
-                "Gift Claims: fallback x=255 y=566 không mở được "
+                "Gift Claims: fallback x=256 y=260 không mở được "
                 "ValuableEvent")
 
             # Some city layouts expose only the Super Value Return launcher,
@@ -342,7 +346,7 @@ def open_named(bot, expected):
     elif expected == GiftScreen.SUPER_VALUE_RETURN:
         # Animation changes the launcher artwork every few frames. Sample
         # several fresh screenshots and use the dedicated multi-template
-        # detector. Never replace a miss with a hard-coded tap.
+        # detector before the user-supplied fallback.
         for attempt in range(SUPER_VALUE_LAUNCH_ATTEMPTS):
             screen = bot.screenshot()
             if identify(bot, screen) == expected:
@@ -357,10 +361,13 @@ def open_named(bot, expected):
                         f"{SUPER_VALUE_LAUNCH_ATTEMPTS - 1})")
                 bot.sleep(SUPER_VALUE_LAUNCH_INTERVAL)
         if launcher is None:
+            scale = screen.shape[1] / REFERENCE_WIDTH
+            launcher = tuple(round(value * scale)
+                             for value in SUPER_VALUE_RETURN_FALLBACK)
+            launcher_is_tap_target = True
             bot.record("Gift Claims: không nhận diện được launcher "
                        f"SuperValueReturn sau {SUPER_VALUE_LAUNCH_ATTEMPTS} "
-                       "frame; không mở ValuableEvent và không bấm tọa độ cứng")
-            return False
+                       "frame; bấm fallback x=35 y=560")
     else:
         screen = bot.screenshot()
         if identify(bot, screen) == expected:

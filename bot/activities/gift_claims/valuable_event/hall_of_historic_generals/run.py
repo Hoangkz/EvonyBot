@@ -37,7 +37,7 @@ CHEST_ABSENCE_CONFIRMATIONS = 2
 SAME_DISTANCE = 24
 CLAIM_THRESHOLD = 0.72
 CLAIMED_THRESHOLD = 0.76
-MAX_CLAIMS_PER_VIEW = 12
+MAX_TAPS_PER_STALLED_CLAIM = 3
 
 # Outcomes consumed by the parent zone. DONE_1 deliberately is not a DB DONE:
 # it defers this task until the next complete Claim Gifts invocation.
@@ -202,37 +202,55 @@ def _swipe_to_top(bot) -> None:
 def _claim_current_view(bot) -> tuple[bool, bool, bool, bool]:
     """Return claimed_now, stuck, saw_claimed, saw_pending for one viewport."""
     claimed_now = False
-    blocked: list[tuple[int, int]] = []
-    for _ in range(MAX_CLAIMS_PER_VIEW):
+    attempted: list[tuple[tuple[int, int], int]] = []
+
+    def attempts_for(point):
+        return next((count for old, count in attempted
+                     if (point[0] - old[0]) ** 2 +
+                     (point[1] - old[1]) ** 2 <= 30 ** 2), 0)
+
+    def note_attempt(point):
+        for index, (old, count) in enumerate(attempted):
+            if ((point[0] - old[0]) ** 2 +
+                    (point[1] - old[1]) ** 2 <= 30 ** 2):
+                attempted[index] = (old, count + 1)
+                return count + 1
+        attempted.append((point, 1))
+        return 1
+
+    while True:
         bot.check()
         screen = bot.screenshot()
         green_claims = _green_claims(bot, screen)
-        candidates = [point for point in green_claims
-                      if all((point[0] - old[0]) ** 2 +
-                             (point[1] - old[1]) ** 2 > 30 ** 2
-                             for old in blocked)]
-        if not candidates:
+        fresh = [point for point in green_claims if attempts_for(point) == 0]
+        retry = next((point for point in green_claims
+                      if 0 < attempts_for(point) < MAX_TAPS_PER_STALLED_CLAIM),
+                     None)
+        point = fresh[0] if fresh else retry
+        if point is None:
             final = bot.screenshot()
-            # A green Claim that survived a tap and is now locally blocked is
-            # not a clean viewport; report it as stuck instead of scrolling
-            # away or accidentally treating nearby Claimed rows as complete.
+            # Every green Claim in this viewport was offered a full set of
+            # paced taps.  We only report it stuck after first trying every
+            # other Claim in the same viewport; a lagged line never aborts
+            # the rest of this turn's work.
             return (claimed_now, bool(green_claims),
                     bool(_gray_claimed(bot, final)),
                     _pending_controls(bot, final))
-        point = candidates[0]
+        tap_number = note_attempt(point)
         bot.record("Gift Claims: Hall of Historic Generals thấy chữ Claim và "
-                   "dải xanh; tap nhận")
+                   f"dải xanh; tap nhận ({tap_number}/"
+                   f"{MAX_TAPS_PER_STALLED_CLAIM} tại vị trí này)")
         bot.tap(*point, delay=STEP_DELAY)
-        close_congratulations(bot, attempts=2)
-        claimed_now = True
+        popup_closed = close_congratulations(bot, attempts=2)
         after = bot.screenshot()
-        if any((candidate[0] - point[0]) ** 2 +
-               (candidate[1] - point[1]) ** 2 <= 30 ** 2
-               for candidate in _green_claims(bot, after)):
-            blocked.append(point)
-
-    remains = bool(_green_claims(bot, bot.screenshot()))
-    return claimed_now, remains, False, False
+        persists = any((candidate[0] - point[0]) ** 2 +
+                       (candidate[1] - point[1]) ** 2 <= 30 ** 2
+                       for candidate in _green_claims(bot, after))
+        if not persists or popup_closed:
+            claimed_now = True
+            continue
+        bot.record("Gift Claims: Hall of Historic Generals Claim chưa đổi; "
+                   "tiếp tục tìm Claim khác trong cùng lượt trước")
 
 
 def _scan_one_full_pass(bot) -> tuple[bool, bool, bool, bool]:

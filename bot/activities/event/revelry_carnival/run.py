@@ -39,6 +39,8 @@ from .constants import (
     PARADE_MASK,
     PARADE_MASK_DONE,
     PARADE_MASK_DONE_REGION,
+    PARADE_MASK_EMPTY_MARKER,
+    PARADE_MASK_OPEN_DELAY,
     PLUS,
     RETURN_TOP_SWIPE,
     REWARD_REGION,
@@ -71,7 +73,7 @@ def _wait(bot, template, *, threshold=CONTROL_THRESHOLD,
 
 
 def _wait_mask_result(bot):
-    """Wait for the exact exhausted marker or the quantity-popup anchor."""
+    """Wait for either supplied empty-Mask marker or the quantity popup."""
     end = time.monotonic() + WAIT_TIMEOUT
     while True:
         screen = bot.screenshot()
@@ -79,6 +81,11 @@ def _wait_mask_result(bot):
                              screen=screen, region=PARADE_MASK_DONE_REGION)
         if exhausted is not None:
             return "done", exhausted
+        empty_marker = bot.find(PARADE_MASK_EMPTY_MARKER,
+                                threshold=CONTROL_THRESHOLD, screen=screen,
+                                region=PARADE_MASK_DONE_REGION)
+        if empty_marker is not None:
+            return "done", empty_marker
         plus = bot.find(PLUS, threshold=CONTROL_THRESHOLD)
         if plus is not None:
             return "plus", plus
@@ -89,12 +96,6 @@ def _wait_mask_result(bot):
         if time.monotonic() >= end:
             return None, None
         bot.sleep(min(1, max(0, end - time.monotonic())))
-
-
-def _parade_mask_done_visible(bot, screen) -> bool:
-    """True only for the supplied post-tap exhausted-Parade-Mask marker."""
-    return bot.find(PARADE_MASK_DONE, threshold=TITLE_THRESHOLD,
-                    screen=screen, region=PARADE_MASK_DONE_REGION) is not None
 
 
 def _template_matches(bot, screen, template, *, threshold, region):
@@ -260,8 +261,9 @@ def _use_parade_masks(bot) -> str:
         if mask is None:
             bot.record(f"{NAME}: không thấy Parade Mask để kiểm tra dấu DONE; giữ PENDING")
             return "pending"
-        bot.record(f"{NAME}: tap Parade Mask")
-        bot.tap(*mask, delay=STEP_DELAY)
+        bot.record(f"{NAME}: tap Parade Mask; chờ {PARADE_MASK_OPEN_DELAY:g}s "
+                   "để kiểm tra popup Use/DONE tải xong")
+        bot.tap(*mask, delay=PARADE_MASK_OPEN_DELAY)
         result, plus = _wait_mask_result(bot)
         if result == "done":
             bot.record(f"{NAME}: sau khi bấm Parade Mask thấy dấu hết Mask; DONE")
@@ -296,19 +298,21 @@ def _use_parade_masks(bot) -> str:
 
 
 def _check_parade_mask_done(bot) -> bool:
-    """Re-open Parade Mask after rewards and require the supplied DONE image."""
+    """Re-open Parade Mask after a clean sweep and require its exact text."""
     screen = bot.screenshot()
     mask = bot.find(PARADE_MASK, threshold=CONTROL_THRESHOLD, screen=screen)
     if mask is None:
         bot.record(f"{NAME}: không thấy Parade Mask để kiểm tra dấu DONE; giữ PENDING")
         return False
-    bot.record(f"{NAME}: quà đã sạch; bấm lại Parade Mask để xác nhận DONE")
-    bot.tap(*mask, delay=STEP_DELAY)
+    bot.record(f"{NAME}: quà đã sạch; bấm lại Parade Mask để tìm dòng "
+               "'You can get items from:' hoặc marker hết Mask")
+    bot.tap(*mask, delay=PARADE_MASK_OPEN_DELAY)
     result, _pos = _wait_mask_result(bot)
     if result == "done":
-        bot.record(f"{NAME}: thấy ảnh dấu hết Parade Mask sau lượt Claim; DONE")
+        bot.record(f"{NAME}: sau lượt Claim đã thấy marker hết Parade Mask; DONE")
         return True
-    bot.record(f"{NAME}: bấm lại Parade Mask nhưng chưa thấy ảnh dấu DONE; giữ PENDING")
+    bot.record(f"{NAME}: bấm lại Parade Mask nhưng chưa thấy "
+               "marker hết Mask; giữ PENDING")
     bot.back(delay=STEP_DELAY)
     return False
 
@@ -470,17 +474,16 @@ def _run_opened(bot) -> bool:
 
 def run(bot, task: dict, state: EventState):
     def handle(action, pos, screen):
-        if action == ON_PARADE_MASK_DONE:
-            bot.record(f"{NAME}: thấy ảnh dấu hết Parade Mask; DONE")
-            mark_done(bot, KEY)
-            return STOP
-        if action == ON_HOW_TO_GET:
-            if _parade_mask_done_visible(bot, screen):
-                bot.record(f"{NAME}: How to get có kèm ảnh dấu hết Mask; DONE")
-                mark_done(bot, KEY)
-                return STOP
-            bot.record(f"{NAME}: title How to get không đủ để DONE; đóng popup và giữ PENDING")
+        if action in (ON_PARADE_MASK_DONE, ON_HOW_TO_GET):
+            # A stale popup (or one the player opened manually) is not proof
+            # that this run has swept every green Claim and then re-opened
+            # Parade Mask.  Return to the event and perform that full
+            # verification path; only _check_parade_mask_done may finish it.
+            bot.record(f"{NAME}: thấy popup Parade Mask ngoài flow kiểm tra; "
+                       "không DONE trực tiếp, quay lại quét Claim rồi xác nhận lại")
             bot.back(delay=STEP_DELAY)
+            if _run_opened(bot):
+                mark_done(bot, KEY)
             return STOP
         if action in (EVENT_OPENED, ON_EVENT):
             if _run_opened(bot):

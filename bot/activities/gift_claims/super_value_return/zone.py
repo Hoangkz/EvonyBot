@@ -32,6 +32,7 @@ PASSES = 3              # số lượt tìm mỗi ngày; đủ thì mọi event 
 SEEN_ATTR = "_super_value_return_seen"   # thuộc tính trên context: (mốc reset, event đã thấy) — xem seen_today
 OPEN_TAPS = 2           # bấm nút vào; vẫn ở màn thành thì bấm lại, tổng tối đa chừng này lần
 OPEN_WAITS = 8          # sau mỗi lần bấm: cứ 1s chụp kiểm tra tiêu đề Super Value Return, tối đa chừng này lần
+LAUNCHER_FALLBACK = (35, 560)  # user-supplied 396x704 target; title must verify
 # Hàng tab cùng kiểu với Valuable Event (đo trên màn 396x704):
 TAB_TAP_Y = 13                   # % màn: bấm vào chính giữa ô tab (ô cao y 62-122), x theo tab tìm được
 AFTER_TAB_TAP = (50, 5)          # % màn (chỗ tiêu đề): đã sang trang event thì bấm chỗ này, nghỉ 1s, rồi mới chạy flow
@@ -335,7 +336,10 @@ def open_super_value_return(bot) -> bool:
         return False
     pos = find_super_value_return(bot)
     if pos is None:
-        return False
+        scale = bot.screenshot().shape[1] / REFERENCE_WIDTH
+        pos = tuple(round(value * scale) for value in LAUNCHER_FALLBACK)
+        bot.record("Gift Claims: không nhận diện được Super Value Return; "
+                   "bấm fallback x=35 y=560")
     for attempt in range(1, OPEN_TAPS + 1):
         bot.record(f"Gift Claims: bấm nút vào Super Value Return tại {pos} (lần {attempt}/{OPEN_TAPS})")
         bot.tap(*pos)

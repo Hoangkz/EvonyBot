@@ -11,6 +11,7 @@ from bot.activities.event.revelry_carnival.constants import (
     CONGRATULATIONS,
     PARADE_MASK,
     PARADE_MASK_DONE,
+    PARADE_MASK_EMPTY_MARKER,
     PLUS,
     REWARD_REGION,
     USE_DONE_KEY,
@@ -61,7 +62,7 @@ class ClaimColourTests(unittest.TestCase):
         self.assertLess(abs(claims[0][0] - (gx + gw // 2)), 2)
 
     def test_reward_region_matches_user_marked_green_frame(self):
-        self.assertEqual(REWARD_REGION, (2, 67, 98, 98))
+        self.assertEqual(REWARD_REGION, (4, 70, 96, 95))
 
     def test_all_reward_swipe_endpoints_stay_inside_green_frame(self):
         from bot.activities.event.revelry_carnival.constants import (
@@ -77,7 +78,8 @@ class ClaimColourTests(unittest.TestCase):
     def test_vertical_movement_is_not_mistaken_for_a_static_reward_frame(self):
         before = np.zeros((704, 396, 3), dtype=np.uint8)
         # Distinct horizontal rows inside the exact green reward rectangle.
-        top, bottom = round(704 * 67 / 100), round(704 * 98 / 100)
+        top = round(704 * REWARD_REGION[1] / 100)
+        bottom = round(704 * REWARD_REGION[3] / 100)
         for y in range(top, bottom, 18):
             before[y:y + 9, 8:388] = (30 + (y % 190), 70, 150)
         after = before.copy()
@@ -85,6 +87,23 @@ class ClaimColourTests(unittest.TestCase):
             before[top:bottom, 8:388], 24, axis=0)
 
         self.assertFalse(run._same_reward_position(before, after))
+
+    def test_every_visible_green_claim_is_tapped_before_the_next_swipe(self):
+        bot = mock.Mock()
+        first = (315, 530)
+        second = (315, 640)
+        with (mock.patch.object(run, "_green_claims",
+                                side_effect=([first, second], [second], [])),
+              mock.patch.object(run, "_close_congratulations_once",
+                                return_value=False)):
+            claimed, stuck = run._claim_current_view(bot)
+
+        self.assertTrue(claimed)
+        self.assertFalse(stuck)
+        self.assertEqual([mock.call(*first, delay=run.STEP_DELAY),
+                          mock.call(*second, delay=run.STEP_DELAY)],
+                         bot.tap.call_args_list)
+        bot.swipe_percent.assert_not_called()
 
 
 class ResumeBot:
@@ -165,6 +184,16 @@ class ResumeTests(unittest.TestCase):
 
 
 class ParadeMaskFlowTests(unittest.TestCase):
+    def test_empty_mask_marker_is_an_internal_post_tap_done_result(self):
+        bot = mock.Mock()
+        bot.screenshot.return_value = object()
+
+        def find(template, **_kwargs):
+            return (100, 100) if template == PARADE_MASK_EMPTY_MARKER else None
+
+        bot.find.side_effect = find
+        self.assertEqual(("done", (100, 100)), run._wait_mask_result(bot))
+
     @mock.patch.object(run, "_wait_after_congratulations", return_value=True)
     @mock.patch.object(run, "_wait", return_value=(100, 500))
     @mock.patch.object(run, "_select_max", return_value=True)
@@ -196,7 +225,44 @@ class ParadeMaskFlowTests(unittest.TestCase):
             (100, 400) if template == PARADE_MASK else None)
 
         self.assertEqual("done", run._use_parade_masks(bot))
-        bot.tap.assert_called_once_with(100, 400, delay=run.STEP_DELAY)
+        bot.tap.assert_called_once_with(
+            100, 400, delay=run.PARADE_MASK_OPEN_DELAY)
+
+
+class DirectPopupTests(unittest.TestCase):
+    class PopupBot:
+        def __init__(self):
+            self.back = mock.Mock()
+            self.record = mock.Mock()
+
+    @mock.patch.object(run, "run_task")
+    @mock.patch.object(run, "_run_opened", return_value=False)
+    def test_popup_marker_does_not_directly_mark_done(self, run_opened, run_task):
+        bot = self.PopupBot()
+        state = mock.Mock()
+        run.run(bot, {}, state)
+        handler = run_task.call_args.args[4]
+
+        self.assertEqual(run.STOP,
+                         handler(run.ON_PARADE_MASK_DONE, None, object()))
+        bot.back.assert_called_once_with(delay=run.STEP_DELAY)
+        run_opened.assert_called_once_with(bot)
+        self.assertNotIn("_task_results", bot.__dict__)
+
+    @mock.patch.object(run, "run_task")
+    @mock.patch.object(run, "_run_opened", return_value=True)
+    def test_popup_marker_marks_done_only_after_verified_flow(
+            self, run_opened, run_task):
+        bot = self.PopupBot()
+        state = mock.Mock()
+        run.run(bot, {}, state)
+        handler = run_task.call_args.args[4]
+
+        handler(run.ON_HOW_TO_GET, None, object())
+
+        run_opened.assert_called_once_with(bot)
+        self.assertEqual(run.KEY, bot._task_results[-1].key)
+        self.assertTrue(bot._task_results[-1].done)
 
 
 if __name__ == "__main__":

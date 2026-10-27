@@ -36,6 +36,7 @@ PASSES = 3              # số lượt tìm mỗi ngày; đủ thì mọi event 
 SEEN_ATTR = "_valuable_event_seen"   # thuộc tính trên context: (mốc reset, event đã thấy) — xem seen_today
 OPEN_ATTEMPTS = 3       # số lần về màn chính tìm nút + bấm; hết mà chưa vào thì bỏ hoạt động trong lần chạy này
 OPEN_WAITS = 8          # sau khi bấm: chụp kiểm tra màn Valuable Event tối đa chừng này lần, mỗi lần chờ 1s
+LAUNCHER_FALLBACK = (256, 260)  # user-supplied 396x704 target; title must verify
 ICON_ABOVE = 30         # px (màn rộng 396): find_valuable_event trả về tâm chữ "Event", bấm lên icon phía trên
 # % màn: tìm thấy tab thì bấm vào chính giữa ô tab. Ô tab cao y 62-122 trên màn 704 -> giữa y 92 (13%); icon nằm giữa ô theo
 # chiều ngang nên x lấy theo tab tìm được. Tâm icon (y ~75) chỉ là nửa trên ô: Optional Package bấm ở đó game không nhận.
@@ -337,11 +338,16 @@ def open_valuable_event(bot) -> bool:
             bot.record("Gift Claims: Valuable Event chưa về màn chính sau khi "
                        "chuyển thành; chưa tìm launcher ở khung này")
         if pos is None:
-            bot.record(f"Gift Claims: không thấy nút Valuable Event ở màn chính (lần {attempt}/{OPEN_ATTEMPTS})")
-            continue
-        above = round(ICON_ABOVE * screen.shape[1] / REFERENCE_WIDTH)
-        bot.record(f"Gift Claims: bấm nút Valuable Event tại {pos} (lần {attempt}/{OPEN_ATTEMPTS})")
-        bot.tap(pos[0], max(0, pos[1] - above))
+            scale = screen.shape[1] / REFERENCE_WIDTH
+            target = tuple(round(value * scale) for value in LAUNCHER_FALLBACK)
+            bot.record("Gift Claims: không thấy nút Valuable Event; "
+                       f"bấm fallback x=256 y=260 (lần {attempt}/{OPEN_ATTEMPTS})")
+        else:
+            above = round(ICON_ABOVE * screen.shape[1] / REFERENCE_WIDTH)
+            target = (pos[0], max(0, pos[1] - above))
+            bot.record(f"Gift Claims: bấm nút Valuable Event tại {pos} "
+                       f"(lần {attempt}/{OPEN_ATTEMPTS})")
+        bot.tap(*target)
         for _ in range(OPEN_WAITS):
             bot.sleep(1)
             if identify(bot, bot.screenshot()) == GiftScreen.VALUABLE_EVENT:
