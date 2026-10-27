@@ -32,6 +32,7 @@ PASSES = 3              # số lượt tìm mỗi ngày; đủ thì mọi event 
 SEEN_ATTR = "_super_value_return_seen"   # thuộc tính trên context: (mốc reset, event đã thấy) — xem seen_today
 OPEN_TAPS = 2           # bấm nút vào; vẫn ở màn thành thì bấm lại, tổng tối đa chừng này lần
 OPEN_WAITS = 8          # sau mỗi lần bấm: cứ 1s chụp kiểm tra tiêu đề Super Value Return, tối đa chừng này lần
+LAUNCHER_FALLBACK = (35, 560)  # user-supplied 396x704 target; title must verify
 # Hàng tab cùng kiểu với Valuable Event (đo trên màn 396x704):
 TAB_TAP_Y = 13                   # % màn: bấm vào chính giữa ô tab (ô cao y 62-122), x theo tab tìm được
 AFTER_TAB_TAP = (50, 5)          # % màn (chỗ tiêu đề): đã sang trang event thì bấm chỗ này, nghỉ 1s, rồi mới chạy flow
@@ -335,7 +336,10 @@ def open_super_value_return(bot) -> bool:
         return False
     pos = find_super_value_return(bot)
     if pos is None:
-        return False
+        scale = bot.screenshot().shape[1] / REFERENCE_WIDTH
+        pos = tuple(round(value * scale) for value in LAUNCHER_FALLBACK)
+        bot.record("Gift Claims: không nhận diện được Super Value Return; "
+                   "bấm fallback x=35 y=560")
     for attempt in range(1, OPEN_TAPS + 1):
         bot.record(f"Gift Claims: bấm nút vào Super Value Return tại {pos} (lần {attempt}/{OPEN_TAPS})")
         bot.tap(*pos)
@@ -401,6 +405,16 @@ def seen_today(bot) -> set[str]:
     return stored[1]
 
 
+def _complete_zone(bot, reason: str) -> bool:
+    """Write the durable parent DONE key without claiming that three passes ran."""
+    for task in TASKS:
+        mark_task_done(bot, task.key)
+    bot.mark_daily_done(KEY)
+    bot.record(f"Gift Claims: {NAME} {reason}; DB DONE {KEY}")
+    return_home(bot)
+    return True
+
+
 def run(bot) -> bool:
     """Xong event nào lưu DB event đó; đủ lượt thì lưu key tổng KEY. Worker (``gift_claims.job``) chỉ đọc KEY trong DB (hoặc
     skip_for_run). Lượt nào thấy event MỚI (chưa thấy ở các lượt trước hôm nay) thì đếm lại từ lượt 1."""
@@ -410,11 +424,17 @@ def run(bot) -> bool:
     while passes_done(bot) < PASSES:
         pending = {task.key for task in TASKS if not bot.is_daily_done(task.key)}
         if not pending:
-            break
+            return _complete_zone(bot, "mọi nhiệm vụ con đã DONE")
         attempted: set[str] = set()
         if not search_pass(bot, pending, attempted):
             return_home(bot)
             return False      # không mở được / chưa đi hết hàng tab: lần chạy sau làm tiếp lượt này
+        # ``do_visible`` writes each child key at the moment its own final
+        # contract succeeds.  Do not create a misleading 1/3 checkpoint (or
+        # perform a further 120-second scan) when that final child just ended
+        # the whole zone.
+        if all(bot.is_daily_done(task.key) for task in TASKS):
+            return _complete_zone(bot, "mọi nhiệm vụ con đã DONE")
         if attempted - seen:
             bot.record("Gift Claims: lượt này thấy event mới; đếm lại lượt tìm từ 1")
             _reset_passes(bot)
@@ -423,12 +443,9 @@ def run(bot) -> bool:
         bot.mark_daily_done(_pass_key(number))
         bot.record(f"Gift Claims: {NAME} xong lượt tìm {number}/{PASSES} hôm nay")
         bot.back(delay=STEP_DELAY)
-    for task in TASKS:
-        mark_task_done(bot, task.key)
-    bot.mark_daily_done(KEY)
-    bot.record(f"Gift Claims: {NAME} đủ {PASSES} lượt tìm; mọi event của hoạt động xong hôm nay")
-    return_home(bot)
-    return True
+    return _complete_zone(
+        bot,
+        f"đã quét đủ {PASSES} lượt; các nhiệm vụ không xuất hiện được coi DONE")
 
 
 def _sweep(bot, pending: list[str], deferred: set[str] | None = None) -> set[str]:

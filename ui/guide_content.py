@@ -231,7 +231,7 @@ Nhiệm vụ mở theo ngày (Day 1 &rarr; Day 7), ngày chưa mở sẽ đượ
 <p>Tinh luyện 6 trang bị của một tướng: bot mở danh sách tướng (••• → Generals), chọn tướng đầu tiên rồi tinh luyện từng trang bị.</p>
 <ul>
   <li><b>General</b>: <i>Favorite generals</i> (lọc tướng yêu thích) và loại tướng; bot luôn chọn tướng đầu tiên sau khi lọc.</li>
-  <li>Mỗi trang bị (Weapon, Armor, Boots, Helmet, Pants, Ring) có danh sách thuộc tính riêng: tích tối đa 4 dòng cần có; mỗi dòng chọn màu tối thiểu (Orange / Gold) và ô <b>Lock</b> (khoá dòng lại khi đã ra đúng).</li>
+  <li>Mỗi trang bị (Weapon, Armor, Boots, Helmet, Pants, Ring) có danh sách thuộc tính riêng: bấm <b>+ Add line</b> để thêm dòng cần có (tối đa 4, vì trang bị có 4 dòng tinh luyện); mỗi dòng chọn một thuộc tính, màu tối thiểu (Orange / Gold) và ô <b>Lock</b> (khoá dòng lại khi đã ra đúng); nút thùng rác xoá dòng. ô <b>Max refines (per equipment)</b> là số lần Refine tối đa cho riêng trang bị đó (100 đến 1000 hoặc ALL = không giới hạn).</li>
   <li>Trang bị không tích dòng nào thì bỏ qua.</li>
 </ul>
 <p><i>Đang phát triển:</i> bot đã mở được màn Refine Equipment của từng trang bị nhưng chưa đọc được 4 dòng kết quả nên chưa tự bấm Refine.</p>

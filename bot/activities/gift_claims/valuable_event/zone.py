@@ -18,7 +18,7 @@ from ....daily_reset import last_reset
 from ....ocr.find_valuable_event import find_valuable_event
 from ..common import (REFERENCE_WIDTH, back_if_close_x,
                       find_valuable_event as find_valuable_event_median,
-                      mark_task_done, on_main, return_home)
+                      mark_task_done, on_main, return_home, swipe_around)
 from ..screens import GiftScreen, identify
 from . import (
     active_monthly_card, ancient_dynasty_treasury, general_vault, golden_tree_rewards, limited_offer,
@@ -34,8 +34,9 @@ from .run import SPECS, _tab
 KEY = "gift_valuable_event"
 PASSES = 3              # số lượt tìm mỗi ngày; đủ thì mọi event của hoạt động coi là xong hôm nay
 SEEN_ATTR = "_valuable_event_seen"   # thuộc tính trên context: (mốc reset, event đã thấy) — xem seen_today
-OPEN_ATTEMPTS = 3       # số lần về màn chính tìm nút + bấm; hết mà chưa vào thì bỏ hoạt động trong lần chạy này
+OPEN_ATTEMPTS = 3       # số vị trí màn thành để tìm launcher; hai lần không thấy đầu sẽ kéo quanh thành, lần cuối mới được fallback
 OPEN_WAITS = 8          # sau khi bấm: chụp kiểm tra màn Valuable Event tối đa chừng này lần, mỗi lần chờ 1s
+LAUNCHER_FALLBACK = (260, 560)  # user-supplied 396x704 target; title must verify
 ICON_ABOVE = 30         # px (màn rộng 396): find_valuable_event trả về tâm chữ "Event", bấm lên icon phía trên
 # % màn: tìm thấy tab thì bấm vào chính giữa ô tab. Ô tab cao y 62-122 trên màn 704 -> giữa y 92 (13%); icon nằm giữa ô theo
 # chiều ngang nên x lấy theo tab tìm được. Tâm icon (y ~75) chỉ là nửa trên ô: Optional Package bấm ở đó game không nhận.
@@ -310,8 +311,9 @@ def scan_to_right_edge(bot, pending: set[str], attempted: set[str], title) -> bo
 
 def open_valuable_event(bot) -> bool:
     """Từ màn chính (có nút •••; đang ở bản đồ thế giới thì to_city vào thành trước) tìm nút Valuable Event bằng ảnh tên median rồi OCR dự phòng, bấm, chờ màn
-    Valuable Event (tiêu đề ValuableEvent/title) tối đa OPEN_WAITS lần x 1s. Chưa vào thì về màn chính làm lại, tối đa
-    OPEN_ATTEMPTS lần; vẫn không vào thì trả False (DB chưa xong: worker gọi lại lần sau)."""
+    Valuable Event (tiêu đề ValuableEvent/title) tối đa OPEN_WAITS lần x 1s. Khi chưa thấy launcher, kéo lại màn thành đúng như
+    Event Center rồi mới thử ảnh tiếp; fallback tọa độ chỉ được dùng sau toàn bộ OPEN_ATTEMPTS vị trí vẫn không thấy. Chưa vào thì
+    trả False (DB chưa xong: worker gọi lại lần sau)."""
     for attempt in range(1, OPEN_ATTEMPTS + 1):
         bot.check()
         screen = bot.screenshot()
@@ -337,11 +339,25 @@ def open_valuable_event(bot) -> bool:
             bot.record("Gift Claims: Valuable Event chưa về màn chính sau khi "
                        "chuyển thành; chưa tìm launcher ở khung này")
         if pos is None:
-            bot.record(f"Gift Claims: không thấy nút Valuable Event ở màn chính (lần {attempt}/{OPEN_ATTEMPTS})")
-            continue
-        above = round(ICON_ABOVE * screen.shape[1] / REFERENCE_WIDTH)
-        bot.record(f"Gift Claims: bấm nút Valuable Event tại {pos} (lần {attempt}/{OPEN_ATTEMPTS})")
-        bot.tap(pos[0], max(0, pos[1] - above))
+            # Match Event Center's launcher recovery: the city can be panned
+            # away from the event rail, so an image miss is not evidence that
+            # the event is absent.  Re-centre first; the fixed coordinate is
+            # reserved for the last verified miss only.
+            if attempt < OPEN_ATTEMPTS:
+                bot.record("Gift Claims: chưa thấy launcher Valuable Event; "
+                           f"kéo màn thành để tìm lại ({attempt}/{OPEN_ATTEMPTS - 1})")
+                swipe_around(bot)
+                continue
+            scale = screen.shape[1] / REFERENCE_WIDTH
+            target = tuple(round(value * scale) for value in LAUNCHER_FALLBACK)
+            bot.record("Gift Claims: không thấy nút Valuable Event; "
+                       "đã kéo tìm ở mọi vị trí; bấm fallback x=260 y=560")
+        else:
+            above = round(ICON_ABOVE * screen.shape[1] / REFERENCE_WIDTH)
+            target = (pos[0], max(0, pos[1] - above))
+            bot.record(f"Gift Claims: bấm nút Valuable Event tại {pos} "
+                       f"(lần {attempt}/{OPEN_ATTEMPTS})")
+        bot.tap(*target)
         for _ in range(OPEN_WAITS):
             bot.sleep(1)
             if identify(bot, bot.screenshot()) == GiftScreen.VALUABLE_EVENT:
@@ -398,6 +414,16 @@ def seen_today(bot) -> set[str]:
     return stored[1]
 
 
+def _complete_zone(bot, reason: str) -> bool:
+    """Write the durable parent DONE key without claiming that three passes ran."""
+    for task in TASKS:
+        mark_task_done(bot, task.key)
+    bot.mark_daily_done(KEY)
+    bot.record(f"Gift Claims: Valuable Event {reason}; DB DONE {KEY}")
+    return_home(bot)
+    return True
+
+
 def run(bot) -> bool:
     """Xong event nào lưu DB event đó; đủ lượt thì lưu key tổng KEY. Worker (``gift_claims.job``) chỉ đọc KEY trong DB: chưa có
     thì gọi lại, bị ngắt giữa chừng (hết 120s, boss...) thì lần sau chạy lại từ đầu và bỏ qua các event đã xong.
@@ -410,11 +436,16 @@ def run(bot) -> bool:
     while passes_done(bot) < PASSES:
         pending = {task.key for task in TASKS if not bot.is_daily_done(task.key)}
         if not pending:
-            break
+            return _complete_zone(bot, "mọi nhiệm vụ con đã DONE")
         attempted: set[str] = set()
         if not search_pass(bot, pending, attempted):
             return_home(bot)
             return False      # không mở được / chưa đi hết hàng tab: lần chạy sau làm tiếp lượt này
+        # A child writes its own DB DONE key only after its exact flow has
+        # verified completion.  Once none remains, finish the parent now;
+        # absence confirmation is for genuinely still-PENDING children only.
+        if all(bot.is_daily_done(task.key) for task in TASKS):
+            return _complete_zone(bot, "mọi nhiệm vụ con đã DONE")
         if attempted - seen:
             bot.record("Gift Claims: lượt này thấy event mới; đếm lại lượt tìm từ 1")
             _reset_passes(bot)
@@ -423,9 +454,6 @@ def run(bot) -> bool:
         bot.mark_daily_done(_pass_key(number))
         bot.record(f"Gift Claims: Valuable Event xong lượt tìm {number}/{PASSES} hôm nay")
         bot.back(delay=STEP_DELAY)
-    for task in TASKS:
-        mark_task_done(bot, task.key)
-    bot.mark_daily_done(KEY)
-    bot.record(f"Gift Claims: Valuable Event đủ {PASSES} lượt tìm; mọi event của hoạt động xong hôm nay")
-    return_home(bot)
-    return True
+    return _complete_zone(
+        bot,
+        f"đã quét đủ {PASSES} lượt; các nhiệm vụ không xuất hiện được coi DONE")

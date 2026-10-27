@@ -25,6 +25,7 @@ MIN_CAPTURE_MATCH = 0.70
 MAX_CAPTURE_ATTEMPTS = 70
 TEMPLATE_PATH = Path("Images/GiftClaims/ValuableEvent/launcher_name_median.png")
 SEARCH_REGION = (40, 68, 88, 96)
+REFERENCE_CROP = (232, 577)
 
 
 def _bounds(screen, region):
@@ -53,6 +54,32 @@ def _outside_best(screen, template, region):
     return float(scores.max())
 
 
+def build_from_frames(frames: list[np.ndarray], output: Path) -> dict:
+    """Build a name median from same-size city frames and measure its bounds."""
+    reference = cv2.imread(str(TEMPLATE_PATH))
+    if reference is None:
+        raise FileNotFoundError(TEMPLATE_PATH)
+    height, width = reference.shape[:2]
+    x, y = REFERENCE_CROP
+    crops = [frame[y:y + height, x:x + width] for frame in frames]
+    if any(crop.shape != reference.shape for crop in crops):
+        raise RuntimeError("launcher crop left the screenshot bounds")
+    median = np.median(np.stack(crops), axis=0).astype(np.uint8)
+    if not cv2.imwrite(str(output), median):
+        raise OSError(f"could not write {output}")
+    real = [_match_bounds(frame, median, SEARCH_REGION)[0] for frame in frames]
+    outside = [_outside_best(frame, median, SEARCH_REGION) for frame in frames]
+    return {
+        "frames": len(frames),
+        "crop_xywh": [x, y, width, height],
+        "real_min": round(min(real), 4),
+        "real_median": round(float(np.median(real)), 4),
+        "real_max": round(max(real), 4),
+        "outside_max": round(max(outside), 4),
+        "recommended_threshold": round((min(real) + max(outside)) / 2, 4),
+    }
+
+
 def capture(serial: str) -> dict:
     device = adbutils.adb.device(serial=serial)
     bot = BotContext(device, threading.Event(), None, lambda _message: None)
@@ -67,7 +94,6 @@ def capture(serial: str) -> dict:
     if initial_score < 0.70:
         raise RuntimeError(f"existing launcher crop did not match the city: {initial_score:.4f}")
 
-    height, width = previous.shape[:2]
     frames = []
     discarded = 0
     while len(frames) < FRAME_COUNT and len(frames) + discarded < MAX_CAPTURE_ATTEMPTS:
@@ -79,33 +105,25 @@ def capture(serial: str) -> dict:
             discarded += 1
     if len(frames) != FRAME_COUNT:
         raise RuntimeError("could not collect 50 stable city frames")
-    crops = [frame[y:y + height, x:x + width] for frame in frames]
-    if any(crop.shape != previous.shape for crop in crops):
-        raise RuntimeError("launcher crop left the screenshot bounds")
-    median = np.median(np.stack(crops), axis=0).astype(np.uint8)
-    if not cv2.imwrite(str(TEMPLATE_PATH), median):
-        raise OSError(f"could not write {TEMPLATE_PATH}")
-
-    real = [_match_bounds(frame, median, SEARCH_REGION)[0] for frame in frames]
-    outside = [_outside_best(frame, median, SEARCH_REGION) for frame in frames]
-    # Midpoint retains equal margin from the weakest genuine name and the
-    # strongest unrelated artwork measured in exactly the launcher region.
-    threshold = (min(real) + max(outside)) / 2
-    return {
-        "frames": len(frames),
-        "discarded_transition_frames": discarded,
-        "crop_xywh": [x, y, width, height],
-        "previous_score": round(initial_score, 4),
-        "real_min": round(min(real), 4),
-        "real_median": round(float(np.median(real)), 4),
-        "real_max": round(max(real), 4),
-        "outside_max": round(max(outside), 4),
-        "recommended_threshold": round(threshold, 4),
-    }
+    result = build_from_frames(frames, TEMPLATE_PATH)
+    result["discarded_transition_frames"] = discarded
+    result["previous_score"] = round(initial_score, 4)
+    return result
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--serial", default="127.0.0.1:21513")
+    parser.add_argument("--source-images", nargs="+", type=Path)
+    parser.add_argument("--output", type=Path)
     arguments = parser.parse_args()
-    print(json.dumps(capture(arguments.serial), ensure_ascii=True))
+    if arguments.source_images:
+        if arguments.output is None:
+            parser.error("--output is required with --source-images")
+        frames = [cv2.imread(str(path)) for path in arguments.source_images]
+        if any(frame is None for frame in frames):
+            parser.error("one or more --source-images could not be read")
+        result = build_from_frames(frames, arguments.output)
+    else:
+        result = capture(arguments.serial)
+    print(json.dumps(result, ensure_ascii=True))

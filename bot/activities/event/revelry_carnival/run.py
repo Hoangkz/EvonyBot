@@ -39,10 +39,14 @@ from .constants import (
     PARADE_MASK,
     PARADE_MASK_DONE,
     PARADE_MASK_DONE_REGION,
+    PARADE_MASK_EMPTY_MARKER,
+    PARADE_MASK_OPEN_DELAY,
     PLUS,
     RETURN_TOP_SWIPE,
+    RETURN_TOP_SWIPE_FALLBACKS,
     REWARD_REGION,
     SCAN_SWIPE,
+    SCAN_SWIPE_FALLBACKS,
     SLOW_SWIPE_DURATION,
     STEP_DELAY,
     TITLE,
@@ -71,7 +75,7 @@ def _wait(bot, template, *, threshold=CONTROL_THRESHOLD,
 
 
 def _wait_mask_result(bot):
-    """Wait for the exact exhausted marker or the quantity-popup anchor."""
+    """Wait for either supplied empty-Mask marker or the quantity popup."""
     end = time.monotonic() + WAIT_TIMEOUT
     while True:
         screen = bot.screenshot()
@@ -79,6 +83,11 @@ def _wait_mask_result(bot):
                              screen=screen, region=PARADE_MASK_DONE_REGION)
         if exhausted is not None:
             return "done", exhausted
+        empty_marker = bot.find(PARADE_MASK_EMPTY_MARKER,
+                                threshold=CONTROL_THRESHOLD, screen=screen,
+                                region=PARADE_MASK_DONE_REGION)
+        if empty_marker is not None:
+            return "done", empty_marker
         plus = bot.find(PLUS, threshold=CONTROL_THRESHOLD)
         if plus is not None:
             return "plus", plus
@@ -89,12 +98,6 @@ def _wait_mask_result(bot):
         if time.monotonic() >= end:
             return None, None
         bot.sleep(min(1, max(0, end - time.monotonic())))
-
-
-def _parade_mask_done_visible(bot, screen) -> bool:
-    """True only for the supplied post-tap exhausted-Parade-Mask marker."""
-    return bot.find(PARADE_MASK_DONE, threshold=TITLE_THRESHOLD,
-                    screen=screen, region=PARADE_MASK_DONE_REGION) is not None
 
 
 def _template_matches(bot, screen, template, *, threshold, region):
@@ -260,8 +263,9 @@ def _use_parade_masks(bot) -> str:
         if mask is None:
             bot.record(f"{NAME}: không thấy Parade Mask để kiểm tra dấu DONE; giữ PENDING")
             return "pending"
-        bot.record(f"{NAME}: tap Parade Mask")
-        bot.tap(*mask, delay=STEP_DELAY)
+        bot.record(f"{NAME}: tap Parade Mask; chờ {PARADE_MASK_OPEN_DELAY:g}s "
+                   "để kiểm tra popup Use/DONE tải xong")
+        bot.tap(*mask, delay=PARADE_MASK_OPEN_DELAY)
         result, plus = _wait_mask_result(bot)
         if result == "done":
             bot.record(f"{NAME}: sau khi bấm Parade Mask thấy dấu hết Mask; DONE")
@@ -296,19 +300,21 @@ def _use_parade_masks(bot) -> str:
 
 
 def _check_parade_mask_done(bot) -> bool:
-    """Re-open Parade Mask after rewards and require the supplied DONE image."""
+    """Re-open Parade Mask after a clean sweep and require its exact text."""
     screen = bot.screenshot()
     mask = bot.find(PARADE_MASK, threshold=CONTROL_THRESHOLD, screen=screen)
     if mask is None:
         bot.record(f"{NAME}: không thấy Parade Mask để kiểm tra dấu DONE; giữ PENDING")
         return False
-    bot.record(f"{NAME}: quà đã sạch; bấm lại Parade Mask để xác nhận DONE")
-    bot.tap(*mask, delay=STEP_DELAY)
+    bot.record(f"{NAME}: quà đã sạch; bấm lại Parade Mask để tìm dòng "
+               "'You can get items from:' hoặc marker hết Mask")
+    bot.tap(*mask, delay=PARADE_MASK_OPEN_DELAY)
     result, _pos = _wait_mask_result(bot)
     if result == "done":
-        bot.record(f"{NAME}: thấy ảnh dấu hết Parade Mask sau lượt Claim; DONE")
+        bot.record(f"{NAME}: sau lượt Claim đã thấy marker hết Parade Mask; DONE")
         return True
-    bot.record(f"{NAME}: bấm lại Parade Mask nhưng chưa thấy ảnh dấu DONE; giữ PENDING")
+    bot.record(f"{NAME}: bấm lại Parade Mask nhưng chưa thấy "
+               "marker hết Mask; giữ PENDING")
     bot.back(delay=STEP_DELAY)
     return False
 
@@ -344,21 +350,42 @@ def _same_reward_position(before, after) -> bool:
     return _reward_hamming_distance(before, after) <= LIST_HASH_DISTANCE
 
 
+def _scroll_reward_frame(bot, direction: str, primary, fallbacks) -> bool:
+    """Scroll inside the green frame; recover from a swallowed centre swipe.
+
+    A stationary primary gesture alone is not an edge.  Some Revelry rows
+    intercept the finger at x=50 on particular levels, even though the list
+    below remains scrollable.  Test each measured alternate path in the same
+    green frame before reporting that this one edge-check did not move.
+    """
+    gestures = (primary, *fallbacks)
+    for probe, gesture in enumerate(gestures, 1):
+        bot.check()
+        before = bot.screenshot()
+        bot.swipe_percent(*gesture, duration=SLOW_SWIPE_DURATION,
+                          delay=STEP_DELAY)
+        after = bot.screenshot()
+        distance = _reward_hamming_distance(before, after)
+        moved = distance > LIST_HASH_DISTANCE
+        bot.record(f"{NAME}: lướt {direction} trong khung quà {gesture}, "
+                   f"Hamming {distance}/{LIST_HASH_DISTANCE}, đường "
+                   f"{probe}/{len(gestures)} {'đã di chuyển' if moved else 'không đổi'}")
+        if moved:
+            return True
+    return False
+
+
 def _swipe_to_top(bot) -> bool:
     unchanged = 0
     swipe = 0
     while unchanged < EDGE_CONFIRMATIONS:
         bot.check()
         swipe += 1
-        before = bot.screenshot()
-        bot.swipe_percent(*RETURN_TOP_SWIPE,
-                          duration=SLOW_SWIPE_DURATION, delay=STEP_DELAY)
-        after = bot.screenshot()
-        distance = _reward_hamming_distance(before, after)
-        unchanged = unchanged + 1 if distance <= LIST_HASH_DISTANCE else 0
-        bot.record(f"{NAME}: lướt lên trong khung quà {RETURN_TOP_SWIPE}, "
-                   f"Hamming {distance}/{LIST_HASH_DISTANCE}, không đổi "
-                   f"{unchanged}/{EDGE_CONFIRMATIONS} (cú {swipe})")
+        moved = _scroll_reward_frame(
+            bot, "lên", RETURN_TOP_SWIPE, RETURN_TOP_SWIPE_FALLBACKS)
+        unchanged = 0 if moved else unchanged + 1
+        bot.record(f"{NAME}: kiểm tra đầu danh sách lần {swipe}; không đổi "
+                   f"{unchanged}/{EDGE_CONFIRMATIONS}")
     bot.record(f"{NAME}: đã xác nhận đầu danh sách quà")
     return True
 
@@ -402,14 +429,10 @@ def _scan_full_list(bot):
         saw_claim = saw_claim or claimed
         if stuck:
             return saw_claim, True, False
-        before = bot.screenshot()
-        bot.swipe_percent(*SCAN_SWIPE,
-                          duration=SLOW_SWIPE_DURATION, delay=STEP_DELAY)
-        after = bot.screenshot()
-        distance = _reward_hamming_distance(before, after)
-        unchanged = unchanged + 1 if distance <= LIST_HASH_DISTANCE else 0
-        bot.record(f"{NAME}: lướt xuống trong khung quà {SCAN_SWIPE}, "
-                   f"Hamming {distance}/{LIST_HASH_DISTANCE}, không đổi "
+        moved = _scroll_reward_frame(
+            bot, "xuống", SCAN_SWIPE, SCAN_SWIPE_FALLBACKS)
+        unchanged = 0 if moved else unchanged + 1
+        bot.record(f"{NAME}: kiểm tra cuối danh sách; không đổi "
                    f"{unchanged}/{EDGE_CONFIRMATIONS}")
         if unchanged >= EDGE_CONFIRMATIONS:
             return saw_claim, False, True
@@ -470,17 +493,16 @@ def _run_opened(bot) -> bool:
 
 def run(bot, task: dict, state: EventState):
     def handle(action, pos, screen):
-        if action == ON_PARADE_MASK_DONE:
-            bot.record(f"{NAME}: thấy ảnh dấu hết Parade Mask; DONE")
-            mark_done(bot, KEY)
-            return STOP
-        if action == ON_HOW_TO_GET:
-            if _parade_mask_done_visible(bot, screen):
-                bot.record(f"{NAME}: How to get có kèm ảnh dấu hết Mask; DONE")
-                mark_done(bot, KEY)
-                return STOP
-            bot.record(f"{NAME}: title How to get không đủ để DONE; đóng popup và giữ PENDING")
+        if action in (ON_PARADE_MASK_DONE, ON_HOW_TO_GET):
+            # A stale popup (or one the player opened manually) is not proof
+            # that this run has swept every green Claim and then re-opened
+            # Parade Mask.  Return to the event and perform that full
+            # verification path; only _check_parade_mask_done may finish it.
+            bot.record(f"{NAME}: thấy popup Parade Mask ngoài flow kiểm tra; "
+                       "không DONE trực tiếp, quay lại quét Claim rồi xác nhận lại")
             bot.back(delay=STEP_DELAY)
+            if _run_opened(bot):
+                mark_done(bot, KEY)
             return STOP
         if action in (EVENT_OPENED, ON_EVENT):
             if _run_opened(bot):

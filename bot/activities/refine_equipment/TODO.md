@@ -2,6 +2,7 @@
 
 - [ ] **Đọc 4 dòng New** (`_judge` ở [run.py](run.py)): cần tên thuộc tính + màu chữ của từng dòng (trắng / xanh / tím / cam / vàng; Original có dòng tím). Cần ảnh chụp New
   với dòng cam / vàng và quyết định cách đọc tên (ảnh mẫu từng tên theo ô trang bị, hay đo bằng mẫu chữ như `ocr-samples`). Hiện luôn False.
+- [ ] **Đạt khi nào**: mỗi dòng cần có (thuộc tính + màu tối thiểu) phải khớp MỘT dòng khác nhau trong 4 dòng New, không cần đúng vị trí. Dòng Original đã đúng thì tính là đã có (khoá nếu `lock`).
 - [ ] **Luật "đạt" và Lock**: mỗi dòng có màu tối thiểu riêng và cờ `lock`. Giả định: dòng ở Original đã đúng thuộc tính + màu thì khoá (nếu `lock`) để Refine không đổi nó; Refine tiếp tới khi mọi dòng đã chọn đều đúng thì Confirm.
   Chưa biết: bấm ổ khoá tốn thêm tài nguyên không, khoá tối đa mấy dòng, ảnh ổ khoá khoá / mở (đã thấy ổ mở ở Original), dòng New có bị khoá giữ nguyên không.
 - [ ] **Bật `READY = True`** ([constants.py](constants.py)) khi hai mục trên xong; tới đó nhiệm vụ không vào danh sách của worker.

@@ -15,7 +15,6 @@ TAB = "SuperValueReturn/SoulOfSpiritualBeast/tab"
 CHALLENGE_QUEST = "SuperValueReturn/SoulOfSpiritualBeast/challenge_quest"
 QUESTS_TITLE = "SuperValueReturn/SoulOfSpiritualBeast/title_quests"
 DAILY_TASKS = "SuperValueReturn/SoulOfSpiritualBeast/tab_daily_tasks"
-SEASONAL = "SuperValueReturn/SoulOfSpiritualBeast/tab_seasonal"
 CLAIM = "SuperValueReturn/SoulOfSpiritualBeast/button_claim"
 CLAIMED = "SuperValueReturn/SoulOfSpiritualBeast/status_claimed"
 GO = "ValuableEvent/SuperValueWeeklyCard/button_go"
@@ -291,22 +290,19 @@ def claim_opened(bot) -> str:
     if not _open_quests(bot):
         return PENDING
 
-    claimed_any = False
-    all_claimed = True
-    both_tabs_clear_of_claims = True
-    for tab in (DAILY_TASKS, SEASONAL):
-        if not _select_quest_tab(bot, tab):
-            bot.back(delay=STEP_DELAY)
-            return PENDING
-        claimed, stuck, saw_claimed, saw_pending = _scan_quest_tab(bot)
-        claimed_any = claimed_any or claimed
-        both_tabs_clear_of_claims = both_tabs_clear_of_claims and not stuck
-        all_claimed = all_claimed and saw_claimed and not saw_pending and not stuck
+    # Seasonal Quests is deliberately out of scope for Gift Claims. The
+    # requested task is Daily Tasks only, so never tap or inspect Seasonal.
+    if not _select_quest_tab(bot, DAILY_TASKS):
+        bot.back(delay=STEP_DELAY)
+        return PENDING
+    claimed_any, stuck, saw_claimed, saw_pending = _scan_quest_tab(bot)
+    daily_clear_of_claims = not stuck
+    all_claimed = saw_claimed and not saw_pending and not stuck
 
     if claimed_any:
-        if not both_tabs_clear_of_claims:
+        if not daily_clear_of_claims:
             bot.record("Gift Claims: Soul Beast đã bấm Claim nhưng chưa xác "
-                       "nhận nhận hết Claim ở cả Daily Tasks và Seasonal; "
+                       "nhận nhận hết Claim ở Daily Tasks; "
                        "không ra nhận rương")
             bot.back(delay=STEP_DELAY)
             return PENDING
@@ -326,8 +322,7 @@ def claim_opened(bot) -> str:
     # post-claim chest sequence requested exclusively after a real claim.
     bot.back(delay=STEP_DELAY)
     if all_claimed:
-        bot.record("Gift Claims: Soul Beast cả Daily Tasks và Seasonal đều "
-                   "toàn bộ Claimed; DONE")
+        bot.record("Gift Claims: Soul Beast Daily Tasks toàn bộ Claimed; DONE")
         return DONE
     bot.record("Gift Claims: Soul Beast chưa toàn bộ Claimed; DONE_1 cho cửa "
                "sổ 120s hiện tại")

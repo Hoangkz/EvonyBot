@@ -9,15 +9,19 @@ FOLDER = "RefineEquipment"
 READY = False
 
 # ---- Settings (cột `refine_equipment` của DB) ---------------------------------------------------------------
-# {"favorite": bool, "general_type": "all", "slots": {"weapon": {"lines": [{"attribute": "Ground Troop Attack", "color": "gold", "lock": true}, ...]}, ...}}
+# {"favorite": bool, "general_type": "all", "slots": {"weapon": {"lines": [{"attribute": "Ground Troop Attack", "color": "gold", "lock": true}, {"attribute": "Ranged Troop Attack", "color": "gold", "lock": false}], "max_refines": 100}, ...}}
 FAVORITE_KEY = "favorite"           # tích tim lọc tướng yêu thích trước khi chọn tướng
 GENERAL_TYPE_KEY = "general_type"   # tab loại tướng ở danh sách Generals
 SLOTS_KEY = "slots"                 # {id ô trang bị: {"lines": [...]}}; ô không có dòng nào = bỏ qua
 LINES_KEY = "lines"                 # các dòng cần có của ô: mỗi dòng riêng thuộc tính, màu tối thiểu, khoá hay không
 ATTRIBUTE_KEY = "attribute"
 COLOR_KEY = "color"                 # màu tối thiểu của dòng đó: orange | gold
+MAX_REFINES_KEY = "max_refines"     # số lần Refine tối đa CHO TỪNG TRANG BỊ mỗi lượt: 100 .. 1000 hoặc "ALL" (không giới hạn)
+REFINES_ALL = "ALL"
+MAX_REFINES_OPTIONS = (*range(100, 1001, 100), REFINES_ALL)
+DEFAULT_MAX_REFINES = 100
 LOCK_KEY = "lock"                   # True: dòng đã ra đúng (thuộc tính + màu) thì khoá lại (ổ khoá cạnh dòng) rồi Refine tiếp các dòng còn lại
-MAX_LINES = 4                       # mỗi trang bị có 4 dòng tinh luyện
+MAX_LINES = 4                       # mỗi trang bị có đúng 4 dòng tinh luyện; người dùng thêm tối đa ngần này dòng cần có (nút +), hai dòng có thể trùng thuộc tính
 
 COLORS = (("orange", "Orange"), ("gold", "Gold"))
 DEFAULT_COLOR = "gold"
@@ -27,10 +31,10 @@ DEFAULT_COLOR = "gold"
 # bấm ALL_TAB_X trước (nằm trong tab All khi nó đang chọn, và là tab đầu khi tab khác đang chọn), rồi mới bấm tab cần.
 GENERAL_TYPES = (
     ("all", "All", 18.2),
-    ("swords", "Swords", 40.4),
-    ("hammer", "Hammer (Development)", 56.3),
-    ("crown", "Crown (Duty)", 73.7),
-    ("tower", "Tower", 89.6),
+    ("military", "Military", 40.4),
+    ("development", "Development", 56.3),
+    ("duty", "Duty", 73.7),
+    ("sub", "Subordinate City", 89.6),
 )
 DEFAULT_GENERAL_TYPE = "all"
 ALL_TAB_X = 10.9                    # % màn hình
@@ -84,9 +88,38 @@ REFINE_BUTTON = "Event/KingsPath/Refine/equipmentRefine.png"   # nút Refine xan
 CANCEL = "Event/KingsPath/Refine/cancel.png"
 CONFIRM = f"{FOLDER}/confirm.png"                   # 1,00 sau khi Refine; màn Refine Equipment chưa có kết quả 0,75 -> ngưỡng 0,9
 
+# ---- Dòng có sẵn (khung Original) và ô Gold / Orange Attribute -------------------------------------------------
+# Mỗi dòng Original có ổ khoá bên trái: đã khoá = vàng (lockOn), chưa khoá = xám (lockOff). Đo trên 21913 (nhẫn có 4 dòng, khoá 0 / 1 / 2 dòng): đúng trạng thái
+# 1,00, trạng thái kia 0,61 .. 0,63 -> ngưỡng 0,9. Trang bị chưa tinh luyện không có khung Original, không thấy ổ khoá nào (0 dòng). Khoá + chưa khoá <= MAX_LINES.
+# Khoá dòng làm nút Refine tính thêm kim cương (hiện "1.5K -> 0" trên nút).
+LOCK_ON = f"{FOLDER}/lockOn.png"
+LOCK_OFF = f"{FOLDER}/lockOff.png"
+LOCK_THRESHOLD = 0.9
+LOCK_REGION = (3, 54, 14, 78)       # % màn hình: cột ổ khoá của 4 dòng Original (y 405 .. 522)
+# Hai ô "Gold Attribute" / "Orange Attribute" (báo khi ra thuộc tính vàng / cam), dùng chung ảnh với King's Path Refine: chữ khớp 1,00; ô đang tích 0,91 (boxOn) /
+# trống 0,46; ô trống 1,00 (boxOff) / tích 0,46 (đo 21913). Ô lệch BOX_FROM_LABEL so với tâm chữ.
+LABEL_GOLD = "Event/KingsPath/Refine/labelGold.png"
+LABEL_ORANGE = "Event/KingsPath/Refine/labelOrange.png"
+LABEL_THRESHOLD = 0.8
+BOX_FROM_LABEL = {LABEL_GOLD: (-33, 8), LABEL_ORANGE: (-42, 8)}
+BOX_ON = "Event/KingsPath/Refine/boxOn.png"
+BOX_OFF = "Event/KingsPath/Refine/boxOff.png"
+BOX_HALF = 18
+
+# ---- Ô trang bị trống ----------------------------------------------------------------------------------------
+# Ô chưa mặc đồ là biểu tượng xám tối; ô đã mặc đồ có khung màu và hình đồ. Đo độ bão hòa (S trong HSV) trung bình của ô SLOT_HALF px quanh tâm
+# (ảnh tướng chưa có đồ nào, 396x704): ô trống 56 .. 65; ô đã mặc đủ 6 món 153 .. 214 -> dưới EMPTY_SATURATION là ô trống, bỏ qua không bấm.
+SLOT_HALF = 35
+EMPTY_SATURATION = 100
+
 # ---- Giới hạn / chờ ------------------------------------------------------------------------------------------
+GENERAL_WAIT_TRIES = 8   # sau khi bấm tướng đầu tiên: chờ 1 s rồi kiểm tra đã sang màn tướng (Enhance) chưa, tối đa ngần này lần
+SLOT_TAP_TRIES = 2       # số lần bấm ô trang bị tối đa: không thấy View sau VIEW_WAIT_TRIES lần chờ thì bấm lại (vẫn ở màn tướng)
+SCREEN_WAIT_TRIES = 8     # sau khi bấm View / Refine / Refine (Craft): chờ 1 s rồi tìm dấu hiệu của màn kế, tối đa ngần này lần
+BUTTON_TAP_TRIES = 2       # số lần bấm mỗi nút tối đa: không thấy màn kế thì bấm lại nút (nếu còn hiện)
+VIEW_WAIT_TRIES = 8      # sau khi bấm ô trang bị: chờ 1 s rồi tìm chữ View, tối đa ngần này lần
+MENU_WAIT_TRIES = 5    # sau khi bấm icon Generals: chờ 1 s rồi kiểm tra đã vào danh sách chưa, tối đa ngần này lần
 MAX_STEPS = 15         # số bước tối đa tới màn tướng
-MAX_REFINES = 100      # số lần Refine tối đa cho mỗi trang bị mỗi lượt
 SCREEN_WAIT = 8        # giây tối đa chờ một màn / nút hiện sau khi bấm
 STEP_WAIT = 2          # sau mỗi lần bấm
 REFINE_WAIT = 4        # chờ kết quả sau khi bấm Refine

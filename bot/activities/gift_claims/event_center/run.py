@@ -113,14 +113,26 @@ APPLE_LIST_SETTLE_SECONDS = 0.8
 APPLE_LIST_EDGE_CONFIRMATIONS = 2
 WISHFUL_SETTLE_SECONDS = 1.0
 WISHFUL_CONFIRMATION_DELAY_SECONDS = 1.0
-WISHFUL_CONTENT_REGION = (3, 26, 97, 88)
-WISHFUL_CLAIM_REGION = (65, 26, 98, 88)
-MAX_WISHFUL_CONTENT_SWIPES = 12
+# Screenshot_20261027-? Wind Blessings green frame: x=20..376,
+# y=190..573 on 396x704.  Restrict all reads and gestures to its interior.
+WISHFUL_CONTENT_REGION = (6, 28, 94, 81)
+WISHFUL_CLAIM_REGION = (65, 28, 94, 81)
+WISHFUL_SCAN_SWIPE = (8, 79.5, 8, 29)
+WISHFUL_SCROLL_DURATION_SECONDS = 1.2
+WISHFUL_SAME_DISTANCE = 8
 MAX_WISHFUL_CLAIMS = 30
 MAX_WISHFUL_TAPS_PER_CLAIM = 3
 WISHFUL_EDGE_CONFIRMATIONS = 2
+# The supplied active Claim crop measures green=0.583/low-saturation=0.483;
+# the Claimed crop measures green=0.000/low-saturation=0.867.  Its white text
+# makes the generic 0.45 gray ceiling too strict for this event.
+WISHFUL_GREEN_MIN_RATIO = 0.22
+WISHFUL_GRAY_MIN_RATIO = 0.50
+WISHFUL_ACTIVE_GRAY_MAX_RATIO = 0.65
 WISHFUL_DONE_ONE_LIMIT = (
     "EventCenter/WishfulWindmillFestival/status_done_one_claim_limit", 0.84)
+WISHFUL_DONE_ONE_NO_RECORDS = (
+    "EventCenter/WishfulWindmillFestival/status_no_records", 0.84)
 WISHFUL_DONE_TWO_CHEST = (
     "EventCenter/WishfulWindmillFestival/button_done2_reward_chest_median",
     0.70,
@@ -561,25 +573,63 @@ def _wishful_content_signature(screen):
     return np.packbits(tiny[:, 1:] > tiny[:, :-1]).tobytes()
 
 
-def _wishful_content_moved(before, after) -> bool:
+def _wishful_content_distance(before, after) -> int:
     old = np.frombuffer(_wishful_content_signature(before), dtype=np.uint8)
     new = np.frombuffer(_wishful_content_signature(after), dtype=np.uint8)
-    return int(np.unpackbits(np.bitwise_xor(old, new)).sum()) > 8
+    return int(np.unpackbits(np.bitwise_xor(old, new)).sum())
+
+
+def _wishful_content_moved(before, after) -> bool:
+    return _wishful_content_distance(before, after) > WISHFUL_SAME_DISTANCE
 
 
 def _wishful_claims(bot, screen):
-    """Claim thật, loại chữ Claim khớp lồng bên trong trạng thái Claimed."""
-    claimed = _wishful_claimed(bot, screen)
+    """Only saturated-green Claim buttons, never the text inside Claimed."""
     return [pos for pos in find_all(
         bot, "EventCenter/WishfulWindmillFestival/button_claim", screen,
         threshold=0.74, region=WISHFUL_CLAIM_REGION)
-        if all(abs(pos[0] - done[0]) > 50 or abs(pos[1] - done[1]) > 22
-               for done in claimed)]
+        if _wishful_is_green_claim(screen, pos)]
 
 
 def _wishful_claimed(bot, screen):
-    return find_all(bot, "EventCenter/WishfulWindmillFestival/status_claimed", screen,
-                    threshold=0.82, region=WISHFUL_CLAIM_REGION)
+    return [pos for pos in find_all(
+        bot, "EventCenter/WishfulWindmillFestival/status_claimed", screen,
+        threshold=0.82, region=WISHFUL_CLAIM_REGION)
+        if _wishful_is_gray_claimed(screen, pos)]
+
+
+def _wishful_button_crop(screen, center, reference_size):
+    scale = screen.shape[1] / 396
+    width = max(1, round(reference_size[0] * scale))
+    height = max(1, round(reference_size[1] * scale))
+    left = max(0, center[0] - width // 2)
+    top = max(0, center[1] - height // 2)
+    return screen[top:min(screen.shape[0], top + height),
+                  left:min(screen.shape[1], left + width)]
+
+
+def _wishful_colour_ratios(crop) -> tuple[float, float]:
+    """Return (green active-band ratio, low-saturation Claimed-band ratio)."""
+    if crop.size == 0:
+        return 0.0, 0.0
+    hsv = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
+    green = ((hsv[..., 0] >= 35) & (hsv[..., 0] <= 90) &
+             (hsv[..., 1] >= 60) & (hsv[..., 2] >= 50))
+    gray = ((hsv[..., 1] <= 70) & (hsv[..., 2] >= 50))
+    return float(green.mean()), float(gray.mean())
+
+
+def _wishful_is_green_claim(screen, center) -> bool:
+    green, gray = _wishful_colour_ratios(
+        _wishful_button_crop(screen, center, (70, 26)))
+    return (green >= WISHFUL_GREEN_MIN_RATIO and
+            gray < WISHFUL_ACTIVE_GRAY_MAX_RATIO)
+
+
+def _wishful_is_gray_claimed(screen, center) -> bool:
+    green, gray = _wishful_colour_ratios(
+        _wishful_button_crop(screen, center, (77, 28)))
+    return green <= 0.08 and gray >= WISHFUL_GRAY_MIN_RATIO
 
 
 def _wishful_claimed_near(bot, screen, claim) -> bool:
@@ -592,6 +642,14 @@ def _wishful_done_one_limit(bot, screen) -> bool:
     template, threshold = WISHFUL_DONE_ONE_LIMIT
     return find(bot, template, screen, threshold=threshold,
                 region=(0, 5, 100, 95)) is not None
+
+
+def _wishful_done_one_no_records(bot, screen) -> bool:
+    """``No Records`` inside the green panel is an immediate DONE 1 state."""
+    template, threshold = WISHFUL_DONE_ONE_NO_RECORDS
+    position = find(bot, template, screen, threshold=threshold,
+                    region=WISHFUL_CONTENT_REGION)
+    return isinstance(position, tuple) and len(position) == 2
 
 
 def _close_wishful_congratulations(bot) -> bool:
@@ -663,10 +721,20 @@ def _claim_wishful_panel(bot, phase: str) -> tuple[ClaimReport, bool]:
                    "Wind Blessings; giữ PENDING")
         return ClaimReport(), False
 
+    # DONE 1 has two terminal paths.  ``No Records`` is the explicit empty
+    # state and finishes immediately; otherwise the ordinary Claim scan below
+    # runs to its confirmed bottom and also finishes once no Claim remains.
+    if phase == "DONE 1" and _wishful_done_one_no_records(bot, bot.screenshot()):
+        bot.record("Gift Claims: Wishful Windmill DONE 1 thấy 'No Records' "
+                   "trong vùng xanh; DONE 1 ngay")
+        return ClaimReport(0, 1), True
+
     attempted = verified = 0
     unresolved = False
     bottom_checks = 0
-    for position in range(1, MAX_WISHFUL_CONTENT_SWIPES + 2):
+    position = 0
+    while True:
+        position += 1
         bot.record(f"Gift Claims: Wishful Windmill {phase} quét vùng xanh "
                    f"vị trí {position}")
         blocked_positions = []
@@ -686,9 +754,9 @@ def _claim_wishful_panel(bot, phase: str) -> tuple[ClaimReport, bool]:
                     bot.sleep(WISHFUL_CONFIRMATION_DELAY_SECONDS)
                     continue
                 if _wishful_claimed(bot, screen):
-                    bot.record(f"Gift Claims: Wishful Windmill {phase} toàn bộ "
-                               "nút trong khung hiện tại đã là Claimed; DONE")
-                    return ClaimReport(attempted, max(verified, 1)), True
+                    bot.record(f"Gift Claims: Wishful Windmill {phase} khung "
+                               "hiện tại chỉ có Claimed; chưa kết luận, lướt "
+                               "tiếp hết vùng xanh")
                 break
 
             empty_checks = 0
@@ -709,22 +777,22 @@ def _claim_wishful_panel(bot, phase: str) -> tuple[ClaimReport, bool]:
                            "còn sau khi bấm; bỏ đúng vị trí và tiếp tục quét")
 
         before = bot.screenshot()
-        if position > MAX_WISHFUL_CONTENT_SWIPES:
-            bot.record(f"Gift Claims: Wishful Windmill {phase} chạm giới hạn "
-                       "12 lần lướt; giữ PENDING")
-            return ClaimReport(attempted, verified), False
         bot.record(f"Gift Claims: Wishful Windmill {phase} hết Claim trong "
-                   "khung hiện tại; lướt chậm trong vùng xanh")
-        bot.swipe_percent(50, 82, 50, 38,
-                          duration=SWIPE_DURATION_SECONDS,
+                   "khung hiện tại; lướt chậm ở mép trái trong vùng xanh")
+        bot.swipe_percent(*WISHFUL_SCAN_SWIPE,
+                          duration=WISHFUL_SCROLL_DURATION_SECONDS,
                           delay=LIST_SCROLL_SETTLE_SECONDS)
         after = bot.screenshot()
-        if _wishful_content_moved(before, after):
+        distance = _wishful_content_distance(before, after)
+        if distance > WISHFUL_SAME_DISTANCE:
+            bot.record(f"Gift Claims: Wishful Windmill {phase} vùng xanh "
+                       f"đã di chuyển, Hamming {distance}/{WISHFUL_SAME_DISTANCE}")
             bottom_checks = 0
             continue
         bottom_checks += 1
         bot.record(f"Gift Claims: Wishful Windmill {phase} vùng xanh không "
-                   f"di chuyển ({bottom_checks}/{WISHFUL_EDGE_CONFIRMATIONS})")
+                   f"di chuyển, Hamming {distance}/{WISHFUL_SAME_DISTANCE} "
+                   f"({bottom_checks}/{WISHFUL_EDGE_CONFIRMATIONS})")
         if bottom_checks < WISHFUL_EDGE_CONFIRMATIONS:
             continue
         remaining = _wishful_claims(bot, after)
@@ -741,7 +809,15 @@ def _claim_wishful_panel(bot, phase: str) -> tuple[ClaimReport, bool]:
 
 
 def _claim_wishful_done_two_chest(bot) -> tuple[ClaimReport, bool]:
-    """Claim the final chest; verify Congratulations or its disappearance."""
+    """Finish DONE 2 from the outer chest after the full green-panel scan.
+
+    No chest in the measured outer region is also terminal: Challenge Quest
+    was already scanned to its confirmed edge, so there is no remaining outer
+    reward to collect.  A chest which *is* visible is repeatedly found again
+    and tapped until it disappears.  A Congratulations popup is closed, but
+    is not sufficient by itself: the outer region is checked again before
+    DONE 2 is accepted.
+    """
     template, threshold = WISHFUL_DONE_TWO_CHEST
     chest = _wait_for(
         bot, template, attempts=5, threshold=threshold,
@@ -749,27 +825,40 @@ def _claim_wishful_done_two_chest(bot) -> tuple[ClaimReport, bool]:
         delay=WISHFUL_SETTLE_SECONDS,
     )
     if chest is None:
-        bot.record("Gift Claims: Wishful Windmill đã nhận Claim DONE 2 nhưng "
-                   "chưa thấy rương cuối; giữ PENDING")
-        return ClaimReport(), False
-    bot.record(f"Gift Claims: Wishful Windmill thấy rương cuối tại {chest}; tap")
-    bot.tap(*chest, delay=WISHFUL_SETTLE_SECONDS)
-    if close_congratulations(bot, attempts=8, region=(0, 18, 100, 65)):
-        bot.record("Gift Claims: Wishful Windmill rương cuối hiện "
-                   "Congratulations; DONE")
-        return ClaimReport(1, 1), True
-    remaining = _wait_for(
-        bot, template, attempts=2, threshold=threshold,
-        region=WISHFUL_DONE_TWO_CHEST_REGION,
-        delay=WISHFUL_SETTLE_SECONDS,
-    )
-    if remaining is None:
-        bot.record("Gift Claims: Wishful Windmill không thấy Congratulations "
-                   "nhưng rương cuối đã biến mất khỏi đúng vùng; DONE")
-        return ClaimReport(1, 1), True
-    bot.record("Gift Claims: Wishful Windmill đã bấm rương cuối nhưng chưa "
-               "thấy Congratulations và rương vẫn còn; giữ PENDING")
-    return ClaimReport(1, 0), False
+        bot.record("Gift Claims: Wishful Windmill đã quét xong Claim DONE 2 "
+                   "và không có rương ngoài để nhận; DONE")
+        return ClaimReport(0, 1), True
+    attempted = 0
+    while chest is not None:
+        # There is deliberately no tap-count ceiling here.  A live chest is
+        # a pending reward, not a reason to conclude DONE/PENDING and leave
+        # it behind.  BotContext.check() still yields safely at the worker's
+        # normal 120-second/boss boundary.
+        bot.check()
+        attempted += 1
+        bot.record(f"Gift Claims: Wishful Windmill thấy rương cuối tại {chest}; "
+                   f"tap ({attempted})")
+        bot.tap(*chest, delay=WISHFUL_SETTLE_SECONDS)
+        saw_congratulations = close_congratulations(
+            bot, attempts=8, region=(0, 18, 100, 65))
+        chest = _wait_for(
+            bot, template, attempts=3, threshold=threshold,
+            region=WISHFUL_DONE_TWO_CHEST_REGION,
+            delay=WISHFUL_SETTLE_SECONDS,
+        )
+        if chest is None:
+            if saw_congratulations:
+                bot.record("Gift Claims: Wishful Windmill rương cuối đã hiện "
+                           "Congratulations và biến mất; DONE")
+            else:
+                bot.record("Gift Claims: Wishful Windmill rương cuối đã biến "
+                           "mất khỏi đúng vùng; DONE")
+            return ClaimReport(attempted, 1), True
+        bot.record("Gift Claims: Wishful Windmill rương cuối vẫn còn; tìm lại "
+                   "đúng ảnh và tap tiếp")
+
+    # Kept for static type checkers; the loop returns when chest becomes None.
+    return ClaimReport(attempted, 1), True
 
 
 def _wait_event_row_open(bot, expected_screen=None, *, delay=UI_SETTLE_SECONDS):
@@ -832,20 +921,14 @@ def _handle_wishful(bot):
     second, second_done = _claim_wishful_panel(bot, "Challenge Quest")
     total = ClaimReport(first.attempted + second.attempted,
                         first.verified + second.verified)
-    if second.attempted == 0:
-        bot.record("Gift Claims: Wishful Windmill DONE 2 không có nút Claim; "
-                   "DONE ngay, không cần nhận rương cuối")
-        return total, second_done
-    if second.verified == 0:
-        bot.record("Gift Claims: Wishful Windmill DONE 2 không bấm nhận được "
-                   "Claim nào; DONE ngay, chuyển nhiệm vụ khác")
-        return total, True
     if not second_done:
         return total, False
 
-    # At least one DONE-2 Claim was really received and the panel is clean.
-    # Return to Wind Power Storage, then the final chest must show
-    # Congratulations before the whole event is persisted as DONE.
+    # A DONE-2 panel is never terminal by itself.  Whether it contained new
+    # Claims or only Claimed rows, first finish the full green-frame scan,
+    # then return to Wind Power Storage and claim the Wishful chest.
+    bot.record("Gift Claims: Wishful Windmill Challenge Quest đã quét hết "
+               "Claim; Back ra ngoài nhận rương trước DONE 2")
     bot.back(delay=WISHFUL_SETTLE_SECONDS)
     chest, chest_done = _claim_wishful_done_two_chest(bot)
     return ClaimReport(total.attempted + chest.attempted,
@@ -1127,6 +1210,50 @@ def _apple_red_multipliers_gray(bot) -> bool:
     return True
 
 
+def _apple_green_multipliers_gray(bot) -> bool:
+    """True when the supplied green x100 and x10 controls are both grey.
+
+    The two controls must be visible in the same stable frame, pass their
+    exact template thresholds, have a grey colour band, and occupy separate
+    positions.  This is a phase-transition signal only: it means there is
+    nothing left to do on the green apple, so the caller must continue with
+    the red apple rather than waiting for a separate Wish Once control.
+    """
+    screen = bot.screenshot()
+    if not isinstance(screen, np.ndarray) or screen.ndim < 2:
+        return False
+    hits = []
+    for label, template_name in (
+            ("x100", "EventCenter/DwarfsLuckyApple/status_green_wish_x100_done"),
+            ("x10", "EventCenter/DwarfsLuckyApple/status_green_wish_x10_done")):
+        template = _scaled_template(bot, template_name, screen)
+        result = bot.best_match(template, screen=screen,
+                                region=(0, 15, 100, 98))
+        if (not isinstance(result, tuple) or len(result) != 2
+                or not isinstance(result[0], (int, float))
+                or not isinstance(result[1], tuple)):
+            return False
+        score, position = result
+        saturation, color_ratio = _apple_button_color_band(screen, position)
+        gray = (saturation <= APPLE_DONE_SATURATION_MAX and
+                color_ratio <= APPLE_DONE_COLOR_RATIO_MAX)
+        bot.record("Gift Claims: Dwarf's Lucky Apple táo xanh kiểm tra Wish "
+                   f"{label} xám: score={score:.3f}, S={saturation:.1f}, "
+                   f"tỷ lệ màu={color_ratio:.2f}")
+        if score < APPLE_RED_MULTIPLIER_DONE_THRESHOLD or not gray:
+            return False
+        hits.append(position)
+    distance_sq = ((hits[0][0] - hits[1][0]) ** 2 +
+                   (hits[0][1] - hits[1][1]) ** 2)
+    if distance_sq <= APPLE_RED_MULTIPLIER_DISTINCT_DISTANCE ** 2:
+        bot.record("Gift Claims: ảnh xanh x100/x10 xám trùng cùng một vị trí; "
+                   "không chuyển tab")
+        return False
+    bot.record("Gift Claims: táo xanh thấy đồng thời Wish x100 và Wish x10 "
+               "đều xám ở hai vị trí riêng")
+    return True
+
+
 def _apple_congratulations_hit(bot, screen):
     """Return a Lucky Apple popup match without taking a second screenshot."""
     for template in (CONGRATULATIONS,
@@ -1330,37 +1457,45 @@ def _handle_dwarfs_lucky_apple(bot):
         return ClaimReport(), False
     bot.tap(*green, delay=UI_SETTLE_SECONDS)
 
-    first, first_done, first_present = _run_optional_apple_phase(
-        bot, "EventCenter/DwarfsLuckyApple/button_green_wish_x100",
-        "EventCenter/DwarfsLuckyApple/status_green_wish_x100_done", "xanh x100")
-    if not first_done:
-        return first, False
+    if _apple_green_multipliers_gray(bot):
+        # The user-supplied grey x100 (500) + x10 (50) images are already a
+        # complete green-phase proof.  Do not wait for Wish Once, which may be
+        # absent in this terminal layout; go directly to the red phase.
+        total = ClaimReport()
+        bot.record("Gift Claims: hai Wish táo xanh đã xám; chuyển ngay sang "
+                   "táo đỏ để kiểm tra tiếp")
+    else:
+        first, first_done, first_present = _run_optional_apple_phase(
+            bot, "EventCenter/DwarfsLuckyApple/button_green_wish_x100",
+            "EventCenter/DwarfsLuckyApple/status_green_wish_x100_done", "xanh x100")
+        if not first_done:
+            return first, False
 
-    second, second_done, second_present = _run_optional_apple_phase(
-        bot, "EventCenter/DwarfsLuckyApple/button_green_wish_x10",
-        "EventCenter/DwarfsLuckyApple/status_green_wish_x10_done", "xanh x10")
-    if not second_done:
+        second, second_done, second_present = _run_optional_apple_phase(
+            bot, "EventCenter/DwarfsLuckyApple/button_green_wish_x10",
+            "EventCenter/DwarfsLuckyApple/status_green_wish_x10_done", "xanh x10")
+        if not second_done:
+            total = ClaimReport(first.attempted + second.attempted,
+                                first.verified + second.verified)
+            return total, False
         total = ClaimReport(first.attempted + second.attempted,
                             first.verified + second.verified)
-        return total, False
-    total = ClaimReport(first.attempted + second.attempted,
-                        first.verified + second.verified)
-    green_once = _wait_apple_special_state(
-        bot, APPLE_GREEN_ONCE_STATES,
-        "Wish Once táo xanh sau khi xử lý hết x100/x10", attempts=3)
-    if green_once is None:
-        bot.record("Gift Claims: Dwarf's Lucky Apple chưa thấy Wish Once táo "
-                   "xanh sau khi kiểm tra x100/x10; giữ nguyên trang để lượt "
-                   "sau kiểm tra lại")
-        return total, False
-    visible = []
-    if first_present:
-        visible.append("x100")
-    if second_present:
-        visible.append("x10")
-    bot.record("Gift Claims: Dwarf's Lucky Apple nhánh xanh đã xử lý xong "
-               f"{', '.join(visible) if visible else 'chỉ có Once'}; "
-               "chuyển sang táo đỏ")
+        green_once = _wait_apple_special_state(
+            bot, APPLE_GREEN_ONCE_STATES,
+            "Wish Once táo xanh sau khi xử lý hết x100/x10", attempts=3)
+        if green_once is None:
+            bot.record("Gift Claims: Dwarf's Lucky Apple chưa thấy Wish Once táo "
+                       "xanh sau khi kiểm tra x100/x10; giữ nguyên trang để lượt "
+                       "sau kiểm tra lại")
+            return total, False
+        visible = []
+        if first_present:
+            visible.append("x100")
+        if second_present:
+            visible.append("x10")
+        bot.record("Gift Claims: Dwarf's Lucky Apple nhánh xanh đã xử lý xong "
+                   f"{', '.join(visible) if visible else 'chỉ có Once'}; "
+                   "chuyển sang táo đỏ")
 
     red = _wait_for_any(
         bot,

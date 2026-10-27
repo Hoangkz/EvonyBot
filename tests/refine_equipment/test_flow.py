@@ -14,7 +14,7 @@ from bot.activities.refine_equipment.constants import (
     TYPE_TAB_Y,
     VIEW,
 )
-from tests.flow import Step, back, end, run_flow, tap, tap_pct
+from tests.flow import Step, back, end, run_flow, tap, tap_at, tap_pct
 
 SCREENS = Path(__file__).parent / "screens"
 WEAPON = SLOTS[0][2]
@@ -29,7 +29,7 @@ FLOW = [
     Step("05_popup.png", tap(VIEW, 0.85)),
     Step("06_equipment.png", tap(EQUIPMENT_REFINE)),
     Step("07_craft.png", tap(CRAFT_REFINE)),
-    Step("08_refine_equipment.png", back()),
+    Step("08_refine_equipment.png", tap_at(35, 330), back()),   # mọi dòng chọn đều vàng: tích ô Gold Attribute, rồi Back (chưa Refine)
     Step("07_craft.png", back()),
     Step("06_equipment.png", back()),
     Step("04_general.png", back(4)),
@@ -41,6 +41,11 @@ SETTINGS = {"slots": {"weapon": {"lines": [{"attribute": "Ground Troop Attack", 
 class RefineEquipmentFlow(unittest.TestCase):
     def test_main_flow(self):
         run_flow(self, refine_equipment.run, SCREENS, FLOW, SETTINGS)
+
+    def test_empty_slot_is_skipped(self):
+        """Tướng chưa mặc đồ nào (ảnh 10): ô trống không bị bấm, bot chỉ Back về thành."""
+        flow = [Step("10_general_empty.png", back(4)), Step("01_home.png", end())]
+        run_flow(self, refine_equipment.run, SCREENS, flow, SETTINGS)
 
     def test_no_attribute_does_nothing(self):
         run_flow(self, refine_equipment.run, SCREENS, [Step("01_home.png", end())], {"slots": {}})
