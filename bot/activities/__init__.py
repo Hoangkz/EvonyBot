@@ -16,6 +16,7 @@ from . import gather_resources
 from . import join_monster_war
 from . import open_gift_box
 from . import recruit_general
+from . import refine_equipment
 from .constants import EXCLUSIVE_ACTIVITIES
 
 ACTIVITIES = {
@@ -27,4 +28,5 @@ ACTIVITIES = {
     "Find Boss": find_boss.run,
     "Craft": craft.run,
     "Gather Resources": gather_resources.run,
+    "Refine Equipment": refine_equipment.run,
 }

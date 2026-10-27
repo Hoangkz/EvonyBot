@@ -24,6 +24,22 @@ Nhánh phụ:
 - Mở bằng `Open.png` (không phải Use): sau Use2, bot chờ `success.png` rồi `back()`.
 - Hộp nằm dưới thanh đáy (y ≥ 650): bot `swipe(50, 50, 50, 36)`.
 
+## Refine Equipment — `tests/refine_equipment/`
+
+Settings: `{"slots": {"weapon": {"lines": [{"attribute": "Ground Troop Attack", "color": "gold", "lock": true}]}}}`
+
+| #   | Màn hình                                           | Action                                                         |
+| --- | -------------------------------------------------- | -------------------------------------------------------------- |
+| 01  | Màn thành                                          | `tap("OpenBox/Setup/chucnang.png")`                            |
+| 02  | Menu •••                                           | `tap("RefineEquipment/menuGenerals.png")`                      |
+| 03  | Danh sách Generals                                 | `tap_pct(10.9, 23.6)` (tab All), `tap_pct(22.7, 49.7)` (tướng đầu) |
+| 04  | Màn tướng                                          | `tap_pct(15.9, 24.1)` (ô vũ khí)                               |
+| 05  | Hộp thông tin trang bị                             | `tap("RefineEquipment/view.png")`                              |
+| 06  | General Equipment                                  | `tap("RefineEquipment/equipmentRefine.png")`                   |
+| 07  | Màn Craft (tab Refine)                             | `tap("Event/KingsPath/Refine/refineButton.png")`               |
+| 08  | Refine Equipment                                   | `back()` (chưa đọc được dòng New nên không Refine)             |
+| 09  | Craft -> General Equipment -> màn tướng -> thành   | `back()` x3, `back(4)`, `end()`                                |
+
 ## Alliance Capacity — `tests/alliance_capacity/`
 
 Settings: `{"times": "1"}` (1 lần donate bằng gems)

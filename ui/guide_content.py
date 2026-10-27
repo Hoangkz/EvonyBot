@@ -226,6 +226,16 @@ Nhiệm vụ mở theo ngày (Day 1 &rarr; Day 7), ngày chưa mở sẽ đượ
   <li>Bot không chọn preset quân: tới màn March là bấm March luôn.</li>
 </ul>
 """),
+    ("Refine Equipment", """
+<h2>Refine Equipment</h2>
+<p>Tinh luyện 6 trang bị của một tướng: bot mở danh sách tướng (••• → Generals), chọn tướng đầu tiên rồi tinh luyện từng trang bị.</p>
+<ul>
+  <li><b>General</b>: <i>Favorite generals</i> (lọc tướng yêu thích) và loại tướng; bot luôn chọn tướng đầu tiên sau khi lọc.</li>
+  <li>Mỗi trang bị (Weapon, Armor, Boots, Helmet, Pants, Ring) có danh sách thuộc tính riêng: tích tối đa 4 dòng cần có; mỗi dòng chọn màu tối thiểu (Orange / Gold) và ô <b>Lock</b> (khoá dòng lại khi đã ra đúng).</li>
+  <li>Trang bị không tích dòng nào thì bỏ qua.</li>
+</ul>
+<p><i>Đang phát triển:</i> bot đã mở được màn Refine Equipment của từng trang bị nhưng chưa đọc được 4 dòng kết quả nên chưa tự bấm Refine.</p>
+"""),
     ("Logs", """
 <h2>Logs</h2>
 <p>Nhật ký của máy đang mở.</p>

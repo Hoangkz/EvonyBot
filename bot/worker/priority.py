@@ -68,6 +68,7 @@ from ..activities.open_gift_box.run import run as open_gift_box
 from ..activities.find_boss import JOB as find_boss_job
 from ..activities.craft import JOB as craft_job
 from ..activities.gather_resources import JOB as gather_resources_job
+from ..activities.refine_equipment import JOB as refine_equipment_job
 from ..activities import gift_claims, join_monster_war
 
 DATA ={
@@ -406,6 +407,16 @@ DATA ={
             "once": True,    # chỉ làm 1 lần (mỗi lần Start): xong thì không làm lại khi sang ngày mới
             "note": "Chế tạo các trang bị đã tích ở tab Craft; một lần duy nhất, ưu tiên cao hơn Daily Activities",
             "needs_city_map": True,   # nhiệm vụ cần route: chỉ vào danh sách khi máy đã có bản đồ thành (worker quét lúc Join Boss rảnh)
+        }
+    ],
+    "Refine Equipment": [
+        {
+            "key": "refine_equipment",
+            "run": refine_equipment_job,
+            "label": "Refine Equipment: tinh luyện 6 trang bị của tướng đầu tiên tới khi đủ dòng mong muốn",
+            "priority": 666,   # sau Craft (669) và General Buy (668), trước City VIP (650) và các nhiệm vụ Daily còn lại
+            "once": True,
+            "note": "Đi từ ••• -> Generals, không cần route công trình. Chưa xong: đọc 4 dòng New còn TODO (bot/activities/refine_equipment/TODO.md), READY = False thì không vào danh sách",
         }
     ],
     "Gather Resources": [
