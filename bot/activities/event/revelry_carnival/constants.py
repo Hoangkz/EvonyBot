@@ -67,6 +67,10 @@ STEP_DELAY = 1.0
 # that there is no Use/DONE result from the first immediately-following frame.
 PARADE_MASK_OPEN_DELAY = 2.0
 EDGE_CONFIRMATIONS = 2
+# Check the viewport shown on entry and exactly one viewport after a scroll.
+# When both contain no green Claim, inspect Parade Mask instead of dragging
+# through an empty reward list.
+EMPTY_VIEWS_BEFORE_MASK_CHECK = 2
 MAX_FULL_PASSES = 3
 MAX_CLAIMS_PER_VIEW = 6
 

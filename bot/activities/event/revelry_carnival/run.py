@@ -17,6 +17,7 @@ from .constants import (
     CONGRATULATIONS,
     CONTROL_THRESHOLD,
     EDGE_CONFIRMATIONS,
+    EMPTY_VIEWS_BEFORE_MASK_CHECK,
     GREEN_HUE,
     GREEN_MIN_RATIO,
     GREEN_MIN_SATURATION,
@@ -414,6 +415,7 @@ def _claim_current_view(bot):
 
 def _scan_full_list(bot):
     saw_claim = False
+    empty_views = 0
     unchanged = 0
     position = 0
     while True:
@@ -424,6 +426,11 @@ def _scan_full_list(bot):
         saw_claim = saw_claim or claimed
         if stuck:
             return saw_claim, True, False
+        empty_views = 0 if claimed else empty_views + 1
+        if empty_views >= EMPTY_VIEWS_BEFORE_MASK_CHECK:
+            bot.record(f"{NAME}: {empty_views} khung liên tiếp không có Claim xanh "
+                       "(khung mở và một lần lướt); dừng quét để kiểm tra Parade Mask")
+            return saw_claim, False, True
         moved = _scroll_reward_frame(
             bot, "xuống", SCAN_SWIPE, SCAN_SWIPE_FALLBACKS)
         unchanged = 0 if moved else unchanged + 1
@@ -453,10 +460,10 @@ def _claim_rewards(bot) -> bool:
             bot.record(f"{NAME}: Claim xanh vẫn còn sau giới hạn bấm; giữ PENDING")
             return False
         if not bottom:
-            bot.record(f"{NAME}: chưa xác nhận được cuối danh sách quà; giữ PENDING")
+            bot.record(f"{NAME}: chưa hoàn tất lượt quét quà; giữ PENDING")
             return False
         if not saw_claim:
-            bot.record(f"{NAME}: đã quét từ đầu tới cuối, không còn Claim xanh; "
+            bot.record(f"{NAME}: hai khung kiểm tra liên tiếp không còn Claim xanh; "
                        "tiếp tục kiểm tra Parade Mask")
             return True
         bot.record(f"{NAME}: vừa nhận quà; quét lại toàn bộ trước khi DONE")

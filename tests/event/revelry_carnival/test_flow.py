@@ -162,6 +162,21 @@ class ClaimColourTests(unittest.TestCase):
         self.assertEqual(2, scan_full_list.call_count)
         swipe_to_top.assert_called_once_with(bot)
 
+    @mock.patch.object(run, "_scroll_reward_frame", return_value=True)
+    @mock.patch.object(run, "_claim_current_view",
+                       side_effect=((False, False), (False, False)))
+    def test_two_empty_views_go_to_parade_mask_check_without_extra_scrolls(
+            self, claim_current_view, scroll_reward_frame):
+        bot = mock.Mock()
+
+        saw_claim, stuck, ready_for_mask = run._scan_full_list(bot)
+
+        self.assertEqual((False, False, True),
+                         (saw_claim, stuck, ready_for_mask))
+        self.assertEqual(2, claim_current_view.call_count)
+        scroll_reward_frame.assert_called_once_with(
+            bot, "xuống", run.SCAN_SWIPE, run.SCAN_SWIPE_FALLBACKS)
+
 
 class ResumeBot:
     def __init__(self, done=()):
