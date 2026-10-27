@@ -108,6 +108,17 @@ def affordable(screen) -> "tuple[int, int] | None":
     return next(((cost, x) for cost, x in BUTTONS if not _red(screen, x)), None)
 
 
+def done_by_red_five_and_ten(screen) -> bool:
+    """The user-defined terminal state: both 5- and 10-coin prices are red.
+
+    The 1-coin control intentionally has no bearing on this event's Gift
+    Claims result.  Check this before any Skip, reward-selection or coin tap
+    so an already-terminal page is never changed.
+    """
+    buttons = dict(BUTTONS)
+    return _red(screen, buttons[5]) and _red(screen, buttons[10])
+
+
 def spend_coins(bot) -> bool:
     """Ở trang: bấm nút có số không đỏ, ưu tiên 10 -> 5 -> 1. Sau mỗi lần bấm, mỗi 1s kiểm tra popup "Congratulations!" đã ra
     chưa, tối đa POPUP_WAITS lần (nút 1 xu 3 lần, nút 5 / 10 WAITS lần). Ra popup thì Back đóng và chờ về trang (1s x WAITS);
@@ -141,8 +152,18 @@ def spend_coins(bot) -> bool:
 
 
 def claim(bot) -> bool:
-    """Flow sau khi mở tab: tích Skip animation (dưới bên phải) -> chọn quà mục tiêu nếu còn dấu + -> bấm các nút tốn xu còn đủ
-    xu (10 -> 5 -> 1). DONE khi đã chọn quà và cả ba số đều đỏ; còn lại giữ PENDING."""
+    """Claim Golden Tree Rewards unless the two user-selected red prices end it.
+
+    Seeing both 5 and 10 red is DONE immediately.  Otherwise keep the older
+    selection/spend flow for a page that is not terminal yet.
+    """
+    screen = bot.screenshot()
+    if _see(bot, PAGE, screen) is None:
+        bot.record("Gift Claims: Golden Tree Rewards không thấy trang event; giữ PENDING")
+        return False
+    if done_by_red_five_and_ten(screen):
+        bot.record("Gift Claims: Golden Tree Rewards nút 5 và 10 cùng đỏ; DONE")
+        return True
     if not ensure_skip_animation(bot, SKIP_TAP, SKIP_BOX, "Golden Tree Rewards"):
         return False
     return select_reward(bot) and spend_coins(bot)

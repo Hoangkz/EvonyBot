@@ -1476,6 +1476,9 @@ class FixedGiftFlowTests(unittest.TestCase):
 
     def test_golden_tree_rewards_ticks_skip_then_selects_gold(self):
         page, popup, chosen, unchecked = self._golden_tree_screens()
+        # Keep 5 and 10 non-red for this legacy selection path.  If both were
+        # red, the user-defined terminal rule must stop before Skip.
+        unchecked = self._golden_tree_whiten(unchecked, 199, 325)
 
         def on_tap(x, y, **_kwargs):
             if bot.current is unchecked and abs(x - 291) <= 3 and abs(y - 573) <= 3:
@@ -1515,6 +1518,17 @@ class FixedGiftFlowTests(unittest.TestCase):
         self.assertIsNone(golden_tree_rewards.affordable(chosen))
         self.assertEqual((5, 199), golden_tree_rewards.affordable(self._golden_tree_whiten(chosen, 199, 73)))
         self.assertEqual((10, 325), golden_tree_rewards.affordable(self._golden_tree_whiten(chosen, 325, 199, 73)))
+
+    def test_golden_tree_rewards_five_and_ten_red_are_done_even_if_one_is_not(self):
+        _page, _popup, chosen, _unchecked = self._golden_tree_screens()
+        # Restore only the 1-coin price to white; 5 and 10 remain red.
+        screen = self._golden_tree_whiten(chosen, 73)
+        bot = self._golden_tree_bot(screen)
+
+        self.assertTrue(golden_tree_rewards.done_by_red_five_and_ten(screen))
+        self.assertTrue(golden_tree_rewards.claim(bot))
+        bot.tap.assert_not_called()
+        bot.back.assert_not_called()
 
     def test_golden_tree_rewards_real_screen_with_5_coins_taps_pest_control(self):
         # Screenshot_20261025-224503: 5 xu, đã chọn vàng; số 1 và 5 trắng, số 10 đỏ.
