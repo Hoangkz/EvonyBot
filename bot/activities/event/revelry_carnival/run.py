@@ -9,7 +9,7 @@ import numpy as np
 import time
 
 from ...daily_activities.alliance_vip.constants import MAX_SLIDER
-from ..common import EVENT_OPENED, STOP, EventState, mark_done, run_task
+from ..common import EVENT_ENDED, EVENT_OPENED, STOP, EventState, mark_done, run_task
 from .constants import (
     CLAIM_GRAY,
     CLAIM_GREEN,
@@ -503,6 +503,14 @@ def _run_opened(bot) -> bool:
 
 def run(bot, task: dict, state: EventState):
     def handle(action, pos, screen):
+        if action == EVENT_ENDED:
+            # Revelry lives in Daily Activities / Gift Claims.  It borrows
+            # the Event navigator only to reach its panel.  No ribbon means
+            # there is no Revelry panel to claim today, so finish this one
+            # Gift Claims task and let the worker continue to the next zone.
+            bot.record(f"{NAME}: không thấy ruy băng Event; Gift Claims DONE")
+            mark_done(bot, KEY)
+            return STOP
         if action in (ON_PARADE_MASK_DONE, ON_HOW_TO_GET):
             # A stale popup (or one the player opened manually) is not proof
             # that this run has swept every green Claim and then re-opened

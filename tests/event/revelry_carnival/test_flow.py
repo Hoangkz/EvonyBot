@@ -336,6 +336,19 @@ class DirectPopupTests(unittest.TestCase):
         self.assertEqual(run.KEY, bot._task_results[-1].key)
         self.assertTrue(bot._task_results[-1].done)
 
+    @mock.patch.object(run, "run_task")
+    def test_missing_event_ribbon_marks_only_revelry_gift_done(self, run_task):
+        bot = self.PopupBot()
+        state = mock.Mock()
+        run.run(bot, {}, state)
+        handler = run_task.call_args.args[4]
+
+        self.assertEqual(run.STOP, handler(run.EVENT_ENDED, None, object()))
+        self.assertEqual(run.KEY, bot._task_results[-1].key)
+        self.assertTrue(bot._task_results[-1].done)
+        bot.record.assert_called_with(
+            "Revelry Carnival: không thấy ruy băng Event; Gift Claims DONE")
+
 
 if __name__ == "__main__":
     unittest.main()
