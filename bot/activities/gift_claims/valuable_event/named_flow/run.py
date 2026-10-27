@@ -132,6 +132,7 @@ class ExactFlow:
     claim_threshold: float = 0.72
     fallback_tap: tuple[int, int] | None = None
     navigation_threshold: float = 0.72
+    navigation_region: tuple[int, int, int, int] = LOWER_CONTENT
     scroll_claims: bool = False
     # Per-event vertical list geometry.  Defaults preserve the older flows;
     # events with a bounded task panel can keep the whole gesture and the
@@ -185,6 +186,7 @@ def _tap_navigation(bot, flow: ExactFlow) -> bool:
     acted = False
     for index, template in enumerate(flow.navigation):
         hit = _wait_any(bot, (template,), attempts=4,
+                        region=flow.navigation_region,
                         threshold=flow.navigation_threshold)
         if hit is None:
             continue

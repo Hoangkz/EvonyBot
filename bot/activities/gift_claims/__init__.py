@@ -75,10 +75,16 @@ def task(job_spec: dict, *, after: str | None = None) -> dict:
 
     def done(ctx, settings):
         # ``True`` ở đây chỉ làm worker tạm bỏ qua task trong lần xét hiện tại.
-        # Worker đọc lại DB mỗi vòng, nên task tự xuất hiện ngay khi zone trước
-        # đã ghi key tổng DONE.
+        # Before the predecessor has run, keep this task locked. Once that
+        # zone has completed one eligibility window and entered its 120-second
+        # retry cooldown, let the next Gift Claims task run even if one child
+        # remains PENDING. When the cooldown expires, the higher-priority
+        # predecessor naturally runs first again.
         if after is not None and not ctx.is_daily_done(after):
-            return True
+            predecessor_waiting = (
+                time.monotonic() < _retry_after(ctx).get(after, 0.0))
+            if not predecessor_waiting:
+                return True
         return bool(original_done(ctx, settings)) if original_done else False
 
     return {**job_spec, "enabled": enabled, "done": done}

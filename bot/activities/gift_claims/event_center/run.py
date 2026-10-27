@@ -1,4 +1,4 @@
-"""Scroll Event Center and process every red-dot row safely."""
+"""Scroll Event Center and process only the explicitly supported events."""
 import time
 
 import cv2
@@ -22,7 +22,6 @@ from ..valuable_event.named_flow import region_hamming_distance
 
 KEY = "gift_event_center_limited"
 PAGE = "EventCenter/title"
-DOT = "EventCenter/notification_dot"
 CONGRATULATIONS = "SuperValueReturn/LoginGifts/congratulations"
 # Event Center uses the same edge contract as Valuable Event: an edge is real
 # only after two consecutive settled swipes do not move the list.  There is no
@@ -74,9 +73,9 @@ APPLE_ORNAMENT_THRESHOLD = 0.70
 APPLE_ORNAMENT_WIDTH_RATIO = 0.18
 # Exact text/border scores fall to 0.485 on the user's lagged live frames,
 # while their HSV bands remain decisive (ACTIVE S=185/81% saturated; DONE
-# S=24/7%). Require the exact control to score at least 0.45, then let the
+# S=24/7%). Require the exact control to score at least 0.44, then let the
 # strict yellow/gray colour gates below decide the state.
-APPLE_COLOR_LOCATE_THRESHOLD = 0.45
+APPLE_COLOR_LOCATE_THRESHOLD = 0.44
 APPLE_ACTIVE_SATURATION_MIN = 110.0
 APPLE_ACTIVE_COLOR_RATIO_MIN = 0.35
 APPLE_DONE_SATURATION_MAX = 65.0
@@ -86,6 +85,15 @@ APPLE_COLOR_SATURATION_CUTOFF = 100
 # làm template DONE chỉ còn khoảng 0.50 (log thực tế 0.507). Khi đồng thời thấy
 # Once đỏ và dải tại vị trí x10 đã xám, ngưỡng định vị thấp này là an toàn.
 APPLE_RED_POST_TAP_GRAY_LOCATE_THRESHOLD = 0.45
+APPLE_RED_X10_DISTINCT_DISTANCE = 45
+APPLE_RED_MULTIPLIER_DONE_THRESHOLD = 0.80
+APPLE_RED_MULTIPLIER_DISTINCT_DISTANCE = 45
+# A loose multiplier threshold is necessary on lagged devices, but the exact
+# Wish Once crop still scores much higher at its own location.  Do not let
+# that yellow/grey Once button impersonate x100/x10 merely because their
+# ornaments overlap visually.
+APPLE_ONCE_EXCLUSION_THRESHOLD = 0.70
+APPLE_ONCE_EXCLUSION_DISTANCE = 45
 MAX_APPLE_TAPS_PER_PHASE = 100
 APPLE_STATE_MISS_RETRIES = 3
 # MEmu can become noticeably slower when the worker controls many devices at
@@ -113,6 +121,11 @@ MAX_WISHFUL_TAPS_PER_CLAIM = 3
 WISHFUL_EDGE_CONFIRMATIONS = 2
 WISHFUL_DONE_ONE_LIMIT = (
     "EventCenter/WishfulWindmillFestival/status_done_one_claim_limit", 0.84)
+WISHFUL_DONE_TWO_CHEST = (
+    "EventCenter/WishfulWindmillFestival/button_done2_reward_chest_median",
+    0.70,
+)
+WISHFUL_DONE_TWO_CHEST_REGION = (2, 15, 28, 35)
 EMPTY_POSITION_CHECKS = 2
 APPLE_GREEN_ONCE_STATES = (
     ("EventCenter/DwarfsLuckyApple/status_green_wish_once", 0.84),
@@ -244,24 +257,6 @@ def run(bot):
     completed = run_opened(bot)
     return_home(bot)
     return completed
-
-
-def _row_dots(bot, screen):
-    return [dot for dot in find_all(bot, DOT, screen, threshold=0.65,
-                                    region=(10, 25, 25, 98))
-            if dot[1] >= 180]
-
-
-def _row_signature(screen, y):
-    top, bottom = max(0, y - 32), min(screen.shape[0], y + 32)
-    # Event artwork on the right is animated.  The icon/title on the left is
-    # the stable row identity and must be the only part persisted across boss
-    # resumes and full-list verification passes.
-    right = max(1, int(screen.shape[1] * 0.68))
-    patch = cv2.cvtColor(screen[top:bottom, :right], cv2.COLOR_BGR2GRAY)
-    tiny = cv2.resize(patch, (25, 8), interpolation=cv2.INTER_AREA)
-    # Difference hash is stable across small animation/brightness changes.
-    return np.packbits(tiny[:, 1:] > tiny[:, :-1]).tobytes()
 
 
 def _close_congratulations(bot):
@@ -745,6 +740,38 @@ def _claim_wishful_panel(bot, phase: str) -> tuple[ClaimReport, bool]:
     return ClaimReport(attempted, verified), False
 
 
+def _claim_wishful_done_two_chest(bot) -> tuple[ClaimReport, bool]:
+    """Claim the final chest; verify Congratulations or its disappearance."""
+    template, threshold = WISHFUL_DONE_TWO_CHEST
+    chest = _wait_for(
+        bot, template, attempts=5, threshold=threshold,
+        region=WISHFUL_DONE_TWO_CHEST_REGION,
+        delay=WISHFUL_SETTLE_SECONDS,
+    )
+    if chest is None:
+        bot.record("Gift Claims: Wishful Windmill đã nhận Claim DONE 2 nhưng "
+                   "chưa thấy rương cuối; giữ PENDING")
+        return ClaimReport(), False
+    bot.record(f"Gift Claims: Wishful Windmill thấy rương cuối tại {chest}; tap")
+    bot.tap(*chest, delay=WISHFUL_SETTLE_SECONDS)
+    if close_congratulations(bot, attempts=8, region=(0, 18, 100, 65)):
+        bot.record("Gift Claims: Wishful Windmill rương cuối hiện "
+                   "Congratulations; DONE")
+        return ClaimReport(1, 1), True
+    remaining = _wait_for(
+        bot, template, attempts=2, threshold=threshold,
+        region=WISHFUL_DONE_TWO_CHEST_REGION,
+        delay=WISHFUL_SETTLE_SECONDS,
+    )
+    if remaining is None:
+        bot.record("Gift Claims: Wishful Windmill không thấy Congratulations "
+                   "nhưng rương cuối đã biến mất khỏi đúng vùng; DONE")
+        return ClaimReport(1, 1), True
+    bot.record("Gift Claims: Wishful Windmill đã bấm rương cuối nhưng chưa "
+               "thấy Congratulations và rương vẫn còn; giữ PENDING")
+    return ClaimReport(1, 0), False
+
+
 def _wait_event_row_open(bot, expected_screen=None, *, delay=UI_SETTLE_SECONDS):
     """Wait through Event Center transition frames after selecting one row.
 
@@ -805,7 +832,24 @@ def _handle_wishful(bot):
     second, second_done = _claim_wishful_panel(bot, "Challenge Quest")
     total = ClaimReport(first.attempted + second.attempted,
                         first.verified + second.verified)
-    return total, second_done
+    if second.attempted == 0:
+        bot.record("Gift Claims: Wishful Windmill DONE 2 không có nút Claim; "
+                   "DONE ngay, không cần nhận rương cuối")
+        return total, second_done
+    if second.verified == 0:
+        bot.record("Gift Claims: Wishful Windmill DONE 2 không bấm nhận được "
+                   "Claim nào; DONE ngay, chuyển nhiệm vụ khác")
+        return total, True
+    if not second_done:
+        return total, False
+
+    # At least one DONE-2 Claim was really received and the panel is clean.
+    # Return to Wind Power Storage, then the final chest must show
+    # Congratulations before the whole event is persisted as DONE.
+    bot.back(delay=WISHFUL_SETTLE_SECONDS)
+    chest, chest_done = _claim_wishful_done_two_chest(bot)
+    return ClaimReport(total.attempted + chest.attempted,
+                       total.verified + chest.verified), chest_done
 
 
 def _apple_done_ornament_matches(screen, template, center) -> tuple[bool, tuple[float, float]]:
@@ -859,8 +903,42 @@ def _apple_button_color_band(screen, center) -> tuple[float, float]:
             float(np.mean(saturation >= APPLE_COLOR_SATURATION_CUTOFF)))
 
 
+def _apple_once_states_for_multiplier(active: str):
+    """Exact Once states that must not satisfy a multiplier template."""
+    if active in (
+            "EventCenter/DwarfsLuckyApple/button_green_wish_x100",
+            "EventCenter/DwarfsLuckyApple/button_green_wish_x10"):
+        return APPLE_GREEN_ONCE_STATES
+    if active == "EventCenter/DwarfsLuckyApple/button_red_wish_x10":
+        return APPLE_RED_ONCE_STATES
+    return ()
+
+
+def _apple_multiplier_is_once(bot, screen, active: str, position,
+                              *, region) -> bool:
+    """Whether ``position`` is an exact Wish Once control, not x100/x10."""
+    if position is None:
+        return False
+    for template_name, _threshold in _apple_once_states_for_multiplier(active):
+        template = _scaled_template(bot, template_name, screen)
+        score, once_position = bot.best_match(template, screen=screen,
+                                              region=region)
+        if (once_position is None or
+                score < APPLE_ONCE_EXCLUSION_THRESHOLD):
+            continue
+        distance_sq = ((position[0] - once_position[0]) ** 2 +
+                       (position[1] - once_position[1]) ** 2)
+        if distance_sq <= APPLE_ONCE_EXCLUSION_DISTANCE ** 2:
+            bot.record("Gift Claims: Dwarf's Lucky Apple template multiplier "
+                       f"đang khớp vào Wish Once ({template_name}, "
+                       f"score={score:.3f}, vị trí={once_position}); loại "
+                       "kết quả để không bấm nhầm")
+            return True
+    return False
+
+
 def _apple_button_state(bot, screen, active: str, finished: str,
-                        region=(0, 15, 100, 98)):
+                        region=(0, 15, 100, 98), *, exclude_once=False):
     """Distinguish the orange active button from the grey disabled button.
 
     Their wording and coin icon are nearly identical, so testing the disabled
@@ -880,14 +958,21 @@ def _apple_button_state(bot, screen, active: str, finished: str,
     done_color = (_apple_button_color_band(screen, done_pos)
                   if done_pos is not None else (0.0, 0.0))
     bot.record(f"Gift Claims: Dwarf's Lucky Apple dải màu "
-               f"ACTIVE score={active_score:.3f}, S={active_color[0]:.1f}, "
+               f"ACTIVE score={active_score:.3f} tại {active_pos}, S={active_color[0]:.1f}, "
                f"tỷ lệ vàng={active_color[1]:.2f}; DONE score={done_score:.3f}, "
-               f"S={done_color[0]:.1f}, tỷ lệ vàng={done_color[1]:.2f}")
+               f"tại {done_pos}, S={done_color[0]:.1f}, tỷ lệ vàng={done_color[1]:.2f}")
+
+    active_is_once = (exclude_once and
+                      _apple_multiplier_is_once(bot, screen, active,
+                                                 active_pos, region=region))
+    done_is_once = (exclude_once and
+                    _apple_multiplier_is_once(bot, screen, active,
+                                               done_pos, region=region))
 
     done_is_gray = (done_color[0] <= APPLE_DONE_SATURATION_MAX and
                     done_color[1] <= APPLE_DONE_COLOR_RATIO_MAX)
     if (done_pos is not None and done_score >= APPLE_STATE_THRESHOLD
-            and done_is_gray):
+            and done_is_gray and not done_is_once):
         ornament_ok, ornament_scores = _apple_done_ornament_matches(
             screen, done_template, done_pos)
         bot.record("Gift Claims: Dwarf's Lucky Apple kiểm tra hoa văn DONE "
@@ -912,7 +997,8 @@ def _apple_button_state(bot, screen, active: str, finished: str,
         locate_color[1] >= APPLE_ACTIVE_COLOR_RATIO_MIN)
     if (locate_pos is not None and
             locate_score >= APPLE_COLOR_LOCATE_THRESHOLD and
-            active_is_yellow):
+            active_is_yellow and not (active_is_once if locate_pos == active_pos
+                                       else done_is_once)):
         bot.record("Gift Claims: Dwarf's Lucky Apple dải vàng đạt chuẩn; "
                    "xác nhận nút ACTIVE và tiếp tục bấm")
         return "active", locate_pos
@@ -929,7 +1015,8 @@ def _apple_button_state(bot, screen, active: str, finished: str,
         locate_color[1] <= APPLE_DONE_COLOR_RATIO_MAX)
     if (locate_pos is not None and
             locate_score >= APPLE_COLOR_LOCATE_THRESHOLD and
-            located_is_gray):
+            located_is_gray and not (active_is_once if locate_pos == active_pos
+                                      else done_is_once)):
         bot.record("Gift Claims: Dwarf's Lucky Apple đã định vị đúng nút và "
                    "dải màu đã xám; xác nhận DONE không chờ template/hoa văn")
         return "done", locate_pos
@@ -948,25 +1035,95 @@ def _apple_red_x10_post_tap_done(bot, screen) -> bool:
     and tapped red x10; it additionally requires an exact red Once state and
     a grey colour band at the weak x10 match.
     """
+    red_once = _apple_special_state(
+        bot, screen, APPLE_RED_ONCE_STATES,
+        "Wish Once táo đỏ sau khi đã bấm x10")
+    if red_once is None:
+        return False
+
+    # The live terminal layout can remove x10 completely and leave only Wish
+    # Once. The x10 ACTIVE template then weakly matches that remaining control
+    # (0.449 in the supplied frame). Do not mistake it for a separate x10: a
+    # genuinely actionable x10 is yellow and spatially distinct from Once.
+    active = "EventCenter/DwarfsLuckyApple/button_red_wish_x10"
+    active_template = _scaled_template(bot, active, screen)
+    active_score, active_pos = bot.best_match(
+        active_template, screen=screen, region=(0, 15, 100, 98))
+    if active_pos is not None:
+        active_saturation, active_color_ratio = _apple_button_color_band(
+            screen, active_pos)
+        once_pos = red_once[1]
+        distance_sq = ((active_pos[0] - once_pos[0]) ** 2 +
+                       (active_pos[1] - once_pos[1]) ** 2)
+        active_is_yellow = (
+            active_saturation >= APPLE_ACTIVE_SATURATION_MIN and
+            active_color_ratio >= APPLE_ACTIVE_COLOR_RATIO_MIN)
+        if (active_score >= APPLE_COLOR_LOCATE_THRESHOLD and
+                active_is_yellow and
+                distance_sq > APPLE_RED_X10_DISTINCT_DISTANCE ** 2):
+            bot.record("Gift Claims: Dwarf's Lucky Apple vẫn thấy một nút "
+                       "đỏ x10 vàng tách biệt với Wish Once; tiếp tục pha")
+            return False
+
     finished = "EventCenter/DwarfsLuckyApple/status_red_wish_x10_done"
     done_template = _scaled_template(bot, finished, screen)
     done_score, done_pos = bot.best_match(
         done_template, screen=screen, region=(0, 15, 100, 98))
-    if (done_pos is None or
-            done_score < APPLE_RED_POST_TAP_GRAY_LOCATE_THRESHOLD):
+    if (done_pos is not None and
+            done_score >= APPLE_RED_POST_TAP_GRAY_LOCATE_THRESHOLD):
+        saturation, color_ratio = _apple_button_color_band(screen, done_pos)
+        if (saturation <= APPLE_DONE_SATURATION_MAX and
+                color_ratio <= APPLE_DONE_COLOR_RATIO_MAX):
+            bot.record("Gift Claims: Dwarf's Lucky Apple đỏ x10 sau tap đã "
+                       f"xám (score={done_score:.3f}, S={saturation:.1f}, "
+                       f"tỷ lệ màu={color_ratio:.2f}) và còn Wish Once; "
+                       "xác nhận DONE")
+            return True
+
+    bot.record("Gift Claims: Dwarf's Lucky Apple đã từng bấm đỏ x10, hiện "
+               "chỉ còn Wish Once và không còn x10 vàng tách biệt; DONE")
+    return True
+
+
+def _apple_red_multipliers_gray(bot) -> bool:
+    """DONE when the red tab simultaneously shows grey Wish x100 and x10.
+
+    These two terminal controls are checked on one frame and must be spatially
+    distinct.  This prevents the very similar button ornaments from allowing
+    one grey control to satisfy both templates.
+    """
+    screen = bot.screenshot()
+    if not isinstance(screen, np.ndarray) or screen.ndim < 2:
         return False
-    saturation, color_ratio = _apple_button_color_band(screen, done_pos)
-    if (saturation > APPLE_DONE_SATURATION_MAX or
-            color_ratio > APPLE_DONE_COLOR_RATIO_MAX):
+    hits = []
+    for label, template_name in (
+            ("x100", "EventCenter/DwarfsLuckyApple/status_red_wish_x100_done"),
+            ("x10", "EventCenter/DwarfsLuckyApple/status_red_wish_x10_done")):
+        template = _scaled_template(bot, template_name, screen)
+        result = bot.best_match(template, screen=screen,
+                                region=(0, 15, 100, 98))
+        if (not isinstance(result, tuple) or len(result) != 2
+                or not isinstance(result[0], (int, float))
+                or not isinstance(result[1], tuple)):
+            return False
+        score, position = result
+        saturation, color_ratio = _apple_button_color_band(screen, position)
+        gray = (saturation <= APPLE_DONE_SATURATION_MAX and
+                color_ratio <= APPLE_DONE_COLOR_RATIO_MAX)
+        bot.record("Gift Claims: Dwarf's Lucky Apple táo đỏ kiểm tra Wish "
+                   f"{label} xám: score={score:.3f}, S={saturation:.1f}, "
+                   f"tỷ lệ màu={color_ratio:.2f}")
+        if score < APPLE_RED_MULTIPLIER_DONE_THRESHOLD or not gray:
+            return False
+        hits.append(position)
+    distance_sq = ((hits[0][0] - hits[1][0]) ** 2 +
+                   (hits[0][1] - hits[1][1]) ** 2)
+    if distance_sq <= APPLE_RED_MULTIPLIER_DISTINCT_DISTANCE ** 2:
+        bot.record("Gift Claims: ảnh đỏ x100/x10 xám trùng cùng một vị trí; "
+                   "không kết luận DONE")
         return False
-    red_once = _apple_special_state(
-        bot, screen, APPLE_RED_ONCE_STATES,
-        "Wish Once táo đỏ bên cạnh x10 đã xám")
-    if red_once is None:
-        return False
-    bot.record("Gift Claims: Dwarf's Lucky Apple đỏ x10 sau tap đã xám "
-               f"(score={done_score:.3f}, S={saturation:.1f}, tỷ lệ màu="
-               f"{color_ratio:.2f}) và còn Wish Once; xác nhận DONE")
+    bot.record("Gift Claims: táo đỏ thấy đồng thời Wish x100 và Wish x10 đều "
+               "màu xám ở hai vị trí riêng; DONE toàn nhiệm vụ")
     return True
 
 
@@ -1058,12 +1215,13 @@ def _apple_phase(bot, active: str, finished: str,
             _close_apple_congratulations(bot, attempts=1)
             bot.sleep(UI_SETTLE_SECONDS)
             continue
-        state, button = _apple_button_state(bot, screen, active, finished)
-        if state == "done":
-            return ClaimReport(attempted, attempted), True
         if (attempted > 0 and
                 active == "EventCenter/DwarfsLuckyApple/button_red_wish_x10" and
                 _apple_red_x10_post_tap_done(bot, screen)):
+            return ClaimReport(attempted, attempted), True
+        state, button = _apple_button_state(bot, screen, active, finished,
+                                            exclude_once=True)
+        if state == "done":
             return ClaimReport(attempted, attempted), True
         if state != "active" or button is None:
             missing_frames += 1
@@ -1120,7 +1278,8 @@ def _probe_optional_apple_phase(bot, active: str, finished: str,
             _close_apple_congratulations(bot, attempts=1)
             bot.sleep(UI_SETTLE_SECONDS)
             continue
-        state, _button = _apple_button_state(bot, screen, active, finished)
+        state, _button = _apple_button_state(bot, screen, active, finished,
+                                              exclude_once=True)
         if state is not None:
             bot.record("Gift Claims: Dwarf's Lucky Apple "
                        f"{label} xuất hiện ({state.upper()})")
@@ -1215,6 +1374,9 @@ def _handle_dwarfs_lucky_apple(bot):
     bot.record("Gift Claims: Dwarf's Lucky Apple bấm tab táo đỏ; chỉ từ "
                "thời điểm này mới được xét DONE toàn nhiệm vụ")
     bot.tap(*red, delay=UI_SETTLE_SECONDS)
+    # A grey red x10 is the primary terminal state.  Check it before every
+    # shortcut involving Wish Once: Once may coexist with x10, and looking at
+    # it earlier would incorrectly skip an already exhausted multiplier.
     third, third_done, third_present = _run_optional_apple_phase(
         bot, "EventCenter/DwarfsLuckyApple/button_red_wish_x10",
         "EventCenter/DwarfsLuckyApple/status_red_wish_x10_done", "đỏ x10")
@@ -1226,6 +1388,12 @@ def _handle_dwarfs_lucky_apple(bot):
         return final, True
     if not third_done:
         return final, False
+
+    # x10 was not readable/present in the regular phase probe.  Retain the
+    # stricter two-control visual fallback for the supplied grey x100+x10
+    # layout before considering the Once-only terminal state.
+    if _apple_red_multipliers_gray(bot):
+        return ClaimReport(final.attempted, max(1, final.verified)), True
 
     # Red x10 is genuinely absent.  Only now may Once (active or grey) finish
     # the task; checking it earlier would incorrectly skip an actionable x10.
@@ -1995,10 +2163,6 @@ def _process_opened_event(bot):
     return _finish_event(bot, policy, total)
 
 
-def _category_signature(category: str, signature: bytes) -> bytes:
-    return category.encode("ascii") + b"\0" + signature
-
-
 def _category_done_key(category: str) -> bytes:
     return CATEGORY_DONE_PREFIX + category.encode("ascii")
 
@@ -2015,21 +2179,6 @@ def _category_policy_keys(category: str) -> tuple[str, ...]:
 def _category_db_done(bot, category: str) -> bool:
     return all(bool(bot.is_daily_done(key))
                for key in _category_policy_keys(category))
-
-
-def _category_seen(category: str, signature: bytes, visited, max_distance=28) -> bool:
-    prefix = category.encode("ascii") + b"\0"
-    current = np.frombuffer(signature, dtype=np.uint8)
-    for item in visited:
-        if not item.startswith(prefix):
-            continue
-        old = np.frombuffer(item[len(prefix):], dtype=np.uint8)
-        if old.shape != current.shape:
-            continue
-        distance = int(np.unpackbits(np.bitwise_xor(current, old)).sum())
-        if distance <= max_distance:
-            return True
-    return False
 
 
 def _select_category(bot, name: str, x_percent: int) -> bool:
@@ -2189,46 +2338,11 @@ def _policy_seen_checkpoint(policy_key: str) -> bytes:
     return POLICY_SEEN_PREFIX + policy_key.encode("utf-8")
 
 
-def _verify_clean(bot, category: str, ignored=()) -> bool:
-    if category == "activities":
-        # Activities owns exactly one supported task: Dwarf's Lucky Apple.
-        # Its named row/terminal state is authoritative; red badges in this
-        # category often belong to Facebook and must never affect the flow.
-        bot.record("Gift Claims: Activities bỏ toàn bộ nhận diện dấu đỏ; "
-                   "chỉ dùng dòng Dwarf's Lucky Apple")
-        return True
-    # Return to the top, then scan the complete vertical list once more.
-    _return_list_to_top(bot, category)
-    bottom_checks = 0
-    while True:
-        bot.check()
-        screen = bot.screenshot()
-        if any(not _category_seen(category, _row_signature(screen, y), ignored)
-               for _, y in _row_dots(bot, screen)):
-            return False
-        before = _list_signature(screen)
-        bot.swipe_percent(50, 86, 50, 32,
-                          duration=SWIPE_DURATION_SECONDS,
-                          delay=LIST_SCROLL_SETTLE_SECONDS)
-        after = _list_signature(bot.screenshot())
-        distance = _list_hamming_distance(before, after)
-        same = _same_list_position(before, after)
-        bottom_checks = bottom_checks + 1 if same else 0
-        bot.record(f"Gift Claims: Event Center/{category} kiểm tra biên cuối, "
-                   f"Hamming {distance}/{LIST_SAME_DISTANCE}, không đổi "
-                   f"{bottom_checks}/{LIST_EDGE_CONFIRMATIONS}")
-        if bottom_checks >= LIST_EDGE_CONFIRMATIONS:
-            bot.record(f"Gift Claims: Event Center/{category} đã xác nhận "
-                       f"biên cuối sau {LIST_EDGE_CONFIRMATIONS} cú không đổi")
-            return True
-
-
 def _scan_category(bot, category: str, visited: set[bytes]) -> bool:
-    """Process all claimable red rows in one Event Center category."""
+    """Process every explicitly registered task in one category."""
     opened_count = 0
     failed_forced = set()
     recentered_forced = set()
-    recentered_rows = set()
     seen_policy_keys: set[str] = {
         item[len(POLICY_SEEN_PREFIX):].decode("utf-8")
         for item in visited if item.startswith(POLICY_SEEN_PREFIX)
@@ -2299,12 +2413,10 @@ def _scan_category(bot, category: str, visited: set[bytes]) -> bool:
                         if policy_key in pending_this_run:
                             # This named task already exhausted its own bounded
                             # checks during the current Gift Claims window.
-                            # Remember both its named key and visual row so the
-                            # generic red-dot scanner cannot reopen it again.
+                            # Remember its named key so it is not reopened in
+                            # this 120-second window.
                             tap_y = min(screen.shape[0] - 1, row[1] + 18)
                             visited.add(key)
-                            visited.add(_category_signature(
-                                category, _row_signature(screen, tap_y)))
                             bot.record(f"Gift Claims: {event_label} đang PENDING "
                                        "trong lượt 120s này; bỏ qua để làm "
                                        "nhiệm vụ kế tiếp")
@@ -2330,12 +2442,6 @@ def _scan_category(bot, category: str, visited: set[bytes]) -> bool:
                         # below it so a small residual scroll cannot select
                         # the preceding event (observed with Dwarf -> Sealed).
                         tap_y = min(screen.shape[0] - 1, row[1] + 18)
-                        # Also checkpoint the visual row. If this exact task
-                        # becomes PENDING after its bounded handler, the
-                        # generic red-dot pass must not reopen the same row a
-                        # second time during this 120-second gift window.
-                        visited.add(_category_signature(
-                            category, _row_signature(screen, tap_y)))
                         # Use the detected title's horizontal centre instead
                         # of a fixed x=52%.  Wishful's row caption can sit far
                         # left on narrower/scaled emulator frames.
@@ -2347,24 +2453,6 @@ def _scan_category(bot, category: str, visited: set[bytes]) -> bool:
                         break
                 if candidate == "recenter":
                     continue
-            if category != "activities":
-                for _, y in _row_dots(bot, screen):
-                    if candidate is not None:
-                        break
-                    signature = _row_signature(screen, y)
-                    key = _category_signature(category, signature)
-                    if not _category_seen(category, signature, visited):
-                        if (y > int(screen.shape[0] * 0.80)
-                                and key not in recentered_rows):
-                            recentered_rows.add(key)
-                            bot.record("Gift Claims: kéo hàng đỏ sát đáy lên giữa trước khi bấm")
-                            bot.swipe_percent(50, 82, 50, 52,
-                                              duration=SWIPE_DURATION_SECONDS,
-                                              delay=LIST_SCROLL_SETTLE_SECONDS)
-                            candidate = "recenter"
-                            break
-                        candidate = round(screen.shape[1] * 0.52), y, key, None, None, None
-                        break
             if candidate == "recenter":
                 empty_checks = 0
                 continue
@@ -2473,22 +2561,13 @@ def _scan_category(bot, category: str, visited: set[bytes]) -> bool:
             break
         scroll += 1
 
-    clean = _verify_clean(bot, category, visited) and not failed_forced
-    has_checkpoint = any(item.startswith(category.encode("ascii") + b"\0")
-                         for item in visited)
-    if not clean and has_checkpoint and not failed_forced:
-        # The authoritative sweep already opened every visible red row.  Some
-        # event badges remain red for purchases, locked rewards, or rotating
-        # notices even after four failed claim/sparkle checks.  They are now
-        # explicit bounded skips and must not block the combined DB task.
-        bot.record(f"Gift Claims: Event Center/{category} còn badge đỏ dai dẳng "
-                   "sau khi đã quét; đánh dấu skip/done")
-        clean = True
+    clean = not failed_forced
     if clean:
         _record_missing_event_policies(bot, seen_policy_keys, category)
-    bot.record(f"Gift Claims: Event Center/{category} đã mở {opened_count} dòng đỏ; "
-               + ("đã quét sạch badge; chờ xác nhận các key DB" if clean
-                  else "chưa DONE, danh sách vẫn còn đỏ"))
+    bot.record(f"Gift Claims: Event Center/{category} đã mở {opened_count} "
+               "nhiệm vụ đã đăng ký; "
+               + ("đã quét hết danh sách; chờ xác nhận các key DB" if clean
+                  else "còn nhiệm vụ đã nhận diện nhưng chưa mở/xử lý xong"))
     return clean
 
 

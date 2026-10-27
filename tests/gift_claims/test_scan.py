@@ -179,8 +179,8 @@ class ScanTest(unittest.TestCase):
               self.assertRaises(RuntimeError)):
             event_center_zone._sweep(bot, [key])
 
-        self.assertEqual(1, scan.misses(bot, key))
-        self.assertIn(f"{key}_miss_1", bot.done)
+        self.assertEqual(1, event_center_zone._limited_misses(bot, key))
+        self.assertIn(f"{key}_miss_done_1", bot.done)
 
     def test_event_center_resumes_miss_counter_across_three_windows(self):
         bot = FakeBot()
@@ -199,12 +199,25 @@ class ScanTest(unittest.TestCase):
               mock.patch.object(event_center_zone, "run_opened",
                                 side_effect=scanned_limited)):
             event_center_zone._sweep(bot, [key])
-            self.assertEqual(1, scan.misses(bot, key))
+            self.assertEqual(1, event_center_zone._limited_misses(bot, key))
             event_center_zone._sweep(bot, [key])
-            self.assertEqual(2, scan.misses(bot, key))
+            self.assertEqual(2, event_center_zone._limited_misses(bot, key))
             event_center_zone._sweep(bot, [key])
 
         self.assertIn(key, bot.done)
+        self.assertTrue(all(f"{key}_miss_done_{index}" in bot.done
+                            for index in range(1, 4)))
+
+    def test_event_center_activities_never_accrues_limited_miss_done(self):
+        bot = FakeBot()
+        key = "gift_dwarfs_lucky_apple"
+        setattr(bot, event_center_zone.SCANNED_CATEGORIES_ATTR, {"activities"})
+        setattr(bot, event_center_zone.SEEN_POLICIES_ATTR, set())
+
+        event_center_zone._checkpoint_categories(bot, [key])
+
+        self.assertEqual(0, event_center_zone._limited_misses(bot, key))
+        self.assertNotIn(key, bot.done)
 
     def test_event_center_resume_category_rotates_durably(self):
         bot = FakeBot()

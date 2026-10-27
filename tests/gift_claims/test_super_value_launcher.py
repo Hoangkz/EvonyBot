@@ -1,4 +1,4 @@
-"""find_super_value_return: TH1 -> TH5 trên ảnh màn thành thật (396x704); open_super_value_return: bấm, chờ, bấm lại, bỏ qua."""
+"""Các lối vào thay thế của Super Value Return và lần bấm đã chọn."""
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -66,15 +66,23 @@ class FakeBot:
 
 
 class SuperValueLauncherTest(unittest.TestCase):
+    def test_th2_loads_every_launcher_image_not_a_fixed_three(self):
+        folder = ROOT / "Images" / "GiftClaims" / "SuperValueReturn" / "launcher_icons"
+        expected = [f"SuperValueReturn/launcher_icons/{path.stem}"
+                    for path in sorted(folder.glob("*.png"))]
+
+        self.assertGreater(len(expected), 3)
+        self.assertEqual(expected, launcher._launchers())
+
     def test_th1_login_gifts_top_right(self):
         bot = FakeBot(screen(LOGIN_TOP_SCREEN))
         self.assertEqual((362, 167), launcher.find_super_value_return(bot))
-        self.assertIn("TH1", bot.log[-1])
+        self.assertIn("chọn lối vào Login Gifts", bot.log[-1])
 
     def test_th2_icon_in_bottom_left(self):
         bot = FakeBot(screen(LOGIN_TOP_SCREEN, LOGIN_TOP))
         self.assertEqual((35, 553), launcher.find_super_value_return(bot))
-        self.assertIn("TH2", bot.log[-1])
+        self.assertIn("chọn lối vào icon", bot.log[-1])
 
     def test_th2_many_matches_takes_smallest_x(self):
         image = screen(LOGIN_TOP_SCREEN, LOGIN_TOP)
@@ -85,7 +93,7 @@ class SuperValueLauncherTest(unittest.TestCase):
     def test_th2_shopping_spree_icon(self):
         bot = FakeBot(screen(ARROW_UP_SCREEN))
         self.assertEqual((36, 557), launcher.find_super_value_return(bot))
-        self.assertIn("TH2", bot.log[-1])
+        self.assertIn("chọn lối vào icon", bot.log[-1])
 
     def test_th2_hall_of_historic_generals_icon(self):
         bot = FakeBot(screen(HALL_SCREEN))
@@ -108,25 +116,25 @@ class SuperValueLauncherTest(unittest.TestCase):
     def test_th1_wins_over_th2(self):
         bot = FakeBot(screen(SCREENS / "super_value_return_empire_depot.png"))
         self.assertEqual((362, 167), launcher.find_super_value_return(bot))
-        self.assertIn("TH1", bot.log[-1])
+        self.assertIn("chọn lối vào Login Gifts", bot.log[-1])
 
     def test_th3_button_below_up_arrow(self):
         bot = FakeBot(screen(ARROW_UP_SCREEN, SHOPPING_ICON))
         self.assertEqual((34, 555), launcher.find_super_value_return(bot))
-        self.assertIn("TH3", bot.log[-1])
+        self.assertIn("chọn lối vào dưới mũi tên lên", bot.log[-1])
         self.assertEqual([], bot.taps)
 
     def test_th4_taps_down_arrow_then_uses_up_arrow(self):
         bot = FakeBot(screen(ARROW_DOWN_SCREEN, SHOPPING_ICON), screen(ARROW_UP_SCREEN, SHOPPING_ICON))
         self.assertEqual((34, 555), launcher.find_super_value_return(bot))
         self.assertEqual([(33, 456)], bot.taps)
-        self.assertIn("TH4", bot.log[-2])
-        self.assertIn("TH3", bot.log[-1])
+        self.assertIn("mở lối vào bằng mũi tên xuống", bot.log[-2])
+        self.assertIn("chọn lối vào dưới mũi tên lên", bot.log[-1])
 
     def test_th5_same_row_as_valuable_event(self):
         bot = FakeBot(screen(ARROW_UP_SCREEN, SHOPPING_ICON, ARROW_UP))
         self.assertEqual((40, 560), launcher.find_super_value_return(bot))
-        self.assertIn("TH5", bot.log[-1])
+        self.assertIn("chọn lối vào cùng hàng Valuable Event", bot.log[-1])
 
     def test_nothing_found(self):
         bot = FakeBot(screen(ARROW_UP_SCREEN, (0, 0, 396, 704)))
@@ -155,6 +163,23 @@ class OpenSuperValueReturnTest(unittest.TestCase):
         bot.tap.assert_called_once_with(34, 557)
         self.assertEqual(3, bot.sleep.call_count)
         self.assertFalse(skipped_for_run(bot, zone.KEY))
+
+    def test_retry_reuses_one_selected_entrance(self):
+        bot = mock.Mock(spec=["check", "screenshot", "tap", "sleep", "record"])
+        frames = iter(["main", "main"] + ["main"] * 8 + ["svr"])
+        bot.screenshot.side_effect = lambda: next(frames)
+        with (mock.patch.object(zone, "on_main", side_effect=lambda _b, s: s == "main"),
+              mock.patch.object(zone, "to_city", return_value=False),
+              mock.patch.object(zone, "return_home"),
+              mock.patch.object(zone, "find_super_value_return",
+                                return_value=(34, 557)) as find_entrance,
+              mock.patch.object(zone, "identify",
+                                side_effect=lambda _b, s: GiftScreen.SUPER_VALUE_RETURN if s == "svr" else None)):
+            self.assertTrue(zone.open_super_value_return(bot))
+
+        find_entrance.assert_called_once_with(bot)
+        self.assertEqual([mock.call(34, 557), mock.call(34, 557)],
+                         bot.tap.call_args_list)
 
     def test_still_in_city_taps_again_once(self):
         opened, bot, _ = self._open(["main"] * 8 + ["svr"])

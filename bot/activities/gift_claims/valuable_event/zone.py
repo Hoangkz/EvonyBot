@@ -16,7 +16,9 @@ import cv2
 from ....common import to_city
 from ....daily_reset import last_reset
 from ....ocr.find_valuable_event import find_valuable_event
-from ..common import REFERENCE_WIDTH, back_if_close_x, mark_task_done, on_main, return_home
+from ..common import (REFERENCE_WIDTH, back_if_close_x,
+                      find_valuable_event as find_valuable_event_median,
+                      mark_task_done, on_main, return_home)
 from ..screens import GiftScreen, identify
 from . import (
     active_monthly_card, ancient_dynasty_treasury, general_vault, golden_tree_rewards, limited_offer,
@@ -307,18 +309,33 @@ def scan_to_right_edge(bot, pending: set[str], attempted: set[str], title) -> bo
 
 
 def open_valuable_event(bot) -> bool:
-    """Từ màn chính (có nút •••; đang ở bản đồ thế giới thì to_city vào thành trước) tìm nút Valuable Event bằng find_valuable_event (mẫu chữ "Event" rồi OCR), bấm, chờ màn
+    """Từ màn chính (có nút •••; đang ở bản đồ thế giới thì to_city vào thành trước) tìm nút Valuable Event bằng ảnh tên median rồi OCR dự phòng, bấm, chờ màn
     Valuable Event (tiêu đề ValuableEvent/title) tối đa OPEN_WAITS lần x 1s. Chưa vào thì về màn chính làm lại, tối đa
     OPEN_ATTEMPTS lần; vẫn không vào thì trả False (DB chưa xong: worker gọi lại lần sau)."""
     for attempt in range(1, OPEN_ATTEMPTS + 1):
         bot.check()
         screen = bot.screenshot()
         if not on_main(bot, screen):
+            bot.record("Gift Claims: Valuable Event chưa ở màn chính; về thành "
+                       "rồi nhận diện lại launcher")
             return_home(bot)
         if to_city(bot):      # hoạt động này phải làm trong thành: đang ở bản đồ thế giới thì bấm nút toà thành
             bot.record("Gift Claims: đang ở bản đồ thế giới; đã chuyển vào thành")
         screen = bot.screenshot()
-        pos = find_valuable_event(screen) if on_main(bot, screen) else None
+        if on_main(bot, screen):
+            # The measured name-only median is independent of changing event
+            # artwork and has a precise tap point.  It must win over OCR:
+            # OCR can return a nearby decorative caption on another account.
+            pos = find_valuable_event_median(bot, screen)
+            if pos is None:
+                pos = find_valuable_event(screen)
+                if pos is not None:
+                    bot.record("Gift Claims: ảnh tên median không thấy; "
+                               "nhận diện Valuable Event bằng OCR dự phòng")
+        else:
+            pos = None
+            bot.record("Gift Claims: Valuable Event chưa về màn chính sau khi "
+                       "chuyển thành; chưa tìm launcher ở khung này")
         if pos is None:
             bot.record(f"Gift Claims: không thấy nút Valuable Event ở màn chính (lần {attempt}/{OPEN_ATTEMPTS})")
             continue

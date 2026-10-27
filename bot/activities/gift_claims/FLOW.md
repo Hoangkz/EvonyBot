@@ -7,9 +7,9 @@ Worker chạy nhóm quà sau khi hoàn thành các Daily Activities và ưu tiê
 thứ tự **Event Center -> Revelry Carnival -> Valuable Event -> Super Value Return** khi ô **Claim Event Gifts** ở tab Daily
 Activities được tích (`settings["General"]["gift_claims"]`, mặc định bật):
 
-Revelry Carnival chỉ trở thành nhiệm vụ tới lượt sau khi Event Center đã ghi
-key tổng `gift_event_center` DONE, không chạy chen vào lúc Event Center đang
-PENDING hoặc đang nghỉ giữa hai cửa sổ 120 giây.
+Sau một cửa sổ Event Center đã chạy và còn PENDING, Event Center nghỉ tới mốc
+120 giây tiếp theo; trong quãng chờ đó Revelry Carnival được mở khóa để làm
+tiếp. Khi hết mốc chờ, Event Center lại được xét trước theo thứ tự ưu tiên.
 
 Khu nào còn PENDING sau một lượt sẽ tạm nghỉ 120 giây thay vì chặn khu kế
 tiếp. Khi cửa sổ mới bắt đầu, thứ tự trên được áp dụng lại từ Event Center.
@@ -20,15 +20,15 @@ tiếp. Khi cửa sổ mới bắt đầu, thứ tự trên được áp dụng 
   `gift_super_value_return`.
 - `gift_claims.event_center.run`: Back to Territory (icon ngoài) + các event con trong danh sách Limited của Event
   Center. Key tổng `gift_event_center`.
-- Revelry Carnival: dùng toàn bộ Parade Mask rồi nhận mọi nút Claim xanh; dùng
-  key `revelry_carnival` và logic điều hướng event hiện có.
-  Khi mới vào, bot kiểm tra vùng danh sách quà: có Claim xanh thì nhận ngay;
-  chỉ có Claim xám thì mới bấm Parade Mask. `How to get` là DONE riêng cho
-  bước Parade Mask và được checkpoint bằng `revelry_carnival_parade_masks_used`,
-  nhưng chưa phải DONE toàn nhiệm vụ. Sau mỗi Claim/Use, nếu hiện
-  Congratulations thì Back đúng một lần và chờ popup biến mất hoặc nút Claim
-  hiện rõ. Toàn nhiệm vụ chỉ DONE sau một lượt quét đủ biên đầu-biên cuối mà
-  không còn Claim xanh.
+- Revelry Carnival: trước hết quét toàn bộ vùng xanh nhận quà từ đầu tới cuối
+  và nhận mọi Claim xanh. Chỉ sau một lượt đầy đủ không còn Claim xanh mới
+  bấm Parade Mask. Nếu sau cú bấm thấy ảnh `paradeMaskDone` (dòng "You can get
+  items from:") thì DONE ngay. Nếu Mask mở popup số lượng thì chọn Max, Use,
+  nhận hết Claim mới sinh ra, rồi bấm Parade Mask lần nữa; chỉ ảnh
+  `paradeMaskDone` ở lần kiểm tra này mới DONE toàn nhiệm vụ. Key
+  `revelry_carnival_parade_masks_used` chỉ checkpoint việc đã Use khi bị ngắt,
+  không phải DONE. Sau mỗi Claim/Use, nếu hiện Congratulations thì Back đúng
+  một lần và chờ popup biến mất hoặc nút Claim hiện rõ.
 
 Mỗi nhiệm vụ con có key `daily_done` riêng (ví dụ `gift_limited_offer`). DB lưu timestamp ISO;
 `BotWorker.is_daily_done()` so với lần reset server gần nhất (mặc định 14:00, lấy từ DB settings): 15:00 ngày 15/10 thì
@@ -176,7 +176,10 @@ Một lượt tìm (`search_pass`):
   để nhận tất cả nút Claim trùng nhau. Chỉ sau đó mới dò sparkle; một sparkle
   không sinh Congratulations thì dừng tab đó. Nếu người dùng bấm Stop giữa
   tab, tab đó chưa được ghi nhớ và phải được mở lại ở lần chạy sau.
-- Event Center: quét xong toàn bộ nhóm Limited trước rồi luôn chuyển sang
+- Event Center: không nhận diện hoặc bấm theo dấu đỏ ngoài danh sách. Bot chỉ
+  tìm và mở các nhiệm vụ đã được đăng ký bằng ảnh tên dòng trong code; các dòng
+  mua hàng/xã hội hoặc nhiệm vụ chưa có ảnh tên sẽ bị bỏ qua. Quét xong toàn bộ
+  nhóm Limited trước rồi luôn chuyển sang
   Activities; không vào Competition. Một nhiệm vụ đã thấy nhưng chạy hết flow
   riêng mà chưa DONE được giữ PENDING và không được mở lại trong cùng lượt
   120 giây. Mỗi nhóm
@@ -207,16 +210,15 @@ Một lượt tìm (`search_pass`):
   được gì, event được coi là đã cạn quà và DONE hôm nay. Mỗi lượt vẫn cho phép
   nút đặc biệt xuất hiện trễ trong số lần dò hữu hạn. Bacchus Tavern vẫn được
   nhận diện và bỏ qua. Sau mỗi event phải quay lại danh sách trước khi
-  cuộn tiếp. Sau một vòng quét đầy đủ, badge mua hàng/khóa vẫn đỏ nhưng event đã
-  có checkpoint và đã thử đủ bốn lần được ghi `skip/done`; badge mới chưa từng
-  xử lý vẫn chặn DONE.
+  cuộn tiếp. Sau một vòng quét đầy đủ, trạng thái hoàn tất chỉ dựa trên các
+  nhiệm vụ tên đã đăng ký và key DB; dấu đỏ còn lại không chặn DONE.
 - Revelation of Horus và Sealed Imperial Treasury được nhận diện theo tiêu đề,
   bỏ qua ngay và coi là DONE.
 - Grace of Star Trail bấm icon `Star Trail Gift`, chờ màn con rồi bấm tiếp icon
   đồng xu có chữ `Claim`; chỉ bước thứ hai mới tính là nhận xu. Dwarf's Treasure
   dùng crop gồm cả rương `Daily Free` để tâm ảnh nằm trong vùng bấm thật.
-- Limited chủ động tìm dòng Grace of Star Trail một lần ngay cả khi dòng ngoài
-  không có badge đỏ. Việc cuộn danh sách dừng sớm khi ảnh ổn định ở biên; các
+- Limited chủ động tìm mọi dòng tên đã đăng ký, bao gồm Grace of Star Trail.
+  Việc cuộn danh sách dừng sớm khi ảnh ổn định ở biên; các
   nhóm đã DONE được checkpoint để lần chạy sau không quét lại.
 - Màn xoay vòng chưa có tiêu đề cố định: vẫn tìm toàn bộ nút chữ nhận trong
   vùng nội dung, sau đó kiểm tra sparkle đủ bốn lần. Nếu không có kết quả nhận

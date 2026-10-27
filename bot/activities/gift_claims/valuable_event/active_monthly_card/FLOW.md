@@ -1,9 +1,13 @@
 # Active Monthly Card
 
-Chọn tab, xác nhận trang bằng dòng `Purchase it to instantly get`, rồi tìm hộp
-quà phát sáng `Common/button_reward_chest` ở ngưỡng `0.80`. Chỉ khi không nhận
-diện được hộp mới tap fallback `(52, 326)`, là tâm hộp quà trên ảnh tham chiếu
-396 px.
+Chọn tab, xác nhận trang bằng dòng `Purchase it to instantly get`, rồi chỉ tìm
+hộp quà phát sáng `button_reward_chest_median` trong khung xanh
+`(2,17,27,41)`. Ảnh median 40x40 được tạo từ 60 frame thật trên máy 21503:
+điểm thấp nhất/trung vị/cao nhất là `0.7869/0.9569/0.9816`, còn nhiễu ngoài
+khung cao nhất `0.2579`; dùng ngưỡng `0.72`.
+
+Không dùng tọa độ fallback. Tọa độ cũ `(52,326)` nằm trên rương mua trả phí,
+không phải rương phát sáng trong khung xanh.
 
 Sau đó quét khung nhiệm vụ màu xanh `(4,59,96,99)`, tương đương khoảng
 `x=16..380, y=415..697` trên ảnh 396x704. Cú lướt dọc nằm trong khung:

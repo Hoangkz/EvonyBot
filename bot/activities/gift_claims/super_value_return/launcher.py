@@ -1,13 +1,18 @@
-"""Tìm nút vào Super Value Return trên màn thành chính (có nút •••). Xét lần lượt, gặp trường hợp nào trước thì dùng luôn:
+"""Chọn *một* lối vào Super Value Return phù hợp trên màn thành chính.
 
-TH1. Icon Login Gifts ở góc trên bên phải (LOGIN_TOP, vùng TOP_RIGHT): chính là nút vào.
-TH2. Một icon trong thư mục LAUNCHER_DIR ở vùng LAUNCHER_REGION: chính là nút vào; bấm vào tâm chỗ khớp. Nhiều chỗ khớp (một
-     hay nhiều icon) thì lấy chỗ có x bé nhất. Ảnh mẫu chỉ là vùng nhỏ trong icon: không có chữ dưới icon, không chạm chấm đỏ
-     (cắt thêm thì thả vào thư mục).
-TH3. Mũi tên đi lên (ARROW_UP, vùng ARROW_UP_REGION): nút ngay dưới mũi tên (thấp hơn BELOW_ARROW px) là nút vào.
-TH4. Mũi tên đi xuống (ARROW_DOWN, vùng ARROW_DOWN_REGION; hàng nút phụ đang mở nên mũi tên nằm cao hơn): bấm vào, nghỉ 1s để
-     nó thành mũi tên đi lên, rồi xét lại TH3.
-TH5. Nút Valuable Event (find_valuable_event): nút vào nằm cùng hàng, lấy y của icon Valuable Event, x = VALUABLE_ROW_X.
+Đây là các phương án thay thế cho cùng một nút vào, không phải các bước hay
+nhiệm vụ cần chạy lần lượt. Mỗi lần gọi trả về ngay tọa độ của phương án đầu
+tiên nhận diện được; :func:`open_super_value_return` chỉ bấm lại chính tọa độ
+đó nếu game chưa phản hồi. Các phương án gồm:
+
+- Icon Login Gifts ở góc trên bên phải (LOGIN_TOP, vùng TOP_RIGHT).
+- Một icon bất kỳ trong thư mục LAUNCHER_DIR ở vùng LAUNCHER_REGION. Nhiều
+  chỗ khớp thì lấy chỗ có x bé nhất. Ảnh mẫu chỉ là vùng nhỏ trong icon: không
+  có chữ dưới icon, không chạm chấm đỏ.
+- Mũi tên đi lên (ARROW_UP): nút vào nằm ngay dưới, thấp hơn BELOW_ARROW px.
+- Mũi tên đi xuống (ARROW_DOWN): đây vẫn là *một* phương án; bấm mũi tên để
+  lộ nút, rồi trả về tọa độ nút vừa lộ.
+- Nút cùng hàng với Valuable Event (find_valuable_event).
 
 Toạ độ / vùng đo trên màn 396x704 (ảnh tests/event/gather_troops/cultivate_generals/screens/01_main_login_gift.png,
 tests/gift_claims/screens/super_value_return_arrow_up.png, super_value_return_arrow_down.png).
@@ -18,7 +23,7 @@ from ..common import REFERENCE_WIDTH, ROOT, find, find_all
 
 LOGIN_TOP = "SuperValueReturn/login_gifts_top"   # nửa dưới icon + chữ "Login Gifts" (bỏ chấm đỏ góc trên)
 TOP_RIGHT = (70, 10, 100, 50)                     # % màn: TH1
-LAUNCHER_DIR = "SuperValueReturn/launcher_icons" # TH2: danh sách icon (mọi *.png trong thư mục)
+LAUNCHER_DIR = "SuperValueReturn/launcher_icons" # danh sách icon (mọi *.png trong thư mục)
 LAUNCHER_REGION = (0, 70, 50, 88)                 # % màn: TH2
 ARROW_UP = "SuperValueReturn/arrow_up"
 ARROW_UP_REGION = (0, 70, 30, 88)                 # % màn: TH3 (mũi tên lên ở y ~515 / 704)
@@ -35,39 +40,44 @@ ARROW_SETTLE = 1.0                                # giây nghỉ sau khi bấm m
 
 
 def _launchers() -> list[str]:
-    """Tên các icon TH2 (đọc lại thư mục mỗi lần: ảnh mới thả vào dùng được ngay)."""
+    """Tên các icon của một phương án vào (đọc lại thư mục mỗi lần)."""
     return [f"{LAUNCHER_DIR}/{path.stem}" for path in sorted((TEMPLATE_DIR / ROOT / LAUNCHER_DIR).glob("*.png"))]
 
 
 def find_super_value_return(bot) -> "tuple[int, int] | None":
-    """Toạ độ bấm để vào Super Value Return trên màn thành chính, hoặc None. Có thể bấm mũi tên xuống (TH4) trước khi trả về."""
+    """Trả về đúng một toạ độ vào Super Value Return, hoặc ``None``.
+
+    Riêng phương án mũi tên xuống phải bấm mở hàng icon trước khi có thể trả
+    về tọa độ của nút. Không phương án nào khác được chạy sau khi đã chọn được
+    một tọa độ.
+    """
     screen = bot.screenshot()
     scale = screen.shape[1] / REFERENCE_WIDTH
 
     pos = find(bot, LOGIN_TOP, screen, threshold=THRESHOLD, region=TOP_RIGHT)
     if pos is not None:
-        bot.record(f"Gift Claims: Super Value Return - TH1 icon Login Gifts góc trên phải tại {pos}")
+        bot.record(f"Gift Claims: Super Value Return - chọn lối vào Login Gifts góc trên phải tại {pos}")
         return pos
 
     icons = [(pos, name) for name in _launchers()
              for pos in find_all(bot, name, screen, threshold=LAUNCHER_THRESHOLD, region=LAUNCHER_REGION)]
     if icons:
         pos, name = min(icons, key=lambda item: item[0][0])
-        bot.record(f"Gift Claims: Super Value Return - TH2 icon {name} tại {pos}")
+        bot.record(f"Gift Claims: Super Value Return - chọn lối vào icon {name} tại {pos}")
         return pos
 
-    for check in range(2):   # lần 2: sau khi đã bấm mũi tên xuống (TH4)
+    for check in range(2):   # lần 2: sau khi phương án mũi tên xuống đã mở hàng icon
         up = find(bot, ARROW_UP, screen, threshold=THRESHOLD, region=ARROW_UP_REGION)
         if up is not None:
             target = (up[0], up[1] + round(BELOW_ARROW * scale))
-            bot.record(f"Gift Claims: Super Value Return - TH3 nút dưới mũi tên lên tại {target}")
+            bot.record(f"Gift Claims: Super Value Return - chọn lối vào dưới mũi tên lên tại {target}")
             return target
         if check:
             break
         down = find(bot, ARROW_DOWN, screen, threshold=THRESHOLD, region=ARROW_DOWN_REGION)
         if down is None:
             break
-        bot.record(f"Gift Claims: Super Value Return - TH4 bấm mũi tên xuống tại {down}")
+        bot.record(f"Gift Claims: Super Value Return - mở lối vào bằng mũi tên xuống tại {down}")
         bot.tap(*down)
         bot.sleep(ARROW_SETTLE)
         screen = bot.screenshot()
@@ -75,7 +85,7 @@ def find_super_value_return(bot) -> "tuple[int, int] | None":
     valuable = find_valuable_event(screen)
     if valuable is not None:
         target = (round(VALUABLE_ROW_X * scale), max(0, valuable[1] - round(VALUABLE_ICON_ABOVE * scale)))
-        bot.record(f"Gift Claims: Super Value Return - TH5 cùng hàng Valuable Event tại {target}")
+        bot.record(f"Gift Claims: Super Value Return - chọn lối vào cùng hàng Valuable Event tại {target}")
         return target
     bot.record("Gift Claims: không tìm thấy nút vào Super Value Return")
     return None

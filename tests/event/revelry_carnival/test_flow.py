@@ -10,6 +10,7 @@ from bot.activities.event.revelry_carnival.constants import (
     CLAIM_GREEN,
     CONGRATULATIONS,
     PARADE_MASK,
+    PARADE_MASK_DONE,
     PLUS,
     REWARD_REGION,
     USE_DONE_KEY,
@@ -60,7 +61,30 @@ class ClaimColourTests(unittest.TestCase):
         self.assertLess(abs(claims[0][0] - (gx + gw // 2)), 2)
 
     def test_reward_region_matches_user_marked_green_frame(self):
-        self.assertEqual(REWARD_REGION, (2, 66, 98, 98))
+        self.assertEqual(REWARD_REGION, (2, 67, 98, 98))
+
+    def test_all_reward_swipe_endpoints_stay_inside_green_frame(self):
+        from bot.activities.event.revelry_carnival.constants import (
+            RETURN_TOP_SWIPE, SCAN_SWIPE)
+        x0, y0, x1, y1 = REWARD_REGION
+        for gesture in (SCAN_SWIPE, RETURN_TOP_SWIPE):
+            with self.subTest(gesture=gesture):
+                self.assertTrue(x0 < gesture[0] < x1)
+                self.assertTrue(y0 < gesture[1] < y1)
+                self.assertTrue(x0 < gesture[2] < x1)
+                self.assertTrue(y0 < gesture[3] < y1)
+
+    def test_vertical_movement_is_not_mistaken_for_a_static_reward_frame(self):
+        before = np.zeros((704, 396, 3), dtype=np.uint8)
+        # Distinct horizontal rows inside the exact green reward rectangle.
+        top, bottom = round(704 * 67 / 100), round(704 * 98 / 100)
+        for y in range(top, bottom, 18):
+            before[y:y + 9, 8:388] = (30 + (y % 190), 70, 150)
+        after = before.copy()
+        after[top:bottom, 8:388] = np.roll(
+            before[top:bottom, 8:388], 24, axis=0)
+
+        self.assertFalse(run._same_reward_position(before, after))
 
 
 class ResumeBot:
@@ -81,60 +105,63 @@ class ResumeBot:
 
 
 class ResumeTests(unittest.TestCase):
-    @mock.patch.object(run, "_claim_rewards", return_value=True)
-    @mock.patch.object(run, "_green_claims", return_value=[(330, 520)])
-    @mock.patch.object(run, "_gray_claim_visible", return_value=False)
+    @mock.patch.object(run, "_check_parade_mask_done")
     @mock.patch.object(run, "_use_parade_masks")
+    @mock.patch.object(run, "_claim_rewards", return_value=False)
     @mock.patch.object(run, "_wait", return_value=(100, 20))
-    def test_green_claims_are_collected_before_touching_parade_mask(
-            self, _wait, use_masks, _gray, _green, claim_rewards):
+    def test_incomplete_first_reward_sweep_never_touches_parade_mask(
+            self, _wait, claim_rewards, use_masks, check_done):
         bot = ResumeBot()
         bot.screenshot = mock.Mock(return_value=object())
-        self.assertTrue(run._run_opened(bot))
+
+        self.assertFalse(run._run_opened(bot))
+        claim_rewards.assert_called_once_with(bot)
         use_masks.assert_not_called()
-        claim_rewards.assert_called_once_with(bot)
+        check_done.assert_not_called()
 
+    @mock.patch.object(run, "_check_parade_mask_done")
+    @mock.patch.object(run, "_use_parade_masks", return_value="done")
     @mock.patch.object(run, "_claim_rewards", return_value=True)
-    @mock.patch.object(run, "_use_parade_masks", return_value=True)
-    @mock.patch.object(run, "_green_claims", return_value=[])
-    @mock.patch.object(run, "_gray_claim_visible", return_value=True)
     @mock.patch.object(run, "_wait", return_value=(100, 20))
-    def test_successful_use_is_saved_before_reward_scan(
-            self, _wait, _gray, _green, use_masks, claim_rewards):
+    def test_terminal_marker_after_first_mask_tap_is_done(
+            self, _wait, claim_rewards, use_masks, check_done):
         bot = ResumeBot()
         bot.screenshot = mock.Mock(return_value=object())
-        self.assertTrue(run._run_opened(bot))
-        self.assertIn(USE_DONE_KEY, bot.done)
-        use_masks.assert_called_once_with(bot)
-        claim_rewards.assert_called_once_with(bot)
 
+        self.assertTrue(run._run_opened(bot))
+        claim_rewards.assert_called_once_with(bot)
+        use_masks.assert_called_once_with(bot)
+        check_done.assert_not_called()
+        self.assertNotIn(USE_DONE_KEY, bot.done)
+
+    @mock.patch.object(run, "_check_parade_mask_done", return_value=True)
+    @mock.patch.object(run, "_use_parade_masks", return_value="used")
     @mock.patch.object(run, "_claim_rewards", return_value=True)
-    @mock.patch.object(run, "_use_parade_masks")
-    @mock.patch.object(run, "_green_claims", return_value=[])
-    @mock.patch.object(run, "_gray_claim_visible", return_value=True)
     @mock.patch.object(run, "_wait", return_value=(100, 20))
-    def test_retry_resumes_at_claims_when_use_is_already_in_db(
-            self, _wait, _gray, _green, use_masks, claim_rewards):
+    def test_used_masks_then_clean_rewards_requires_second_mask_done_check(
+            self, _wait, claim_rewards, use_masks, check_done):
+        bot = ResumeBot()
+        bot.screenshot = mock.Mock(return_value=object())
+
+        self.assertTrue(run._run_opened(bot))
+        self.assertEqual(2, claim_rewards.call_count)
+        use_masks.assert_called_once_with(bot)
+        check_done.assert_called_once_with(bot)
+        self.assertIn(USE_DONE_KEY, bot.done)
+
+    @mock.patch.object(run, "_check_parade_mask_done", return_value=True)
+    @mock.patch.object(run, "_use_parade_masks")
+    @mock.patch.object(run, "_claim_rewards", return_value=True)
+    @mock.patch.object(run, "_wait", return_value=(100, 20))
+    def test_resume_after_mask_use_scans_rewards_then_checks_marker(
+            self, _wait, claim_rewards, use_masks, check_done):
         bot = ResumeBot(done=[USE_DONE_KEY])
         bot.screenshot = mock.Mock(return_value=object())
-        self.assertTrue(run._run_opened(bot))
-        use_masks.assert_not_called()
-        claim_rewards.assert_called_once_with(bot)
 
-    @mock.patch.object(run, "_claim_rewards")
-    @mock.patch.object(run, "_use_parade_masks", return_value=None)
-    @mock.patch.object(run, "_green_claims", return_value=[])
-    @mock.patch.object(run, "_gray_claim_visible", return_value=True)
-    @mock.patch.object(run, "_wait", return_value=(100, 20))
-    def test_how_to_get_still_scans_claims_before_done(
-            self, _wait, _gray, _green, use_masks, claim_rewards):
-        bot = ResumeBot()
-        bot.screenshot = mock.Mock(return_value=object())
-        claim_rewards.return_value = True
         self.assertTrue(run._run_opened(bot))
-        use_masks.assert_called_once_with(bot)
         claim_rewards.assert_called_once_with(bot)
-        self.assertIn(USE_DONE_KEY, bot.done)
+        use_masks.assert_not_called()
+        check_done.assert_called_once_with(bot)
 
 
 class ParadeMaskFlowTests(unittest.TestCase):
@@ -155,11 +182,21 @@ class ParadeMaskFlowTests(unittest.TestCase):
             return None
 
         bot.find.side_effect = find
-        self.assertTrue(run._use_parade_masks(bot))
+        self.assertEqual("used", run._use_parade_masks(bot))
         select_max.assert_called_once_with(bot, None)
         self.assertEqual(wait.call_count, 2)  # Use, then Congratulations
         bot.back.assert_called_once()
         wait_after.assert_called_once_with(bot)
+
+    @mock.patch.object(run, "_wait_mask_result", return_value=("done", (100, 100)))
+    def test_post_tap_done_marker_ends_mask_flow_without_using(self, wait_result):
+        bot = mock.Mock()
+        bot.screenshot.return_value = object()
+        bot.find.side_effect = lambda template, **_kwargs: (
+            (100, 400) if template == PARADE_MASK else None)
+
+        self.assertEqual("done", run._use_parade_masks(bot))
+        bot.tap.assert_called_once_with(100, 400, delay=run.STEP_DELAY)
 
 
 if __name__ == "__main__":

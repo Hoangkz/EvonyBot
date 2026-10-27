@@ -50,8 +50,12 @@
    khoảng `0.507`: nếu chính lượt này đã nhận diện và bấm đỏ x10 ACTIVE, vị
    trí khớp yếu của x10 đã có dải xám (`S <= 65`, tỷ lệ màu `<= 20%`) và đồng
    thời nhận diện chính xác `status_red_wish_once` hoặc
-   `status_red_wish_once_gray`, thì xác nhận đỏ x10 DONE. Điều kiện kết hợp
-   này không được dùng trước khi bot đã bấm một nút đỏ x10 ACTIVE.
+   `status_red_wish_once_gray`, thì xác nhận đỏ x10 DONE. Ngưỡng định vị dải
+   màu chung là `0.44`. Sau khi bot đã thực sự bấm đỏ x10, nếu chỉ còn nhận
+   diện chính xác Wish Once và không còn nút x10 vàng ở một vị trí tách biệt,
+   cũng xác nhận DONE; không được nhầm điểm khớp yếu của Wish Once thành x10.
+   Các điều kiện kết hợp này không được dùng trước khi bot đã bấm một nút đỏ
+   x10 ACTIVE.
 8. Nếu ảnh nút đang chuyển sáng làm nhận dạng mơ hồ, bot ở nguyên trong nhiệm
    vụ và chụp lại mỗi 1 giây; ba lần không đọc được không được chuyển PENDING
    hoặc Back ra danh sách. Chỉ bộ đếm 120 giây của worker mới được ngắt để quay
