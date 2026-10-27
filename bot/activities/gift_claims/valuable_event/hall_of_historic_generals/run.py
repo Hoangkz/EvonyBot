@@ -1,4 +1,4 @@
-"""Claim Hall of Historic Generals quest scores without confusing Claimed."""
+"""Claim Hall of Historic Generals Daily Tasks scores without confusing Claimed."""
 import cv2
 
 from ...common import (GiftTask, close_congratulations, find, find_all,
@@ -156,6 +156,8 @@ def _claim_main_chests(bot) -> bool:
 
 
 def _open_scores(bot) -> bool:
+    # The score popup opens on Daily Tasks. Seasonal Quests is intentionally
+    # outside this Gift Claims flow and is never selected or scanned.
     for attempt in range(4):
         screen = bot.screenshot()
         challenge = find(bot, CHALLENGE_QUEST, screen, threshold=0.78,

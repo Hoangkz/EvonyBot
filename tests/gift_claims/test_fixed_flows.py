@@ -788,6 +788,92 @@ class FixedGiftFlowTests(unittest.TestCase):
         self.assertIn(task_key, done)
         self.assertIn("gift_zone_test", done)
 
+    def test_completed_child_is_not_scanned_in_next_eligibility_window(self):
+        """A child saved as DONE must be omitted on the next 120-second run."""
+        done = set()
+        bot = mock.Mock()
+        bot.is_daily_done.side_effect = done.__contains__
+        bot.mark_daily_done.side_effect = done.add
+        bot.done_at.side_effect = lambda key: "today" if key in done else None
+        bot.forget_daily.side_effect = done.discard
+        completed = "gift_completed_child"
+        pending = "gift_pending_child"
+        calls = []
+
+        def sweep(_bot, keys):
+            calls.append(tuple(keys))
+            if len(calls) == 1:
+                done.add(completed)
+            # Both rows were genuinely inspected, so this test concerns only
+            # whether the persisted DONE child is offered again next window.
+            return set(keys)
+
+        tasks = [(completed, "Completed child"), (pending, "Pending child")]
+        self.assertFalse(gift_scan.run_zone(
+            bot, "gift_zone_test", tasks, sweep, max_sweeps=1))
+        self.assertFalse(gift_scan.run_zone(
+            bot, "gift_zone_test", tasks, sweep, max_sweeps=1))
+
+        self.assertEqual([(completed, pending), (pending,)], calls)
+
+    def test_super_and_valuable_omit_done_children_from_a_new_pass(self):
+        """The tab zones rebuild pending from durable DB state, not a window cache."""
+        for zone in (super_value_zone, valuable_event_zone):
+            with self.subTest(zone=zone.KEY):
+                still_pending = zone.TASKS[0].key
+                done = {task.key for task in zone.TASKS
+                        if task.key != still_pending}
+                bot = mock.Mock()
+                bot.is_daily_done.side_effect = done.__contains__
+                bot.mark_daily_done.side_effect = done.add
+                bot.done_at.side_effect = (
+                    lambda key: "today" if key in done else None)
+                bot.forget_daily.side_effect = done.discard
+                searched = []
+
+                def search_pass(_bot, keys, _attempted):
+                    searched.append(set(keys))
+                    return True
+
+                with (mock.patch.object(zone, "PASSES", 1),
+                      mock.patch.object(zone, "seen_today", return_value=set()),
+                      mock.patch.object(zone, "search_pass",
+                                        side_effect=search_pass),
+                      mock.patch.object(zone, "return_home")):
+                    self.assertTrue(zone.run(bot))
+
+                self.assertEqual([{still_pending}], searched)
+
+    def test_super_and_valuable_finish_parent_when_last_child_finishes(self):
+        """A completed final child must not force the two absence passes."""
+        for zone in (super_value_zone, valuable_event_zone):
+            with self.subTest(zone=zone.KEY):
+                done = set()
+                bot = mock.Mock()
+                bot.is_daily_done.side_effect = done.__contains__
+                bot.mark_daily_done.side_effect = done.add
+                bot.done_at.side_effect = (
+                    lambda key: "today" if key in done else None)
+                bot.forget_daily.side_effect = done.discard
+                searched = []
+
+                def search_pass(_bot, pending, _attempted):
+                    searched.append(set(pending))
+                    done.update(task.key for task in zone.TASKS)
+                    return True
+
+                with (mock.patch.object(zone, "seen_today", return_value=set()),
+                      mock.patch.object(zone, "search_pass",
+                                        side_effect=search_pass),
+                      mock.patch.object(zone, "return_home")):
+                    self.assertTrue(zone.run(bot))
+
+                self.assertEqual([{task.key for task in zone.TASKS}], searched)
+                self.assertIn(zone.KEY, done)
+                self.assertFalse(any(key.startswith(f"{zone.KEY}_pass_")
+                                     for key in done))
+                bot.back.assert_not_called()
+
     def test_super_value_return_uses_dedicated_image_finder(self):
         bot = mock.Mock()
         bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
@@ -1828,7 +1914,7 @@ class FixedGiftFlowTests(unittest.TestCase):
         self.assertTrue(soul_of_spiritual_beast._is_gray_claimed(
             claimed_screen, claimed_center))
 
-    def test_soul_all_claimed_in_both_tabs_is_done(self):
+    def test_soul_daily_tasks_all_claimed_is_done_without_opening_seasonal(self):
         bot = mock.Mock()
         with (mock.patch.object(soul_of_spiritual_beast, "_main_open",
                                 return_value=True),
@@ -1837,13 +1923,13 @@ class FixedGiftFlowTests(unittest.TestCase):
               mock.patch.object(soul_of_spiritual_beast, "_open_quests",
                                 return_value=True),
               mock.patch.object(soul_of_spiritual_beast,
-                                "_select_quest_tab", return_value=True),
+                                "_select_quest_tab", return_value=True) as select_tab,
               mock.patch.object(soul_of_spiritual_beast, "_scan_quest_tab",
-                                side_effect=[(False, False, True, False),
-                                             (False, False, True, False)])):
+                                return_value=(False, False, True, False))):
             outcome = soul_of_spiritual_beast.claim_opened(bot)
 
         self.assertEqual(soul_of_spiritual_beast.DONE, outcome)
+        select_tab.assert_called_once_with(bot, soul_of_spiritual_beast.DAILY_TASKS)
         bot.back.assert_called_once()
 
     def test_soul_failed_initial_chest_still_opens_challenge_quest(self):
@@ -1857,14 +1943,13 @@ class FixedGiftFlowTests(unittest.TestCase):
               mock.patch.object(soul_of_spiritual_beast,
                                 "_select_quest_tab", return_value=True),
               mock.patch.object(soul_of_spiritual_beast, "_scan_quest_tab",
-                                side_effect=[(False, False, True, False),
-                                             (False, False, True, False)])):
+                                return_value=(False, False, True, False))):
             outcome = soul_of_spiritual_beast.claim_opened(bot)
 
         self.assertEqual(soul_of_spiritual_beast.DONE, outcome)
         quests.assert_called_once_with(bot)
 
-    def test_soul_claims_both_tabs_then_checks_main_chests_and_defers(self):
+    def test_soul_claims_daily_tasks_then_checks_main_chests_and_defers(self):
         bot = mock.Mock()
         with (mock.patch.object(soul_of_spiritual_beast, "_main_open",
                                 return_value=True),
@@ -1876,8 +1961,7 @@ class FixedGiftFlowTests(unittest.TestCase):
               mock.patch.object(soul_of_spiritual_beast,
                                 "_select_quest_tab", return_value=True),
               mock.patch.object(soul_of_spiritual_beast, "_scan_quest_tab",
-                                side_effect=[(True, False, True, False),
-                                             (False, False, True, False)])):
+                                return_value=(True, False, True, False))):
             outcome = soul_of_spiritual_beast.claim_opened(bot)
 
         self.assertEqual(soul_of_spiritual_beast.DONE_1, outcome)
@@ -1896,14 +1980,13 @@ class FixedGiftFlowTests(unittest.TestCase):
               mock.patch.object(soul_of_spiritual_beast,
                                 "_select_quest_tab", return_value=True),
               mock.patch.object(soul_of_spiritual_beast, "_scan_quest_tab",
-                                side_effect=[(False, False, True, True),
-                                             (False, False, True, False)])):
+                                return_value=(False, False, True, True))):
             outcome = soul_of_spiritual_beast.claim_opened(bot)
 
         self.assertEqual(soul_of_spiritual_beast.DONE_1, outcome)
         chests.assert_called_once()
 
-    def test_soul_does_not_open_main_chest_until_both_tabs_are_clear(self):
+    def test_soul_does_not_open_main_chest_until_daily_tasks_is_clear(self):
         bot = mock.Mock()
         with (mock.patch.object(soul_of_spiritual_beast, "_main_open",
                                 return_value=True),
@@ -1914,13 +1997,12 @@ class FixedGiftFlowTests(unittest.TestCase):
               mock.patch.object(soul_of_spiritual_beast,
                                 "_select_quest_tab", return_value=True),
               mock.patch.object(soul_of_spiritual_beast, "_scan_quest_tab",
-                                side_effect=[(True, True, True, False),
-                                             (True, False, True, False)])):
+                                return_value=(True, True, True, False))):
             outcome = soul_of_spiritual_beast.claim_opened(bot)
 
         self.assertEqual(soul_of_spiritual_beast.PENDING, outcome)
         # The first call checks the chest before opening Quests. There must be
-        # no second, post-Claim pass while either tab still has a Claim.
+        # no second, post-Claim pass while Daily Tasks still has a Claim.
         chests.assert_called_once()
 
     def test_soul_missing_congratulations_accepts_confirmed_chest_absence(self):
