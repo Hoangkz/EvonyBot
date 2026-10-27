@@ -37,7 +37,7 @@ Settings: `{"slots": {"weapon": {"lines": [{"attribute": "Ground Troop Attack", 
 | 05  | Hộp thông tin trang bị                             | `tap("RefineEquipment/view.png")`                              |
 | 06  | General Equipment                                  | `tap("RefineEquipment/equipmentRefine.png")`                   |
 | 07  | Màn Craft (tab Refine)                             | `tap("Event/KingsPath/Refine/refineButton.png")`               |
-| 08  | Refine Equipment                                   | `tap_at(35, 330)` (tích Gold Attribute vì mọi dòng chọn đều vàng), `back()` (chưa đọc được dòng New nên không Refine) |
+| 08  | Refine Equipment                                   | `back()` (vòng Refine tách ra test riêng `test_refine_loop_cancel_then_confirm`) |
 | 09  | Craft -> General Equipment -> màn tướng -> thành   | `back()` x3, `back(4)`, `end()`                                |
 
 ## Alliance Capacity — `tests/alliance_capacity/`
