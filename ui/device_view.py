@@ -28,6 +28,7 @@ from .tabs import (
     LogsTab,
     OpenGiftBoxTab,
     RecruitGeneralTab,
+    RefineEquipmentTab,
 )
 
 
@@ -100,7 +101,8 @@ class DeviceView(QWidget):
                 ("Recruit General", "recruit_general_tab", RecruitGeneralTab),
                 ("Find Boss", "find_boss_tab", FindBossTab),
                 ("Craft", "craft_tab", CraftTab),
-                ("Gather Resources", "gather_resources_tab", GatherResourcesTab)):
+                ("Gather Resources", "gather_resources_tab", GatherResourcesTab),
+                ("Refine Equipment", "refine_equipment_tab", RefineEquipmentTab)):
             self._lazy[title] = (attr, factory)
             self._add_tab_button(title, self.tabs.addTab(QWidget(), title))
         # Logs không có cấu hình: thêm thẳng, không nối Apply ALL / settings.

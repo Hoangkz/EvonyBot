@@ -20,12 +20,14 @@ DESIGNER_DATA = {
     "buttonFindBoss": {"loc": [797, 117], "size": [230, 40], "text": "Find Boss", "type": "Button"},
     "buttonCraft": {"loc": [35, 181], "size": [230, 40], "text": "Craft", "type": "Button"},
     "buttonGatherResources": {"loc": [289, 181], "size": [230, 40], "text": "Gather Resources", "type": "Button"},
+    "buttonRefineEquipment": {"loc": [543, 181], "size": [230, 40], "text": "Refine Equipment", "type": "Button"},
     "buttonDailyActivities": {"loc": [289, 53], "size": [230, 40], "text": "Daily Activities", "type": "Button"},
     "buttonInitializationApplyAll": {"loc": [935, 16], "size": [132, 43], "text": "Apply ALL", "type": "Button"},
     "buttonStart": {"loc": [449, 400], "size": [217, 51], "text": "Start", "type": "Button"},
     "groupBox2": {
         "children": ["ButtonJoinMonsterWar", "buttonDailyActivities", "buttonEvent", "ButtonOpenGiftBox",
-                      "buttonAllianceCapacity", "buttonBlackMarket", "buttonRecruitGeneral", "buttonFindBoss", "buttonCraft", "buttonGatherResources"],
+                      "buttonAllianceCapacity", "buttonBlackMarket", "buttonRecruitGeneral", "buttonFindBoss", "buttonCraft", "buttonGatherResources",
+                      "buttonRefineEquipment"],
         "loc": [13, 150], "size": [1062, 240], "text": "Select Activity", "type": "GroupBox",
     },
     "checkBoxBubble": {"loc": [13, 62], "size": [75, 28], "text": "Bubble", "type": "CheckBox"},
@@ -81,6 +83,7 @@ ACTIVITY_BUTTONS = {
     "buttonFindBoss": {"target": "Find Boss", "exclusive": False},
     "buttonCraft": {"target": "Craft", "exclusive": False},
     "buttonGatherResources": {"target": "Gather Resources", "exclusive": False},
+    "buttonRefineEquipment": {"target": "Refine Equipment", "exclusive": False},
 }
 ACTIVITY_BUTTON_TARGETS = {name: info["target"] for name, info in ACTIVITY_BUTTONS.items()}
 
