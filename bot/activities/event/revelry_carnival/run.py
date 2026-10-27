@@ -25,7 +25,6 @@ from .constants import (
     HOW_TO_GET_REGION,
     ICON,
     KEY,
-    LIST_HASH_DISTANCE,
     MAX_BAR_STILL_DIFF,
     MAX_BAR_WIDTH,
     MAX_BUTTON,
@@ -45,6 +44,8 @@ from .constants import (
     RETURN_TOP_SWIPE,
     RETURN_TOP_SWIPE_FALLBACKS,
     REWARD_REGION,
+    REWARD_STATIC_REGION,
+    REWARD_STATIC_SAME,
     SCAN_SWIPE,
     SCAN_SWIPE_FALLBACKS,
     SLOW_SWIPE_DURATION,
@@ -319,35 +320,29 @@ def _check_parade_mask_done(bot) -> bool:
     return False
 
 
-def _reward_signature(screen) -> bytes:
-    """Animation-tolerant two-axis dHash of only the green reward frame.
+def _reward_static_similarity(before, after) -> float:
+    """Similarity of the non-animated level strip at the left of the list.
 
-    The previous horizontal-only hash could remain nearly identical when two
-    visually similar reward rows moved vertically.  Including vertical
-    gradients makes a real vertical scroll distinguishable from a stable
-    frame, while keeping animated colour changes out of the comparison.
+    Live testing on 21513 showed a stationary LV3/LV4 list with a full-frame
+    hash change of 139 bits because locks and rewards animate.  The level strip
+    remained 0.92 similar, while a true LV1/LV2 -> LV3/LV4 scroll scored 0.49.
     """
-    height, width = screen.shape[:2]
-    x0, y0, x1, y1 = REWARD_REGION
-    patch = screen[round(height * y0 / 100):round(height * y1 / 100),
-                   round(width * x0 / 100):round(width * x1 / 100)]
-    gray = cv2.cvtColor(patch, cv2.COLOR_BGR2GRAY)
-    tiny = cv2.resize(gray, (49, 24), interpolation=cv2.INTER_AREA)
-    horizontal = tiny[:, 1:] > tiny[:, :-1]
-    vertical = tiny[1:, :] > tiny[:-1, :]
-    return np.packbits(np.concatenate((horizontal.ravel(), vertical.ravel()))).tobytes()
-
-
-def _reward_hamming_distance(before, after) -> int:
-    old = np.frombuffer(_reward_signature(before), dtype=np.uint8)
-    new = np.frombuffer(_reward_signature(after), dtype=np.uint8)
-    if old.shape != new.shape:
-        return LIST_HASH_DISTANCE + 1
-    return int(np.unpackbits(np.bitwise_xor(old, new)).sum())
+    if before.shape[:2] != after.shape[:2]:
+        return 0.0
+    height, width = before.shape[:2]
+    x0, y0, x1, y1 = REWARD_STATIC_REGION
+    left, top = round(width * x0 / 100), round(height * y0 / 100)
+    right, bottom = round(width * x1 / 100), round(height * y1 / 100)
+    old = before[top:bottom, left:right]
+    new = after[top:bottom, left:right]
+    if old.size == 0 or old.shape != new.shape:
+        return 0.0
+    return float(np.nan_to_num(
+        cv2.matchTemplate(old, new, cv2.TM_CCOEFF_NORMED)[0, 0], nan=0.0))
 
 
 def _same_reward_position(before, after) -> bool:
-    return _reward_hamming_distance(before, after) <= LIST_HASH_DISTANCE
+    return _reward_static_similarity(before, after) >= REWARD_STATIC_SAME
 
 
 def _scroll_reward_frame(bot, direction: str, primary, fallbacks) -> bool:
@@ -365,10 +360,10 @@ def _scroll_reward_frame(bot, direction: str, primary, fallbacks) -> bool:
         bot.swipe_percent(*gesture, duration=SLOW_SWIPE_DURATION,
                           delay=STEP_DELAY)
         after = bot.screenshot()
-        distance = _reward_hamming_distance(before, after)
-        moved = distance > LIST_HASH_DISTANCE
+        similarity = _reward_static_similarity(before, after)
+        moved = similarity < REWARD_STATIC_SAME
         bot.record(f"{NAME}: lướt {direction} trong khung quà {gesture}, "
-                   f"Hamming {distance}/{LIST_HASH_DISTANCE}, đường "
+                   f"ảnh tĩnh LV {similarity:.3f}/{REWARD_STATIC_SAME:.2f}, đường "
                    f"{probe}/{len(gestures)} {'đã di chuyển' if moved else 'không đổi'}")
         if moved:
             return True
@@ -441,10 +436,18 @@ def _scan_full_list(bot):
 def _claim_rewards(bot) -> bool:
     """Return only when a complete pass has no green Claim; not task DONE."""
     for pass_number in range(1, MAX_FULL_PASSES + 1):
-        bot.record(f"{NAME}: bắt đầu lượt quét quà đầy đủ "
-                   f"{pass_number}/{MAX_FULL_PASSES}")
-        if not _swipe_to_top(bot):
-            return False
+        if pass_number == 1:
+            # Opening Revelry already presents a valid reward viewport.  Do
+            # not waste it by first dragging upward: detect and claim the
+            # visible green controls immediately, then continue downward only
+            # if this viewport is clear.
+            bot.record(f"{NAME}: vừa vào màn; quét Claim ngay ở khung hiện tại "
+                       "trước khi lướt")
+        else:
+            bot.record(f"{NAME}: bắt đầu lượt quét lại {pass_number}/{MAX_FULL_PASSES}; "
+                       "trở về đầu danh sách")
+            if not _swipe_to_top(bot):
+                return False
         saw_claim, stuck, bottom = _scan_full_list(bot)
         if stuck:
             bot.record(f"{NAME}: Claim xanh vẫn còn sau giới hạn bấm; giữ PENDING")

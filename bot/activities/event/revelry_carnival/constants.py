@@ -28,9 +28,15 @@ TITLE_REGION = (15, 0, 85, 8)
 HOW_TO_GET_REGION = (15, 0, 85, 8)
 PARADE_MASK_DONE_REGION = (0, 12, 100, 90)
 # The supplied 396x705 screenshot has a green outer border at x=13..382 and
-# y=486..673.  Keep recognition strictly *inside* it: x=4..96%, y=70..95%.
-# This excludes the green border itself while retaining every reward row.
+# y=486..673.  Keep Claim recognition strictly *inside* it: x=4..96%,
+# y=70..95%.  This excludes the green border itself while retaining every
+# reward row.
 REWARD_REGION = (4, 70, 96, 95)
+# The left level-number strip scrolls with the reward list but contains no
+# sparkling reward art, lock animation, or Claim glow.  Use only this static
+# image band when deciding whether a swipe actually moved the list.
+REWARD_STATIC_REGION = (4, 71, 16, 94)
+REWARD_STATIC_SAME = 0.85
 
 # Every endpoint stays safely inside the measured green reward frame.  On the
 # 21503 device, the former 147 px gesture (y=93 -> 72%) did not move the list;
@@ -78,5 +84,4 @@ MAX_CROP_LEFT = 50
 MAX_CROP_HALF_HEIGHT = 18
 MAX_BAR_WIDTH = 240
 MAX_BAR_STILL_DIFF = 3.0
-LIST_HASH_DISTANCE = 24
 

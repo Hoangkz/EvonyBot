@@ -91,6 +91,21 @@ class ClaimColourTests(unittest.TestCase):
 
         self.assertFalse(run._same_reward_position(before, after))
 
+    def test_animated_rewards_do_not_move_the_static_level_strip(self):
+        before = np.zeros((704, 396, 3), dtype=np.uint8)
+        height, width = before.shape[:2]
+        x0, y0, x1, y1 = run.REWARD_STATIC_REGION
+        left, top = round(width * x0 / 100), round(height * y0 / 100)
+        right, bottom = round(width * x1 / 100), round(height * y1 / 100)
+        # Simulate the unchanging LV labels/borders while the reward artwork
+        # and locks on the right keep animating.
+        before[top:bottom, left:right] = np.indices(
+            (bottom - top, right - left))[0, ..., None] * (1, 2, 3)
+        after = before.copy()
+        after[top:bottom, right:min(width, right + 180)] = 255
+
+        self.assertTrue(run._same_reward_position(before, after))
+
     def test_every_visible_green_claim_is_tapped_before_the_next_swipe(self):
         bot = mock.Mock()
         first = (315, 530)
@@ -111,8 +126,8 @@ class ClaimColourTests(unittest.TestCase):
     def test_stationary_centre_swipe_tries_green_frame_fallback_before_edge(self):
         bot = mock.Mock()
         bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
-        with mock.patch.object(run, "_reward_hamming_distance",
-                               side_effect=(0, 533)):
+        with mock.patch.object(run, "_reward_static_similarity",
+                               side_effect=(0.95, 0.42)):
             moved = run._scroll_reward_frame(
                 bot, "xuống", run.SCAN_SWIPE, run.SCAN_SWIPE_FALLBACKS)
 
@@ -123,6 +138,29 @@ class ClaimColourTests(unittest.TestCase):
              mock.call(*run.SCAN_SWIPE_FALLBACKS[0],
                        duration=run.SLOW_SWIPE_DURATION, delay=run.STEP_DELAY)],
             bot.swipe_percent.call_args_list)
+
+    @mock.patch.object(run, "_scan_full_list", return_value=(False, False, True))
+    @mock.patch.object(run, "_swipe_to_top")
+    def test_first_reward_sweep_checks_opened_view_without_swiping_up(
+            self, swipe_to_top, scan_full_list):
+        bot = mock.Mock()
+
+        self.assertTrue(run._claim_rewards(bot))
+
+        scan_full_list.assert_called_once_with(bot)
+        swipe_to_top.assert_not_called()
+
+    @mock.patch.object(run, "_scan_full_list",
+                       side_effect=((True, False, True), (False, False, True)))
+    @mock.patch.object(run, "_swipe_to_top", return_value=True)
+    def test_repeat_sweep_returns_to_top_only_after_a_claim_was_found(
+            self, swipe_to_top, scan_full_list):
+        bot = mock.Mock()
+
+        self.assertTrue(run._claim_rewards(bot))
+
+        self.assertEqual(2, scan_full_list.call_count)
+        swipe_to_top.assert_called_once_with(bot)
 
 
 class ResumeBot:
