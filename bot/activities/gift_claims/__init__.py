@@ -13,6 +13,7 @@ Event Center trước Revelry Carnival, Valuable Event và Super Value Return
 from importlib import import_module
 import time
 
+from ...context.errors import BossAvailable, TimedOut, YieldToBoss
 from . import event_center, super_value_return, valuable_event
 # Lối tắt cho nơi từng import một luồng quà cụ thể từ ``gift_claims``; phần cài đặt nằm ở ``valuable_event/`` và ``super_value_return/``.
 back_to_territory = import_module(f"{__name__}.back_to_territory.run")
@@ -45,8 +46,19 @@ def job(zone) -> dict:
     """Dòng nhiệm vụ cho bảng ``priority.py``: chạy ``zone.run`` khi ô nhận quà được tích; xong khi key tổng của zone có trong DB hoặc bị skip."""
     def run(ctx, _settings):
         window_started = time.monotonic()
-        completed = bool(zone.run(ctx))
         retry_after = _retry_after(ctx)
+        try:
+            completed = bool(zone.run(ctx))
+        except (TimedOut, BossAvailable, YieldToBoss):
+            # The worker resumes the interrupted task first.  Without this
+            # checkpoint, an Event Center scan stopped by Boss/120s never
+            # reaches its ordinary PENDING return path, so Revelry cannot
+            # receive the next Gift Claims turn.
+            if not ctx.is_daily_done(zone.KEY) and not skipped_for_run(ctx, zone.KEY):
+                retry_after[zone.KEY] = window_started + RETRY_WINDOW_SECONDS
+                ctx.record(f"Gift Claims: {zone.KEY} bị ngắt; nghỉ đến lượt "
+                           "120s kế tiếp để chạy khu nhận quà tiếp theo")
+            raise
         if completed:
             retry_after.pop(zone.KEY, None)
         else:
@@ -65,15 +77,39 @@ def job(zone) -> dict:
     return {"run": run, "enabled": enabled, "done": done}
 
 
-def task(job_spec: dict, *, after: str | None = None) -> dict:
+def task(job_spec: dict, *, key: str, after: str | None = None) -> dict:
     """Đưa một job có sẵn vào Claim Gifts và dùng ô bật/tắt chung của nhóm.
 
-    Revelry Carnival vẫn dùng ``event_job`` để giữ nguyên điều hướng và luật
-    checkpoint, nhưng không còn phụ thuộc checkbox ở tab Event.
+    ``job_spec`` vẫn có thể tái sử dụng điều hướng của activity khác (Revelry
+    dùng ``event_job``), nhưng checkpoint PENDING/DONE phải thuộc về Gift
+    Claims.  Nếu giữ ``done`` gốc, nó sẽ nhận cấu hình của Daily Activities
+    thay vì nhóm Event và một lượt bị Boss ngắt không kịp nhường cho task sau.
     """
-    original_done = job_spec.get("done")
+    def defer(ctx, started: float, *, interrupted: bool = False):
+        _retry_after(ctx)[key] = started + RETRY_WINDOW_SECONDS
+        state = "bị ngắt" if interrupted else "còn PENDING"
+        ctx.record(f"Gift Claims: {key} {state}; nghỉ đến lượt "
+                   "120s kế tiếp để chạy khu nhận quà tiếp theo")
 
-    def done(ctx, settings):
+    def run(ctx, settings):
+        started = time.monotonic()
+        try:
+            job_spec["run"](ctx, settings)
+        except (TimedOut, BossAvailable, YieldToBoss):
+            # A 120-second expiry or a new Boss used to leave Revelry locked:
+            # the worker retried Event Center immediately because its normal
+            # return path had not written RETRY_AFTER_ATTR yet.  Persist the
+            # same hand-off checkpoint even on an intentional interruption.
+            if not ctx.is_daily_done(key):
+                defer(ctx, started, interrupted=True)
+            raise
+        retry_after = _retry_after(ctx)
+        if ctx.is_daily_done(key):
+            retry_after.pop(key, None)
+        else:
+            defer(ctx, started)
+
+    def done(ctx, _settings):
         # ``True`` ở đây chỉ làm worker tạm bỏ qua task trong lần xét hiện tại.
         # Before the predecessor has run, keep this task locked. Once that
         # zone has completed one eligibility window and entered its 120-second
@@ -85,9 +121,11 @@ def task(job_spec: dict, *, after: str | None = None) -> dict:
                 time.monotonic() < _retry_after(ctx).get(after, 0.0))
             if not predecessor_waiting:
                 return True
-        return bool(original_done(ctx, settings)) if original_done else False
+        if ctx.is_daily_done(key):
+            return True
+        return time.monotonic() < _retry_after(ctx).get(key, 0.0)
 
-    return {**job_spec, "enabled": enabled, "done": done}
+    return {**job_spec, "run": run, "enabled": enabled, "done": done}
 
 
 __all__ = ["event_center", "super_value_return", "valuable_event", "enabled", "job", "task"]

@@ -448,6 +448,7 @@ DATA ={
             "group": "Daily Activities",
             "run": gift_claims.task(
                 event_job("revelry_carnival", revelry_carnival),
+                key="revelry_carnival",
                 after=gift_claims.event_center.KEY,
             ),
             "label": "Gift Claims: Revelry Carnival (Parade Mask + Claim xanh)",

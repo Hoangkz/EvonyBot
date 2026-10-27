@@ -12,7 +12,7 @@ from . import (blessing_of_pallas, dragon_battle, dwarfs_lucky_apple,
                moment_of_glory,
                poseidons_day, precious_blazon_exchange, revelation_of_horus,
                sealed_imperial_treasury, wishful_windmill_festival)
-from ..common import (ClaimReport, GiftTask, TEXT_CLAIM_CONTROLS, back_if_close_x,
+from ..common import (ClaimReport, GiftTask, REFERENCE_WIDTH, TEXT_CLAIM_CONTROLS, back_if_close_x,
                      _scaled_template,
                      claim_fixed_controls, claim_sparkles,
                      close_congratulations, find, find_all,
@@ -129,6 +129,11 @@ WISHFUL_EDGE_CONFIRMATIONS = 2
 WISHFUL_GREEN_MIN_RATIO = 0.22
 WISHFUL_GRAY_MIN_RATIO = 0.50
 WISHFUL_ACTIVE_GRAY_MAX_RATIO = 0.65
+# Claim/Claimed artwork is allowed to settle after the tap.  The wait is
+# deliberately restricted to the tapped row, so an older Claimed row cannot
+# validate a different reward.
+WISHFUL_CLAIMED_WAIT_ATTEMPTS = 6
+WISHFUL_CLAIMED_WAIT_THRESHOLD = 0.82
 WISHFUL_DONE_ONE_LIMIT = (
     "EventCenter/WishfulWindmillFestival/status_done_one_claim_limit", 0.84)
 WISHFUL_DONE_ONE_NO_RECORDS = (
@@ -137,7 +142,10 @@ WISHFUL_DONE_TWO_CHEST = (
     "EventCenter/WishfulWindmillFestival/button_done2_reward_chest_median",
     0.70,
 )
-WISHFUL_DONE_TWO_CHEST_REGION = (2, 15, 28, 35)
+# User-marked green frame in Wind Power Storage (x=11..75, y=126..193 on
+# the 399x705 supplied screenshot).  It encloses only the final chest at
+# centre ~(42, 162), excluding the level/reward grid.
+WISHFUL_DONE_TWO_CHEST_REGION = (2, 17, 20, 28)
 EMPTY_POSITION_CHECKS = 2
 APPLE_GREEN_ONCE_STATES = (
     ("EventCenter/DwarfsLuckyApple/status_green_wish_once", 0.84),
@@ -637,6 +645,33 @@ def _wishful_claimed_near(bot, screen, claim) -> bool:
                for pos in _wishful_claimed(bot, screen))
 
 
+def _wait_for_wishful_claimed_near(bot, claim) -> bool:
+    """Wait for the tapped row to become ``Claimed`` instead of reading a
+    transient post-tap frame.
+
+    Challenge Quest has all of its reward controls on its first page.  The
+    small, row-local search region prevents a pre-existing Claimed row from
+    proving that the Claim just tapped was accepted.
+    """
+    screen = bot.screenshot()
+    height, width = screen.shape[:2]
+    half_width = round(58 * width / REFERENCE_WIDTH)
+    half_height = round(34 * width / REFERENCE_WIDTH)
+    region = (
+        max(0, (claim[0] - half_width) * 100 / width),
+        max(0, (claim[1] - half_height) * 100 / height),
+        min(100, (claim[0] + half_width) * 100 / width),
+        min(100, (claim[1] + half_height) * 100 / height),
+    )
+    found = _wait_for(
+        bot, "EventCenter/WishfulWindmillFestival/status_claimed",
+        attempts=WISHFUL_CLAIMED_WAIT_ATTEMPTS,
+        threshold=WISHFUL_CLAIMED_WAIT_THRESHOLD, region=region,
+        delay=WISHFUL_CONFIRMATION_DELAY_SECONDS,
+    )
+    return found is not None
+
+
 def _wishful_done_one_limit(bot, screen) -> bool:
     """The claim-limit toast finishes Wind Blessings DONE 1 only."""
     template, threshold = WISHFUL_DONE_ONE_LIMIT
@@ -693,7 +728,10 @@ def _tap_wishful_claim(bot, claim: tuple[int, int],
                        "thành Claimed; DONE")
             return tap_number, True, True
         popup_closed = _close_wishful_congratulations(bot)
-        bot.sleep(WISHFUL_CONFIRMATION_DELAY_SECONDS)
+        if _wait_for_wishful_claimed_near(bot, claim):
+            bot.record(f"Gift Claims: Wishful Windmill {phase} wait_for đã "
+                       "thấy Claimed ở đúng dòng; DONE")
+            return tap_number, True, True
         after = bot.screenshot()
         if _wishful_claimed_near(bot, after, claim):
             bot.record(f"Gift Claims: Wishful Windmill {phase} xác nhận dòng "
@@ -757,6 +795,10 @@ def _claim_wishful_panel(bot, phase: str) -> tuple[ClaimReport, bool]:
                     bot.record(f"Gift Claims: Wishful Windmill {phase} khung "
                                "hiện tại chỉ có Claimed; chưa kết luận, lướt "
                                "tiếp hết vùng xanh")
+                if phase == "Challenge Quest" and not unresolved:
+                    bot.record("Gift Claims: Wishful Windmill Challenge Quest "
+                               "đã chờ kiểm tra trang đầu, không còn Claim; DONE")
+                    return ClaimReport(attempted, max(verified, 1)), True
                 break
 
             empty_checks = 0

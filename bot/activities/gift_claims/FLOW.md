@@ -7,9 +7,11 @@ Worker chạy nhóm quà sau khi hoàn thành các Daily Activities và ưu tiê
 thứ tự **Event Center -> Revelry Carnival -> Valuable Event -> Super Value Return** khi ô **Claim Event Gifts** ở tab Daily
 Activities được tích (`settings["General"]["gift_claims"]`, mặc định bật):
 
-Sau một cửa sổ Event Center đã chạy và còn PENDING, Event Center nghỉ tới mốc
-120 giây tiếp theo; trong quãng chờ đó Revelry Carnival được mở khóa để làm
-tiếp. Khi hết mốc chờ, Event Center lại được xét trước theo thứ tự ưu tiên.
+Sau một cửa sổ Event Center đã chạy và còn PENDING, hoặc bị ngắt bởi Boss/hết
+120 giây, Event Center nghỉ tới mốc 120 giây tiếp theo; trong quãng chờ đó
+Revelry Carnival được mở khóa để làm tiếp. Revelry cũng có checkpoint PENDING
+riêng, nên không thể chặn Valuable Event/Super Value Return hoặc bị làm lặp
+liên tục. Khi hết mốc chờ, Event Center lại được xét trước theo thứ tự ưu tiên.
 
 Khu nào còn PENDING sau một lượt sẽ tạm nghỉ 120 giây thay vì chặn khu kế
 tiếp. Khi cửa sổ mới bắt đầu, thứ tự trên được áp dụng lại từ Event Center.

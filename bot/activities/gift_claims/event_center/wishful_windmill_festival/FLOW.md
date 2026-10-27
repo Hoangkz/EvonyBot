@@ -22,11 +22,13 @@
    sang kiểm tra DONE 2; không tiếp tục lướt hoặc bấm Claim của DONE 1.
 6. Sau khi DONE 1 mới đóng panel một lần, mở `Wind Power Storage`, rồi bấm
    `Challenge Quest`. Phải thấy lại title Wind Blessings trước khi nhận.
-7. Phần Challenge Quest dùng cùng cơ chế: ở nguyên panel, nhận/lướt vùng xanh
-   đến khi đã quét tới biên và không còn Claim xanh. Đây là điều kiện để sang
-   DONE 2, bất kể lượt đó có Claim mới hay chỉ có Claimed.
+7. Phần Challenge Quest chỉ có Claim ở trang đầu. Sau mỗi cú bấm, dùng
+   `wait_for` trong đúng dòng vừa bấm để chờ trạng thái `Claimed`, tránh đọc
+   nhầm khung hiệu ứng chuyển tiếp. Khi trang đầu đã chờ kiểm tra và không còn
+   Claim xanh thì sang DONE 2, không lướt thêm vô ích.
 8. Sau khi quét sạch Challenge Quest, **luôn** Back về Wind Power Storage, tìm
-   rương cuối bằng ảnh median 40x40 trong vùng `(2,15,28,35)` ở ngưỡng `0.70`,
+   rương cuối bằng ảnh median 40x40 chỉ trong khung xanh `(2,17,20,28)` ở
+   ngưỡng `0.70`,
    rồi bấm rương. Nếu **không có rương** sau toàn bộ lượt tìm ở vùng này thì
    cũng ghi DONE 2. Nếu có rương, bot luôn tìm lại đúng ảnh và bấm tiếp cho
    tới khi rương biến mất khỏi đúng vùng. `Congratulations!` chỉ là dấu hiệu

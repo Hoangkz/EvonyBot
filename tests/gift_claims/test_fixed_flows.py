@@ -1395,6 +1395,45 @@ class FixedGiftFlowTests(unittest.TestCase):
             lambda key: key == gift_claims.event_center.KEY)
         self.assertFalse(row["run"]["done"](bot, {}))
 
+    def test_interrupted_event_center_window_releases_revelry(self):
+        """A Boss/timeout must hand the next Gift Claims slot to Revelry."""
+        from bot.context.errors import TimedOut
+        from types import SimpleNamespace
+
+        event_center = gift_claims.job(SimpleNamespace(
+            KEY=gift_claims.event_center.KEY,
+            run=mock.Mock(side_effect=TimedOut()),
+        ))
+        revelry = gift_claims.task(
+            {"run": mock.Mock()}, key="revelry_carnival",
+            after=gift_claims.event_center.KEY,
+        )
+        bot = mock.Mock()
+        bot.is_daily_done.return_value = False
+
+        with mock.patch.object(gift_claims.time, "monotonic", return_value=100.0):
+            with self.assertRaises(TimedOut):
+                event_center["run"](bot, {})
+            self.assertEqual(
+                220.0,
+                getattr(bot, gift_claims.RETRY_AFTER_ATTR)[gift_claims.event_center.KEY],
+            )
+            self.assertFalse(revelry["done"](bot, {}))
+
+    def test_revelry_pending_gets_its_own_120_second_checkpoint(self):
+        job = mock.Mock()
+        revelry = gift_claims.task({"run": job}, key="revelry_carnival")
+        bot = mock.Mock()
+        bot.is_daily_done.return_value = False
+
+        with mock.patch.object(gift_claims.time, "monotonic", return_value=100.0):
+            revelry["run"](bot, {})
+            self.assertTrue(revelry["done"](bot, {}))
+            self.assertEqual(
+                220.0,
+                getattr(bot, gift_claims.RETRY_AFTER_ATTR)["revelry_carnival"],
+            )
+
     def test_gift_zones_are_tail_tasks_after_all_daily_work(self):
         from bot.worker.priority import DATA
 
@@ -3136,6 +3175,10 @@ class FixedGiftFlowTests(unittest.TestCase):
         self.assertEqual((20, 233), limit.shape[:2])
         self.assertEqual((28, 77), claimed.shape[:2])
 
+    def test_wishful_done_two_chest_search_is_limited_to_the_marked_green_frame(self):
+        self.assertEqual((2, 17, 20, 28),
+                         event_center.WISHFUL_DONE_TWO_CHEST_REGION)
+
     def test_wishful_claim_limit_toast_finishes_done_one_immediately(self):
         bot = mock.Mock()
         bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
@@ -3166,7 +3209,7 @@ class FixedGiftFlowTests(unittest.TestCase):
             result = event_center._tap_wishful_claim(
                 bot, (330, 245), "Challenge Quest")
 
-        self.assertEqual((1, True, False), result)
+        self.assertEqual((1, True, True), result)
         limit.assert_not_called()
 
     def test_wishful_claim_changing_to_claimed_finishes_phase(self):
@@ -3214,7 +3257,7 @@ class FixedGiftFlowTests(unittest.TestCase):
         claims.assert_not_called()
         bot.swipe_percent.assert_not_called()
 
-    def test_wishful_done_two_scan_uses_the_measured_left_frame_gesture(self):
+    def test_wishful_done_two_finishes_after_clear_first_page_without_swiping(self):
         bot = mock.Mock()
         bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
         with (mock.patch.object(event_center, "_wishful_panel_open",
@@ -3227,11 +3270,26 @@ class FixedGiftFlowTests(unittest.TestCase):
                 bot, "Challenge Quest")
 
         self.assertTrue(done)
-        expected = mock.call(
-            *event_center.WISHFUL_SCAN_SWIPE,
-            duration=event_center.WISHFUL_SCROLL_DURATION_SECONDS,
-            delay=event_center.LIST_SCROLL_SETTLE_SECONDS)
-        self.assertEqual([expected, expected], bot.swipe_percent.call_args_list)
+        bot.swipe_percent.assert_not_called()
+
+    def test_wishful_claim_waits_for_claimed_at_the_tapped_row(self):
+        bot = mock.Mock()
+        bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
+        with (mock.patch.object(event_center, "_wishful_done_one_limit",
+                                return_value=False),
+              mock.patch.object(event_center, "_wishful_claimed_near",
+                                return_value=False),
+              mock.patch.object(event_center,
+                                "_close_wishful_congratulations",
+                                return_value=False),
+              mock.patch.object(event_center,
+                                "_wait_for_wishful_claimed_near",
+                                return_value=True) as wait):
+            result = event_center._tap_wishful_claim(
+                bot, (330, 245), "Challenge Quest")
+
+        self.assertEqual((1, True, True), result)
+        wait.assert_called_once_with(bot, (330, 245))
 
     def test_wishful_claim_and_claimed_require_opposite_colour_bands(self):
         root = IMAGES / "GiftClaims" / "EventCenter" / "WishfulWindmillFestival"
@@ -3280,6 +3338,9 @@ class FixedGiftFlowTests(unittest.TestCase):
               mock.patch.object(event_center, "_wishful_done_one_limit",
                                 return_value=False),
               mock.patch.object(event_center, "_wishful_claimed_near",
+                                return_value=False),
+              mock.patch.object(event_center,
+                                "_wait_for_wishful_claimed_near",
                                 return_value=False),
               mock.patch.object(event_center, "_wishful_claimed",
                                 return_value=[]),
