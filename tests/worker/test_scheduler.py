@@ -171,6 +171,23 @@ class WorkerLoopTests(unittest.TestCase):
         self.run_until_stop(worker, run_activity)
         self.assertEqual(calls, [JOIN_BOSS, "high", JOIN_BOSS, "low", JOIN_BOSS])
 
+    def test_stamina_wait_still_runs_the_next_daily_task(self):
+        """A stamina cooldown delays only Join Boss, never the task queue."""
+        calls = []
+
+        def run_task(_ctx, _settings):
+            calls.append("daily")
+            worker._stop.set()
+
+        worker = self.make_worker([JOIN_BOSS, "G"], [("daily", 1, run_task)])
+        worker.ctx.stamina_until = time.monotonic() + 60
+        worker._check_boss = mock.Mock()
+
+        self.run_until_stop(worker)
+
+        self.assertEqual(["daily"], calls)
+        worker._check_boss.assert_not_called()
+
     def test_task_run_called_directly_with_group_settings(self):
         """Worker gọi thẳng run của nhiệm vụ với cấu hình tab của group, không đi qua ACTIVITIES."""
         got = []

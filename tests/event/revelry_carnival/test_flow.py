@@ -91,6 +91,21 @@ class ClaimColourTests(unittest.TestCase):
 
         self.assertFalse(run._same_reward_position(before, after))
 
+    def test_animated_rewards_do_not_move_the_static_level_strip(self):
+        before = np.zeros((704, 396, 3), dtype=np.uint8)
+        height, width = before.shape[:2]
+        x0, y0, x1, y1 = run.REWARD_STATIC_REGION
+        left, top = round(width * x0 / 100), round(height * y0 / 100)
+        right, bottom = round(width * x1 / 100), round(height * y1 / 100)
+        # Simulate the unchanging LV labels/borders while the reward artwork
+        # and locks on the right keep animating.
+        before[top:bottom, left:right] = np.indices(
+            (bottom - top, right - left))[0, ..., None] * (1, 2, 3)
+        after = before.copy()
+        after[top:bottom, right:min(width, right + 180)] = 255
+
+        self.assertTrue(run._same_reward_position(before, after))
+
     def test_every_visible_green_claim_is_tapped_before_the_next_swipe(self):
         bot = mock.Mock()
         first = (315, 530)
@@ -111,8 +126,8 @@ class ClaimColourTests(unittest.TestCase):
     def test_stationary_centre_swipe_tries_green_frame_fallback_before_edge(self):
         bot = mock.Mock()
         bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
-        with mock.patch.object(run, "_reward_hamming_distance",
-                               side_effect=(0, 533)):
+        with mock.patch.object(run, "_reward_static_similarity",
+                               side_effect=(0.95, 0.42)):
             moved = run._scroll_reward_frame(
                 bot, "xuống", run.SCAN_SWIPE, run.SCAN_SWIPE_FALLBACKS)
 
@@ -123,6 +138,46 @@ class ClaimColourTests(unittest.TestCase):
              mock.call(*run.SCAN_SWIPE_FALLBACKS[0],
                        duration=run.SLOW_SWIPE_DURATION, delay=run.STEP_DELAY)],
             bot.swipe_percent.call_args_list)
+
+    @mock.patch.object(run, "_scan_full_list",
+                       side_effect=((False, False, True), (False, False, True)))
+    @mock.patch.object(run, "_swipe_to_top", return_value=True)
+    def test_clean_claim_audit_checks_opened_view_then_returns_up_for_second_pass(
+            self, swipe_to_top, scan_full_list):
+        bot = mock.Mock()
+
+        self.assertTrue(run._claim_rewards(bot))
+
+        self.assertEqual(2, scan_full_list.call_count)
+        self.assertEqual(2, swipe_to_top.call_count)
+
+    @mock.patch.object(run, "_scan_full_list",
+                       side_effect=((True, False, True), (False, False, True),
+                                    (False, False, True)))
+    @mock.patch.object(run, "_swipe_to_top", return_value=True)
+    def test_claim_resets_the_two_clean_up_down_audits(
+            self, swipe_to_top, scan_full_list):
+        bot = mock.Mock()
+
+        self.assertTrue(run._claim_rewards(bot))
+
+        self.assertEqual(3, scan_full_list.call_count)
+        self.assertEqual(3, swipe_to_top.call_count)
+
+    @mock.patch.object(run, "_scroll_reward_frame", return_value=True)
+    @mock.patch.object(run, "_claim_current_view",
+                       side_effect=((False, False), (False, False)))
+    def test_two_empty_views_go_to_parade_mask_check_without_extra_scrolls(
+            self, claim_current_view, scroll_reward_frame):
+        bot = mock.Mock()
+
+        saw_claim, stuck, ready_for_mask = run._scan_full_list(bot)
+
+        self.assertEqual((False, False, True),
+                         (saw_claim, stuck, ready_for_mask))
+        self.assertEqual(2, claim_current_view.call_count)
+        scroll_reward_frame.assert_called_once_with(
+            bot, "xuống", run.SCAN_SWIPE, run.SCAN_SWIPE_FALLBACKS)
 
 
 class ResumeBot:
@@ -282,6 +337,19 @@ class DirectPopupTests(unittest.TestCase):
         run_opened.assert_called_once_with(bot)
         self.assertEqual(run.KEY, bot._task_results[-1].key)
         self.assertTrue(bot._task_results[-1].done)
+
+    @mock.patch.object(run, "run_task")
+    def test_missing_event_ribbon_marks_only_revelry_gift_done(self, run_task):
+        bot = self.PopupBot()
+        state = mock.Mock()
+        run.run(bot, {}, state)
+        handler = run_task.call_args.args[4]
+
+        self.assertEqual(run.STOP, handler(run.EVENT_ENDED, None, object()))
+        self.assertEqual(run.KEY, bot._task_results[-1].key)
+        self.assertTrue(bot._task_results[-1].done)
+        bot.record.assert_called_with(
+            "Revelry Carnival: không thấy ruy băng Event; Gift Claims DONE")
 
 
 if __name__ == "__main__":

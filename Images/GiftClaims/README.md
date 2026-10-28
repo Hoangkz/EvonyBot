@@ -21,6 +21,7 @@ sự kiện nằm trong các thư mục con:
 - EagleOfFreedom
 - GiantsWisdomTemple
 - GraceOfStarTrail
+- GreatExpedition
 - HypnosDream
 - LegionHunting
 - PoseidonsDay

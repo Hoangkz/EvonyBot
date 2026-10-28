@@ -72,7 +72,8 @@ class EventRunTests(unittest.TestCase):
     @staticmethod
     def run_patrol(bot, settings, fake):
         """Chạy event_job của King's Path Patrol với hàm làm việc giả `fake(bot, cấu hình riêng, state)`."""
-        with mock.patch.dict(job._KEY_OF, {fake: "kings_path_patrol"}):
+        with (mock.patch.dict(job._KEY_OF, {fake: "kings_path_patrol"}),
+              mock.patch.object(job, "to_city")):
             job.event_job("kings_path", fake)["run"](bot, settings)
 
     def test_run_event_task_runs_only_that_task(self):
@@ -95,6 +96,17 @@ class EventRunTests(unittest.TestCase):
         self.run_patrol(bot, {"kings_path_patrol": ON}, lambda b, task, state: mark_done(b, "kings_path_patrol"))
         self.assertIn("Event: xong kings_path_patrol", bot.logs)
         self.assertIn("kings_path_patrol", bot.done)
+
+    def test_reused_event_navigator_can_report_the_own_worker_group(self):
+        bot = FakeBot()
+        fake = lambda b, task, state: mark_done(b, "revelry_carnival")
+        with (mock.patch.dict(job._KEY_OF, {fake: "revelry_carnival"}),
+              mock.patch.object(job, "to_city")):
+            job.event_job("revelry_carnival", fake,
+                          completion_label="Gift Claims")["run"](bot, {})
+
+        self.assertIn("Gift Claims: xong revelry_carnival", bot.logs)
+        self.assertNotIn("Event: xong revelry_carnival", bot.logs)
 
     def test_records_target_reached_and_locked(self):
         settings = {"kings_path_patrol": {"value": 30, "day": 2}}

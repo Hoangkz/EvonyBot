@@ -225,6 +225,12 @@ def run_task(bot, state: EventState, name: str, event_icon: str, handle=None, *,
             continue
         opened = handle_common(bot, state, action, pos, screen)
         if opened == EVENT_ENDED:
+            # A caller that only borrows Event navigation (for example a
+            # Daily Activities / Gift Claims task) may define its own meaning
+            # for a missing ribbon.  Give it that terminal signal before the
+            # ordinary seven-day Event absence handling.
+            if handle is not None and handle(EVENT_ENDED, None, screen) == STOP:
+                return
             bot.record(f"{name}: no event ribbon next to Event Center, event has ended, skip to next task")
             state.absent.update(cycle.EVENT_OF_ICON.values())   # cả 2 event 7 ngày đều nằm sau nút ruy băng này
             return

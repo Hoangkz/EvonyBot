@@ -245,6 +245,7 @@ class BotWorker(QThread):
         stalled = 0        # số nhiệm vụ liên tiếp chạy xong một lượt mà vẫn chưa xong
         scan_tried = False  # đã thử quét bản đồ thành trong lượt Start này (rảnh mới quét, xem nhánh `not pending` bên dưới)
         stamina_wait_on = False   # vòng trước đang chờ thể lực (đổi trạng thái thì ghi log)
+        idle_skip_snapshot = None  # chỉ ghi lý do rảnh khi trạng thái thay đổi, không spam mỗi 5 giây
         while not self._stop.is_set():
             self._clear_future_done()
             # Hết thể lực: Join Boss đặt mốc "+20 phút" trên ctx (chỉ trong lượt chạy này); chưa tới mốc thì làm nhiệm vụ (không gọi Join Boss, boss mới cũng
@@ -279,6 +280,45 @@ class BotWorker(QThread):
             pending = [t for t in order if not skip(t)]
             if task is None:
                 if not pending:
+                    # Waiting for stamina deliberately suppresses only the
+                    # next Join Boss pass.  Make an empty ordinary queue
+                    # explicit, so it cannot look as if stamina stopped all
+                    # Daily Activities.
+                    retry_after = getattr(self.ctx, "_gift_claims_zone_retry_after", {})
+
+                    def unavailable_reason(candidate):
+                        if candidate.once and candidate.key in ran_once:
+                            return "đã chạy một lần"
+                        if attempts.get(candidate.key, 0) >= MAX_ATTEMPTS:
+                            return f"đã đủ {MAX_ATTEMPTS} lần thử"
+                        if candidate.needs_alliance and no_alliance.known(self.ctx):
+                            return "không có Alliance"
+                        if waiting(candidate):
+                            return "chờ route thành"
+                        retry_until = (retry_after.get(candidate.key, 0.0)
+                                       if isinstance(retry_after, dict) else 0.0)
+                        if time.monotonic() < retry_until:
+                            return "đang chờ lượt Gift Claims 120s"
+                        is_daily_done = getattr(self.ctx, "is_daily_done", None)
+                        if callable(is_daily_done) and is_daily_done(candidate.key):
+                            return "DONE hôm nay"
+                        if self._is_done(candidate, ran):
+                            return "đang bị task giữ lại"
+                        return "chưa tới điều kiện chạy"
+
+                    unavailable = tuple(
+                        (candidate.key, unavailable_reason(candidate))
+                        for candidate in order)
+                    if unavailable != idle_skip_snapshot:
+                        if unavailable:
+                            shown = unavailable[:12]
+                            suffix = (f"; +{len(unavailable) - len(shown)} nhiệm vụ"
+                                      if len(unavailable) > len(shown) else "")
+                            detail = "; ".join(
+                                f"{key} ({reason})" for key, reason in shown)
+                            self.record("Không có nhiệm vụ thường sẵn sàng: "
+                                        f"{detail}{suffix}")
+                        idle_skip_snapshot = unavailable
                     # Không còn nhiệm vụ nào (kể cả việc theo giờ chưa tới giờ) và Join Boss vừa báo rảnh: chưa có bản đồ thành
                     # thì tìm route các công trình (city_map.scan_city: tìm Thành chính trước rồi quét từng ô, lưu DB); cứ 3 cú
                     # vuốt kiểm tra số boss, tăng thì vào Join Boss tới khi rảnh rồi vuốt tiếp. Mỗi lượt Start thử một lần.
@@ -306,7 +346,10 @@ class BotWorker(QThread):
                         continue
                     self.guards.call(None, self.ctx.sleep, IDLE_WAIT)
                     continue
+                idle_skip_snapshot = None
                 task = pending[0]
+            else:
+                idle_skip_snapshot = None
             completed = self._run_task(task, boss and not stamina_wait_on)   # False: bị ngắt giữa chừng (không tính là một lần thử)
             if completed and task.done is None:
                 ran.add(task.key)

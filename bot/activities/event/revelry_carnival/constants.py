@@ -28,9 +28,15 @@ TITLE_REGION = (15, 0, 85, 8)
 HOW_TO_GET_REGION = (15, 0, 85, 8)
 PARADE_MASK_DONE_REGION = (0, 12, 100, 90)
 # The supplied 396x705 screenshot has a green outer border at x=13..382 and
-# y=486..673.  Keep recognition strictly *inside* it: x=4..96%, y=70..95%.
-# This excludes the green border itself while retaining every reward row.
+# y=486..673.  Keep Claim recognition strictly *inside* it: x=4..96%,
+# y=70..95%.  This excludes the green border itself while retaining every
+# reward row.
 REWARD_REGION = (4, 70, 96, 95)
+# The left level-number strip scrolls with the reward list but contains no
+# sparkling reward art, lock animation, or Claim glow.  Use only this static
+# image band when deciding whether a swipe actually moved the list.
+REWARD_STATIC_REGION = (4, 71, 16, 94)
+REWARD_STATIC_SAME = 0.85
 
 # Every endpoint stays safely inside the measured green reward frame.  On the
 # 21503 device, the former 147 px gesture (y=93 -> 72%) did not move the list;
@@ -61,6 +67,14 @@ STEP_DELAY = 1.0
 # that there is no Use/DONE result from the first immediately-following frame.
 PARADE_MASK_OPEN_DELAY = 2.0
 EDGE_CONFIRMATIONS = 2
+# Check the viewport shown on entry and exactly one viewport after a scroll.
+# When both contain no green Claim, inspect Parade Mask instead of dragging
+# through an empty reward list.
+EMPTY_VIEWS_BEFORE_MASK_CHECK = 2
+# Before Parade Mask is inspected, repeat the entire Claim scan in both
+# vertical directions.  This catches a delayed green Claim without treating a
+# single apparently empty viewport as clean.
+CLEAN_CLAIM_AUDIT_PASSES = 2
 MAX_FULL_PASSES = 3
 MAX_CLAIMS_PER_VIEW = 6
 
@@ -78,5 +92,4 @@ MAX_CROP_LEFT = 50
 MAX_CROP_HALF_HEIGHT = 18
 MAX_BAR_WIDTH = 240
 MAX_BAR_STILL_DIFF = 3.0
-LIST_HASH_DISTANCE = 24
 

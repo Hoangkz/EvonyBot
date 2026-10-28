@@ -447,7 +447,8 @@ DATA ={
             "key": "revelry_carnival",
             "group": "Daily Activities",
             "run": gift_claims.task(
-                event_job("revelry_carnival", revelry_carnival),
+                event_job("revelry_carnival", revelry_carnival,
+                          completion_label="Gift Claims"),
                 key="revelry_carnival",
                 after=gift_claims.event_center.KEY,
             ),

@@ -16,6 +16,8 @@ event_center = import_module("bot.activities.gift_claims.event_center.run")
 event_center_zone = import_module("bot.activities.gift_claims.event_center.zone")
 dragon_battle = import_module(
     "bot.activities.gift_claims.event_center.dragon_battle.run")
+great_expedition = import_module(
+    "bot.activities.gift_claims.event_center.great_expedition.run")
 valuable_event = import_module("bot.activities.gift_claims.valuable_event.run")
 valuable_event_zone = import_module("bot.activities.gift_claims.valuable_event.zone")
 valuable_named_flow = import_module(
@@ -100,7 +102,7 @@ class FixedGiftFlowTests(unittest.TestCase):
             {"RevelryCarnival"},
             {path.name for path in (root / "Event").iterdir()
              if path.is_dir()})
-        self.assertEqual(17, len([
+        self.assertEqual(18, len([
             path for path in (root / "EventCenter").iterdir()
             if path.is_dir()]))
         self.assertEqual(18, len([
@@ -1907,18 +1909,26 @@ class FixedGiftFlowTests(unittest.TestCase):
             delay=hall_of_historic_generals.STEP_DELAY)
         chests.assert_called_once_with(bot)
 
-    def test_hall_without_new_claim_does_not_check_main_chests(self):
+    def test_hall_without_new_claim_still_checks_main_chest(self):
         bot = mock.Mock()
         with (mock.patch.object(hall_of_historic_generals, "_open_scores",
                                 return_value=True),
               mock.patch.object(hall_of_historic_generals, "_scan_rewards",
                                 return_value=hall_of_historic_generals.DONE),
+              mock.patch.object(hall_of_historic_generals, "_main_open",
+                                return_value=True),
               mock.patch.object(hall_of_historic_generals,
-                                "_claim_main_chests") as chests):
+                                "_claim_main_chests", return_value=True) as chests):
             outcome = hall_of_historic_generals.claim_opened(bot)
 
         self.assertEqual(hall_of_historic_generals.DONE, outcome)
-        chests.assert_not_called()
+        chests.assert_called_once_with(bot)
+
+    def test_hall_chest_threshold_accepts_the_calibrated_animation_floor(self):
+        # Lowest score in the 15 supplied Hall animation captures is 0.4815.
+        # The configured threshold deliberately retains a margin below it.
+        self.assertEqual(0.45, hall_of_historic_generals.MAIN_CHEST_THRESHOLD)
+        self.assertLess(hall_of_historic_generals.MAIN_CHEST_THRESHOLD, 0.4815)
 
     def test_hall_missing_congratulations_accepts_chest_absence(self):
         bot = mock.Mock()
@@ -2830,6 +2840,220 @@ class FixedGiftFlowTests(unittest.TestCase):
         screen[5:5 + height, 100:100 + width] = title
         self.assertEqual(GiftScreen.MOMENT_OF_GLORY,
                          identify(CvBot(), screen))
+
+    def test_great_expedition_assets_and_limited_registration(self):
+        folder = (IMAGES / "GiftClaims" / "EventCenter" /
+                  "GreatExpedition")
+        for name in (
+                "list_row.png", "title.png", "checkbox_skip_animation.png",
+                "button_roll_once.png", "button_roll_x5.png",
+                "button_challenge_quest.png", "button_challenge_quest_close.png",
+                "title_how_to_earn_scores.png",
+                "button_quest_claim.png", "status_quest_claimed.png",
+                "button_map_chest.png", "tab_chest_quests.png",
+                "status_map_chest_red_dot.png",
+                "button_chest_claim.png", "status_chest_claimed.png",
+                "tab_expedition_trial.png", "tab_great_expedition.png",
+                "marker_upgrade.png",
+                "button_trial_chest_median.png",
+                "popup_trial_upgrade_congratulations.png"):
+            self.assertTrue((folder / name).is_file(), name)
+        expedition = next(
+            policy for policy in event_center.EVENT_POLICIES
+            if policy.key == "gift_great_expedition")
+        self.assertEqual(GiftScreen.GREAT_EXPEDITION, expedition.screen)
+        self.assertNotIn(expedition.key, event_center.POLICY_CATEGORIES)
+        self.assertTrue(any(
+            row[0] == "EventCenter/GreatExpedition/list_row"
+            and row[2] == GiftScreen.GREAT_EXPEDITION
+            for row in event_center.FORCED_LIMITED_ROWS))
+        self.assertIs(event_center.EXACT_HANDLERS[
+            GiftScreen.GREAT_EXPEDITION], great_expedition.claim_opened)
+
+    def test_great_expedition_title_identifies_opened_page(self):
+        title = cv2.imread(str(IMAGES / "GiftClaims" / "EventCenter" /
+                               "GreatExpedition" / "title.png"))
+        screen = np.zeros((704, 396, 3), dtype=np.uint8)
+        height, width = title.shape[:2]
+        screen[5:5 + height, 100:100 + width] = title
+        self.assertEqual(GiftScreen.GREAT_EXPEDITION,
+                         identify(CvBot(), screen))
+
+    def test_great_expedition_quest_claim_ignores_gray_claimed(self):
+        folder = (IMAGES / "GiftClaims" / "EventCenter" /
+                  "GreatExpedition")
+        active = cv2.imread(str(folder / "button_quest_claim.png"))
+        claimed = cv2.imread(str(folder / "status_quest_claimed.png"))
+        screen = np.zeros((704, 396, 3), dtype=np.uint8)
+        screen[280:280 + active.shape[0],
+               286:286 + active.shape[1]] = active
+        claims = great_expedition._active_claims(
+            CvBot(), screen, great_expedition.QUEST_CLAIM,
+            great_expedition.QUEST_CLAIM_REGION)
+        self.assertEqual(1, len(claims))
+
+        gray = np.zeros_like(screen)
+        gray[280:280 + claimed.shape[0],
+             286:286 + claimed.shape[1]] = claimed
+        self.assertEqual([], great_expedition._active_claims(
+            CvBot(), gray, great_expedition.QUEST_CLAIM,
+            great_expedition.QUEST_CLAIM_REGION))
+        self.assertTrue(great_expedition._claimed_near(
+            CvBot(), gray, (321, 293), great_expedition.QUEST_CLAIMED,
+            great_expedition.QUEST_CLAIM_REGION))
+
+    def test_great_expedition_chest_quests_include_the_top_green_claim(self):
+        folder = (IMAGES / "GiftClaims" / "EventCenter" /
+                  "GreatExpedition")
+        active = cv2.imread(str(folder / "button_chest_claim.png"))
+        screen = np.zeros((704, 396, 3), dtype=np.uint8)
+        # Actual map-chest Quests: top-left (293, 165), centre y=175.
+        screen[165:165 + active.shape[0],
+               293:293 + active.shape[1]] = active
+        claims = great_expedition._active_claims(
+            CvBot(), screen, great_expedition.CHEST_QUEST_CLAIM,
+            great_expedition.CHEST_QUEST_CLAIM_REGION)
+        self.assertEqual([(326, 175)], claims)
+
+    def test_great_expedition_uses_roll_x5_anchor_to_read_red_costs(self):
+        folder = (IMAGES / "GiftClaims" / "EventCenter" /
+                  "GreatExpedition")
+        x5 = cv2.imread(str(folder / "button_roll_x5.png"))
+        chest = cv2.imread(str(folder / "button_map_chest.png"))
+        screen = np.zeros((704, 396, 3), dtype=np.uint8)
+        screen[646:646 + x5.shape[0], 22:22 + x5.shape[1]] = x5
+        screen[203:203 + chest.shape[0], 29:29 + chest.shape[1]] = chest
+        # Measured red 5/1 glyph locations relative to the detected x5 label.
+        screen[675:693, 115:126] = (0, 0, 220)
+        screen[675:693, 282:293] = (0, 0, 220)
+
+        controls = great_expedition._roll_controls(CvBot(), screen)
+        self.assertIsNotNone(controls)
+        self.assertTrue(controls[2])
+        self.assertTrue(controls[3])
+        self.assertIsNotNone(great_expedition._find_map_chest(
+            CvBot(), screen, left_only=True))
+
+    def test_great_expedition_opens_map_chest_only_with_its_red_dot(self):
+        folder = (IMAGES / "GiftClaims" / "EventCenter" /
+                  "GreatExpedition")
+        chest = cv2.imread(str(folder / "button_map_chest.png"))
+        badge = cv2.imread(str(folder / "status_map_chest_red_dot.png"))
+        screen = np.zeros((704, 396, 3), dtype=np.uint8)
+        screen[204:204 + chest.shape[0],
+               31:31 + chest.shape[1]] = chest
+        self.assertIsNone(great_expedition._find_actionable_map_chest(
+            CvBot(), screen))
+
+        screen[202:202 + badge.shape[0],
+               63:63 + badge.shape[1]] = badge
+        self.assertIsNotNone(great_expedition._find_actionable_map_chest(
+            CvBot(), screen))
+
+    def test_great_expedition_trial_chest_uses_calibrated_median(self):
+        folder = (IMAGES / "GiftClaims" / "EventCenter" /
+                  "GreatExpedition")
+        chest = cv2.imread(str(folder / "button_trial_chest_median.png"))
+        marker = cv2.imread(str(folder / "marker_upgrade.png"))
+        screen = np.zeros((704, 396, 3), dtype=np.uint8)
+        screen[195:195 + chest.shape[0],
+               25:25 + chest.shape[1]] = chest
+        screen[286:286 + marker.shape[0],
+               208:208 + marker.shape[1]] = marker
+
+        self.assertEqual(0.75, great_expedition.TRIAL_CHEST_THRESHOLD)
+        self.assertTrue(great_expedition._trial_open(CvBot(), screen))
+        self.assertIsNotNone(great_expedition.find(
+            CvBot(), great_expedition.TRIAL_CHEST, screen,
+            threshold=great_expedition.TRIAL_CHEST_THRESHOLD,
+            region=great_expedition.TRIAL_CHEST_REGION))
+
+    def test_great_expedition_recognizes_trial_upgrade_congratulations(self):
+        folder = (IMAGES / "GiftClaims" / "EventCenter" /
+                  "GreatExpedition")
+        popup = cv2.imread(str(
+            folder / "popup_trial_upgrade_congratulations.png"))
+        screen = np.zeros((704, 396, 3), dtype=np.uint8)
+        screen[181:181 + popup.shape[0],
+               68:68 + popup.shape[1]] = popup
+        self.assertIsNotNone(great_expedition.find(
+            CvBot(), great_expedition.TRIAL_UPGRADE_CONGRATULATIONS, screen,
+            threshold=0.82, region=(0, 20, 100, 50)))
+
+    def test_great_expedition_recognizes_challenge_quest_close_x(self):
+        folder = (IMAGES / "GiftClaims" / "EventCenter" /
+                  "GreatExpedition")
+        close = cv2.imread(str(folder / "button_challenge_quest_close.png"))
+        screen = np.zeros((704, 396, 3), dtype=np.uint8)
+        screen[97:97 + close.shape[0],
+               351:351 + close.shape[1]] = close
+        self.assertIsNotNone(great_expedition.find(
+            CvBot(), great_expedition.CHALLENGE_QUEST_CLOSE, screen,
+            threshold=0.82, region=(85, 10, 100, 25)))
+
+    def test_great_expedition_finishes_only_after_final_quest_pass(self):
+        bot = mock.Mock()
+        report = common.ClaimReport()
+        with (mock.patch.object(great_expedition, "_main_open",
+                                return_value=True),
+              mock.patch.object(great_expedition, "_claim_trial_chest")
+              as trial_chest,
+              mock.patch.object(great_expedition, "_open_main_board",
+                                return_value=True) as open_main,
+              mock.patch.object(great_expedition, "_enable_skip_and_roll_free",
+                                return_value=report) as roll_free,
+              mock.patch.object(great_expedition, "_run_case_one",
+                                side_effect=[None, (report, True)]) as case_one,
+              mock.patch.object(great_expedition, "_run_case_two",
+                                return_value=(report, "case_one")) as case_two,
+              mock.patch.object(great_expedition, "_roll_controls",
+                                return_value=((1, 1), (2, 1), True, True)),
+              mock.patch.object(great_expedition, "_find_map_chest",
+                                return_value=None)):
+            actual, done = great_expedition.claim_opened(bot)
+
+        self.assertTrue(done)
+        self.assertEqual(common.ClaimReport(0, 1), actual)
+        trial_chest.assert_not_called()
+        open_main.assert_called_once_with(bot)
+        roll_free.assert_called_once_with(bot)
+        self.assertEqual(2, case_one.call_count)
+        case_two.assert_called_once_with(bot)
+
+    def test_great_expedition_case_one_chest_terminal_skips_case_two(self):
+        bot = mock.Mock()
+        report = common.ClaimReport(1, 1)
+        with (mock.patch.object(great_expedition, "_main_open",
+                                return_value=True),
+              mock.patch.object(great_expedition, "_open_main_board",
+                                return_value=True),
+              mock.patch.object(great_expedition, "_enable_skip_and_roll_free",
+                                return_value=common.ClaimReport()),
+              mock.patch.object(great_expedition, "_run_case_one",
+                                return_value=(report, True)) as case_one,
+              mock.patch.object(great_expedition, "_run_case_two") as case_two):
+            actual, done = great_expedition.claim_opened(bot)
+
+        self.assertTrue(done)
+        self.assertEqual(report, actual)
+        case_one.assert_called_once_with(bot, force_trial=False)
+        case_two.assert_not_called()
+
+    def test_great_expedition_persistent_map_chest_after_clean_quests_is_cleared(self):
+        bot = mock.Mock()
+        report = common.ClaimReport(1, 1)
+        with (mock.patch.object(great_expedition, "_wait_for",
+                                return_value=(140, 100)),
+              mock.patch.object(great_expedition, "_scan_panel",
+                                return_value=(report, True)),
+              mock.patch.object(great_expedition, "_main_open",
+                                return_value=True),
+              mock.patch.object(great_expedition, "_find_map_chest",
+                                return_value=(56, 225))):
+            actual, done = great_expedition._claim_chest_quests(bot)
+
+        self.assertTrue(done)
+        self.assertEqual(report, actual)
 
     def test_moment_of_glory_no_claim_full_pass_is_done(self):
         bot = mock.Mock()

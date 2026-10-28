@@ -205,7 +205,7 @@ def record_outcome(ctx, settings: dict, outcome: TaskResult):
 
 
 # ---- Dict luật của việc ({run, enabled, done}) cho bảng priority.py -----------------------------------------------------------------------------------
-def event_job(event: str, run_task) -> dict:
+def event_job(event: str, run_task, *, completion_label: str = "Event") -> dict:
     """Nhiệm vụ Event: `run_task(ctx, cấu hình riêng, EventState)` là hàm làm việc của nhiệm vụ (khai trong EVENTS)."""
     key = _KEY_OF[run_task]
 
@@ -217,7 +217,11 @@ def event_job(event: str, run_task) -> dict:
         for outcome in result.outcomes:
             record_outcome(ctx, settings, outcome)
         if result.done:
-            ctx.record(f"Event: xong {key}")
+            # Some callers reuse the Event navigator for a task belonging to
+            # another worker group (Gift Claims).  Its completion must remain
+            # visibly scoped to that group, rather than suggesting the whole
+            # Event activity has ended.
+            ctx.record(f"{completion_label}: xong {key}")
 
     return {"run": run, "enabled": lambda settings: group_active(settings, event) and task_enabled(settings, key),
             "done": lambda ctx, settings: skip_reason(ctx, settings, key) is not None}
