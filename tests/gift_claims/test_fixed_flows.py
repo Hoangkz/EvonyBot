@@ -2847,6 +2847,7 @@ class FixedGiftFlowTests(unittest.TestCase):
         for name in (
                 "list_row.png", "title.png", "checkbox_skip_animation.png",
                 "button_roll_once.png", "button_roll_x5.png",
+                "status_x5_auto_rolling.png",
                 "button_challenge_quest.png", "button_challenge_quest_close.png",
                 "title_how_to_earn_scores.png",
                 "button_quest_claim.png", "status_quest_claimed.png",
@@ -2934,6 +2935,16 @@ class FixedGiftFlowTests(unittest.TestCase):
         self.assertIsNotNone(great_expedition._find_map_chest(
             CvBot(), screen, left_only=True))
 
+    def test_great_expedition_waits_for_auto_rolling_only_at_x5(self):
+        folder = (IMAGES / "GiftClaims" / "EventCenter" /
+                  "GreatExpedition")
+        auto = cv2.imread(str(folder / "status_x5_auto_rolling.png"))
+        screen = np.zeros((704, 396, 3), dtype=np.uint8)
+        screen[644:644 + auto.shape[0],
+               34:34 + auto.shape[1]] = auto
+        self.assertTrue(great_expedition._x5_auto_rolling(
+            CvBot(), screen, (104, 657)))
+
     def test_great_expedition_opens_map_chest_only_with_its_red_dot(self):
         folder = (IMAGES / "GiftClaims" / "EventCenter" /
                   "GreatExpedition")
@@ -2990,6 +3001,45 @@ class FixedGiftFlowTests(unittest.TestCase):
         self.assertIsNotNone(great_expedition.find(
             CvBot(), great_expedition.CHALLENGE_QUEST_CLOSE, screen,
             threshold=0.82, region=(85, 10, 100, 25)))
+
+    def test_great_expedition_retries_a_still_green_claim_three_times(self):
+        bot = mock.Mock()
+        claim = (324, 292)
+        with (mock.patch.object(great_expedition, "_green_claim_near",
+                                side_effect=[claim, claim, claim]),
+              mock.patch.object(great_expedition, "_claimed_near",
+                                return_value=False),
+              mock.patch.object(great_expedition,
+                                "_close_trial_upgrade_congratulations",
+                                return_value=False),
+              mock.patch.object(great_expedition, "close_congratulations",
+                                return_value=False),
+              mock.patch.object(great_expedition, "_wait_claimed_near",
+                                return_value=False)):
+            taps, resolved = great_expedition._claim_green_until_resolved(
+                bot, label="Challenge Quest", claim=claim,
+                claim_template=great_expedition.QUEST_CLAIM,
+                claimed_template=great_expedition.QUEST_CLAIMED,
+                claim_region=great_expedition.QUEST_CLAIM_REGION)
+
+        self.assertEqual(3, taps)
+        self.assertFalse(resolved)
+        self.assertEqual(3, bot.tap.call_count)
+
+    def test_great_expedition_retries_trial_chest_until_it_disappears(self):
+        bot = mock.Mock()
+        chest = (52, 220)
+        with (mock.patch.object(great_expedition, "_open_trial",
+                                return_value=True),
+              mock.patch.object(great_expedition, "_wait_for",
+                                side_effect=[chest, chest, None]),
+              mock.patch.object(great_expedition, "close_congratulations",
+                                return_value=False)):
+            report, done = great_expedition._claim_trial_chest(bot)
+
+        self.assertTrue(done)
+        self.assertEqual(common.ClaimReport(2, 1), report)
+        self.assertEqual(2, bot.tap.call_count)
 
     def test_great_expedition_finishes_only_after_final_quest_pass(self):
         bot = mock.Mock()

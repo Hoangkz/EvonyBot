@@ -36,6 +36,7 @@ CONTENT_SAME_DISTANCE = 10
 EDGE_CONFIRMATIONS = 2
 MAX_PANEL_SWIPES = 15
 MAX_CLAIMS_PER_VIEW = 12
+MAX_TAPS_PER_GREEN_CLAIM = 3
 MAX_ROLLS_PER_WINDOW = 80
 # Median of all 15 supplied Expedition Trial frames.  It scores 0.803..0.973
 # on the real chest and at most 0.221 against every reward-grid false match.
@@ -45,6 +46,8 @@ MAIN_TITLE = "EventCenter/GreatExpedition/title"
 SKIP_ANIMATION = "EventCenter/GreatExpedition/checkbox_skip_animation"
 ROLL_ONCE = "EventCenter/GreatExpedition/button_roll_once"
 ROLL_X5 = "EventCenter/GreatExpedition/button_roll_x5"
+X5_AUTO_ROLLING = "EventCenter/GreatExpedition/status_x5_auto_rolling"
+X5_AUTO_ROLLING_SECONDS = 5.0
 MAP_CHEST = "EventCenter/GreatExpedition/button_map_chest"
 MAP_CHEST_RED_DOT = "EventCenter/GreatExpedition/status_map_chest_red_dot"
 MAP_CHEST_RED_DOT_THRESHOLD = 0.85
@@ -224,9 +227,18 @@ def _claimed_near(bot, screen, claim, template: str, region) -> bool:
                abs(point[1] - claim[1]) <= 30 for point in claimed)
 
 
+def _green_claim_near(bot, screen, claim, template: str, region):
+    """Re-find the same green Claim row after a tap, if it is still active."""
+    nearby = [point for point in _active_claims(bot, screen, template, region)
+              if abs(point[0] - claim[0]) <= 50
+              and abs(point[1] - claim[1]) <= 30]
+    return min(nearby, key=lambda point: (point[0] - claim[0]) ** 2 +
+               (point[1] - claim[1]) ** 2) if nearby else None
+
+
 def _close_trial_upgrade_congratulations(bot, screen) -> bool:
     """Verify and close Trial's level-up popup caused by a real Claim tap."""
-    if find(bot, TRIAL_UPGRADE_CONGRATULATIONS, screen, threshold=0.82,
+    if find(bot, TRIAL_UPGRADE_CONGRATULATIONS, screen, threshold=0.72,
             region=(0, 20, 100, 50)) is None:
         return False
     bot.record("Gift Claims: Great Expedition Claim -> nâng cấp Trial")
@@ -243,6 +255,39 @@ def _wait_claimed_near(bot, claim, template: str, region) -> bool:
         if attempt < 4:
             bot.sleep(SETTLE_SECONDS)
     return False
+
+
+def _claim_green_until_resolved(bot, *, label: str, claim, claim_template: str,
+                                claimed_template: str, claim_region) -> tuple[int, bool]:
+    """Tap one green Claim up to three times, requiring gray/popup proof."""
+    target = claim
+    for tap_number in range(1, MAX_TAPS_PER_GREEN_CLAIM + 1):
+        screen = bot.screenshot()
+        current = _green_claim_near(bot, screen, target, claim_template,
+                                    claim_region)
+        if current is None:
+            # Do not count a vanished control without a recognised Claimed
+            # state or reward popup: a rerender may otherwise hide a failed tap.
+            if _claimed_near(bot, screen, target, claimed_template, claim_region):
+                return tap_number - 1, True
+            return tap_number - 1, False
+        target = current
+        bot.record(f"Gift Claims: Great Expedition {label} tap Claim "
+                   f"{tap_number}/{MAX_TAPS_PER_GREEN_CLAIM} tại {target}")
+        bot.tap(*target, delay=SETTLE_SECONDS)
+        after = bot.screenshot()
+        if _claimed_near(bot, after, target, claimed_template, claim_region):
+            return tap_number, True
+        if _close_trial_upgrade_congratulations(bot, after):
+            return tap_number, True
+        if close_congratulations(bot, attempts=2, region=(0, 20, 100, 62)):
+            return tap_number, True
+        if _wait_claimed_near(bot, target, claimed_template, claim_region):
+            return tap_number, True
+        if tap_number < MAX_TAPS_PER_GREEN_CLAIM:
+            bot.record("Gift Claims: Great Expedition Claim vẫn xanh; "
+                       "tìm lại và bấm thêm")
+    return MAX_TAPS_PER_GREEN_CLAIM, False
 
 
 def _panel_to_top(bot, *, label: str, content_region) -> bool:
@@ -290,24 +335,15 @@ def _scan_panel(bot, *, label: str, title_open, content_region, claim_region,
             if claim is None:
                 break
             blocked.append(claim)
-            attempted += 1
-            bot.record(f"Gift Claims: Great Expedition {label} tap Claim tại {claim}")
-            bot.tap(*claim, delay=SETTLE_SECONDS)
-            after = bot.screenshot()
-            if _claimed_near(bot, after, claim, claimed_template, claim_region):
+            taps, resolved = _claim_green_until_resolved(
+                bot, label=label, claim=claim, claim_template=claim_template,
+                claimed_template=claimed_template, claim_region=claim_region)
+            attempted += taps
+            if resolved:
                 verified += 1
                 continue
-            if _close_trial_upgrade_congratulations(bot, after):
-                verified += 1
-                continue
-            if close_congratulations(bot, attempts=2):
-                verified += 1
-                continue
-            if _wait_claimed_near(bot, claim, claimed_template, claim_region):
-                verified += 1
-                continue
-            bot.record("Gift Claims: Great Expedition Claim vẫn còn sau khi bấm; "
-                       "giữ PENDING")
+            bot.record("Gift Claims: Great Expedition Claim vẫn xanh sau 3 lần "
+                       "bấm; giữ PENDING")
             return ClaimReport(attempted, verified), False
 
         if position > MAX_PANEL_SWIPES:
@@ -401,21 +437,25 @@ def _claim_trial_chest(bot) -> tuple[ClaimReport, bool]:
                    "rương vàng phía trên trái; DONE")
         return ClaimReport(0, 1), True
 
-    bot.record(f"Gift Claims: Great Expedition thấy rương Trial tại {chest}; tap")
-    bot.tap(*chest, delay=SETTLE_SECONDS)
-    # A received chest must disappear, or produce the standard Congratulations
-    # state; merely opening an item-information tooltip never counts.
-    if close_congratulations(bot, attempts=3):
-        bot.record("Gift Claims: Great Expedition rương Trial -> Congratulations")
-    remaining = _wait_for(bot, TRIAL_CHEST, attempts=4,
+    attempted = 0
+    while chest is not None:
+        bot.check()
+        attempted += 1
+        bot.record(f"Gift Claims: Great Expedition thấy rương Trial tại {chest}; "
+                   f"tap lần {attempted}")
+        bot.tap(*chest, delay=SETTLE_SECONDS)
+        # A received chest must disappear, or produce the standard
+        # Congratulations state; keep retrying this exact chest until it does.
+        if close_congratulations(bot, attempts=3):
+            bot.record("Gift Claims: Great Expedition rương Trial -> Congratulations")
+        chest = _wait_for(bot, TRIAL_CHEST, attempts=4,
                           threshold=TRIAL_CHEST_THRESHOLD,
                           region=TRIAL_CHEST_REGION)
-    if remaining is not None:
-        bot.record("Gift Claims: Great Expedition rương Trial vẫn còn sau khi "
-                   "bấm; giữ PENDING")
-        return ClaimReport(1, 0), False
+        if chest is not None:
+            bot.record("Gift Claims: Great Expedition rương Trial vẫn còn; "
+                       "bấm lại, không chuyển PENDING")
     bot.record("Gift Claims: Great Expedition rương Trial đã biến mất")
-    return ClaimReport(1, 1), True
+    return ClaimReport(attempted, 1), True
 
 
 def _run_case_one(bot, *, force_trial: bool = False) -> tuple[ClaimReport, bool] | None:
@@ -491,6 +531,23 @@ def _roll_controls(bot, screen):
             _roll_cost_red(screen, x1, offset_x=2))
 
 
+def _x5_auto_rolling(bot, screen, x5=None) -> bool:
+    """Read the supplied Auto-Rolling label only in the left dice control."""
+    height, width = screen.shape[:2]
+    if x5 is None:
+        region = (0, 88, 54, 100)
+    else:
+        scale = width / REFERENCE_WIDTH
+        left = max(0, x5[0] - round(110 * scale))
+        right = min(width, x5[0] + round(115 * scale))
+        top = max(0, x5[1] - round(25 * scale))
+        bottom = min(height, x5[1] + round(25 * scale))
+        region = (left * 100 / width, top * 100 / height,
+                  right * 100 / width, bottom * 100 / height)
+    return find(bot, X5_AUTO_ROLLING, screen, threshold=0.82,
+                region=region) is not None
+
+
 def _skip_animation_enabled(screen, label: tuple[int, int]) -> bool:
     """Read the green tick immediately right of the detected Skip label."""
     scale = screen.shape[1] / REFERENCE_WIDTH
@@ -553,11 +610,17 @@ def _run_case_two(bot) -> tuple[ClaimReport, str]:
     """Spend x5 then x1; a persistent map chest is only one Quests launcher."""
     attempted = verified = 0
     map_chest_handled = False
-    for roll in range(1, MAX_ROLLS_PER_WINDOW + 1):
+    roll = 0
+    while roll < MAX_ROLLS_PER_WINDOW:
         bot.check()
         screen = bot.screenshot()
         controls = _roll_controls(bot, screen)
         if controls is None:
+            if _x5_auto_rolling(bot, screen):
+                bot.record("Gift Claims: Great Expedition x5 đang Auto-Rolling; "
+                           "đợi 5s rồi quét lại")
+                bot.sleep(X5_AUTO_ROLLING_SECONDS)
+                continue
             bot.record("Gift Claims: Great Expedition không tìm thấy Roll x5; "
                        "giữ PENDING")
             return ClaimReport(attempted, verified), "pending"
@@ -580,9 +643,19 @@ def _run_case_two(bot) -> tuple[ClaimReport, str]:
                        "sang Challenge Quest ở Expedition Trial")
             return ClaimReport(attempted, verified), "case_one"
 
-        target, label = (x5, "Roll x5") if not x5_red else (x1, "Roll Once")
-        bot.record(f"Gift Claims: Great Expedition {label} (lần {roll}); chờ 2s")
-        bot.tap(*target, delay=ROLL_SETTLE_SECONDS)
+        if not x5_red:
+            if _x5_auto_rolling(bot, screen, x5):
+                bot.record("Gift Claims: Great Expedition x5 đang Auto-Rolling; "
+                           "đợi 5s rồi quét lại")
+                bot.sleep(X5_AUTO_ROLLING_SECONDS)
+                continue
+            target, label, delay = x5, "Roll x5", X5_AUTO_ROLLING_SECONDS
+        else:
+            target, label, delay = x1, "Roll Once", ROLL_SETTLE_SECONDS
+        roll += 1
+        bot.record(f"Gift Claims: Great Expedition {label} (lần {roll}); "
+                   f"chờ {delay:g}s")
+        bot.tap(*target, delay=delay)
         attempted += 1
         # A new roll may reveal a fresh map chest; permit its Quests panel once
         # more even if the old permanent launcher is still visible.
