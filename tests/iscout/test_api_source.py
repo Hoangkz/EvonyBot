@@ -124,6 +124,42 @@ class ApiSourceTests(unittest.TestCase):
                 ApiSource(email, password).poll(bot)
             self.assertEqual(bot.alerts, [IScoutNoCredentials.message])
 
+    def feed_ready(self, *states):
+        states = iter(states)
+
+        def ready(server, email="", password=""):
+            state = next(states)
+            if isinstance(state, Exception):
+                raise state
+            return state
+        patch = mock.patch.object(sources.iscout, "get_hub", lambda: SimpleNamespace(ready=ready))
+        patch.start()
+        self.addCleanup(patch.stop)
+
+    def test_prepare_waits_until_the_browser_is_ready(self):
+        self.feed_ready(False, False, True)
+        bot = make_bot()
+        bot.sleeps = []
+        bot.sleep = bot.sleeps.append
+        ApiSource("a@b.c", "pw").prepare(bot)
+        self.assertEqual(bot.sleeps, [sources.ISCOUT_CHECK_POLL] * 2)
+        self.assertEqual(bot.alerts, [])
+
+    def test_prepare_alerts_and_stops_on_a_problem(self):
+        self.feed_ready(False, IScoutNotOpen())
+        bot = make_bot()
+        bot.sleep = lambda seconds: None
+        with self.assertRaises(StopRequested):
+            ApiSource("a@b.c", "pw").prepare(bot)
+        self.assertEqual(bot.alerts, [IScoutNotOpen.message])
+
+    def test_prepare_without_credentials_stops_before_opening_anything(self):
+        self.feed_ready(True)
+        bot = make_bot()
+        with self.assertRaises(StopRequested):
+            ApiSource("", "").prepare(bot)
+        self.assertEqual(bot.alerts, [IScoutNoCredentials.message])
+
     def test_api_source_attacks_every_boss_without_filter(self):
         self.assertTrue(wanted({"source": "api"}, BossOffer(556, 66, "Rùa Nham thạch", 1)))
 

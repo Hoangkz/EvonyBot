@@ -23,6 +23,7 @@ SOURCE_PLAYER = "player_chat"
 SOURCE_API = "api"
 ISCOUT_DONE_MINUTES = 10          # nguồn IsCout: boss đã đánh chỉ nhớ tối đa chừng này phút (theo id và theo toạ độ), sau đó còn sống thì đánh lại được
 ISCOUT_BATCH = 6                 # nguồn IsCout: mỗi lượt lấy bấy nhiêu boss gần thành nhất, đánh hết rồi mới kiểm tra trình duyệt lại
+ISCOUT_CHECK_POLL = 1            # nguồn IsCout: giây giữa hai lần kiểm tra trình duyệt iScout lúc bắt đầu (chờ mở trình duyệt / đăng nhập / nhận dữ liệu)
 SOURCES = (
     (SOURCE_ALLIANCE, "Alliance chat"),
     (SOURCE_PLAYER, "Whisper"),

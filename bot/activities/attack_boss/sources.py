@@ -16,7 +16,7 @@ from ...ocr import read_chat
 from .world import ensure_world
 from .constants import (AGE_LIMIT_MIN, CHAT_BAR, CHAT_OPEN_WAIT, CHAT_THRESHOLD, CHAT_TITLE, MAX_PAGES, SAME_PAGE_DIFF, SCROLL, SCROLL_TIME,
                         SCROLL_WAIT, TAB_ALLIANCE, TAB_WAIT, CONVERSATION_WAIT, TAB_WHISPER, WHISPER_BATCH, WHISPER_KEEP)
-from .constants import EMAIL_KEY, ISCOUT_BATCH, ISCOUT_DONE_MINUTES, PASSWORD_KEY, PLAYER_KEY, SOURCE_API, SOURCE_DEFAULT, SOURCE_KEY, SOURCE_PLAYER
+from .constants import EMAIL_KEY, ISCOUT_BATCH, ISCOUT_CHECK_POLL, ISCOUT_DONE_MINUTES, PASSWORD_KEY, PLAYER_KEY, SOURCE_API, SOURCE_DEFAULT, SOURCE_KEY, SOURCE_PLAYER
 
 
 @dataclass(frozen=True)
@@ -194,15 +194,28 @@ class ApiSource:
         self.done: dict[str, float] = {}                      # id đã đánh -> lúc đánh; không đánh lại dù dời chỗ, nhớ tối đa ISCOUT_DONE_MINUTES phút
         self.batch: dict[str, tuple[int, int] | None] = {}    # lượt hiện tại: id -> toạ độ đã trả (None = chưa trả); chưa đánh xong thì còn ở đây
 
-    def poll(self, bot) -> list[BossOffer]:
+    def prepare(self, bot) -> None:
+        """Việc ĐẦU TIÊN của Attack Boss (trước Crazy Eggs, Viking, ra bản đồ, đọc toạ độ thành): kiểm tra trình duyệt iScout. Chưa có thì mở, chưa đăng
+        nhập thì đăng nhập, rồi chờ tab cùng server với thiết bị nhận dữ liệu (kiểm tra mỗi ISCOUT_CHECK_POLL giây). Có vấn đề (hub báo lỗi, hết thời gian
+        chờ của hub): popup rồi dừng thiết bị (`StopRequested`), không làm gì ở game."""
+        bot.log("Attack Boss: kiểm tra trình duyệt iScout")
+        while not self._guard(bot, lambda: iscout.get_hub().ready(bot.server, self.email, self.password)):
+            bot.sleep(ISCOUT_CHECK_POLL)
+        bot.log("Attack Boss: iScout sẵn sàng")
+
+    def _guard(self, bot, call):
+        """`call()` của hub; lỗi iScout (hoặc chưa nhập email / mật khẩu) thì popup rồi dừng."""
         try:
             if not (self.email and self.password):
                 raise iscout.IScoutNoCredentials()
-            bosses = iscout.get_hub().bosses(bot.server, self.email, self.password)
+            return call()
         except iscout.IScoutError as error:
             bot.log(f"Attack Boss: {error.message.splitlines()[0]} Dừng.")
             bot.alert(error.message)
             raise StopRequested()
+
+    def poll(self, bot) -> list[BossOffer]:
+        bosses = self._guard(bot, lambda: iscout.get_hub().bosses(bot.server, self.email, self.password))
         by_id = {boss["id"]: boss for boss in bosses}
         now = self._clock()
         self.done = {uid: at for uid, at in self.done.items() if uid in by_id and now - at < ISCOUT_DONE_MINUTES * 60}      # boss đã chết hoặc quá hạn: quên

@@ -221,6 +221,19 @@ class IScoutHub:
 
     def bosses(self, server, email="", password=""):
         """Boss của tab cùng server với thiết bị ([] khi còn đang mở trình duyệt / đăng nhập / chờ dữ liệu). Raises IScoutError."""
+        tab = self._tab(server, email, password)
+        if tab is None:
+            return []
+        with self._lock:
+            return list(tab.bosses.values())
+
+    def ready(self, server, email="", password="") -> bool:
+        """Trình duyệt đã mở, đã đăng nhập và có tab iScout cùng server với thiết bị (đã nhận dữ liệu). False khi còn đang mở trình duyệt / đăng nhập / chờ
+        dữ liệu (gọi lại sau). Chưa có tab thì mở trình duyệt, y như `bosses`. Raises IScoutError."""
+        return self._tab(server, email, password) is not None
+
+    def _tab(self, server, email, password):
+        """Tab đã dùng được cho `server`, hoặc None khi còn đang chờ. Raises IScoutError."""
         self._login = (email, password)
         self._refresh()
         with self._lock:
@@ -231,16 +244,15 @@ class IScoutHub:
                 self._launcher(self._port)
                 self._launched = now
             if now - self._launched < BROWSER_START_SECONDS:
-                return []
+                return None
             self._launched = None
             raise IScoutNotOpen()
         self._launched = None
         with self._lock:
             tab = pick_tab(tabs, server, self._last.get(str(server)))
-            if tab is None:
-                return []
-            self._last[str(server)] = tab
-            return list(tab.bosses.values())
+            if tab is not None:
+                self._last[str(server)] = tab
+            return tab
 
     def _targets(self):
         try:

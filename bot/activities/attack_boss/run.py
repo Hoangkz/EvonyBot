@@ -35,6 +35,7 @@ def run(bot, settings: dict):
         minutes = ISCOUT_DONE_MINUTES if settings.get(SOURCE_KEY) == SOURCE_API else AGE_LIMIT_MIN       # IsCout: boss đã đánh chỉ nhớ tối đa 10 phút
         bot.attack_memory = BossMemory(ttl=minutes * 60)      # sống cùng BotContext: qua các lần Start trong một phiên giả lập
     source = make_source(settings)
+    getattr(source, "prepare", lambda _bot: None)(bot)      # IsCout: kiểm tra trình duyệt iScout trước mọi bước khác (Eggs, Viking, ra bản đồ...)
     hours = eggs_hours(settings)
     nearest_first = settings.get(SOURCE_KEY, SOURCE_DEFAULT) == SOURCE_ALLIANCE
     pending: dict[tuple[int, int], BossOffer] = {}    # boss đã nhận mà chưa đánh xong: toạ độ -> boss
