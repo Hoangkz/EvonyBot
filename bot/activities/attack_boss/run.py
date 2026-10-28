@@ -21,7 +21,7 @@ from ..join_monster_war.boss_memory import JOINED, BossMemory
 from ..join_monster_war.constants import (GENERAL_SEARCH, MARCH, NOT_ENOUGH_STAMINA, PRESET_ACTIVE_WAIT, PRESET_COUNT, PRESET_DX,
                                           PRESET_LOCKED, PRESET_LOCKED_THRESHOLD, PRESET_X0, PRESET_Y, REGIONS)
 from ..join_monster_war.run import _Boss, _preset_active, _troops
-from .constants import (NAME_GAP, NAME_MAX_H, NAME_MIN_H, NAME_MIN_W, NAME_TAP_ABOVE, AGE_LIMIT_MIN, ATTACK_FROM_WAR, ISCOUT_DONE_MINUTES, ATTACK_MENU_POLL, ATTACK_MENU_WAIT, BOSS_NEAR, BOSS_POLL, BOSS_WAIT, DROP, EGGS_KEY, FULL, FULL_RETRY_WAIT, FULL_TRIES, IDLE_WAIT, RETAP_AFTER, RETAP_MOVE, RING_MAX_DIST, LOW_ODDS, LOW_ODDS_CANCEL, LOW_ODDS_THRESHOLD, MAIN_GENERAL_REGION, MARCH_BUTTON,
+from .constants import (NAME_GAP, NAME_MAX_H, NAME_MAX_RB, NAME_MIN_H, NAME_MIN_W, NAME_TAP_ABOVE, AGE_LIMIT_MIN, ATTACK_FROM_WAR, ISCOUT_DONE_MINUTES, ATTACK_MENU_POLL, ATTACK_MENU_WAIT, BOSS_NEAR, BOSS_POLL, BOSS_WAIT, DROP, EGGS_KEY, FULL, FULL_RETRY_WAIT, FULL_TRIES, IDLE_WAIT, RETAP_AFTER, RETAP_MOVE, RING_MAX_DIST, LOW_ODDS, LOW_ODDS_CANCEL, LOW_ODDS_THRESHOLD, MAIN_GENERAL_REGION, MARCH_BUTTON,
                         MARCH_OPEN_WAIT, MARCH_SPEED_KEY, MARCH_THRESHOLD, MARCH_WAIT, MARCHED, NO_LANES_WAIT, ON_SPOT_KM, POLL, POPUP_WAIT,
                         RALLY_BUTTONS, RALLY_MINUTES, RALLY_TITLE, RALLY_WAIT, RETRY, RETURN_SPEED_KEY, SOURCE_ALLIANCE,
                         SOURCE_API, SOURCE_DEFAULT, SOURCE_KEY, SOURCE_PLAYER, STAMINA, STAMINA_WAIT_MINUTES, TYPE_ATTACK, TYPE_DEFAULT, TYPE_KEY, TYPE_WAR,
@@ -338,7 +338,8 @@ def _name_point(screen):
         return None
     x1, y1, x2, y2 = region
     area = masked[y1:y2, x1:x2].astype(np.int16)
-    text = (((area[..., 2] > 185) & (area[..., 1] > 150) & (area[..., 2] - area[..., 0] > 20)) * 255).astype(np.uint8)
+    red_over_blue = area[..., 2] - area[..., 0]
+    text = (((area[..., 2] > 185) & (area[..., 1] > 150) & (red_over_blue > 20) & (red_over_blue <= NAME_MAX_RB)) * 255).astype(np.uint8)      # chữ be kem, không lấy điểm cam sáng của vòng sáng
     merged = cv2.dilate(text, cv2.getStructuringElement(cv2.MORPH_RECT, (NAME_GAP, 1)))
     count, _, stats, _ = cv2.connectedComponentsWithStats(merged, 8)
     names = [(int(x1 + x + w // 2), int(y1 + y)) for x, y, w, h, _ in stats[1:count] if w >= NAME_MIN_W and NAME_MIN_H <= h <= NAME_MAX_H]

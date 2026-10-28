@@ -236,8 +236,74 @@ class NameLineTests(unittest.TestCase):
         from bot.activities.attack_boss.constants import NAME_TAP_ABOVE
         shot = cv2.imread(os.path.join(os.path.dirname(__file__), "screens", "lava_turtle_world.png"))
         x, y = run._name_point(shot)
-        self.assertLessEqual(abs(x - 195), 3)                       # giữa dòng tên (đo trên ảnh thật: x 156-234)
+        self.assertLessEqual(abs(x - 201), 3)                       # giữa chữ tên (đo trên ảnh thật: x 168-234; huy hiệu cấp vàng bên trái không tính)
         self.assertEqual(y, 361 - NAME_TAP_ABOVE)                   # mép trên dòng tên y = 361, bấm cao hơn NAME_TAP_ABOVE px
+
+    def test_name_stuck_to_the_ring_below_it_is_still_found(self):
+        """Ảnh thật (Peryton): chữ "(Boss) Peryton" ở y 361-368 nằm sát vòng sáng cam ngay dưới (y 372-384) và cạnh nhãn quái thường "Murderous Warrior" (y 427-433)."""
+        import os
+
+        import cv2
+        from bot.activities.attack_boss.constants import NAME_TAP_ABOVE
+        shot = cv2.imread(os.path.join(os.path.dirname(__file__), "screens", "peryton_world.png"))
+        x, y = run._name_point(shot)
+        self.assertLessEqual(abs(x - 204), 4)                       # giữa chữ (x 162-246), không phải nhãn "Murderous Warrior" (x 67-129)
+        self.assertEqual(y, 361 - NAME_TAP_ABOVE)                   # cao hơn mép trên tên 4 px
+
+    def test_griffin_with_other_labels_around_it(self):
+        """Ảnh thật (Griffin): quanh có nhãn quái thường "Murderous Warrior", nhãn thành phố, và một boss khác bị cắt ở mép trái (vòng cam ở x 16): chỉ chọn boss gần giữa."""
+        import os
+
+        import cv2
+        from bot.activities.attack_boss.constants import NAME_TAP_ABOVE
+        shot = cv2.imread(os.path.join(os.path.dirname(__file__), "screens", "griffin_world.png"))
+        x, y = run._name_point(shot)
+        self.assertLessEqual(abs(x - 204), 4)                       # giữa chữ "(Boss) Gnffin" (x 167-242)
+        self.assertEqual(y, 361 - NAME_TAP_ABOVE)
+
+    def test_real_screens(self):
+        """Ảnh thật: (tên ảnh, điểm bấm mong đợi). Điểm bấm = giữa chữ tên theo x, mép trên chữ tên - NAME_TAP_ABOVE theo y."""
+        import os
+
+        import cv2
+        here = os.path.join(os.path.dirname(__file__), "screens")
+        cases = [
+            ("centaur_world.png", (204, 357)),                          # (Boss) Centaur ở giữa
+            ("yasha_world.png", (204, 357)),                            # (Boss) Yasha ở giữa; con cá cam ở (262, 317) là vòng cam xa hơn nên bị bỏ qua
+            ("skeleton_dragon_lava_turtle_world.png", (261, 351)),      # hai boss gần nhau, bảng March đang mở: lấy boss có vòng sáng gần tâm nhất (Skeleton Dragon)
+        ]
+        for name, (x, y) in cases:
+            with self.subTest(name):
+                shot = cv2.imread(os.path.join(here, name))
+                self.assertIsNotNone(shot, name)
+                found = run._name_point(shot)
+                self.assertIsNotNone(found)
+                self.assertLessEqual(abs(found[0] - x), 4)
+                self.assertLessEqual(abs(found[1] - y), 2)
+
+    def test_viking_summoned_is_not_an_iscout_boss_so_no_ring_and_no_boss_is_found(self):
+        """Viking tự gọi ("Viking(Asking for help)") không phải boss / boss sự kiện của iScout (hub chỉ nhận boss_monster và event_monster) và có luồng riêng:
+        trên ảnh thật này bước tìm vòng sáng không ra gì, không có vùng cam, không có điểm bấm, và _wait_boss (nearest) chờ hết BOSS_WAIT giây rồi trả None (không thấy boss)."""
+        import os
+
+        import cv2
+        from bot.ocr.find_bosses import glow_points, glow_regions
+        shot = cv2.imread(os.path.join(os.path.dirname(__file__), "screens", "viking_asking_for_help_world.png"))
+        self.assertEqual(glow_points(shot), [])
+        self.assertEqual(glow_regions(shot), [])
+        self.assertIsNone(run._name_point(shot))
+        naps = []
+        bot = SimpleNamespace(sleep=naps.append, screenshot=lambda: shot)
+        self.assertIsNone(run._wait_boss(bot, nearest=True))
+        self.assertEqual(naps, [BOSS_POLL] * round(BOSS_WAIT / BOSS_POLL))
+
+    def test_orange_ring_pixels_are_not_text(self):
+        import os
+
+        import cv2
+        shot = cv2.imread(os.path.join(os.path.dirname(__file__), "screens", "peryton_world.png"))
+        _, y = run._name_point(shot)
+        self.assertLess(y, 372)                                     # không bấm xuống vùng vòng sáng / dưới tên
 
     def test_far_glow_is_ignored(self):
         import os
