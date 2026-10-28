@@ -309,23 +309,27 @@ def _ring_point(screen):
 
 
 def _name_point(screen):
-    """IsCout: với từng vùng cam (vòng sáng) tìm dòng tên boss nằm trong vùng đó (chữ be kem, nối huy hiệu cấp và các từ của tên bằng NAME_GAP; không cần đọc ra tên),
-    lấy dòng gần giữa màn hình nhất trong RING_MAX_DIST px. Điểm bấm = (giữa dòng tên theo x, mép trên dòng tên - NAME_TAP_ABOVE), tức cao hơn tên một chút. None nếu không có."""
+    """IsCout: chọn MỘT vùng cam (vòng sáng) gần giữa màn hình nhất (điểm vòng sáng cách tâm không quá RING_MAX_DIST px, xa hơn là boss khác), rồi chỉ trong vùng đó tìm
+    dòng tên boss (chữ be kem, nối huy hiệu cấp và các từ của tên bằng NAME_GAP; không cần đọc ra tên); nhiều dòng thì lấy dòng gần vòng sáng nhất. Điểm bấm = (giữa dòng tên
+    theo x, mép trên dòng tên - NAME_TAP_ABOVE), tức cao hơn tên một chút. None nếu không có vùng cam gần tâm hoặc không thấy dòng tên."""
     masked = world_mask.mask_ui(screen)
-    best, best_dist = None, RING_MAX_DIST + 1
-    for x1, y1, x2, y2 in glow_regions(screen, masked):
-        area = masked[y1:y2, x1:x2].astype(np.int16)
-        text = (((area[..., 2] > 185) & (area[..., 1] > 150) & (area[..., 2] - area[..., 0] > 20)) * 255).astype(np.uint8)
-        merged = cv2.dilate(text, cv2.getStructuringElement(cv2.MORPH_RECT, (NAME_GAP, 1)))
-        count, _, stats, _ = cv2.connectedComponentsWithStats(merged, 8)
-        for x, y, w, h, _ in stats[1:count]:
-            if w < NAME_MIN_W or not NAME_MIN_H <= h <= NAME_MAX_H:
-                continue
-            at = (int(x1 + x + w // 2), int(y1 + y))
-            dist = math.dist(at, boss_scan.CAMERA_PX)
-            if dist < best_dist:
-                best, best_dist = at, dist
-    return None if best is None else (best[0], best[1] - NAME_TAP_ABOVE)
+    points = [point for point in glow_points(screen, masked) if math.dist(point, boss_scan.CAMERA_PX) <= RING_MAX_DIST]
+    if not points:
+        return None
+    glow = min(points, key=lambda point: math.dist(point, boss_scan.CAMERA_PX))      # vòng sáng gần tâm nhất
+    region = next((box for box in glow_regions(screen, masked) if box[0] <= glow[0] <= box[2] and box[1] <= glow[1] <= box[3]), None)
+    if region is None:
+        return None
+    x1, y1, x2, y2 = region
+    area = masked[y1:y2, x1:x2].astype(np.int16)
+    text = (((area[..., 2] > 185) & (area[..., 1] > 150) & (area[..., 2] - area[..., 0] > 20)) * 255).astype(np.uint8)
+    merged = cv2.dilate(text, cv2.getStructuringElement(cv2.MORPH_RECT, (NAME_GAP, 1)))
+    count, _, stats, _ = cv2.connectedComponentsWithStats(merged, 8)
+    names = [(int(x1 + x + w // 2), int(y1 + y)) for x, y, w, h, _ in stats[1:count] if w >= NAME_MIN_W and NAME_MIN_H <= h <= NAME_MAX_H]
+    if not names:
+        return None
+    x, top = min(names, key=lambda name: math.dist(name, glow))
+    return x, top - NAME_TAP_ABOVE
 
 
 def _wait_boss(bot, nearest: bool = False):
