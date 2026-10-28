@@ -235,6 +235,205 @@ class NameLineTests(unittest.TestCase):
         self.assertIsNone(run._name_point(np.zeros((704, 396, 3), np.uint8)))
 
 
+class StaminaTests(unittest.TestCase):
+    """Hết thể lực ở màn March: ô Use Stamina được chọn thì dùng vật phẩm y như Join Monster War rồi March lại một lần; không thì bỏ qua boss."""
+
+    def march_with_popup(self, use_stamina, refill_result="ok", popup_forever=False):
+        state = {"refilled": False, "refills": 0, "ensure_map": 0}
+
+        def find(template, screen=None, region=None, threshold=0.8, **kwargs):
+            if template == run.NOT_ENOUGH_STAMINA:
+                return (200, 400) if popup_forever or not state["refilled"] else None
+            return (200, 670) if template == run.MARCH_BUTTON else None
+
+        def refill(bot, helper, confirm):
+            state["refills"] += 1
+            state["refilled"] = True
+            return refill_result
+        records = []
+        bot = SimpleNamespace(sleep=lambda seconds: None, screenshot=lambda: "shot", log=lambda message: None, record=records.append,
+                              tap=lambda *args, **kwargs: None, find=find, back=lambda *args, **kwargs: None)
+        with (mock.patch.object(run, "_Boss", lambda b, s: SimpleNamespace(troops=[1], use_stamina=use_stamina)),
+              mock.patch.object(run, "_pick_troop", lambda *args: 1),
+              mock.patch.object(run.lanes, "no_lanes", lambda b, s: False),
+              mock.patch.object(run.stamina, "refill", refill),
+              mock.patch.object(boss_scan, "on_map", lambda b, shot=None: state["refilled"] and not popup_forever),
+              mock.patch.object(boss_scan, "ensure_map", lambda b: state.__setitem__("ensure_map", state["ensure_map"] + 1))):
+            result = run._march(bot, {}, None)
+        return result, state, records, bot
+
+    def test_stamina_item_is_used_then_march_runs_again(self):
+        result, state, _, bot = self.march_with_popup("ALL")
+        self.assertTrue(result)
+        self.assertFalse(getattr(bot, "attack_no_stamina", False))
+        self.assertEqual(state["refills"], 1)
+
+    def test_no_stamina_setting_skips_the_boss_without_using_items(self):
+        result, state, records, bot = self.march_with_popup("No")
+        self.assertFalse(result)
+        self.assertTrue(bot.attack_no_stamina)       # attack trả STAMINA: run bỏ các boss còn lại, tăng tốc, nghỉ
+        self.assertEqual(state["refills"], 0)
+        self.assertEqual(state["ensure_map"], 1)
+        self.assertTrue(any("không dùng vật phẩm" in message for message in records))
+
+    def test_refill_failure_only_skips_the_boss(self):
+        result, state, _, bot = self.march_with_popup("100", refill_result="failed")      # lỗi khác (màn không mở / không đóng): chưa phải hết thể lực
+        self.assertFalse(result)
+        self.assertEqual(state["refills"], 1)
+        self.assertEqual(state["ensure_map"], 1)
+        self.assertFalse(getattr(bot, "attack_no_stamina", False))
+
+    def test_no_stamina_items_left_flags_out_of_stamina(self):
+        result, state, _, bot = self.march_with_popup("ALL", refill_result="empty")
+        self.assertFalse(result)
+        self.assertTrue(bot.attack_no_stamina)
+
+    def test_items_are_used_only_once_per_march(self):
+        result, state, records, bot = self.march_with_popup("ALL", popup_forever=True)       # dùng rồi mà popup vẫn hiện: không lặp vô hạn
+        self.assertFalse(result)
+        self.assertTrue(bot.attack_no_stamina)
+        self.assertEqual(state["refills"], 1)
+        self.assertTrue(any("đã dùng vật phẩm mà vẫn thiếu" in message for message in records))
+
+
+class RefillTests(unittest.TestCase):
+    """stamina.refill: Confirm -> vật phẩm đầu tiên -> số lượng -> Use -> Back, theo đúng thứ tự của Join Monster War."""
+
+    def run_refill(self, use_stamina, steps):
+        from bot.activities.attack_boss import stamina
+        taps, percents, added, records, backs = [], [], [], [], []
+        bot = SimpleNamespace(tap=lambda *args, **kwargs: taps.append(args), tap_percent=lambda *args, **kwargs: percents.append(args),
+                              record=records.append, back=lambda *args, **kwargs: backs.append(1), sleep=lambda seconds: None)
+        helper = SimpleNamespace(use_stamina=use_stamina, _poll_screen=lambda step, predicate, **kwargs: steps[step],
+                                 _add_stamina=lambda shot, target: added.append(target))
+        with mock.patch.object(stamina, "delay", lambda b, seconds: None):
+            result = stamina.refill(bot, helper, (200, 400))
+        return result, taps, percents, added, records, backs
+
+    OPEN = {"attack_stamina_items": ("shot", [(290, 360), (290, 480)]), "attack_stamina_amount": ("shot", (281, 502)), "attack_stamina_closed": ("shot", True)}
+
+    def test_all_taps_confirm_first_item_slider_end_and_use(self):
+        result, taps, percents, added, _, backs = self.run_refill("ALL", self.OPEN)
+        self.assertEqual(result, "ok")
+        self.assertEqual(taps, [(200, 400), (290, 360), (281, 502)])      # Confirm, nút Use của vật phẩm trên cùng, nút Use của popup số lượng
+        self.assertEqual(len(percents), 1)                                  # thanh trượt kéo tới cuối = dùng hết
+        self.assertEqual(added, [])
+        self.assertEqual(len(backs), 1)
+
+    def test_multiple_adds_stamina_with_plus_button(self):
+        result, _, percents, added, _, _ = self.run_refill("300", self.OPEN)
+        self.assertEqual(result, "ok")
+        self.assertEqual(added, [300])
+        self.assertEqual(percents, [])
+
+    def test_no_items_left_returns_false_and_records(self):
+        steps = dict(self.OPEN, attack_stamina_items=("shot", []))
+        result, taps, _, _, records, _ = self.run_refill("ALL", steps)
+        self.assertEqual(result, "empty")
+        self.assertEqual(taps, [(200, 400)])         # chỉ bấm Confirm, không có vật phẩm để Use
+        self.assertTrue(any("hết vật phẩm thể lực" in message for message in records))
+
+    def test_popup_that_never_closes_returns_false(self):
+        steps = dict(self.OPEN, attack_stamina_closed=("shot", False))
+        result, _, _, _, records, backs = self.run_refill("ALL", steps)
+        self.assertEqual(result, "failed")
+        self.assertGreaterEqual(len(backs), 2)
+        self.assertTrue(any("chưa đóng" in message for message in records))
+
+
+class OutOfStaminaTests(unittest.TestCase):
+    """Hết thể lực mà không dùng được: attack trả STAMINA, run bỏ các boss còn lại (KHÔNG tính là đã đánh), tăng tốc (nếu có chọn) rồi nghỉ 20 phút."""
+
+    def attack_result(self, flagged):
+        bot = fake_bot()
+
+        def march(b, settings, region):
+            b.attack_no_stamina = flagged
+            return False
+        with (mock.patch.object(run, "ensure_world", lambda b: True),
+              mock.patch.object(run, "_on_spot", lambda b, offer: True),
+              mock.patch.object(run, "_wait_boss", lambda b, nearest=False: (400, 300)),
+              mock.patch.object(run, "_tap_attack", lambda b, pos, relocate=None: True),
+              mock.patch.object(run, "_wait_popup", lambda b: (None, (100, 100))),
+              mock.patch.object(run, "read_popup", lambda screen: None),
+              mock.patch.object(run, "_march", march),
+              mock.patch.object(run.lanes, "consume_full", lambda b: False)):
+            result = run.attack(bot, {"source": "api", "attack_type": "attack"}, BossOffer(556, 66, "Rùa Nham thạch", 1, uid="a"))
+        return result, bot
+
+    def test_attack_returns_stamina_once_and_clears_the_flag(self):
+        result, bot = self.attack_result(True)
+        self.assertEqual(result, run.STAMINA)
+        self.assertFalse(bot.attack_no_stamina)
+
+    def test_attack_keeps_retry_when_stamina_is_fine(self):
+        self.assertEqual(self.attack_result(False)[0], RETRY)
+
+    def test_out_of_stamina_drops_the_list_speeds_up_and_rests_20_minutes(self):
+        calls = []
+        pending = {(1, 2): "a", (3, 4): "b"}
+        source = SimpleNamespace(drop_all=lambda offers: calls.append(("drop_all", sorted(offers))))
+        bot = SimpleNamespace(record=lambda message: calls.append("record"))
+        with (mock.patch.object(run, "speed_up_if_full", lambda b, settings, troops, force=False: calls.append(("speed", troops, force))),
+              mock.patch.object(run, "delay", lambda b, seconds: calls.append(("delay", seconds)))):
+            run.out_of_stamina(bot, {}, source, pending, 3)
+        self.assertEqual(pending, {})
+        self.assertEqual(calls, [("drop_all", ["a", "b"]), "record", ("speed", 3, True), ("delay", 20 * 60)])      # nguồn nhận danh sách boss bị bỏ để quên chúng      # tăng tốc ngay (không đọc số đường), rồi mới nghỉ
+
+    def test_dropped_bosses_are_not_marked_as_attacked(self):
+        from bot.activities.attack_boss.sources import ApiSource
+        source = ApiSource("a@b.c", "x")
+        source.batch = {"a": (1, 2), "b": None, "c": (5, 6)}
+        source.done = {"z": 1.0}
+        source.drop_all()
+        self.assertEqual(source.batch, {})
+        self.assertEqual(source.done, {"z": 1.0})            # bỏ khỏi danh sách chưa đánh KHÔNG có nghĩa là đã đánh: boss còn sống được nhận lại sau khi nghỉ
+
+    def test_whisper_forgets_dropped_bosses_so_they_are_found_again_after_the_rest(self):
+        from bot.activities.attack_boss.sources import PlayerChatSource
+        source = PlayerChatSource("Someone")
+        source.crops = {1: ("old", (1, 1)), 2: ("dropped", (2, 2)), 3: ("dropped too", (3, 3))}      # 1: đã đánh xong (giữ ảnh), 2 và 3: chưa đánh
+        source.inside = True
+        source.drop_all([BossOffer(ident=2), BossOffer(ident=3)])
+        self.assertEqual(list(source.crops), [1])             # tin của boss 2, 3 lại là tin "chưa cắt": lần poll sau khi nghỉ nhận lại; boss 1 vẫn không bị đánh trùng
+        self.assertFalse(source.inside)
+
+    def test_alliance_chat_source_needs_no_memory_to_find_bosses_again(self):
+        from bot.activities.attack_boss.sources import AllianceChatSource
+        self.assertFalse(hasattr(AllianceChatSource(), "drop_all"))        # đọc lại chat mỗi lần poll, không nhớ boss nào
+
+    def test_run_stops_attacking_the_rest_of_the_list_without_marking_them(self):
+        class Rest(Exception):
+            pass
+        attacked, rested, finished = [], [], []
+        offers = [BossOffer(1, 1, "a", 1, uid="a"), BossOffer(2, 2, "b", 1, uid="b"), BossOffer(3, 3, "c", 1, uid="c")]
+        source = SimpleNamespace(poll=lambda b: offers, drop_all=lambda dropped: None, finished=finished.append)
+
+        def attack(b, settings, offer, go=None, own=None, latest=None):
+            attacked.append(offer.uid)
+            return run.STAMINA if offer.uid == "b" else run.MARCHED
+
+        def out_of_stamina(b, settings, src, pending, troops):
+            rested.append(sorted(pending))
+            raise Rest()
+        bot = SimpleNamespace(attack_memory=None, screenshot=lambda: None, log=lambda message: None, record=lambda message: None, sleep=lambda seconds: None)
+        with (mock.patch.object(run, "make_source", lambda settings: source),
+              mock.patch.object(run, "eggs_due", lambda b, hours: False),
+              mock.patch.object(run.viking, "summon_due", lambda b, settings, screen: False),
+              mock.patch.object(run, "ensure_world", lambda b: True),
+              mock.patch.object(run, "home_coords", lambda b: None),
+              mock.patch.object(run, "attack", attack),
+              mock.patch.object(run, "speed_up_if_full", lambda *args, **kwargs: None),
+              mock.patch.object(run, "out_of_stamina", out_of_stamina)):
+            with self.assertRaises(Rest):
+                run.run(bot, {"source": "api"})
+        self.assertEqual(attacked, ["a", "b"])           # boss c chưa đánh: không đánh sau khi hết thể lực
+        self.assertEqual(rested, [[(2, 2), (3, 3)]])     # lúc nghỉ b và c còn trong danh sách chờ (out_of_stamina xoá)
+        self.assertEqual([offer.uid for offer in finished], ["a"])      # chỉ boss a (đã hành quân) là xong; b và c không bị tính là đã đánh
+        self.assertIsNone(bot.attack_memory.status((2, 2)))
+        self.assertIsNone(bot.attack_memory.status((3, 3)))
+
+
 class LowOddsTests(unittest.TestCase):
     """Hộp "tỷ lệ thắng cực thấp, vẫn gửi quân?" sau khi bấm March: Cancel và tính boss là đã đánh."""
 

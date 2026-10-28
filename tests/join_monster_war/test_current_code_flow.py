@@ -24,6 +24,7 @@ from bot.activities.join_monster_war.constants import (
 from bot.activities.join_monster_war.run import _Boss
 from bot.context import BotContext
 from tests.flow import Step, end, run_flow, swipe, tap, tap_at, tap_pct
+from tests.join_monster_war.test_flow import lit, lit_preset
 
 
 SCREENS = Path(__file__).parent / "screens" / "new_join_boss_flow"
@@ -147,10 +148,10 @@ class CurrentCodeJoinBossFlow(unittest.TestCase):
             Step("01_home_listboss.png", tap(LISTBOSS)),
             Step("06_valid_boss_before_join.png", tap(JOIN)),
             Step("07_march_before_action.png", tap_pct(PRESET_X0, PRESET_Y, tol=8)),
-            Step("07_march_before_action.png", tap(MARCH)),
+            Step(lit("07_march_before_action.png"), tap(MARCH)),      # bot chỉ xét tướng khi ô đội vừa bấm đã sáng: ảnh thật chưa bấm nên tạo ảnh ô 1 sáng
             Step("08_war_after_march_joined.png", end(IDLE)),
         ]
-        device = run_flow(self, join_monster_war.run, SCREENS, flow, SETTINGS)
+        device = run_flow(self, join_monster_war.run, SCREENS, flow, SETTINGS, variants={"lit1": lit_preset(1)})
         self.assertEqual(device.reported, [(767, 811)])
         self.assertIn("Chọn đội quân 1", device.logs)
         with device.fake_time():

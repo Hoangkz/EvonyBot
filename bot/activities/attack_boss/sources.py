@@ -40,7 +40,7 @@ class AllianceChatSource:
     SAU ĐÓ mới OCR các ảnh: chỉ lấy tin "shared Coordinates:", đọc toạ độ, tên, cấp và giờ gửi."""
 
     def poll(self, bot) -> list[BossOffer]:
-        return read_offers(capture(bot, TAB_ALLIANCE))
+        return read_offers(capture(bot, TAB_ALLIANCE))     # đọc lại chat mỗi lần (không nhớ gì): sau khi nghỉ vì hết thể lực tự nhận lại các boss còn trong 30 phút gần nhất
 
 
 def capture(bot, tab: tuple[int, int]) -> list:
@@ -142,6 +142,13 @@ class PlayerChatSource:
         self.inside = False
         self._leave(bot)
         return []
+
+    def drop_all(self, offers=None) -> None:
+        """`run` gọi khi hết thể lực: các boss `offers` còn chưa đánh bị bỏ khỏi danh sách chờ nhưng KHÔNG tính là đã đánh, nên quên ảnh cắt của chúng: sau khi nghỉ,
+        lần poll kế vào Whisper lại thấy các tin đó là tin chưa cắt và nhận lại. Boss đã đánh xong vẫn giữ ảnh (không đánh trùng)."""
+        for offer in offers or ():
+            self.crops.pop(offer.ident, None)
+        self.inside = False
 
     def goto(self, bot, offer: BossOffer) -> bool:
         """Tới boss bằng cách bấm vào toạ độ trong tin của nó ở Whisper (tìm tin bằng ảnh cắt). False nếu không có ảnh cắt / không tìm thấy tin."""
@@ -254,6 +261,10 @@ class ApiSource:
             if boss["id"] == offer.uid:
                 return BossOffer(boss["x"], boss["y"], boss["name"], boss["level"], uid=offer.uid)
         return None
+
+    def drop_all(self, offers=None) -> None:
+        """`run` gọi khi hết thể lực: bỏ các boss còn chưa đánh của lượt (không tính là đã đánh); sau khi nghỉ, lượt mới được lấy lại từ iScout."""
+        self.batch.clear()
 
     def finished(self, offer: BossOffer) -> None:
         """`run` gọi khi xong một boss của lượt: đã hành quân, hoặc bỏ vì không tìm thấy boss. Cả hai đều tính là đã đánh (không đánh lại)."""
