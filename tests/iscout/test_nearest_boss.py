@@ -143,6 +143,24 @@ class PickTroopTests(unittest.TestCase):
     def test_only_troop_1_chosen_with_general_picks_it(self):
         self.assertEqual(self.pick([1], with_general=(1,)), (1, [1]))
 
+    def test_checks_one_round_only_without_going_back_to_the_first_troop(self):
+        tapped = []
+        bot = SimpleNamespace(find_all=lambda *args, **kwargs: [], log=lambda message: None, find=lambda *args, **kwargs: None)
+        bot.tap_percent = lambda x, y: tapped.append(round((x - run.PRESET_X0) / run.PRESET_DX) + 1)
+        helper = SimpleNamespace(troops=[1, 2, 3], _poll_screen=lambda name, fn, **kwargs: (None, fn(None)))
+        with mock.patch.object(run, "_preset_active", lambda image, troop: True):
+            self.assertIsNone(run._pick_troop(bot, helper, None, None))
+        self.assertEqual(tapped, [1, 2, 3])          # đội 1 -> 2 -> 3 rồi dừng, không xoay vòng lần hai
+
+    def test_troop_whose_preset_never_lights_up_is_skipped_once(self):
+        tapped = []
+        bot = SimpleNamespace(find_all=lambda *args, **kwargs: [], log=lambda message: None, find=lambda *args, **kwargs: (1, 1))
+        bot.tap_percent = lambda x, y: tapped.append(round((x - run.PRESET_X0) / run.PRESET_DX) + 1)
+        helper = SimpleNamespace(troops=[1, 2], _poll_screen=lambda name, fn, **kwargs: (None, fn(None)))
+        with mock.patch.object(run, "_preset_active", lambda image, troop: troop == 2):
+            self.assertEqual(run._pick_troop(bot, helper, None, None), 2)
+        self.assertEqual(tapped, [1, 2])
+
     def test_tries_the_next_chosen_troop_but_not_the_others(self):
         picked, tapped = self.pick([1, 2], with_general=(2,))
         self.assertEqual(picked, 2)
@@ -402,6 +420,40 @@ class OutOfStaminaTests(unittest.TestCase):
         from bot.activities.attack_boss.sources import AllianceChatSource
         self.assertFalse(hasattr(AllianceChatSource(), "drop_all"))        # đọc lại chat mỗi lần poll, không nhớ boss nào
 
+    def test_retry_keeps_the_boss_unmarked_and_attacks_it_again(self):
+        """Không đội nào có tướng (attack trả RETRY): boss KHÔNG được tính là đã đánh (không finished, không attack_memory), ở lại danh sách chờ và bị đánh lại ở vòng sau."""
+        class Done(Exception):
+            pass
+        boss = BossOffer(1, 1, "a", 1, uid="a")
+        results, finished, polls, marked = iter([run.RETRY, run.MARCHED]), [], [], []
+
+        def poll(b):
+            polls.append(1)
+            if len(polls) >= 3:
+                raise Done()
+            return [boss] if len(polls) == 1 else []
+
+        attacked = []
+
+        def attack(b, settings, offer, go=None, own=None, latest=None):
+            attacked.append(offer.uid)
+            if len(attacked) == 1:
+                self.assertIsNone(b.attack_memory.status((1, 1)))       # sau lần RETRY đầu vẫn chưa tính là đã đánh
+            return next(results)
+        source = SimpleNamespace(poll=poll, drop_all=lambda dropped: None, finished=finished.append)
+        bot = SimpleNamespace(attack_memory=None, screenshot=lambda: None, log=lambda message: None, record=lambda message: None, sleep=lambda seconds: None)
+        with (mock.patch.object(run, "make_source", lambda settings: source),
+              mock.patch.object(run, "eggs_due", lambda b, hours: False),
+              mock.patch.object(run.viking, "summon_due", lambda b, settings, screen: False),
+              mock.patch.object(run, "ensure_world", lambda b: True),
+              mock.patch.object(run, "home_coords", lambda b: None),
+              mock.patch.object(run, "attack", attack),
+              mock.patch.object(run, "speed_up_if_full", lambda *args, **kwargs: None)):
+            with self.assertRaises(Done):
+                run.run(bot, {"source": "api"})
+        self.assertEqual(attacked, ["a", "a"])                          # cùng một boss được đánh lại
+        self.assertEqual([offer.uid for offer in finished], ["a"])      # chỉ xong (finished) sau lần hành quân thành công, không phải sau lần RETRY
+
     def test_run_stops_attacking_the_rest_of_the_list_without_marking_them(self):
         class Rest(Exception):
             pass
@@ -465,6 +517,18 @@ class LowOddsTests(unittest.TestCase):
             self.assertFalse(run._march(bot, {}, None))
         self.assertTrue(bot.attack_low_odds)
         self.assertIn((198 + run.LOW_ODDS_CANCEL[0], 337 + run.LOW_ODDS_CANCEL[1]), taps)
+
+    def test_no_troop_with_general_backs_out_to_a_clean_map(self):
+        backs, cleaned = [], []
+        bot = SimpleNamespace(sleep=lambda seconds: None, screenshot=lambda: "shot", log=lambda message: None, record=lambda message: None,
+                              tap=lambda *args, **kwargs: None, back=lambda *args, **kwargs: backs.append(1),
+                              find=lambda template, **kwargs: (200, 670) if template == run.MARCH_BUTTON else None)
+        with (mock.patch.object(run, "_Boss", lambda b, s: SimpleNamespace(troops=[1, 2, 3])),
+              mock.patch.object(run, "_pick_troop", lambda *args: None),
+              mock.patch.object(boss_scan, "ensure_map", cleaned.append)):
+            self.assertFalse(run._march(bot, {}, None))
+        self.assertEqual(len(backs), 1)          # Back một lần
+        self.assertEqual(len(cleaned), 1)        # rồi về bản đồ sạch
 
     def test_attack_drops_the_boss_when_march_hit_the_box(self):
         bot = fake_bot()

@@ -24,7 +24,7 @@ from ..join_monster_war.run import _Boss, _preset_active, _troops
 from .constants import (NAME_GAP, NAME_MAX_H, NAME_MIN_H, NAME_MIN_W, NAME_TAP_ABOVE, AGE_LIMIT_MIN, ATTACK_FROM_WAR, ISCOUT_DONE_MINUTES, ATTACK_MENU_POLL, ATTACK_MENU_WAIT, BOSS_NEAR, BOSS_POLL, BOSS_WAIT, DROP, EGGS_KEY, FULL, FULL_RETRY_WAIT, FULL_TRIES, IDLE_WAIT, RETAP_AFTER, RETAP_MOVE, RING_MAX_DIST, LOW_ODDS, LOW_ODDS_CANCEL, LOW_ODDS_THRESHOLD, MAIN_GENERAL_REGION, MARCH_BUTTON,
                         MARCH_OPEN_WAIT, MARCH_SPEED_KEY, MARCH_THRESHOLD, MARCH_WAIT, MARCHED, NO_LANES_WAIT, ON_SPOT_KM, POLL, POPUP_WAIT,
                         RALLY_BUTTONS, RALLY_MINUTES, RALLY_TITLE, RALLY_WAIT, RETRY, RETURN_SPEED_KEY, SOURCE_ALLIANCE,
-                        SOURCE_API, SOURCE_DEFAULT, SOURCE_KEY, SOURCE_PLAYER, STAMINA, STAMINA_WAIT_MINUTES, TROOP_TRIES, TYPE_ATTACK, TYPE_DEFAULT, TYPE_KEY, TYPE_WAR,
+                        SOURCE_API, SOURCE_DEFAULT, SOURCE_KEY, SOURCE_PLAYER, STAMINA, STAMINA_WAIT_MINUTES, TYPE_ATTACK, TYPE_DEFAULT, TYPE_KEY, TYPE_WAR,
                         VIKING_LABEL)
 from . import lanes, speedup, stamina, viking
 from .goto import goto_coords
@@ -409,19 +409,18 @@ def _wait_popup(bot):
 
 
 def _pick_troop(bot, helper, screen, region) -> int | None:
-    """Chọn đội (preset 1-8) CHỈ trong các đội đã tích (từ đội nhỏ nhất, bỏ đội bị khoá), không đụng tới đội khác; xoay vòng qua các đội đã tích tối đa TROOP_TRIES (10) lần thử;
-    đội đạt = ô preset sáng lên và ô Main General có tướng (thấy kính lúp). Trả số đội, None nếu không đội đã tích nào có tướng. Bố cục màn March của Attack khác rally: ô tướng chính nằm cao hơn."""
+    """Chọn đội (preset 1-8) CHỈ trong các đội đã tích (từ đội nhỏ nhất, bỏ đội bị khoá), không đụng tới đội khác; kiểm tra đúng MỘT vòng (VD 1 -> 2 -> 3), mỗi đội một lần,
+    không quay lại đội đầu; đội đạt = ô preset sáng lên và ô Main General có tướng (thấy kính lúp). Trả số đội, None nếu không đội đã tích nào có tướng. Bố cục màn March của Attack
+    khác rally: ô tướng chính nằm cao hơn."""
     locked = len(bot.find_all(PRESET_LOCKED, threshold=PRESET_LOCKED_THRESHOLD, screen=screen, region=REGIONS[PRESET_LOCKED]))
     unlocked = range(1, PRESET_COUNT - locked + 1)
-    chosen = [t for t in helper.troops if t in unlocked]
-    candidates = chosen          # chỉ các đội người dùng đã tích
-    for attempt in range(TROOP_TRIES if candidates else 0):      # xoay vòng qua các đội, tối đa TROOP_TRIES lần thử
-        troop = candidates[attempt % len(candidates)]
+    candidates = [t for t in helper.troops if t in unlocked]          # chỉ các đội người dùng đã tích
+    for troop in candidates:
         bot.tap_percent(PRESET_X0 + (troop - 1) * PRESET_DX, PRESET_Y)
         _, active = helper._poll_screen(f"attack_activate_troop_{troop}", lambda image: _preset_active(image, troop),
                                         timeout=PRESET_ACTIVE_WAIT, interval=1)
         if not active:
-            bot.log(f"Attack Boss: bấm đội {troop} mà ô không sáng, thử lại")
+            bot.log(f"Attack Boss: bấm đội {troop} mà ô không sáng, qua đội kế")
             continue
         _, general = helper._poll_screen(f"attack_troop_{troop}_general", lambda image: bot.find(GENERAL_SEARCH, screen=image, region=region))
         if general is not None:
@@ -432,8 +431,8 @@ def _pick_troop(bot, helper, screen, region) -> int | None:
 
 
 def _march(bot, settings: dict, region, refilled: bool = False) -> bool:
-    """Màn March: BẮT BUỘC chọn được đội quân có tướng chính (đội không có tướng thì thử đội khác; tích Select General thì chọn tướng cho đội;
-    vẫn không có thì Back, không hành quân). Tướng phụ không bắt buộc (không chọn). Xong bấm March; thành công khi về bản đồ sạch.
+    """Màn March: BẮT BUỘC chọn được đội quân có tướng chính (đội không có tướng thì thử đội đã tích kế tiếp, chỉ một vòng 1 -> 2 -> 3 ...;
+    không đội nào có tướng thì Back, không hành quân). Tướng phụ không bắt buộc (không chọn). Xong bấm March; thành công khi về bản đồ sạch.
     Hết thể lực (popup "Get more now?"): ô Use Stamina của tab được chọn thì dùng vật phẩm thể lực y như Join Monster War (stamina.refill) rồi làm lại màn March
     một lần (`refilled`: không dùng thể lực lần nữa). Không chọn, hết vật phẩm hoặc đã dùng rồi mà vẫn thiếu thì đặt cờ `bot.attack_no_stamina` (attack trả STAMINA);
     lỗi khác (màn dùng thể lực không mở / không đóng) chỉ bỏ qua boss này (RETRY)."""
@@ -453,6 +452,7 @@ def _march(bot, settings: dict, region, refilled: bool = False) -> bool:
     if _pick_troop(bot, helper, screen, region) is None:
         bot.record("Attack Boss: không có đội quân nào có tướng, không hành quân")
         bot.back()
+        boss_scan.ensure_map(bot)       # về bản đồ sạch rồi làm các bước kế tiếp (attack trả RETRY: boss giữ lại, run qua boss kế)
         return False
     pos = bot.find(MARCH_BUTTON, region=REGIONS[MARCH], threshold=MARCH_THRESHOLD)
     if pos is None:

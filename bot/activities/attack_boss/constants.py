@@ -64,7 +64,6 @@ MARCH_THRESHOLD = 0.8
 LOW_ODDS = "AttackBoss/lowOdds.png"   # hai dòng chữ đầu của hộp "winning odds are extremely low. Are you sure you still want to send the troops?" (Cancel / Confirm) hiện sau khi bấm March
 LOW_ODDS_THRESHOLD = 0.7              # đo trên 24 ảnh thật: có hộp 1,0; không có hộp tối đa 0,23
 LOW_ODDS_CANCEL = (-65, 77)           # nút Cancel so với tâm ảnh mẫu (hộp nằm cố định giữa màn hình)
-TROOP_TRIES = 10               # số lần thử chọn đội có tướng (xoay vòng qua các đội đã tích)
 # Alliance War (rally): bấm nút Alliance War ở cửa sổ boss -> hộp "Alliance War Rally!" chọn thời gian chờ -> màn March (bố cục như màn March của Join Monster War)
 RALLY_TITLE = "AttackBoss/rallyTitle.png"
 RALLY_MINUTES = 5                                   # thời gian chờ rally chọn mặc định
