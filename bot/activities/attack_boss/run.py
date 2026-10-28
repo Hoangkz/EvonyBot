@@ -21,7 +21,7 @@ from ..join_monster_war.boss_memory import JOINED, BossMemory
 from ..join_monster_war.constants import (GENERAL_SEARCH, MARCH, NOT_ENOUGH_STAMINA, PRESET_ACTIVE_WAIT, PRESET_COUNT, PRESET_DX,
                                           PRESET_LOCKED, PRESET_LOCKED_THRESHOLD, PRESET_X0, PRESET_Y, REGIONS)
 from ..join_monster_war.run import _Boss, _preset_active, _troops
-from .constants import (NAME_GAP, NAME_MAX_H, NAME_MIN_H, NAME_MIN_W, NAME_TAP_ABOVE, AGE_LIMIT_MIN, ATTACK_FROM_WAR, ISCOUT_DONE_MINUTES, ATTACK_MENU_POLL, ATTACK_MENU_WAIT, BOSS_NEAR, BOSS_POLL, BOSS_WAIT, DROP, EGGS_KEY, FULL, FULL_RETRY_WAIT, FULL_TRIES, IDLE_WAIT, RETAP_AFTER, RETAP_MOVE, RING_BELOW, RING_MAX_DIST, TAP_MAX_Y, LOW_ODDS, LOW_ODDS_CANCEL, LOW_ODDS_THRESHOLD, MAIN_GENERAL_REGION, MARCH_BUTTON,
+from .constants import (NAME_GAP, NAME_MAX_H, NAME_MIN_H, NAME_MIN_W, NAME_TAP_ABOVE, AGE_LIMIT_MIN, ATTACK_FROM_WAR, ISCOUT_DONE_MINUTES, ATTACK_MENU_POLL, ATTACK_MENU_WAIT, BOSS_NEAR, BOSS_POLL, BOSS_WAIT, DROP, EGGS_KEY, FULL, FULL_RETRY_WAIT, FULL_TRIES, IDLE_WAIT, RETAP_AFTER, RETAP_MOVE, RING_MAX_DIST, LOW_ODDS, LOW_ODDS_CANCEL, LOW_ODDS_THRESHOLD, MAIN_GENERAL_REGION, MARCH_BUTTON,
                         MARCH_OPEN_WAIT, MARCH_SPEED_KEY, MARCH_THRESHOLD, MARCH_WAIT, MARCHED, NO_LANES_WAIT, ON_SPOT_KM, POLL, POPUP_WAIT,
                         RALLY_BUTTONS, RALLY_MINUTES, RALLY_TITLE, RALLY_WAIT, RETRY, RETURN_SPEED_KEY, SOURCE_ALLIANCE,
                         SOURCE_API, SOURCE_DEFAULT, SOURCE_KEY, SOURCE_PLAYER, TROOP_TRIES, TYPE_ATTACK, TYPE_DEFAULT, TYPE_KEY, TYPE_WAR,
@@ -298,16 +298,6 @@ def _on_spot(bot, offer: BossOffer) -> bool:
     return camera is not None and abs(camera[0] - offer.x) <= ON_SPOT_KM and abs(camera[1] - offer.y) <= ON_SPOT_KM
 
 
-def _ring_point(screen):
-    """IsCout: điểm bấm của vòng màu boss gần tâm màn hình nhất, chỉ xét vòng cách tâm không quá RING_MAX_DIST px (xa hơn là boss khác, không phải boss
-    đích). Điểm bấm = (trung bình x, đáy vòng sáng + RING_BELOW), không thấp hơn TAP_MAX_Y; None nếu không có vòng nào."""
-    points = [point for point in glow_points(screen) if math.dist(point, boss_scan.CAMERA_PX) <= RING_MAX_DIST]
-    if not points:
-        return None
-    x, bottom = min(points, key=lambda point: math.dist(point, boss_scan.CAMERA_PX))
-    return x, min(bottom + RING_BELOW, TAP_MAX_Y)
-
-
 def _name_point(screen):
     """IsCout: chọn MỘT vùng cam (vòng sáng) gần giữa màn hình nhất (điểm vòng sáng cách tâm không quá RING_MAX_DIST px, xa hơn là boss khác), rồi chỉ trong vùng đó tìm
     dòng tên boss (chữ be kem, nối huy hiệu cấp và các từ của tên bằng NAME_GAP; không cần đọc ra tên); nhiều dòng thì lấy dòng gần vòng sáng nhất. Điểm bấm = (giữa dòng tên
@@ -335,12 +325,13 @@ def _name_point(screen):
 def _wait_boss(bot, nearest: bool = False):
     """Chờ tới BOSS_WAIT giây cho boss hiện ra (bản đồ vừa nhảy tới, boss tải chậm hơn nền đất). Tìm mỗi BOSS_POLL (1) giây. Trả vị trí để bấm vào boss, None nếu không thấy.
     Mặc định boss phải nằm trong BOSS_NEAR quanh giữa màn hình và bấm giữa màn hình. `nearest` (IsCout: boss thật có thể lệch khỏi toạ độ nhận được):
-    lấy vòng màu boss gần giữa màn hình nhất trong RING_MAX_DIST px (`_ring_point`) và bấm vào điểm của vòng đó (x = trung bình x, y = đáy vòng sáng + RING_BELOW, tối đa TAP_MAX_Y: `_ring_point`)."""
+    lấy vùng cam (vòng sáng) gần giữa màn hình nhất trong RING_MAX_DIST px, tìm dòng tên boss trong vùng đó và bấm cao hơn tên một chút (`_name_point`). Không thấy tên trong vùng cam thì coi như
+    boss đã đánh: hết BOSS_WAIT giây trả None (attack trả DROP)."""
     for _ in range(round(BOSS_WAIT / BOSS_POLL)):
         bot.sleep(BOSS_POLL)
         screen = bot.screenshot()
         if nearest:
-            point = _name_point(screen) or _ring_point(screen)      # ưu tiên bấm trên dòng tên; không thấy tên mới dùng vòng sáng
+            point = _name_point(screen)
             if point is not None:
                 return point
             continue

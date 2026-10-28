@@ -42,8 +42,6 @@ TYPE_DEFAULT = TYPE_ATTACK
 IDLE_WAIT = 5            # giây nghỉ khi nguồn chưa có boss mới
 
 # Bước đánh (đo trên giả lập 396 x 704)
-RING_BELOW = 10                # px: điểm bấm = đáy vòng sáng + chừng này (kỵ sĩ Bayard đứng DƯỚI vòng sáng: bấm đúng đáy / giữa vòng thì trượt, đo trên 21913)
-TAP_MAX_Y = 352               # px: điểm bấm không thấp hơn y này = giữa màn hình (boss đứng yên trúng ở y này cho cả 7 loại đã đo trên 21913; Quỷ Vương và Kamaitachi trượt ở y 378-380)
 RING_MAX_DIST = 100            # px: IsCout chỉ nhận vòng màu cách tâm màn hình không quá chừng này; xa hơn là boss khác (đo trên 21913: boss đích lệch < 50 px, boss khác 160-190 px)
 NAME_GAP = 15                  # px: IsCout tìm dòng tên boss trong vùng cam: chữ cách nhau dưới chừng này cột gộp thành một dòng (huy hiệu cấp + từng từ của tên)
 NAME_MIN_W = 40                # px: dòng tên rộng ít nhất chừng này (tia lửa và mảnh viền vòng sáng hẹp hơn hoặc thấp hơn)

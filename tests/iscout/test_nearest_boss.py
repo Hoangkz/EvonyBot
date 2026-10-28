@@ -5,7 +5,7 @@ from types import SimpleNamespace
 from unittest import mock
 
 from bot.activities.attack_boss.constants import (ATTACK_MENU_POLL, ATTACK_MENU_WAIT, BOSS_NEAR, BOSS_POLL, BOSS_WAIT, DROP, RETAP_AFTER, RETRY,
-                                                  RING_BELOW, RING_MAX_DIST, TAP_MAX_Y)
+                                                  RING_MAX_DIST)
 from bot.activities.attack_boss.sources import BossOffer
 from bot.common import boss_scan
 
@@ -22,20 +22,15 @@ def boss_at(dx, dy):
 
 
 class WaitBossTests(unittest.TestCase):
-    def test_nearest_ring_within_reach_is_tapped_and_far_rings_are_ignored(self):
+    def test_no_name_in_the_glow_means_boss_not_found_even_if_a_ring_is_seen(self):
         near = (CENTER[0] + 40, CENTER[1] - 30)
-        far = (CENTER[0] + RING_MAX_DIST + 60, CENTER[1])         # boss khác ở xa (đo thật 160-190 px)
-        with mock.patch.object(run, "_name_point", lambda screen: None), \
-                mock.patch.object(run, "glow_points", lambda screen: [far, near]), \
-                mock.patch.object(run, "find_bosses", lambda screen: [boss_at(BOSS_NEAR + 150, 0)]):
-            self.assertEqual(run._wait_boss(fake_bot(), nearest=True), (near[0], near[1] + RING_BELOW))      # điểm đo là đáy vòng sáng: bấm thấp hơn RING_BELOW
+        with mock.patch.object(run, "_name_point", lambda screen: None),                 mock.patch.object(run, "glow_points", lambda screen: [near]),                 mock.patch.object(run, "find_bosses", lambda screen: [boss_at(BOSS_NEAR + 150, 0)]):
+            self.assertIsNone(run._wait_boss(fake_bot(), nearest=True))      # không dự phòng bằng vòng sáng: không thấy tên = coi như đã đánh
             self.assertIsNone(run._wait_boss(fake_bot()))        # nguồn khác: boss phải gần giữa màn hình
-        with mock.patch.object(run, "_name_point", lambda screen: None), mock.patch.object(run, "glow_points", lambda screen: [far]):
-            self.assertIsNone(run._wait_boss(fake_bot(), nearest=True))      # chỉ có boss khác: coi như không thấy boss đích
 
-    def test_name_line_is_tapped_before_the_ring(self):
+    def test_name_line_is_tapped(self):
         with mock.patch.object(run, "_name_point", lambda screen: (195, 357)), mock.patch.object(run, "glow_points", lambda screen: [(192, 376)]):
-            self.assertEqual(run._wait_boss(fake_bot(), nearest=True), (195, 357))      # có dòng tên: bấm trên tên, không bấm theo vòng sáng
+            self.assertEqual(run._wait_boss(fake_bot(), nearest=True), (195, 357))      # có dòng tên: bấm trên tên
 
     def test_default_taps_the_center_when_boss_is_near(self):
         with mock.patch.object(run, "find_bosses", lambda screen: [boss_at(10, 10)]):
@@ -211,8 +206,6 @@ class GlowCenterTests(unittest.TestCase):
         x, y = points[0]
         self.assertLessEqual(abs(x - 192), 3)       # trung bình x các điểm cam sáng (đo trên ảnh thật 21923)
         self.assertLessEqual(abs(y - 376), 3)       # đáy vòng sáng (y lớn nhất)
-        self.assertEqual(TAP_MAX_Y, 352)
-        self.assertEqual(run._ring_point(shot), (x, min(y + RING_BELOW, TAP_MAX_Y)))      # điểm bấm thật: đáy + 10, tối đa TAP_MAX_Y (352)
 
 
 class NameLineTests(unittest.TestCase):
@@ -227,6 +220,15 @@ class NameLineTests(unittest.TestCase):
         x, y = run._name_point(shot)
         self.assertLessEqual(abs(x - 195), 3)                       # giữa dòng tên (đo trên ảnh thật: x 156-234)
         self.assertEqual(y, 361 - NAME_TAP_ABOVE)                   # mép trên dòng tên y = 361, bấm cao hơn NAME_TAP_ABOVE px
+
+    def test_far_glow_is_ignored(self):
+        import os
+
+        import cv2
+        shot = cv2.imread(os.path.join(os.path.dirname(__file__), "screens", "lava_turtle_world.png"))
+        far = (CENTER[0] + RING_MAX_DIST + 60, CENTER[1])         # boss khác ở xa (đo thật 160-190 px)
+        with mock.patch.object(run, "glow_points", lambda screen, masked=None: [far]):
+            self.assertIsNone(run._name_point(shot))
 
     def test_no_name_when_there_is_no_glow(self):
         import numpy as np
