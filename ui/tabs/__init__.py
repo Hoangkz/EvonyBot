@@ -1,4 +1,5 @@
 from .alliance_capacity_tab import AllianceCapacityTab
+from .attack_boss_tab import AttackBossTab
 from .black_market_tab import BlackMarketTab
 from .craft_tab import CraftTab
 from .daily_activities_tab import DailyActivitiesTab
@@ -15,6 +16,7 @@ from .tab_placeholder import BaseTab, CheckGroup, LabeledCombo, PlaceholderTab, 
 
 __all__ = [
     "AllianceCapacityTab",
+    "AttackBossTab",
     "BlackMarketTab",
     "CraftTab",
     "DailyActivitiesTab",

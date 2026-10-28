@@ -15,10 +15,12 @@ STAMINA_OPTIONS = ["ALL", "100", "200", "300", "400", "500", "No"]
 
 
 class JoinMonsterWarTab(BaseTab):
-    def __init__(self, parent=None):
-        super().__init__(title="Join Monster War", show_apply_all=False, parent=parent)
+    def __init__(self, parent=None, title="Join Monster War"):
+        super().__init__(title=title, show_apply_all=False, parent=parent)
         self.controls = {}
         self.boss_choices = []
+        self.boss_cards = []     # (category_key, tên boss, khung của boss): để tab con ẩn bớt boss
+        self.boss_groups = []    # (category_key, khung của cả nhóm boss)
         self._boss_grids = []
         self._columns = None
         self._boss_style = "QCheckBox { spacing: 3px; padding: 0px; }"
@@ -153,6 +155,7 @@ class JoinMonsterWarTab(BaseTab):
                         )
                     level_grid.addWidget(select_all, 0, 0)
                 cards.append(card)
+                self.boss_cards.append((category["category_key"], boss["name"], card))
                 grid.addWidget(card, len(cards) - 1, 0, Qt.AlignTop)
                 self.boss_choices.append((category["category_key"], boss["name"], enabled, level_boxes))
             if standard:
@@ -170,6 +173,7 @@ class JoinMonsterWarTab(BaseTab):
                 cards.insert(0, select_all)
                 grid.addWidget(select_all, len(cards) - 1, 0, Qt.AlignTop)
             self._boss_grids.append((grid, cards, standard))
+            self.boss_groups.append((category["category_key"], group))
             self.add_row(group)
         # "active" in boss.py (on a plain boss, or on each level) = ticked by
         # default. Set after the "All" boxes are wired so they follow.

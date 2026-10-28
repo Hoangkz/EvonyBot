@@ -9,6 +9,7 @@ its Select Activity button) to that function. Worker chạy theo từng nhiệm 
 Activities và Event không có hàm run của cả activity).
 """
 from . import alliance_capacity
+from . import attack_boss
 from . import black_market
 from . import craft
 from . import find_boss
@@ -29,4 +30,5 @@ ACTIVITIES = {
     "Craft": craft.run,
     "Gather Resources": gather_resources.run,
     "Refine Equipment": refine_equipment.run,
+    "Attack Boss": attack_boss.run,
 }
