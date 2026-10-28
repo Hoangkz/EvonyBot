@@ -7,7 +7,8 @@ import numpy as np
 from . import (blessing_of_pallas, dragon_battle, dwarfs_lucky_apple,
                dwarfs_treasure,
                eagle_of_freedom,
-               giants_wisdom_temple, grace_of_star_trail, hypnos_dream,
+               giants_wisdom_temple, grace_of_star_trail, great_expedition,
+               hypnos_dream,
                legion_hunting,
                moment_of_glory,
                poseidons_day, precious_blazon_exchange, revelation_of_horus,
@@ -213,6 +214,7 @@ EVENT_POLICIES = (
     eagle_of_freedom.POLICY,
     legion_hunting.POLICY,
     moment_of_glory.POLICY,
+    great_expedition.POLICY,
     giants_wisdom_temple.POLICY,
     wishful_windmill_festival.POLICY,
     revelation_of_horus.POLICY,
@@ -258,6 +260,9 @@ FORCED_LIMITED_ROWS = (
     ("EventCenter/MomentOfGlory/list_row", FORCED_EVENT_PREFIX + b"moment_of_glory",
      GiftScreen.MOMENT_OF_GLORY, "Moment of Glory",
      moment_of_glory.POLICY.key),
+    ("EventCenter/GreatExpedition/list_row", FORCED_EVENT_PREFIX + b"great_expedition",
+     GiftScreen.GREAT_EXPEDITION, "Great Expedition",
+     great_expedition.POLICY.key),
 )
 FORCED_ACTIVITY_ROWS = (
     ("EventCenter/DwarfsLuckyApple/list_row",
@@ -1961,6 +1966,7 @@ EXACT_HANDLERS = {
     GiftScreen.EAGLE_OF_FREEDOM: _handle_eagle_of_freedom,
     GiftScreen.LEGION_HUNTING: _handle_legion_hunting,
     GiftScreen.MOMENT_OF_GLORY: _handle_moment_of_glory,
+    GiftScreen.GREAT_EXPEDITION: great_expedition.claim_opened,
 }
 
 

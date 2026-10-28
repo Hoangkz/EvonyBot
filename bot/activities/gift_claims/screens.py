@@ -26,6 +26,7 @@ class GiftScreen(str, Enum):
     EAGLE_OF_FREEDOM = "EagleOfFreedom"
     LEGION_HUNTING = "LegionHunting"
     MOMENT_OF_GLORY = "MomentOfGlory"
+    GREAT_EXPEDITION = "GreatExpedition"
 
 
 TITLE_TEMPLATES = {
@@ -38,6 +39,7 @@ TITLE_TEMPLATES = {
     GiftScreen.EAGLE_OF_FREEDOM: "EventCenter/EagleOfFreedom/title",
     GiftScreen.LEGION_HUNTING: "EventCenter/LegionHunting/title",
     GiftScreen.MOMENT_OF_GLORY: "EventCenter/MomentOfGlory/title",
+    GiftScreen.GREAT_EXPEDITION: "EventCenter/GreatExpedition/title",
     GiftScreen.GRACE_OF_STAR_TRAIL: "EventCenter/GraceOfStarTrail/title",
     GiftScreen.BACCHUS_TAVERN: "EventCenter/BacchusTavern/title",
     GiftScreen.BACK_TO_TERRITORY: "EventCenter/BackToTerritory/title",

@@ -139,28 +139,30 @@ class ClaimColourTests(unittest.TestCase):
                        duration=run.SLOW_SWIPE_DURATION, delay=run.STEP_DELAY)],
             bot.swipe_percent.call_args_list)
 
-    @mock.patch.object(run, "_scan_full_list", return_value=(False, False, True))
-    @mock.patch.object(run, "_swipe_to_top")
-    def test_first_reward_sweep_checks_opened_view_without_swiping_up(
-            self, swipe_to_top, scan_full_list):
-        bot = mock.Mock()
-
-        self.assertTrue(run._claim_rewards(bot))
-
-        scan_full_list.assert_called_once_with(bot)
-        swipe_to_top.assert_not_called()
-
     @mock.patch.object(run, "_scan_full_list",
-                       side_effect=((True, False, True), (False, False, True)))
+                       side_effect=((False, False, True), (False, False, True)))
     @mock.patch.object(run, "_swipe_to_top", return_value=True)
-    def test_repeat_sweep_returns_to_top_only_after_a_claim_was_found(
+    def test_clean_claim_audit_checks_opened_view_then_returns_up_for_second_pass(
             self, swipe_to_top, scan_full_list):
         bot = mock.Mock()
 
         self.assertTrue(run._claim_rewards(bot))
 
         self.assertEqual(2, scan_full_list.call_count)
-        swipe_to_top.assert_called_once_with(bot)
+        self.assertEqual(2, swipe_to_top.call_count)
+
+    @mock.patch.object(run, "_scan_full_list",
+                       side_effect=((True, False, True), (False, False, True),
+                                    (False, False, True)))
+    @mock.patch.object(run, "_swipe_to_top", return_value=True)
+    def test_claim_resets_the_two_clean_up_down_audits(
+            self, swipe_to_top, scan_full_list):
+        bot = mock.Mock()
+
+        self.assertTrue(run._claim_rewards(bot))
+
+        self.assertEqual(3, scan_full_list.call_count)
+        self.assertEqual(3, swipe_to_top.call_count)
 
     @mock.patch.object(run, "_scroll_reward_frame", return_value=True)
     @mock.patch.object(run, "_claim_current_view",

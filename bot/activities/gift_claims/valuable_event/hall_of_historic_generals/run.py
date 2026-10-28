@@ -26,10 +26,12 @@ REWARD_REGION = (5, 40, 97, 86)
 # Main-page chest rectangle from the supplied Hall screenshot. The tap target
 # always comes from the shared Login Gifts chest template, never coordinates.
 MAIN_CHEST_REGION = (2, 18, 27, 41)
-# On the supplied Hall screenshot the shared Login Gifts chest scores 0.6078;
-# the strongest match outside this Hall box is 0.4295. Hall has a different
-# animated background, so keep a separate conservative threshold.
-MAIN_CHEST_THRESHOLD = 0.52
+# Hall's chest sparkles through several animation frames.  The 15 supplied
+# 21513 captures score 0.4815..0.6164 at the same (52, 219) centre; the
+# strongest non-chest location inside this tightly limited region is 0.2352.
+# 0.45 accepts every observed active frame with a 0.0315 safety margin while
+# remaining 0.2148 above the nearest in-region false match.
+MAIN_CHEST_THRESHOLD = 0.45
 SCAN_SWIPE = (50, 82, 50, 48)
 RETURN_TOP_SWIPE = (50, 48, 50, 82)
 EDGE_CONFIRMATIONS = 2
@@ -131,7 +133,11 @@ def _claim_main_chests(bot) -> bool:
         chest = find_reward_chest(bot, screen, region=MAIN_CHEST_REGION,
                                   threshold=MAIN_CHEST_THRESHOLD)
         if chest is None:
-            return True
+            if _confirm_main_chest_absent(bot):
+                bot.record("Gift Claims: Hall xác nhận vùng rương đã trống")
+                return True
+            bot.record("Gift Claims: Hall không xác nhận được trạng thái rương; PENDING")
+            return False
         bot.record("Gift Claims: Hall thấy rương trong vùng xanh; tap")
         bot.tap(*chest, delay=STEP_DELAY)
         bot.sleep(1)
@@ -338,7 +344,10 @@ def claim_opened(bot) -> str:
         return PENDING
     outcome = _scan_rewards(bot)
     bot.back(delay=STEP_DELAY)
-    if outcome == DONE_1:
+    # A score chest can be ready even when every visible task row was already
+    # Claimed before this run.  Therefore both a clean DONE sweep and DONE_1
+    # return to the Hall main page and use only image detection to tap it.
+    if outcome in (DONE, DONE_1):
         if not _main_open(bot):
             bot.record("Gift Claims: Hall Back nhưng chưa về màn Challenge Quest")
             return PENDING

@@ -71,6 +71,10 @@ EDGE_CONFIRMATIONS = 2
 # When both contain no green Claim, inspect Parade Mask instead of dragging
 # through an empty reward list.
 EMPTY_VIEWS_BEFORE_MASK_CHECK = 2
+# Before Parade Mask is inspected, repeat the entire Claim scan in both
+# vertical directions.  This catches a delayed green Claim without treating a
+# single apparently empty viewport as clean.
+CLEAN_CLAIM_AUDIT_PASSES = 2
 MAX_FULL_PASSES = 3
 MAX_CLAIMS_PER_VIEW = 6
 

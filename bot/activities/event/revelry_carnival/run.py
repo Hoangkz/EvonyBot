@@ -14,6 +14,7 @@ from .constants import (
     CLAIM_GRAY,
     CLAIM_GREEN,
     CLAIM_THRESHOLD,
+    CLEAN_CLAIM_AUDIT_PASSES,
     CONGRATULATIONS,
     CONTROL_THRESHOLD,
     EDGE_CONFIRMATIONS,
@@ -441,7 +442,8 @@ def _scan_full_list(bot):
 
 
 def _claim_rewards(bot) -> bool:
-    """Return only when a complete pass has no green Claim; not task DONE."""
+    """Return only after two clean up/down Claim audits; not task DONE."""
+    clean_audits = 0
     for pass_number in range(1, MAX_FULL_PASSES + 1):
         if pass_number == 1:
             # Opening Revelry already presents a valid reward viewport.  Do
@@ -462,11 +464,20 @@ def _claim_rewards(bot) -> bool:
         if not bottom:
             bot.record(f"{NAME}: chưa hoàn tất lượt quét quà; giữ PENDING")
             return False
-        if not saw_claim:
-            bot.record(f"{NAME}: hai khung kiểm tra liên tiếp không còn Claim xanh; "
-                       "tiếp tục kiểm tra Parade Mask")
+        if saw_claim:
+            clean_audits = 0
+            bot.record(f"{NAME}: vừa nhận quà; quét lại toàn bộ trước khi DONE")
+            continue
+        clean_audits += 1
+        if clean_audits >= CLEAN_CLAIM_AUDIT_PASSES:
+            bot.record(f"{NAME}: đã soát Claim xanh lên/xuống "
+                       f"{clean_audits}/{CLEAN_CLAIM_AUDIT_PASSES} lần không thấy; "
+                       "lướt lên lần cuối rồi kiểm tra Parade Mask")
+            if not _swipe_to_top(bot):
+                return False
             return True
-        bot.record(f"{NAME}: vừa nhận quà; quét lại toàn bộ trước khi DONE")
+        bot.record(f"{NAME}: lượt soát Claim sạch {clean_audits}/"
+                   f"{CLEAN_CLAIM_AUDIT_PASSES}; lướt lên rồi quét xuống lần nữa")
     bot.record(f"{NAME}: chưa có lượt quét sạch Claim xanh; giữ PENDING")
     return False
 
