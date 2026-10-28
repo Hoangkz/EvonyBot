@@ -22,6 +22,7 @@ from .tabs import (
     GatherResourcesTab,
     DailyActivitiesTab,
     EventTab,
+    AttackBossTab,
     FindBossTab,
     InitializationTab,
     JoinMonsterWarTab,
@@ -102,7 +103,8 @@ class DeviceView(QWidget):
                 ("Find Boss", "find_boss_tab", FindBossTab),
                 ("Craft", "craft_tab", CraftTab),
                 ("Gather Resources", "gather_resources_tab", GatherResourcesTab),
-                ("Refine Equipment", "refine_equipment_tab", RefineEquipmentTab)):
+                ("Refine Equipment", "refine_equipment_tab", RefineEquipmentTab),
+                ("Attack Boss", "attack_boss_tab", AttackBossTab)):
             self._lazy[title] = (attr, factory)
             self._add_tab_button(title, self.tabs.addTab(QWidget(), title))
         # Logs không có cấu hình: thêm thẳng, không nối Apply ALL / settings.
