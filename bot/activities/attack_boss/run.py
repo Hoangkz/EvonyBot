@@ -7,9 +7,12 @@ chen vào là Crazy Eggs (ô chọn giờ ở tab Attack Boss): tới giờ thì
 import math
 from datetime import datetime
 
+import cv2
+import numpy as np
+
 from ...common import arc_sweep, boss_scan, delay
-from ...ocr import read_camera
-from ...ocr.find_bosses import find_bosses, glow_points, read_popup
+from ...ocr import read_camera, world_mask
+from ...ocr.find_bosses import find_bosses, glow_points, glow_regions, read_popup
 from ..event_center.crazy_eggs import constants as eggs
 from ..event_center.crazy_eggs.run import _run_crazy_eggs
 from ..find_boss.constants import TO_WORLD_TAP, TO_WORLD_TRIES, TO_WORLD_WAIT
@@ -18,7 +21,7 @@ from ..join_monster_war.boss_memory import JOINED, BossMemory
 from ..join_monster_war.constants import (GENERAL_SEARCH, MARCH, NOT_ENOUGH_STAMINA, PRESET_ACTIVE_WAIT, PRESET_COUNT, PRESET_DX,
                                           PRESET_LOCKED, PRESET_LOCKED_THRESHOLD, PRESET_X0, PRESET_Y, REGIONS)
 from ..join_monster_war.run import _Boss, _preset_active, _troops
-from .constants import (AGE_LIMIT_MIN, ATTACK_FROM_WAR, ISCOUT_DONE_MINUTES, ATTACK_MENU_POLL, ATTACK_MENU_WAIT, BOSS_NEAR, BOSS_POLL, BOSS_WAIT, DROP, EGGS_KEY, FULL, FULL_RETRY_WAIT, FULL_TRIES, IDLE_WAIT, RETAP_AFTER, RETAP_MOVE, RING_BELOW, RING_MAX_DIST, TAP_MAX_Y, LOW_ODDS, LOW_ODDS_CANCEL, LOW_ODDS_THRESHOLD, MAIN_GENERAL_REGION, MARCH_BUTTON,
+from .constants import (NAME_GAP, NAME_MAX_H, NAME_MIN_H, NAME_MIN_W, NAME_TAP_ABOVE, AGE_LIMIT_MIN, ATTACK_FROM_WAR, ISCOUT_DONE_MINUTES, ATTACK_MENU_POLL, ATTACK_MENU_WAIT, BOSS_NEAR, BOSS_POLL, BOSS_WAIT, DROP, EGGS_KEY, FULL, FULL_RETRY_WAIT, FULL_TRIES, IDLE_WAIT, RETAP_AFTER, RETAP_MOVE, RING_BELOW, RING_MAX_DIST, TAP_MAX_Y, LOW_ODDS, LOW_ODDS_CANCEL, LOW_ODDS_THRESHOLD, MAIN_GENERAL_REGION, MARCH_BUTTON,
                         MARCH_OPEN_WAIT, MARCH_SPEED_KEY, MARCH_THRESHOLD, MARCH_WAIT, MARCHED, NO_LANES_WAIT, ON_SPOT_KM, POLL, POPUP_WAIT,
                         RALLY_BUTTONS, RALLY_MINUTES, RALLY_TITLE, RALLY_WAIT, RETRY, RETURN_SPEED_KEY, SOURCE_ALLIANCE,
                         SOURCE_API, SOURCE_DEFAULT, SOURCE_KEY, SOURCE_PLAYER, TROOP_TRIES, TYPE_ATTACK, TYPE_DEFAULT, TYPE_KEY, TYPE_WAR,
@@ -208,7 +211,7 @@ def attack(bot, settings: dict, offer: BossOffer, go=None, own=None, latest=None
             bot.log(f"Attack Boss: không thấy boss ở giữa màn hình ({offer}), boss đã chết hoặc đã đi, bỏ")
             boss_scan.ensure_map(bot)
             return DROP
-    opened = _tap_attack(bot, own or tap_at, relocate=_ring_point) if iscout else boss_scan.tap_menu_item(bot, own or tap_at, boss_scan.ATTACK_ICON)
+    opened = _tap_attack(bot, own or tap_at) if iscout else boss_scan.tap_menu_item(bot, own or tap_at, boss_scan.ATTACK_ICON)
     if not opened:
         return DROP if iscout else RETRY       # IsCout: bấm vào boss mà không ra Attack = coi như đã đánh
     screen, war = _wait_popup(bot)
@@ -305,6 +308,26 @@ def _ring_point(screen):
     return x, min(bottom + RING_BELOW, TAP_MAX_Y)
 
 
+def _name_point(screen):
+    """IsCout: với từng vùng cam (vòng sáng) tìm dòng tên boss nằm trong vùng đó (chữ be kem, nối huy hiệu cấp và các từ của tên bằng NAME_GAP; không cần đọc ra tên),
+    lấy dòng gần giữa màn hình nhất trong RING_MAX_DIST px. Điểm bấm = (giữa dòng tên theo x, mép trên dòng tên - NAME_TAP_ABOVE), tức cao hơn tên một chút. None nếu không có."""
+    masked = world_mask.mask_ui(screen)
+    best, best_dist = None, RING_MAX_DIST + 1
+    for x1, y1, x2, y2 in glow_regions(screen, masked):
+        area = masked[y1:y2, x1:x2].astype(np.int16)
+        text = (((area[..., 2] > 185) & (area[..., 1] > 150) & (area[..., 2] - area[..., 0] > 20)) * 255).astype(np.uint8)
+        merged = cv2.dilate(text, cv2.getStructuringElement(cv2.MORPH_RECT, (NAME_GAP, 1)))
+        count, _, stats, _ = cv2.connectedComponentsWithStats(merged, 8)
+        for x, y, w, h, _ in stats[1:count]:
+            if w < NAME_MIN_W or not NAME_MIN_H <= h <= NAME_MAX_H:
+                continue
+            at = (int(x1 + x + w // 2), int(y1 + y))
+            dist = math.dist(at, boss_scan.CAMERA_PX)
+            if dist < best_dist:
+                best, best_dist = at, dist
+    return None if best is None else (best[0], best[1] - NAME_TAP_ABOVE)
+
+
 def _wait_boss(bot, nearest: bool = False):
     """Chờ tới BOSS_WAIT giây cho boss hiện ra (bản đồ vừa nhảy tới, boss tải chậm hơn nền đất). Tìm mỗi BOSS_POLL (1) giây. Trả vị trí để bấm vào boss, None nếu không thấy.
     Mặc định boss phải nằm trong BOSS_NEAR quanh giữa màn hình và bấm giữa màn hình. `nearest` (IsCout: boss thật có thể lệch khỏi toạ độ nhận được):
@@ -313,7 +336,7 @@ def _wait_boss(bot, nearest: bool = False):
         bot.sleep(BOSS_POLL)
         screen = bot.screenshot()
         if nearest:
-            point = _ring_point(screen)
+            point = _name_point(screen) or _ring_point(screen)      # ưu tiên bấm trên dòng tên; không thấy tên mới dùng vòng sáng
             if point is not None:
                 return point
             continue

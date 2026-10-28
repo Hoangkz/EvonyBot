@@ -45,7 +45,11 @@ IDLE_WAIT = 5            # giây nghỉ khi nguồn chưa có boss mới
 RING_BELOW = 10                # px: điểm bấm = đáy vòng sáng + chừng này (kỵ sĩ Bayard đứng DƯỚI vòng sáng: bấm đúng đáy / giữa vòng thì trượt, đo trên 21913)
 TAP_MAX_Y = 352               # px: điểm bấm không thấp hơn y này = giữa màn hình (boss đứng yên trúng ở y này cho cả 7 loại đã đo trên 21913; Quỷ Vương và Kamaitachi trượt ở y 378-380)
 RING_MAX_DIST = 100            # px: IsCout chỉ nhận vòng màu cách tâm màn hình không quá chừng này; xa hơn là boss khác (đo trên 21913: boss đích lệch < 50 px, boss khác 160-190 px)
-RETAP_AFTER = 2               # IsCout: bấm vào boss mà sau chừng này lần tìm nút Attack (mỗi ATTACK_MENU_POLL giây) vẫn chưa thấy thì tìm lại vòng màu (boss có thể đang di chuyển)
+NAME_GAP = 15                  # px: IsCout tìm dòng tên boss trong vùng cam: chữ cách nhau dưới chừng này cột gộp thành một dòng (huy hiệu cấp + từng từ của tên)
+NAME_MIN_W = 40                # px: dòng tên rộng ít nhất chừng này (tia lửa và mảnh viền vòng sáng hẹp hơn hoặc thấp hơn)
+NAME_MIN_H, NAME_MAX_H = 7, 12   # px: dòng tên cao trong khoảng này
+NAME_TAP_ABOVE = 4             # px: bấm cao hơn mép trên của dòng tên chừng này (y nhỏ hơn y của tên một chút) = vào chân / thân boss
+RETAP_AFTER = 2              # IsCout: bấm vào boss mà sau chừng này lần tìm nút Attack (mỗi ATTACK_MENU_POLL giây) vẫn chưa thấy thì tìm lại vòng màu (boss có thể đang di chuyển)
 RETAP_MOVE = 20               # px: vòng màu tìm lại cách chỗ đã bấm hơn chừng này thì bấm lại (đáy vòng nhấp nháy ~10 px theo hoạt ảnh lửa); không thì chỉ chờ tiếp (menu hiện chậm do lag)
 ATTACK_MENU_POLL = 1          # IsCout: giây giữa hai lần tìm nút Attack của menu nhanh sau khi bấm vào boss
 ATTACK_MENU_WAIT = 8          # IsCout: chờ tối đa chừng này giây; không thấy nút Attack thì tính boss là đã đánh ngay

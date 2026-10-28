@@ -25,19 +25,24 @@ class WaitBossTests(unittest.TestCase):
     def test_nearest_ring_within_reach_is_tapped_and_far_rings_are_ignored(self):
         near = (CENTER[0] + 40, CENTER[1] - 30)
         far = (CENTER[0] + RING_MAX_DIST + 60, CENTER[1])         # boss khác ở xa (đo thật 160-190 px)
-        with mock.patch.object(run, "glow_points", lambda screen: [far, near]), \
+        with mock.patch.object(run, "_name_point", lambda screen: None), \
+                mock.patch.object(run, "glow_points", lambda screen: [far, near]), \
                 mock.patch.object(run, "find_bosses", lambda screen: [boss_at(BOSS_NEAR + 150, 0)]):
             self.assertEqual(run._wait_boss(fake_bot(), nearest=True), (near[0], near[1] + RING_BELOW))      # điểm đo là đáy vòng sáng: bấm thấp hơn RING_BELOW
             self.assertIsNone(run._wait_boss(fake_bot()))        # nguồn khác: boss phải gần giữa màn hình
-        with mock.patch.object(run, "glow_points", lambda screen: [far]):
+        with mock.patch.object(run, "_name_point", lambda screen: None), mock.patch.object(run, "glow_points", lambda screen: [far]):
             self.assertIsNone(run._wait_boss(fake_bot(), nearest=True))      # chỉ có boss khác: coi như không thấy boss đích
+
+    def test_name_line_is_tapped_before_the_ring(self):
+        with mock.patch.object(run, "_name_point", lambda screen: (195, 357)), mock.patch.object(run, "glow_points", lambda screen: [(192, 376)]):
+            self.assertEqual(run._wait_boss(fake_bot(), nearest=True), (195, 357))      # có dòng tên: bấm trên tên, không bấm theo vòng sáng
 
     def test_default_taps_the_center_when_boss_is_near(self):
         with mock.patch.object(run, "find_bosses", lambda screen: [boss_at(10, 10)]):
             self.assertEqual(run._wait_boss(fake_bot()), CENTER)
 
     def test_no_ring_at_all_returns_none(self):
-        with mock.patch.object(run, "glow_points", lambda screen: []):
+        with mock.patch.object(run, "_name_point", lambda screen: None), mock.patch.object(run, "glow_points", lambda screen: []):
             self.assertIsNone(run._wait_boss(fake_bot(), nearest=True))
 
 
@@ -185,7 +190,7 @@ class RingPollTests(unittest.TestCase):
     def test_rings_are_searched_once_per_second_for_boss_wait_seconds(self):
         naps = []
         bot = SimpleNamespace(sleep=naps.append, screenshot=lambda: None)
-        with mock.patch.object(run, "glow_points", lambda screen: []):
+        with mock.patch.object(run, "_name_point", lambda screen: None), mock.patch.object(run, "glow_points", lambda screen: []):
             self.assertIsNone(run._wait_boss(bot, nearest=True))
         self.assertEqual(naps, [BOSS_POLL] * round(BOSS_WAIT / BOSS_POLL))
         self.assertEqual(BOSS_POLL, 1)
@@ -208,6 +213,24 @@ class GlowCenterTests(unittest.TestCase):
         self.assertLessEqual(abs(y - 376), 3)       # đáy vòng sáng (y lớn nhất)
         self.assertEqual(TAP_MAX_Y, 352)
         self.assertEqual(run._ring_point(shot), (x, min(y + RING_BELOW, TAP_MAX_Y)))      # điểm bấm thật: đáy + 10, tối đa TAP_MAX_Y (352)
+
+
+class NameLineTests(unittest.TestCase):
+    """Ảnh thật (giả lập 21923): tên "1 Lava Turtle" bị huy hiệu cấp tách thành hai mảnh hẹp; điểm bấm nằm cao hơn mép trên tên một chút."""
+
+    def test_tap_point_is_middle_of_the_name_and_a_little_above_it(self):
+        import os
+
+        import cv2
+        from bot.activities.attack_boss.constants import NAME_TAP_ABOVE
+        shot = cv2.imread(os.path.join(os.path.dirname(__file__), "screens", "lava_turtle_world.png"))
+        x, y = run._name_point(shot)
+        self.assertLessEqual(abs(x - 195), 3)                       # giữa dòng tên (đo trên ảnh thật: x 156-234)
+        self.assertEqual(y, 361 - NAME_TAP_ABOVE)                   # mép trên dòng tên y = 361, bấm cao hơn NAME_TAP_ABOVE px
+
+    def test_no_name_when_there_is_no_glow(self):
+        import numpy as np
+        self.assertIsNone(run._name_point(np.zeros((704, 396, 3), np.uint8)))
 
 
 class LowOddsTests(unittest.TestCase):
