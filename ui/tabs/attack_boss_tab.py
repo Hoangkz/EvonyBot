@@ -79,7 +79,7 @@ class AttackBossTab(JoinMonsterWarTab):
                 row.addWidget(self.player_name)
             if key == ab.SOURCE_API:
                 self.email = QLineEdit()
-                self.email.setPlaceholderText("Email")
+                self.email.setPlaceholderText("iScout email")
                 self.email.setFixedWidth(180)
                 self.password = QLineEdit()
                 self.password.setPlaceholderText("Password")
@@ -112,20 +112,21 @@ class AttackBossTab(JoinMonsterWarTab):
         return next((key for key, radio in self.source_radios.items() if radio.isChecked()), ab.SOURCE_DEFAULT)
 
     def _on_source_changed(self):
-        """Whisper: cần tên người chơi, ẩn phần chọn boss (boss nào được gửi thì đánh boss đó), Type luôn là Attack. Nguồn khác: chọn boss
-        như Join Monster War."""
-        whisper = self._selected_source() == ab.SOURCE_PLAYER
+        """Whisper: cần tên người chơi, ẩn phần chọn boss (boss nào được gửi thì đánh boss đó), Type luôn là Attack. IsCout: cũng ẩn phần chọn boss
+        (bộ lọc đặt trên trang iScout, đánh từ trên xuống). Alliance: chọn boss như Join Monster War."""
+        source = self._selected_source()
+        whisper = source == ab.SOURCE_PLAYER
         self.player_name.setEnabled(whisper)
-        iscout = self._selected_source() == ab.SOURCE_API
-        self.email.setEnabled(iscout)
-        self.password.setEnabled(iscout)
+        self.email.setEnabled(source == ab.SOURCE_API)
+        self.password.setEnabled(source == ab.SOURCE_API)
         if whisper:
             self.attack_type.setCurrentText(dict(ab.ATTACK_TYPES)[ab.TYPE_ATTACK])
         self.attack_type.setEnabled(not whisper)
-        for _, group in self.boss_groups:       # Whisper: không chọn boss nào (kể cả Viking share), boss nào được gửi thì đánh
-            group.setVisible(not whisper)
+        no_pick = source in (ab.SOURCE_PLAYER, ab.SOURCE_API)
+        for _, group in self.boss_groups:       # không chọn boss nào (kể cả Viking share), boss nào có thì đánh
+            group.setVisible(not no_pick)
         for _, _, card in self.boss_cards:
-            card.setVisible(not whisper)
+            card.setVisible(not no_pick)
 
     def get_settings(self) -> dict:
         settings = super().get_settings()

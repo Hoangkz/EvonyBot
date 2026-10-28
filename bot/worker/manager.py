@@ -33,6 +33,7 @@ class BotManager(QObject):
     city_map_found = pyqtSignal(str, str)     # (serial, bản đồ thành JSON bot quét được)
     bubble_disabled = pyqtSignal(str)         # (serial) không đủ kim cương -> bỏ tích Bubble
     craft_done = pyqtSignal(str, str)         # (serial, id trang bị) vừa chế tạo xong một cái
+    alert = pyqtSignal(str, str)              # (serial, nội dung) -> popup cảnh báo
     log_message = pyqtSignal(str, str)        # (serial, dòng log) -> tab Logs > Info
     history = pyqtSignal(str, str)            # (serial, sự kiện) -> lưu DB + tab Logs > History
 
@@ -94,6 +95,7 @@ class BotManager(QObject):
         worker.city_map_found.connect(self.city_map_found.emit)
         worker.bubble_disabled.connect(self.bubble_disabled.emit)
         worker.craft_done.connect(self.craft_done.emit)
+        worker.alert.connect(self.alert.emit)
         worker.log_message.connect(self.log_message.emit)
         worker.history.connect(self.history.emit)
         worker.finished.connect(lambda: self._on_finished(serial))

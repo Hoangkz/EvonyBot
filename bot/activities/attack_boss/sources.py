@@ -4,16 +4,19 @@ sources.py — ba nguồn nhận boss của Attack Boss. Mỗi nguồn có `poll
 """
 from dataclasses import dataclass
 
+import math
 import time
 
 import numpy as np
 
+from ...context.errors import StopRequested
+from ...iscout import hub as iscout
 from ...ocr import read_chat
 
 from .world import ensure_world
 from .constants import (AGE_LIMIT_MIN, CHAT_BAR, CHAT_OPEN_WAIT, CHAT_THRESHOLD, CHAT_TITLE, MAX_PAGES, SAME_PAGE_DIFF, SCROLL, SCROLL_TIME,
                         SCROLL_WAIT, TAB_ALLIANCE, TAB_WAIT, CONVERSATION_WAIT, TAB_WHISPER, WHISPER_BATCH, WHISPER_KEEP)
-from .constants import EMAIL_KEY, PASSWORD_KEY, PLAYER_KEY, SOURCE_API, SOURCE_DEFAULT, SOURCE_KEY, SOURCE_PLAYER
+from .constants import EMAIL_KEY, ISCOUT_BATCH, ISCOUT_DONE_MINUTES, PASSWORD_KEY, PLAYER_KEY, SOURCE_API, SOURCE_DEFAULT, SOURCE_KEY, SOURCE_PLAYER
 
 
 @dataclass(frozen=True)
@@ -23,6 +26,7 @@ class BossOffer:
     y: int | None = None
     name: str | None = None
     level: int | None = None
+    uid: str | None = None       # IsCout: id của boss (không đổi dù toạ độ đổi)
     ident: int | None = None     # Whisper: không đọc toạ độ, boss chỉ có số thứ tự (ảnh cắt của tin nhắn)
 
     @property
@@ -176,15 +180,59 @@ class PlayerChatSource:
 
 
 class ApiSource:
-    """Boss gửi về từ IsCout (đăng nhập bằng email / password ở tab)."""
+    """Boss từ IsCout: bot tự mở một trình duyệt Chromium (hồ sơ riêng), tự đăng nhập iScout bằng email / mật khẩu ở tab rồi đọc khung socket của
+    tab iScout (bộ lọc boss do người dùng đặt trên trang iScout). Mỗi lượt: kiểm tra trình duyệt (ưu tiên tab đã dùng; tab phải cùng server với thiết bị), lấy ISCOUT_BATCH (6) boss gần thành nhất
+    (sự kiện + boss) chưa đánh theo id, đánh hết lượt đó rồi mới kiểm tra lại và lấy lượt kế. Boss đã hành quân hoặc bỏ vì không tìm thấy boss đều tính là đã đánh. Boss có `id` không đổi còn toạ độ thì đổi: boss trong
+    lượt mà dời chỗ thì đánh ở toạ độ mới; boss đã tính là đã đánh thì không đánh lại. Chưa mở / chưa đăng nhập / không lấy được server / sai server:
+    popup rồi dừng thiết bị (`StopRequested`)."""
+    needs_home = True      # run đọc toạ độ thành trước mỗi poll để xếp boss theo khoảng cách
 
-    def __init__(self, email: str, password: str):
+    def __init__(self, email: str = "", password: str = "", clock=time.monotonic):
+        self._clock = clock
         self.email = email.strip()
         self.password = password
+        self.done: dict[str, float] = {}                      # id đã đánh -> lúc đánh; không đánh lại dù dời chỗ, nhớ tối đa ISCOUT_DONE_MINUTES phút
+        self.batch: dict[str, tuple[int, int] | None] = {}    # lượt hiện tại: id -> toạ độ đã trả (None = chưa trả); chưa đánh xong thì còn ở đây
 
     def poll(self, bot) -> list[BossOffer]:
-        # TODO: đăng nhập IsCout bằng self.email / self.password rồi lấy boss mới (chưa có địa chỉ / định dạng API).
-        return []
+        try:
+            if not (self.email and self.password):
+                raise iscout.IScoutNoCredentials()
+            bosses = iscout.get_hub().bosses(bot.server, self.email, self.password)
+        except iscout.IScoutError as error:
+            bot.log(f"Attack Boss: {error.message.splitlines()[0]} Dừng.")
+            bot.alert(error.message)
+            raise StopRequested()
+        by_id = {boss["id"]: boss for boss in bosses}
+        now = self._clock()
+        self.done = {uid: at for uid, at in self.done.items() if uid in by_id and now - at < ISCOUT_DONE_MINUTES * 60}      # boss đã chết hoặc quá hạn: quên
+        self.batch = {uid: at for uid, at in self.batch.items() if uid in by_id}   # chết giữa chừng: bỏ khỏi lượt
+        if not self.batch:
+            fresh = [boss for boss in bosses if boss["id"] not in self.done]
+            for boss in self._nearest(bot, fresh)[:ISCOUT_BATCH]:
+                self.batch[boss["id"]] = None
+        offers = []
+        for uid, sent in self.batch.items():
+            boss = by_id[uid]
+            at = (boss["x"], boss["y"])
+            if sent != at:
+                self.batch[uid] = at
+                offers.append(BossOffer(boss["x"], boss["y"], boss["name"], boss["level"], uid=uid))
+        return offers
+
+    @staticmethod
+    def _nearest(bot, bosses: list[dict]) -> list[dict]:
+        """Gần thành của mình nhất trước (chưa biết toạ độ thành thì giữ thứ tự nhận)."""
+        home = getattr(bot, "attack_home", None)
+        if home is None:
+            return bosses
+        return sorted(bosses, key=lambda boss: math.dist((boss["x"], boss["y"]), home))
+
+    def finished(self, offer: BossOffer) -> None:
+        """`run` gọi khi xong một boss của lượt: đã hành quân, hoặc bỏ vì không tìm thấy boss. Cả hai đều tính là đã đánh (không đánh lại)."""
+        self.batch.pop(offer.uid, None)
+        if offer.uid is not None:
+            self.done[offer.uid] = self._clock()
 
 
 def make_source(settings: dict):

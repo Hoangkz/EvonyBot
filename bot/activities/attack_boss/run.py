@@ -9,7 +9,7 @@ from datetime import datetime
 
 from ...common import arc_sweep, boss_scan, delay
 from ...ocr import read_camera
-from ...ocr.find_bosses import find_bosses, read_popup
+from ...ocr.find_bosses import find_bosses, glow_points, read_popup
 from ..event_center.crazy_eggs import constants as eggs
 from ..event_center.crazy_eggs.run import _run_crazy_eggs
 from ..find_boss.constants import TO_WORLD_TAP, TO_WORLD_TRIES, TO_WORLD_WAIT
@@ -18,10 +18,10 @@ from ..join_monster_war.boss_memory import JOINED, BossMemory
 from ..join_monster_war.constants import (GENERAL_SEARCH, MARCH, NOT_ENOUGH_STAMINA, PRESET_ACTIVE_WAIT, PRESET_COUNT, PRESET_DX,
                                           PRESET_LOCKED, PRESET_LOCKED_THRESHOLD, PRESET_X0, PRESET_Y, REGIONS)
 from ..join_monster_war.run import _Boss, _preset_active, _troops
-from .constants import (AGE_LIMIT_MIN, ATTACK_FROM_WAR, BOSS_NEAR, BOSS_WAIT, DROP, EGGS_KEY, FULL, FULL_RETRY_WAIT, FULL_TRIES, IDLE_WAIT, MAIN_GENERAL_REGION, MARCH_BUTTON,
+from .constants import (AGE_LIMIT_MIN, ATTACK_FROM_WAR, ISCOUT_DONE_MINUTES, ATTACK_MENU_POLL, ATTACK_MENU_WAIT, BOSS_NEAR, BOSS_POLL, BOSS_WAIT, DROP, EGGS_KEY, FULL, FULL_RETRY_WAIT, FULL_TRIES, GLOW_TAP_DX, GLOW_TAP_DY, IDLE_WAIT, LOW_ODDS, LOW_ODDS_CANCEL, LOW_ODDS_THRESHOLD, MAIN_GENERAL_REGION, MARCH_BUTTON,
                         MARCH_OPEN_WAIT, MARCH_SPEED_KEY, MARCH_THRESHOLD, MARCH_WAIT, MARCHED, NO_LANES_WAIT, ON_SPOT_KM, POLL, POPUP_WAIT,
                         RALLY_BUTTONS, RALLY_MINUTES, RALLY_TITLE, RALLY_WAIT, RETRY, RETURN_SPEED_KEY, SOURCE_ALLIANCE,
-                        SOURCE_DEFAULT, SOURCE_KEY, SOURCE_PLAYER, TROOP_TRIES, TYPE_ATTACK, TYPE_DEFAULT, TYPE_KEY, TYPE_WAR,
+                        SOURCE_API, SOURCE_DEFAULT, SOURCE_KEY, SOURCE_PLAYER, TROOP_TRIES, TYPE_ATTACK, TYPE_DEFAULT, TYPE_KEY, TYPE_WAR,
                         VIKING_LABEL)
 from . import lanes, speedup, viking
 from .goto import goto_coords
@@ -32,7 +32,8 @@ from .world import ensure_world
 def run(bot, settings: dict):
     """`bot` là BotContext của thiết bị; `settings` là cấu hình của tab "Attack Boss". Không return (tới khi Stop)."""
     if getattr(bot, "attack_memory", None) is None:
-        bot.attack_memory = BossMemory(ttl=AGE_LIMIT_MIN * 60)      # sống cùng BotContext: qua các lần Start trong một phiên giả lập
+        minutes = ISCOUT_DONE_MINUTES if settings.get(SOURCE_KEY) == SOURCE_API else AGE_LIMIT_MIN       # IsCout: boss đã đánh chỉ nhớ tối đa 10 phút
+        bot.attack_memory = BossMemory(ttl=minutes * 60)      # sống cùng BotContext: qua các lần Start trong một phiên giả lập
     source = make_source(settings)
     hours = eggs_hours(settings)
     nearest_first = settings.get(SOURCE_KEY, SOURCE_DEFAULT) == SOURCE_ALLIANCE
@@ -49,7 +50,12 @@ def run(bot, settings: dict):
             delay(bot, IDLE_WAIT)
             continue
         troops = len(_troops(settings.get("troop")))
+        if getattr(source, "needs_home", False):      # IsCout: xếp boss theo khoảng cách tới thành
+            home_coords(bot)
         for offer in source.poll(bot):              # nhận boss mới (Alliance: đọc chat; Whisper: tìm tin chưa cắt ảnh)
+            if offer.uid is not None:       # IsCout: boss đã nhận dời chỗ thì bỏ toạ độ cũ, dùng toạ độ mới
+                for stale in [at for at, old in pending.items() if old.uid == offer.uid and at != offer.coords]:
+                    del pending[stale]
             if bot.attack_memory.status(offer.coords) is None:
                 pending.setdefault(offer.coords, offer)
         if not pending:
@@ -75,6 +81,7 @@ def run(bot, settings: dict):
                 retry = True
             else:
                 del pending[offer.coords]
+                getattr(source, "finished", lambda _offer: None)(offer)
                 if result == MARCHED:
                     bot.attack_memory.mark(offer.coords, JOINED)
                     speed_up_if_full(bot, settings, troops)      # đánh xong mà số đường đã đủ tối đa thì tăng tốc, xong đánh boss mới luôn
@@ -141,8 +148,8 @@ def eggs_due(bot, hours: int) -> bool:
 
 def wanted(settings: dict, offer: BossOffer) -> bool:
     """Có đánh boss này không (boss được gửi: Viking cũng đi theo luồng chung). Whisper: không chọn boss, được gửi boss nào đánh boss đó. Nguồn khác: theo
-    boss / cấp đã tích (như Join Monster War). Viking TỰ GỌI là việc riêng (summon_due)."""
-    if settings.get(SOURCE_KEY) == SOURCE_PLAYER:
+    boss / cấp đã tích (như Join Monster War). IsCout: bộ lọc do người dùng đặt trên trang iScout nên đánh hết boss trên bảng. Viking TỰ GỌI là việc riêng (summon_due)."""
+    if settings.get(SOURCE_KEY) in (SOURCE_PLAYER, SOURCE_API):
         return True
     boss, _ = boss_names.parse(offer.name)
     return boss_names.wanted(boss_names.selection(settings), boss, offer.level)
@@ -161,7 +168,7 @@ def attack(bot, settings: dict, offer: BossOffer, go=None, own=None) -> str:
     """Tới boss, chờ boss hiện ra, bấm giữa màn hình mở menu -> Attack -> cửa sổ thông tin boss -> Attack / Alliance War (theo
     attack_type) -> màn March: chọn đội rồi March. Trả:
     - MARCHED: đã hành quân;
-    - DROP: boss không còn đó (đã chết) hoặc không thuộc loại được tích: bỏ hẳn;
+    - DROP: boss không còn đó (đã chết), không thuộc loại được tích, hoặc game báo tỷ lệ thắng cực thấp (đã Cancel): bỏ hẳn;
     - FULL: game báo hết đường hành quân ("You cannot send more troops."): giữ boss lại, `run` chuyển sang tăng tốc rồi chờ có đường trống;
     - RETRY: chưa đánh được (không đội nào có tướng, hết thể lực, màn không mở...): giữ boss lại đánh sau, KHÔNG bỏ qua.
     Mọi nhánh thất bại đều về bản đồ sạch.
@@ -170,7 +177,12 @@ def attack(bot, settings: dict, offer: BossOffer, go=None, own=None) -> str:
     nguồn có và làm được; không thì nhập toạ độ ở bản đồ thế giới (goto_coords). Camera đã đứng đúng chỗ thì khỏi di chuyển. Boss luôn nằm giữa màn hình.
 
     `own`: vị trí nhãn của boss Viking TỰ GỌI (đang ở giữa màn hình): bấm vào đó thay cho giữa màn hình, không tìm boss, không lọc theo ô đã tích, và luôn đánh
-    bằng Alliance War vì cửa sổ boss tự gọi chỉ có nút Alliance War."""
+    bằng Alliance War vì cửa sổ boss tự gọi chỉ có nút Alliance War.
+
+    Nguồn IsCout (boss thật có thể lệch khỏi toạ độ): sau khi tới toạ độ, bấm vào vòng boss gần giữa màn hình nhất (không cần đúng giữa); không thấy vòng
+    boss nào, hoặc bấm vào mà không ra Attack, thì DROP (tính là đã đánh). Từ cửa sổ thông tin trở đi giống mọi nguồn khác."""
+    iscout = settings.get(SOURCE_KEY) == SOURCE_API
+    tap_at = boss_scan.CAMERA_PX
     if own is None:
         if go is not None and go(bot, offer):
             pass
@@ -182,12 +194,14 @@ def attack(bot, settings: dict, offer: BossOffer, go=None, own=None) -> str:
             bot.log(f"Attack Boss: không nhập được toạ độ {offer.coords}, giữ lại")
             boss_scan.ensure_map(bot)
             return RETRY
-        if not _wait_boss(bot):
+        tap_at = _wait_boss(bot, nearest=iscout)
+        if tap_at is None:
             bot.log(f"Attack Boss: không thấy boss ở giữa màn hình ({offer}), boss đã chết hoặc đã đi, bỏ")
             boss_scan.ensure_map(bot)
             return DROP
-    if not boss_scan.tap_menu_item(bot, own or boss_scan.CAMERA_PX, boss_scan.ATTACK_ICON):
-        return RETRY
+    opened = _tap_attack(bot, own or tap_at) if iscout else boss_scan.tap_menu_item(bot, own or tap_at, boss_scan.ATTACK_ICON)
+    if not opened:
+        return DROP if iscout else RETRY       # IsCout: bấm vào boss mà không ra Attack = coi như đã đánh
     screen, war = _wait_popup(bot)
     if war is None:
         bot.log(f"Attack Boss: không thấy cửa sổ thông tin boss ({offer}), thử lại sau")
@@ -202,12 +216,23 @@ def attack(bot, settings: dict, offer: BossOffer, go=None, own=None) -> str:
         marched = _war(bot, settings, war)
         if lanes.consume_full(bot):
             return FULL
+        if _consume_low_odds(bot):
+            return DROP
         return MARCHED if marched else RETRY
     bot.tap(war[0] + ATTACK_FROM_WAR[0], war[1] + ATTACK_FROM_WAR[1])
     marched = _march(bot, settings, MAIN_GENERAL_REGION)
     if lanes.consume_full(bot):
         return FULL
+    if _consume_low_odds(bot):
+        return DROP
     return MARCHED if marched else RETRY
+
+
+def _consume_low_odds(bot) -> bool:
+    """`_march` vừa gặp hộp "tỷ lệ thắng cực thấp" (đã Cancel): True một lần, rồi xoá cờ."""
+    flagged = getattr(bot, "attack_low_odds", False)
+    bot.attack_low_odds = False
+    return flagged
 
 
 def _war(bot, settings: dict, war: tuple[int, int]) -> bool:
@@ -261,13 +286,40 @@ def _on_spot(bot, offer: BossOffer) -> bool:
     return camera is not None and abs(camera[0] - offer.x) <= ON_SPOT_KM and abs(camera[1] - offer.y) <= ON_SPOT_KM
 
 
-def _wait_boss(bot) -> bool:
-    """Chờ tới BOSS_WAIT giây cho boss hiện ra ở giữa màn hình (bản đồ vừa nhảy tới, boss tải chậm hơn nền đất)."""
-    for _ in range(round(BOSS_WAIT / POLL)):
-        bot.sleep(POLL)
-        for boss in find_bosses(bot.screenshot()):
-            if math.dist(boss["pos"], boss_scan.CAMERA_PX) <= BOSS_NEAR:
-                return True
+def _wait_boss(bot, nearest: bool = False):
+    """Chờ tới BOSS_WAIT giây cho boss hiện ra (bản đồ vừa nhảy tới, boss tải chậm hơn nền đất). Tìm mỗi BOSS_POLL (1) giây. Trả vị trí để bấm vào boss, None nếu không thấy.
+    Mặc định boss phải nằm trong BOSS_NEAR quanh giữa màn hình và bấm giữa màn hình. `nearest` (IsCout: boss thật có thể lệch khỏi toạ độ nhận được):
+    lấy vòng màu boss gần giữa màn hình nhất, ở đâu cũng được, và bấm vào điểm của vòng đó (x = trung bình x, y = y lớn nhất của các điểm cam sáng: `glow_points`), dời GLOW_TAP_DX / GLOW_TAP_DY px."""
+    for _ in range(round(BOSS_WAIT / BOSS_POLL)):
+        bot.sleep(BOSS_POLL)
+        screen = bot.screenshot()
+        if nearest:
+            points = glow_points(screen)
+            if points:
+                x, y = min(points, key=lambda point: math.dist(point, boss_scan.CAMERA_PX))
+                return x + GLOW_TAP_DX, y + GLOW_TAP_DY
+            continue
+        found = find_bosses(screen)
+        if not found:
+            continue
+        best = min(found, key=lambda boss: math.dist(boss["pos"], boss_scan.CAMERA_PX))
+        if math.dist(best["pos"], boss_scan.CAMERA_PX) <= BOSS_NEAR:
+            return boss_scan.CAMERA_PX
+    return None
+
+
+def _tap_attack(bot, pos: tuple[int, int]) -> bool:
+    """IsCout: bấm vào boss rồi tìm nút Attack của menu nhanh mỗi ATTACK_MENU_POLL (1) giây, tối đa ATTACK_MENU_WAIT (8) giây; thấy thì bấm. False nếu
+    không thấy (về bản đồ sạch): boss tính là đã đánh. Không dùng boss_scan.tap_menu_item (dùng chung, nhịp 0,3 giây / 5 giây) để không đổi các hoạt động khác."""
+    bot.tap(*pos, delay=0)
+    for _ in range(round(ATTACK_MENU_WAIT / ATTACK_MENU_POLL)):
+        bot.sleep(ATTACK_MENU_POLL)
+        found = boss_scan.find_menu_item(bot, bot.screenshot(), boss_scan.ATTACK_ICON)
+        if found is not None:
+            bot.tap(*found, delay=0)
+            return True
+    bot.log(f"Attack Boss: không thấy nút Attack sau khi bấm {pos}")
+    boss_scan.ensure_map(bot)
     return False
 
 
@@ -284,25 +336,25 @@ def _wait_popup(bot):
 
 
 def _pick_troop(bot, helper, screen, region) -> int | None:
-    """Chọn đội (preset 1-8): các đội đã tích trước (từ đội nhỏ nhất), không đội nào có tướng thì tới các đội còn lại chưa khoá; xoay vòng như vậy tối đa TROOP_TRIES (10) lần thử; đội đạt = ô
-    preset sáng lên và ô Main General có tướng (thấy kính lúp). Trả số đội, None nếu không đội nào có tướng. Bố cục màn March của Attack khác rally: ô tướng chính nằm cao hơn."""
+    """Chọn đội (preset 1-8) CHỈ trong các đội đã tích (từ đội nhỏ nhất, bỏ đội bị khoá), không đụng tới đội khác; xoay vòng qua các đội đã tích tối đa TROOP_TRIES (10) lần thử;
+    đội đạt = ô preset sáng lên và ô Main General có tướng (thấy kính lúp). Trả số đội, None nếu không đội đã tích nào có tướng. Bố cục màn March của Attack khác rally: ô tướng chính nằm cao hơn."""
     locked = len(bot.find_all(PRESET_LOCKED, threshold=PRESET_LOCKED_THRESHOLD, screen=screen, region=REGIONS[PRESET_LOCKED]))
     unlocked = range(1, PRESET_COUNT - locked + 1)
     chosen = [t for t in helper.troops if t in unlocked]
-    candidates = chosen + [t for t in unlocked if t not in chosen]
+    candidates = chosen          # chỉ các đội người dùng đã tích
     for attempt in range(TROOP_TRIES if candidates else 0):      # xoay vòng qua các đội, tối đa TROOP_TRIES lần thử
         troop = candidates[attempt % len(candidates)]
         bot.tap_percent(PRESET_X0 + (troop - 1) * PRESET_DX, PRESET_Y)
         _, active = helper._poll_screen(f"attack_activate_troop_{troop}", lambda image: _preset_active(image, troop),
                                         timeout=PRESET_ACTIVE_WAIT, interval=1)
         if not active:
-            bot.log(f"Attack Boss: bấm đội {troop} mà ô không sáng, thử đội khác")
+            bot.log(f"Attack Boss: bấm đội {troop} mà ô không sáng, thử lại")
             continue
         _, general = helper._poll_screen(f"attack_troop_{troop}_general", lambda image: bot.find(GENERAL_SEARCH, screen=image, region=region))
         if general is not None:
             bot.log(f"Attack Boss: chọn đội {troop}")
             return troop
-        bot.log(f"Attack Boss: đội {troop} không có tướng, thử đội khác")
+        bot.log(f"Attack Boss: đội {troop} không có tướng")
     return None
 
 
@@ -341,6 +393,13 @@ def _march(bot, settings: dict, region) -> bool:
                 lanes.learn(bot)
                 full = True
                 break
+            odds = bot.find(LOW_ODDS, screen=shot, threshold=LOW_ODDS_THRESHOLD)
+            if odds is not None:                   # "tỷ lệ thắng cực thấp, vẫn gửi quân?": không gửi, bấm Cancel; boss này tính là đã đánh (attack trả DROP)
+                bot.record("Attack Boss: tỷ lệ thắng cực thấp, không gửi quân, tính là đã đánh")
+                bot.tap(odds[0] + LOW_ODDS_CANCEL[0], odds[1] + LOW_ODDS_CANCEL[1])
+                bot.attack_low_odds = True
+                boss_scan.ensure_map(bot)
+                return False
             if bot.find(NOT_ENOUGH_STAMINA, screen=shot) is not None:
                 # TODO: dùng vật phẩm thể lực (helper._use_stamina gắn với vòng lặp Join Boss), tạm bỏ qua boss này.
                 bot.record("Attack Boss: hết thể lực, chưa xử lý")
