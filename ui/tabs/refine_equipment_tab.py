@@ -84,6 +84,7 @@ class _LineRow:
         self.kind.setFixedWidth(KIND_WIDTH)
         self.kind.setToolTip("All: cả tăng % lẫn tăng chỉ số | %: chỉ dòng tăng % (+3.9%) | Flat: chỉ dòng tăng chỉ số (+128)")
         self.lock = QCheckBox("Lock")
+        self.lock.setChecked(True)
         self.lock.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)   # rộng đúng bằng ô tích + chữ "Lock" theo font thật, không cắt chữ
         self.lock.setToolTip("Khoá dòng này lại khi đã ra đúng thuộc tính và màu")
         for widget in (self.color, self.kind, self.lock):
@@ -113,10 +114,11 @@ class _LineRow:
 
     def set_value(self, data: dict | None):
         self.box.setChecked(data is not None)
+        saved = data is not None
         data = data or {}
         self.color.setCurrentIndex(max(0, self.color.findData(data.get(COLOR_KEY, DEFAULT_COLOR))))
         self.kind.setCurrentIndex(max(0, self.kind.findData(data.get(KIND_KEY, DEFAULT_KIND))))
-        self.lock.setChecked(bool(data.get(LOCK_KEY)))
+        self.lock.setChecked(bool(data.get(LOCK_KEY)) if saved else True)   # dòng có trong DB: theo DB; dòng chưa lưu: mặc định khoá
 
 
 class _SlotGroup(QGroupBox):
