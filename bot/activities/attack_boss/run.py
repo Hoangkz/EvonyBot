@@ -5,7 +5,9 @@ Chạy MỘT MÌNH (activities.EXCLUSIVE_ACTIVITIES): worker gọi thẳng `run(
 chen vào là Crazy Eggs (ô chọn giờ ở tab Attack Boss): tới giờ thì đập trứng, rồi quay lại đánh boss.
 """
 import math
+import os
 from datetime import datetime
+from pathlib import Path
 
 import cv2
 import numpy as np
@@ -349,6 +351,21 @@ def _name_point(screen):
     return x, top - NAME_TAP_ABOVE
 
 
+BOSS_ISCOUT_LOGS = Path(os.environ.get("LOCALAPPDATA", Path.home())) / "EvonyBot" / "logs" / "bossIsCout"
+
+
+def _save_tap_debug(screen, point: tuple[int, int]):
+    """TODO(test): CHỈ ĐỂ TEST, sẽ xoá. Lưu ảnh màn hình có dấu thập đỏ tại điểm sắp bấm vào boss vào logs/bossIsCout/<giờ>.png."""
+    try:
+        BOSS_ISCOUT_LOGS.mkdir(parents=True, exist_ok=True)
+        image = screen.copy()
+        x, y = int(point[0]), int(point[1])
+        cv2.drawMarker(image, (x, y), (0, 0, 255), cv2.MARKER_CROSS, 24, 2)
+        cv2.imwrite(str(BOSS_ISCOUT_LOGS / f"{datetime.now():%Y%m%d_%H%M%S_%f}_{x}_{y}.png"), image)
+    except Exception:
+        pass
+
+
 def _wait_boss(bot, nearest: bool = False):
     """Chờ tới BOSS_WAIT giây cho boss hiện ra (bản đồ vừa nhảy tới, boss tải chậm hơn nền đất). Tìm mỗi BOSS_POLL (1) giây. Trả vị trí để bấm vào boss, None nếu không thấy.
     Mặc định boss phải nằm trong BOSS_NEAR quanh giữa màn hình và bấm giữa màn hình. `nearest` (IsCout: boss thật có thể lệch khỏi toạ độ nhận được):
@@ -360,6 +377,7 @@ def _wait_boss(bot, nearest: bool = False):
         if nearest:
             point = _name_point(screen)
             if point is not None:
+                _save_tap_debug(screen, point)      # TODO(test): xoá cùng _save_tap_debug
                 return point
             continue
         found = find_bosses(screen)
