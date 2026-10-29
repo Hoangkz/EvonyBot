@@ -4,9 +4,11 @@ Mở dòng Activity + bấm Go: ../common.py (open_task_or_finish, daily_job).
 """
 from ....ocr import read_offer_cost
 from ....ocr.read_offer_cost import CROP as COST_CROP
+from ....ocr.read_offer_cost import unaffordable
 from ...event.city_building import SHRINE
 from ...event.kings_path.building import open_building
 from ...result import done as report_done
+from ....common import no_gems
 from ..common import Task
 from .constants import (
     BACKS_AFTER_OFFER,
@@ -91,6 +93,24 @@ def read_cost(bot, screen=None) -> int | None:
     return read_offer_cost(bot.crop(screen, *COST_CROP))
 
 
+def cost_red(bot, screen=None) -> bool:
+    """Cost của popup Offer Gems hiện chữ đỏ (không đủ kim cương)."""
+    screen = bot.screenshot() if screen is None else screen
+    return unaffordable(bot.crop(screen, *COST_CROP))
+
+
+def _cannot_offer(bot, cost: int | None, reason: str) -> bool:
+    """Không offer: Cost đọc không được vì chữ đỏ -> thiếu kim cương (ghi rõ); không thì ghi `reason`. Đóng popup, False
+    (chưa xong, lượt sau thử lại như bình thường)."""
+    if cost is None and cost_red(bot):
+        bot.record(f"{LABEL}: not enough gems (Cost shown in red), not offering")
+        no_gems.flag(bot)
+    else:
+        bot.record(reason)
+    _close_popup(bot)
+    return False
+
+
 def _offer_in_popup(bot, times: int) -> bool:
     """Popup Offer Gems đang mở ở số lượng 1. Không mua lại lượt đã offer hôm nay:
     1. OCR Cost (số lượng 1) -> các khả năng số lượt đã làm (offers_done); lấy nhỏ nhất `k`.
@@ -101,9 +121,7 @@ def _offer_in_popup(bot, times: int) -> bool:
     cost = read_cost(bot)
     candidates = offers_done([cost]) if cost is not None else []
     if not candidates:
-        bot.record(f"{LABEL}: cannot read Offer Gems cost ({cost}), not offering")
-        _close_popup(bot)
-        return False
+        return _cannot_offer(bot, cost, f"{LABEL}: cannot read Offer Gems cost ({cost}), not offering")
     done = min(candidates)
     if done >= times:
         bot.record(f"{LABEL}: already offered {done} time(s) today (target {times})")
@@ -122,9 +140,7 @@ def _offer_in_popup(bot, times: int) -> bool:
         total = read_cost(bot)
         exact = [k for k in candidates if offer_total(k, count) == total]
         if not exact:
-            bot.record(f"{LABEL}: Offer Gems cost {total} for {count} does not match, not offering")
-            _close_popup(bot)
-            return False
+            return _cannot_offer(bot, total, f"{LABEL}: Offer Gems cost {total} for {count} does not match, not offering")
         extra = exact[0] - done   # thực tế đã làm nhiều hơn -> lùi lại
         if extra > 0:
             minus = bot.find(POPUP_MINUS, region=POPUP_MINUS_REGION)

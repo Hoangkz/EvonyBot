@@ -19,7 +19,7 @@ from tests.flow import Step, back, end, run_flow, shell, swipe, tap, tap_at, tap
 def _eggs(bot, settings):
     """Như worker: xong (đủ 4 quả vỡ / không thấy event) thì lưu DONE_KEY."""
     result = crazy_eggs.run(bot, settings)
-    record_result(bot, None, DONE_KEY, result)
+    record_result(bot, DONE_KEY, result)
     return result
 
 

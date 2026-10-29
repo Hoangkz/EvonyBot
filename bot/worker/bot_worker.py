@@ -48,7 +48,7 @@ from ..activities.join_monster_war import IDLE as BOSS_IDLE
 from ..activities.join_monster_war import stamina_wait
 from ..activities.join_monster_war.constants import LISTBOSS
 from ..ocr.read_boss_count import crop as boss_count_crop, run as read_boss_count
-from ..common import get_server, no_alliance
+from ..common import get_server, no_alliance, no_gems
 from ..daily_reset import done_today, future_keys, last_reset
 from ..context import BotContext, BotInterrupted, TimedOut
 from ..context.errors import BossAvailable, StopRequested, YieldToBoss, YieldToTask
@@ -118,6 +118,7 @@ class BotWorker(QThread):
         self.serial = serial
         self.boss_board = boss_board
         self.activities = list(activities)
+        self.gems_out: set[str] = set()     # key nhiệm vụ đã báo hết kim cương: loại khỏi danh sách tới khi Start lại / sang ngày mới (không lưu DB)
         # Nhận cấu hình từ UI; ở đây giữ tham chiếu, không sao chép settings.
         self.settings = settings            # DeviceView.get_settings() snapshot
         # Dùng server đã cấu hình; nếu thiếu sẽ thử đọc trong game.
@@ -242,6 +243,7 @@ class BotWorker(QThread):
         ran = set()        # nhiệm vụ không có dấu xong trong DB: đã chạy hết một lượt kể từ lần reset gần nhất
         ran_once = set()   # nhiệm vụ `once` đã chạy xong: không làm lại khi sang ngày mới (chỉ khi Start lại)
         attempts = {}      # key -> số lần chạy hết một lượt mà vẫn chưa xong hôm nay (tối đa MAX_ATTEMPTS)
+        self.gems_out.clear()
         stalled = 0        # số nhiệm vụ liên tiếp chạy xong một lượt mà vẫn chưa xong
         scan_tried = False  # đã thử quét bản đồ thành trong lượt Start này (rảnh mới quét, xem nhánh `not pending` bên dưới)
         stamina_wait_on = False   # vòng trước đang chờ thể lực (đổi trạng thái thì ghi log)
@@ -263,6 +265,7 @@ class BotWorker(QThread):
                 reset = now_reset
                 ran.clear()
                 attempts.clear()
+                self.gems_out.clear()   # sang ngày mới: nhiệm vụ hết kim cương hôm qua được kiểm tra lại
                 # Tới mốc reset server: tắt game bật lại. Thường đã làm đúng giờ bởi ResetDue (guards.py, kể cả khi đang chạy
                 # nhiệm vụ); ở đây chỉ làm nếu chưa (restart_for_reset bỏ qua mốc đã xử lý). Game tự mở lại ở nhiệm vụ kế tiếp
                 # (go_home).
@@ -272,7 +275,7 @@ class BotWorker(QThread):
             # Nhiệm vụ cần route (needs_city_map) chờ tới khi máy có bản đồ thành (quét lúc rảnh, bên dưới); đã thử quét mà
             # không được thì thôi chờ, nhiệm vụ tự xoay xở.
             waiting = lambda t: t.needs_city_map and not self.ctx.city_map and not scan_tried
-            skip = lambda t: ((t.once and t.key in ran_once) or attempts.get(t.key, 0) >= MAX_ATTEMPTS
+            skip = lambda t: ((t.once and t.key in ran_once) or t.key in self.gems_out or attempts.get(t.key, 0) >= MAX_ATTEMPTS
                               or (t.needs_alliance and no_alliance.known(self.ctx))
                               or waiting(t) or self._is_done(t, ran))
             # Việc theo giờ: chỉ cần so giờ đã lưu trong DB; tới giờ thì làm ngay, trước các việc trong danh sách.
@@ -444,6 +447,7 @@ class BotWorker(QThread):
                 finally:
                     self.ctx._idle_abort = aborting
             self.ctx.swipe_watch = watch   # chỉ việc idle_only: có nhiệm vụ khác tới lượt thì ngắt (YieldToTask)
+        no_gems.take(self.ctx)   # bỏ cờ hết kim cương còn sót của lần trước
         try:
             # Lo bubble trước (không có Join Boss thì không có bước nào khác lo), rồi xét Stop / boss mới.
             self.guards.call(None, self.ctx.check)
@@ -482,6 +486,9 @@ class BotWorker(QThread):
             raise
         # Luôn gỡ deadline, kể cả khi Stop/lỗi, để không ảnh hưởng lượt chạy boss.
         finally:
+            if no_gems.take(self.ctx):   # nhiệm vụ báo hết kim cương (popup Buy / nút xám): loại khỏi danh sách, không thử lại
+                self.gems_out.add(task.key)
+                self.record(f"{task.key}: hết kim cương, loại khỏi danh sách nhiệm vụ (Start lại hoặc sang ngày mới thì kiểm tra lại)")
             self.guards.release()
             self.ctx._idle_abort = None
             self.ctx.swipe_watch = None

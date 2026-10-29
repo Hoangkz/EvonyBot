@@ -13,7 +13,7 @@ import numpy as np
 from ....ocr._digits import read as read_digits
 from ...result import TaskResult, save_errors
 from ..constants import GENERAL, HAMMER_DONE, STAMINA_REACHED
-from ....common import click_images, delay, exit_images, find_first, go_home
+from ....common import click_images, delay, exit_images, find_first, go_home, no_gems
 
 BUY = "DailyActivites/ActivitiesBuyDaily"
 FEATURES_ICON = "OpenBox/Setup/chucnang.png"   # ảnh dùng chung với OpenBox
@@ -26,6 +26,8 @@ BACK = "back"
 MAX_STEPS = 100
 COST_CROP = (170, 440, 75, 24)   # vùng số kim cương trên nút xanh của popup (màn 396x704); icon kim cương dịch trái theo độ dài số
 COST_FONT = "BuyCost"            # mẫu chữ số Images/OCR/BuyCost (số trên nút xanh, đã lọc màu kem)
+BUY_BUTTON = (130, 432, 136, 40)   # vùng nút mua của popup (x, y, w, h; màn 396x704), cùng chỗ ở popup Stamina / Hammer
+BUY_DISABLED_MAX = 25   # không đủ kim cương thì nút mua XÁM (không có popup Buy): G - R trung bình ~1; nút xanh ~50
 HAMMER_SOLD_OUT = f"{BUY}/HammerSoldOut.png"   # nút giá xám của dòng Hammer ("Daily Limit: 0 / 10"): hết lượt hôm nay
 SOLD_OUT_THRESHOLD = 0.97   # nút giá còn lượt (cam) khớp 0,88 với mẫu xám: phải đặt cao hơn
 HAMMER_MAX_TAPS = 10             # số lần bấm "+" khi mua Hammer (giới hạn 10 / ngày)
@@ -107,6 +109,21 @@ def _close_popup(bot):
     bot.back(delay=1)
 
 
+def _buy_disabled(screen) -> bool:
+    """Nút mua của popup bị xám (không đủ kim cương cho số lượng đang chọn)."""
+    x, y, w, h = BUY_BUTTON
+    box = screen[y:y + h, x:x + w].astype(int)
+    return float((box[..., 1] - box[..., 2]).mean()) < BUY_DISABLED_MAX
+
+
+def _stop_no_gems(bot, what: str) -> bool:
+    """Nút mua xám: ghi lịch sử, đóng popup, không mua. False = chưa xong (lượt sau thử lại như bình thường)."""
+    bot.record(f"Daily General: not enough gems for {what} (buy button disabled), not buying")
+    no_gems.flag(bot)
+    _close_popup(bot)
+    return False
+
+
 def _buy_in_popup(bot, screen, target: int) -> bool:
     """Popup mua Stamina đang mở ở số lượng 1. Không mua lại cái đã mua hôm nay:
     1. OCR Cost (số lượng 1) -> các khả năng số cái đã mua (stamina_done); lấy nhỏ nhất `k`.
@@ -114,6 +131,8 @@ def _buy_in_popup(bot, screen, target: int) -> bool:
     3. Bấm "+" lên (target - k) cái, OCR lại Cost -> biết chính xác số đã mua.
     4. Thực tế đã mua nhiều hơn k -> bấm "-" lùi số bước dư, rồi bấm nút mua.
     Không đọc được Cost: không mua (tránh tốn kim cương)."""
+    if _buy_disabled(screen):
+        return _stop_no_gems(bot, "Stamina")
     cost = read_cost(bot, screen)
     candidates = stamina_done([cost]) if cost is not None else []
     if not candidates:
@@ -243,6 +262,8 @@ def buy_all_hammers(bot) -> bool:
             # đáng tin: trượt khỏi đầu thanh nên chỉ mua 1 cái.
             for _ in range(HAMMER_MAX_TAPS):
                 bot.tap(*plus, delay=PLUS_WAIT)
+            if _buy_disabled(bot.screenshot()):
+                return _stop_no_gems(bot, "Hammer")
             bot.tap(screen.shape[1] // 2, plus[1] + 110, delay=5)
             return True
         if action == "special_selected":

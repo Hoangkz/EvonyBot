@@ -101,6 +101,26 @@ class BlackMarketFlow(unittest.TestCase):
         device = _run(self, flow, _settings(quantity_buy="1"))
         self.assertIn("Black Market: Instant Refresh 1", device.logs)
 
+    def test_not_enough_gems_after_confirm_stops(self):
+        """Bấm Confirm mua mà thiếu kim cương -> popup "insufficient Gems ... Buy": Back (không Buy), không tính là đã mua,
+        Back ra khỏi Black Market, dừng."""
+        flow = [
+            *_buy("bm_screen.png", 0),
+            Step(f"{KP}bm_no_gems.png", back(), back(), end()),
+        ]
+        device = _run(self, flow, _settings())
+        self.assertIn("Black Market: not enough gems (buy-gems popup), cancel", device.logs)
+        self.assertIn("Black Market: not enough gems (buy-gems popup), bought 0, stop", device.logs)
+
+    def test_not_enough_gems_after_refresh_stops(self):
+        """Bấm Instant Refresh mà thiếu kim cương -> popup Buy: Back, Back ra khỏi Black Market, dừng (không bấm Refresh lại)."""
+        flow = [
+            Step(f"{KP}bm_screen.png?sold_out", tap(INSTANT_REFRESH)),
+            Step(f"{KP}bm_no_gems.png", back(), back(), end()),
+        ]
+        device = _run(self, flow, _settings())
+        self.assertIn("Black Market: not enough gems (buy-gems popup), bought 0, stop", device.logs)
+
     def test_refresh_limit(self):
         """Hết ô để mua và đã đủ số lần Refresh (2) -> Back, không refresh thêm."""
         flow = [

@@ -12,9 +12,9 @@ keep_bubble() làm cả hai việc trong một lần vào game:
 5. Quay lại Use Item: đọc "Remaining Time" mới, lưu, thoát ra.
 Không đủ kim cương để mua -> ném NotEnoughGems (worker bỏ tích Bubble).
 """
-from ..context.templates import TEMPLATE_DIR
 from ..ocr.read_bubble_time import ink as has_text
 from ..ocr.read_bubble_time import run as read_bubble_time
+from . import no_gems
 from .click_images import click_images
 from .delay import delay
 from .exit_images import exit_images
@@ -33,9 +33,6 @@ BUFF_ICON = "Bubble/1.png"      # icon buff dưới avatar ở màn hình chính
 TRUCE = "Bubble/truce.png"      # icon Truce Agreement ở màn City Buff
 USE_ITEM = "Bubble/useItem.png" # tiêu đề "Use Item"
 CONFIRM = "Bubble/confirm.png"  # nút Confirm của popup thay / dùng / mua bubble
-# Màn báo không đủ kim cương. Chưa có ảnh: khi thêm file này vào Images/ thì
-# bot tự nhận ra (xem _targets).
-NO_GEMS = "Bubble/noGems.png"
 # Tiêu đề từng loại ở màn Use Item -> (ảnh, khoảng cách từ góc trên-trái tiêu đề
 # tới giữa nút Use / kim cương cùng dòng). Tiêu đề "Hour" xuống 2 dòng nên nút thấp hơn.
 TYPE_ROWS = {
@@ -74,7 +71,6 @@ def _targets() -> list[tuple[str, str]]:
     """(ảnh, action); ảnh đứng trước được ưu tiên hơn. Popup Confirm trước
     hết: màn dưới popup bị tối đi nhưng tiêu đề Use Item vẫn khớp."""
     return [
-        *([(NO_GEMS, NOT_ENOUGH)] if (TEMPLATE_DIR / NO_GEMS).exists() else []),
         (CONFIRM, CONFIRMED),
         (USE_ITEM, USE),
         (TRUCE, CITY_BUFF),
@@ -120,8 +116,12 @@ def keep_bubble(bot, bubble_type: str, renew_before: int) -> int | None:
     known = None            # thời gian đọc được gần nhất
     screen = bot.screenshot()
     for _ in range(MAX_ROUNDS):
-        action, pos = find_first(bot, screen, targets, top_left=top_left,
-                                 regions=REGIONS, thresholds=THRESHOLDS)
+        # Popup "insufficient Gems ... Buy" (bấm nút kim cương mà thiếu): xét trước hết, màn Use Item dưới popup vẫn khớp.
+        if no_gems.shown(bot, screen):
+            action, pos = NOT_ENOUGH, None
+        else:
+            action, pos = find_first(bot, screen, targets, top_left=top_left,
+                                     regions=REGIONS, thresholds=THRESHOLDS)
         if action == NOT_ENOUGH:
             bot.log(f"Bubble: không đủ kim cương để mua {bubble_type}")
             _leave(bot, 3)      # đóng thông báo, rồi Use Item -> City Buff -> màn hình chính

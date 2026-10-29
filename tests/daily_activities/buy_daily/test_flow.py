@@ -55,8 +55,32 @@ class BuyDailyFlow(unittest.TestCase):
             *OPEN_STORE,
             Step("03_items_resources.png", tap(f"{buy.BUY}/special.png")),
             Step("08_special_list.png", tap(f"{buy.BUY}/checkSpecial.png"), tap_pct(87.5, 35)),
-            Step("09_hammer_popup_1.png", tap_at(PLUS_XY[0] - 20, PLUS_XY[1] + 2), tap_at(*CONFIRM)),
+            Step("09_hammer_popup_1.png", *[tap(PLUS)] * buy.HAMMER_MAX_TAPS, tap_at(*CONFIRM)),
             Step("01_home.png", end(result=True)),
+        ]
+        run_flow(self, lambda bot, _s: buy.buy_all_hammers(bot), SCREENS, flow, {})
+
+    def test_stamina_not_enough_gems_button_disabled(self):
+        """Không đủ kim cương: nút mua (2,000) xám, không có popup Buy -> chỉ Back đóng popup, không mua, chưa xong."""
+        flow = [
+            *OPEN_STORE,
+            Step("03_items_resources.png", tap(f"{buy.BUY}/war.png")),
+            Step("04_items_war.png", swipe()),
+            Step("05_war_scrolled.png", tap_at(334, 468, tol=20)),
+            Step("27_stamina_popup_no_gems.png", back()),
+            Step("01_home.png", end(result=False)),
+        ]
+        run_flow(self, lambda bot, _s: buy.buy_stamina(bot, 10), SCREENS, flow, {})
+
+    def test_hammers_not_enough_gems_button_disabled(self):
+        """Hammer 10 / 10 nhưng nút mua (2,000) xám: bấm "+" xong thấy nút xám -> Back, không bấm mua, chưa xong
+        (trước đây bấm nút xám rồi coi là đã mua)."""
+        flow = [
+            *OPEN_STORE,
+            Step("03_items_resources.png", tap(f"{buy.BUY}/special.png")),
+            Step("08_special_list.png", tap(f"{buy.BUY}/checkSpecial.png"), tap_pct(87.5, 35)),
+            Step("28_hammer_popup_no_gems.png", *[tap(PLUS)] * buy.HAMMER_MAX_TAPS, back()),
+            Step("01_home.png", end(result=False)),
         ]
         run_flow(self, lambda bot, _s: buy.buy_all_hammers(bot), SCREENS, flow, {})
 

@@ -83,6 +83,28 @@ class DonateFlow(unittest.TestCase):
             device = _run(self, flow, {donate.KEY: {"value": 60, "day": 2}})
         self.assertNotIn(donate.KEY, device.daily_done)
 
+    def test_donate_out_of_gems(self):
+        """Hết lượt miễn phí, bấm nút kim cương -> popup "insufficient Gems ... Buy" -> Back (không Buy), xong hôm
+        nay (mai làm tiếp); không bấm kim cương thêm lần nào."""
+        flow = [
+            Step("day2_teamwork.png", tap_at(335, 567)),
+            Step("donate_gems.png", tap(GEMS_BUTTON)),
+            Step("donate_no_gems.png", back(), end()),
+        ]
+        device = _run(self, flow, {donate.KEY: {"value": 60, "day": 2}})
+        self.assertIn(donate.KEY, device.daily_done)
+        self.assertTrue(any("out of gems" in line for line in device.logs))
+
+    def test_donate_via_alliance_out_of_gems(self):
+        """Ô Patrol = 0, hết lượt miễn phí: bấm nút kim cương -> popup không đủ kim cương -> Back, xong hôm nay."""
+        settings = {patrol.KEY: {"value": 0, "day": 2}, donate.KEY: {"value": 60, "day": 2}}
+        flow = [
+            Step("donate_gems.png", tap(GEMS_BUTTON)),
+            Step("donate_no_gems.png", back(), end()),
+        ]
+        device = _run(self, flow, settings, ctx_settings={"Event": settings})
+        self.assertIn(donate.KEY, device.daily_done)
+
 
 if __name__ == "__main__":
     unittest.main()

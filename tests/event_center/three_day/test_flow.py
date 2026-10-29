@@ -27,7 +27,7 @@ def _three_day(bot, settings):
     result = run_module.run(bot, settings)
     for outcome in result.outcomes:
         record_outcome(bot, settings, outcome)
-    record_result(bot, None, c.DONE_KEY, result)
+    record_result(bot, c.DONE_KEY, result)
     return result
 
 
@@ -100,6 +100,28 @@ class ThreeDayFlow(unittest.TestCase):
             device = self._run(flow, settings)
         self.assertEqual(calls, [(c.ALLIANCE_KEY, 0, 60)] * c.GO_TRIES)
         self.assertIn(c.ALLIANCE_KEY, device.daily_done)
+
+    def test_alliance_out_of_gems_saves_nothing(self):
+        """Donate hết kim cương (after_go trả OUT_OF_GEMS): chỉ bấm Go một lần (không thử lại GO_TRIES lần), KHÔNG lưu gì vào
+        DB: không lưu nhiệm vụ Alliance, cũng không lưu cả event xong hôm nay (lần chạy sau kiểm tra lại)."""
+        from bot.activities.event.kings_path.donate.run import OUT_OF_GEMS
+        calls = []
+
+        def after_go(bot, path, done, target):
+            calls.append((path.key, done, target))
+            return OUT_OF_GEMS
+
+        flow = _to_event() + [
+            Step(TD + "04_tasks.png", swipe()),
+            Step(TD + "05_donate_rows.png", tap_at(336, 390, tol=6)),
+            Step(TD + "05_donate_rows.png", end()),
+        ]
+        settings = {"three_day_alliance": {"value": 60}, "three_day_heal": {"value": 0}}
+        with mock.patch.object(run_module, "TASKS", [(c.ALLIANCE_KEY, "Alliance", after_go)]),                 mock.patch.object(run_module, "_claim_and_redeem", return_value=None):
+            device = self._run(flow, settings)
+        self.assertEqual(calls, [(c.ALLIANCE_KEY, 0, 60)])
+        self.assertNotIn(c.ALLIANCE_KEY, device.daily_done)
+        self.assertNotIn(c.DONE_KEY, device.daily_done)
 
     def test_heal_row_go(self):
         """Heal 5000: cuộn xuống thấy chữ chung "Heal" + nút Go (dòng Heal đầu thấy được), đọc tiến độ 0 < 5000, bấm

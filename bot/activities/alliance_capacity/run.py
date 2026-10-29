@@ -8,7 +8,7 @@ xong khi hàm chạy hết một lượt); chỉ lỗi thật mới lưu `allian
 
 Each loop takes one screenshot, finds the first known image on it (checked in list order) and acts on it.
 """
-from ...common import no_alliance
+from ...common import no_alliance, no_gems
 from ...common import click_images, delay, exit_images, find_first, go_home
 from ..daily_activities.alliance_donation.constants import TRIED_KEY as DONATION_TRIED_KEY
 from ..result import save_errors
@@ -30,6 +30,9 @@ def run(bot, settings: dict):
         action, pos = find_first(bot, screen, targets, top_left={OUT_ALLIANCE})
 
         if action == DONE:
+            bot.record("Alliance Capacity: buy-gems popup (not enough gems), stop")
+            no_gems.flag(bot)
+            bot.back(delay=1)   # đóng popup (Cancel), không Buy
             break
         if action == GEMS:
             if gems_limit != -1 and gems_used >= gems_limit:

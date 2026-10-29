@@ -15,6 +15,7 @@ mai làm tiếp (tiến độ game lưu ở dòng Go, lượt sau đọc lại).
 import cv2
 import numpy as np
 
+from .....common import no_gems
 from ...city_building import WALLS
 from ...common import EventState, mark_daily_activity, mark_done, mark_target_reached
 from .. import path_task
@@ -117,7 +118,14 @@ def patrol_rounds(bot, progress: int, target: int, finish, name: str = NAME, key
             return False
         if not _tap(bot, screen, PATROL_BUTTON, f"Patrol (round {today + 1} today)", name):
             return False
-        if not _wait_claimed(bot):
+        try:
+            confirmed = _wait_claimed(bot, name)
+        except no_gems.OutOfGems:
+            # Nút Patrol tốn kim cương, thiếu thì hiện popup "insufficient Gems ... Buy" (đã Back đóng, không Buy): dừng,
+            # KHÔNG lưu gì vào DB (không finish): nhiệm vụ chưa xong, worker bỏ qua nó sau MAX_ATTEMPTS lần, lần chạy sau vẫn kiểm tra.
+            bot.record(f"{name}: not enough gems (buy-gems popup), stop")
+            return False
+        if not confirmed:
             bot.record(f"{name}: patrol not confirmed after {PATROL_CONFIRM_WAIT} s, not counted, stop")
             return False
         today += 1
@@ -150,10 +158,13 @@ def _claimed(screen) -> bool:
     return int((stats[1:, cv2.CC_STAT_AREA] >= BIG_TICK_AREA).sum()) >= BIG_TICKS
 
 
-def _wait_claimed(bot) -> bool:
-    """Sau khi bấm Patrol: chờ (tối đa PATROL_CONFIRM_WAIT giây) màn chuyển sang "đã patrol"."""
+def _wait_claimed(bot, name: str = NAME) -> bool:
+    """Sau khi bấm Patrol: chờ (tối đa PATROL_CONFIRM_WAIT giây) màn chuyển sang "đã patrol". Hiện popup không đủ kim
+    cương -> no_gems.check đóng popup rồi ném OutOfGems."""
     for _ in range(PATROL_CONFIRM_WAIT):
-        if _claimed(bot.screenshot()):
+        screen = bot.screenshot()
+        no_gems.check(bot, screen, name)
+        if _claimed(screen):
             return True
         bot.sleep(1)
     return False

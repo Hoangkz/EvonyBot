@@ -156,6 +156,18 @@ class EventFlow(unittest.TestCase):
         device = run_flow(self, run_event_tasks, SCREENS, flow, SETTINGS, variants=VARIANTS)
         self.assertNotIn(KEY, device.daily_done)
 
+    def test_not_enough_gems_stops(self):
+        """Bấm Cultivate x100 mà thiếu gems: popup "insufficient Gems ... Buy" -> Back đóng (không Buy), không tính +100,
+        không bấm x100 lại, dừng; KHÔNG lưu gì vào DB (lần chạy sau vẫn kiểm tra lại)."""
+        flow = [
+            *TO_GENERALS, *TO_QUICK_CULTIVATE,
+            Step("11_quick_cultivate.png", tap("Event/GatherTroops/CultivateGenerals/cultivateX100.png")),
+            Step("14_quick_cultivate_no_gems.png", back(), end()),
+        ]
+        device = run_flow(self, run_event_tasks, SCREENS, flow, SETTINGS, variants=VARIANTS)
+        self.assertNotIn(KEY, device.daily_done)
+        self.assertFalse([line for line in device.logs if "Cultivate x100 ->" in line])
+
     def test_cultivate_button_4_columns(self):
         """Tướng có hàng 4 nút (thêm Specialty): nút Cultivate nhỏ hơn, ở (152, 677)."""
         flow = [

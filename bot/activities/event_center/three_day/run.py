@@ -26,7 +26,7 @@ from ...event import cycle
 from ...event.run import record_outcome
 from ...result import NOT_DONE, TaskResult, clear, save_errors, take_all
 from ...event.constants import CONGRATULATIONS, GO_BUTTON, GO_REGION
-from ...event.kings_path.donate.run import _donate as donate_after_go
+from ...event.kings_path.donate.run import OUT_OF_GEMS, _donate as donate_after_go
 from ...event.kings_path.heal.run import _heal as heal_after_go
 from ...event.kings_path.path_task import AGAIN
 from ..common import HANDLED, ICON_NOT_FOUND, TAB_NOT_FOUND, run_task
@@ -50,7 +50,7 @@ def run(bot, settings: dict) -> TaskResult:
         return NOT_DONE
     # Nhiệm vụ coi là xong TRONG LƯỢT này (ctx["finished"]) chỉ khi quét danh sách thấy một trong 3 trường hợp (xem
     # _check_task); dấu "đã xong" (daily_done) do donate / heal tự lưu không dùng để bỏ qua việc kiểm tra.
-    ctx = {"finished": set(), "go_tries": {}}
+    ctx = {"finished": set(), "go_tries": {}, "out_of_gems": set()}
     misses = rounds = 0   # misses: số lần liên tiếp quét mà không kết luận được nhiệm vụ nào
     while rounds < c.MAX_ROUNDS:
         rounds += 1
@@ -83,6 +83,10 @@ def run(bot, settings: dict) -> TaskResult:
     bot.check()
     if _claim_and_redeem(bot, _order(settings)) in (TAB_NOT_FOUND, ICON_NOT_FOUND):
         return _missing(bot)
+    if ctx["out_of_gems"]:
+        # Hết kim cương (popup Buy) ở nhiệm vụ nào đó: KHÔNG lưu gì vào DB cho nó, cũng không báo cả event xong hôm nay.
+        bot.record(f"{NAME}: hết kim cương ({', '.join(sorted(ctx['out_of_gems']))}), chưa xong hôm nay, lần chạy sau kiểm tra lại")
+        return TaskResult(outcomes=tuple(take_all(bot)))
     bot.record(f"{NAME}: xong hôm nay")
     return _finished(bot)
 
@@ -355,7 +359,10 @@ def _check_task(bot, screen, task, ctx):
             return _ROW_DONE
         bot.tap(*pos, delay=c.GO_WAIT)
         _wait_settled(bot)
-        after_go(bot, SimpleNamespace(key=key, name=name), done, target)
+        if after_go(bot, SimpleNamespace(key=key, name=name), done, target) == OUT_OF_GEMS:
+            # Hết kim cương: không bấm Go lại trong lượt này; không lưu gì vào DB (xem run()).
+            ctx["out_of_gems"].add(key)
+            return _ROW_DONE
         return HANDLED
     if _three_claimed([(title, status) for title, status, _ in rows]):
         bot.record(f"{NAME}: {name} 3 rows all Claimed, done")

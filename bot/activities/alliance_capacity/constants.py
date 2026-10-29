@@ -5,7 +5,7 @@ SCIENCE = "Science"
 BOSS = "JoinBoss"
 
 # What to do when each image is seen.
-DONE = "done"               # buy-gems dialog: out of free donations -> finished
+DONE = "done"               # popup "insufficient Gems ... Buy": hết gem / hết lượt free -> đóng popup, dừng activity
 GEMS = "gems"               # donate with gems
 DONATE = "donate"           # donate screen open -> long-press Donate
 OUT_ALLIANCE = "out_alliance"

@@ -63,6 +63,25 @@ class KeepBubbleFlowTests(unittest.TestCase):
         ]
         run_flow(self, run, SCREENS, flow, {"type": "3d", "renew": 25000})
 
+    def test_buy_without_enough_gems_stops(self):
+        """Bấm nút kim cương mà thiếu: popup "insufficient Gems ... Buy" -> Back đóng popup (không Buy), rồi Back ra khỏi
+        Use Item -> City Buff -> màn chính, ném NotEnoughGems (worker bỏ tích Bubble)."""
+        from bot.common.bubble import NotEnoughGems
+
+        def run_catching(ctx, settings):
+            try:
+                return keep_bubble(ctx, settings["type"], settings["renew"])
+            except NotEnoughGems:
+                return "no_gems"
+
+        flow = [
+            Step("home.png", tap(BUFF_ICON)),
+            Step("city_buff_time.png", tap(TRUCE)),
+            Step("use_item_time.png", tap_at(333, 453)),     # nút kim cương dòng 3d
+            Step("use_item_no_gems.png", back(3), end("no_gems")),
+        ]
+        run_flow(self, run_catching, SCREENS, flow, {"type": "3d", "renew": 25000})
+
     def test_new_time_unreadable_falls_back_to_duration(self):
         # Sau khi dùng vẫn thấy thời gian cũ (<= renew) -> đọc lại 3 lần rồi tính theo loại.
         flow = [

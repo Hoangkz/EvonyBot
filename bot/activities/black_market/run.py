@@ -19,6 +19,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from ...common import no_gems
 from ...ocr.read_balance import read_gems, read_gold
 from ..daily_activities.constants import MAIN_MORE
 from ..event.kings_path.black_market.constants import (
@@ -180,42 +181,47 @@ def buy(bot, settings: dict, wanted: list[Wanted]) -> int:
     buy_limit = _limit(settings.get("quantity_buy"))
     bought = refreshes = idle = 0
     tried: set[int] = set()   # ô đã bấm trong bộ hàng hiện tại
-    while idle < MAX_IDLE_STEPS:
-        idle += 1
-        screen = bot.screenshot()
-        if bot.find(TITLE, screen=screen) is None:
-            bot.record(f"{NAME}: not on Black Market screen, stop")
-            return bought
-        low = _low_balance(screen, check_gold)
-        if low:
-            return _stop(bot, f"{low}, bought {bought}", bought)
-        if buy_limit != NO_LIMIT and bought >= buy_limit:
-            return _stop(bot, f"Quantity Buy reached ({bought})", bought)
-        targets = [t for t in scan(bot, screen, wanted) if t.slot not in tried]
-        if targets:
-            target = targets[0]
-            tried.add(target.slot)
-            bot.log(f"{NAME}: buy {target.item} (slot {target.slot + 1})")
-            bot.tap(*target.pos)
-            confirm = bot.wait_for(CONFIRM, timeout=CONFIRM_WAIT)
-            if confirm is None:
-                bot.log(f"{NAME}: no Confirm for slot {target.slot + 1}, skip it")
+    try:
+        while idle < MAX_IDLE_STEPS:
+            idle += 1
+            screen = bot.screenshot()
+            no_gems.check(bot, screen, NAME)
+            if bot.find(TITLE, screen=screen) is None:
+                bot.record(f"{NAME}: not on Black Market screen, stop")
+                return bought
+            low = _low_balance(screen, check_gold)
+            if low:
+                return _stop(bot, f"{low}, bought {bought}", bought)
+            if buy_limit != NO_LIMIT and bought >= buy_limit:
+                return _stop(bot, f"Quantity Buy reached ({bought})", bought)
+            targets = [t for t in scan(bot, screen, wanted) if t.slot not in tried]
+            if targets:
+                target = targets[0]
+                tried.add(target.slot)
+                bot.log(f"{NAME}: buy {target.item} (slot {target.slot + 1})")
+                bot.tap(*target.pos)
+                confirm = bot.wait_for(CONFIRM, timeout=CONFIRM_WAIT)
+                if confirm is None:
+                    bot.log(f"{NAME}: no Confirm for slot {target.slot + 1}, skip it")
+                    continue
+                bot.tap(*confirm, delay=BUY_WAIT)
+                no_gems.check(bot, bot.screenshot(), NAME)   # thiếu kim cương: popup hiện thay vì mua
+                bought += 1
+                idle = 0
+                bot.log(f"{NAME}: bought {bought}" + ("" if buy_limit == NO_LIMIT else f" / {buy_limit}"))
                 continue
-            bot.tap(*confirm, delay=BUY_WAIT)
-            bought += 1
+            if refresh_limit != NO_LIMIT and refreshes >= refresh_limit:
+                return _stop(bot, f"Refresh limit reached ({refreshes}), bought {bought}", bought)
+            if bot.find(INSTANT_REFRESH, screen=screen) is None:
+                return _stop(bot, f"no Instant Refresh, bought {bought}", bought)
+            refreshes += 1
+            bot.log(f"{NAME}: Instant Refresh {refreshes}" + ("" if refresh_limit == NO_LIMIT else f" / {refresh_limit}"))
+            if not _refresh(bot, screen, NAME):
+                return _stop(bot, f"items did not change after Refresh, bought {bought}", bought)
+            tried.clear()
             idle = 0
-            bot.log(f"{NAME}: bought {bought}" + ("" if buy_limit == NO_LIMIT else f" / {buy_limit}"))
-            continue
-        if refresh_limit != NO_LIMIT and refreshes >= refresh_limit:
-            return _stop(bot, f"Refresh limit reached ({refreshes}), bought {bought}", bought)
-        if bot.find(INSTANT_REFRESH, screen=screen) is None:
-            return _stop(bot, f"no Instant Refresh, bought {bought}", bought)
-        refreshes += 1
-        bot.log(f"{NAME}: Instant Refresh {refreshes}" + ("" if refresh_limit == NO_LIMIT else f" / {refresh_limit}"))
-        if not _refresh(bot, screen, NAME):
-            return _stop(bot, f"items did not change after Refresh, bought {bought}", bought)
-        tried.clear()
-        idle = 0
+    except no_gems.OutOfGems:
+        return _stop(bot, f"not enough gems (buy-gems popup), bought {bought}", bought)
     return _stop(bot, f"nothing done in {MAX_IDLE_STEPS} steps, bought {bought}", bought)
 
 

@@ -6,6 +6,7 @@ Mỗi bước chụp 1 ảnh: hộp "Spend N Gems on clearing the Cooldown?" -> 
 khoa học trên cùng -> bấm (+1), bấm tiếp tới khi hết lượt miễn phí (nút kim cương), kể cả khi đã đủ số cần; chưa đủ
 mà hết lượt -> mua lại lượt, tối đa MAX_GEM_BUYS lần.
 """
+from .....common import no_gems
 from .constants import (
     DONATE_BUTTONS,
     DONATE_WAIT,
@@ -19,14 +20,27 @@ from .constants import (
 )
 
 
+class OutOfGems(Exception):
+    """Bấm nút kim cương mà hiện popup "insufficient Gems" (đã Back, không Buy). `donated` = số lần đã donate."""
+
+    def __init__(self, donated: int):
+        super().__init__(donated)
+        self.donated = donated
+
+
 def donate_times(bot, name: str, need: int, on_donate=None) -> int:
     """Donate ở màn Alliance Science tới khi HẾT LƯỢT MIỄN PHÍ (nút Donate chuyển thành nút kim cương), kể cả
     khi đã đủ `need` lần (người dùng chốt: không dừng trước khi ra nút kim cương). Mới đủ `need` thì không mua
     thêm lượt bằng kim cương; chưa đủ mà hết lượt miễn phí thì mua lại (tối đa MAX_GEM_BUYS lần). `on_donate(i)`
-    gọi sau lần donate thứ i (VD lưu tiến độ). Trả số lần đã donate (< need nếu hết lượt mua / không nhận ra màn)."""
+    gọi sau lần donate thứ i (VD lưu tiến độ). Trả số lần đã donate (< need nếu hết lượt mua / không nhận ra màn).
+    Hiện popup không đủ kim cương (no_gems) -> Back (không Buy) rồi ném OutOfGems."""
     donated = gem_buys = misses = 0
     while donated < MAX_DONATES:
-        action, pos = read_screen(bot, bot.screenshot())
+        screen = bot.screenshot()
+        if no_gems.shown(bot, screen):
+            no_gems.dismiss(bot, name)
+            raise OutOfGems(donated)
+        action, pos = read_screen(bot, screen)
         if action is None:
             misses += 1
             if misses > MAX_MISSES:

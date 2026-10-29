@@ -60,6 +60,10 @@ STEP_WAIT = 0.3      # sau mỗi lần bấm "−" / "+" (giữ nhanh)
 TAX_STEP_WAIT = 2    # chờ thêm sau mọi bước khác trong màn Tax (bấm dòng, popup hiện, Tax, về màn Tax)
 # Nút "Tax" to trong popup (198, 438): 1,00; màn khác <= 0,61.
 POPUP_TAX = f"{CITY_TAX}/popupTax.png"
+# Không đủ kim cương cho số lần đã chọn: Cost hiện chữ ĐỎ và nút Tax XÁM (không có popup Buy; xám khớp popupTax.png 0,81 -> không
+# nhận ra theo ảnh): vùng nút lấy G - R trung bình: xanh ~54, xám ~1 (hộp xác nhận làm tối nút ~14) -> dưới ngưỡng là xám.
+POPUP_TAX_BOX = (130, 424, 136, 28)   # (x, y, w, h) quanh nút (198, 438)
+POPUP_TAX_DISABLED_MAX = 10
 # Nút "+" của popup (324, 345; PLUS_OFFSET so với chữ "Cost"): 1,00 khi popup mở; màn Tax đã đóng
 # popup 0,58 (màn Train cũng có "+" 0,98 -> chỉ tìm trong ô PLUS_HALF quanh vị trí nút). Bấm Tax
 # trong popup xong: không thấy "+" = popup đã đóng; còn thấy thì kiểm tra lại CLOSE_CHECKS lần, mỗi
