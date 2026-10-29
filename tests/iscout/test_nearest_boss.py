@@ -10,6 +10,16 @@ from bot.activities.attack_boss.sources import BossOffer
 from bot.common import boss_scan
 
 run = importlib.import_module("bot.activities.attack_boss.run")      # `attack_boss.run` là hàm run của package, lấy module qua importlib
+
+
+def setUpModule():
+    global _gray_patch
+    _gray_patch = mock.patch.object(run, "_march_gray", lambda screen, pos: False)      # ảnh giả của các test này là chuỗi, không đo màu nút March
+    _gray_patch.start()
+
+
+def tearDownModule():
+    _gray_patch.stop()
 CENTER = boss_scan.CAMERA_PX
 
 
@@ -336,7 +346,7 @@ class StaminaTests(unittest.TestCase):
             return refill_result
         records = []
         bot = SimpleNamespace(sleep=lambda seconds: None, screenshot=lambda: "shot", log=lambda message: None, record=records.append,
-                              tap=lambda *args, **kwargs: None, find=find, back=lambda *args, **kwargs: None)
+                              tap=lambda *args, **kwargs: None, tap_percent=lambda *args, **kwargs: None, find=find, back=lambda *args, **kwargs: None)
         with (mock.patch.object(run, "_Boss", lambda b, s: SimpleNamespace(troops=[1], use_stamina=use_stamina)),
               mock.patch.object(run, "_pick_troop", lambda *args: 1),
               mock.patch.object(run.lanes, "no_lanes", lambda b, s: False),
@@ -569,7 +579,7 @@ class LowOddsTests(unittest.TestCase):
     def test_march_cancels_the_box_and_flags_the_boss(self):
         taps = []
         bot = SimpleNamespace(sleep=lambda seconds: None, screenshot=lambda: "shot", log=lambda message: None, record=lambda message: None,
-                              tap=lambda *args, **kwargs: taps.append(args))
+                              tap=lambda *args, **kwargs: taps.append(args), tap_percent=lambda *args, **kwargs: None)
 
         def find(template, screen=None, region=None, threshold=0.8, **kwargs):
             if template == run.LOW_ODDS:
@@ -587,7 +597,7 @@ class LowOddsTests(unittest.TestCase):
     def test_no_troop_with_general_backs_out_to_a_clean_map(self):
         backs, cleaned = [], []
         bot = SimpleNamespace(sleep=lambda seconds: None, screenshot=lambda: "shot", log=lambda message: None, record=lambda message: None,
-                              tap=lambda *args, **kwargs: None, back=lambda *args, **kwargs: backs.append(1),
+                              tap=lambda *args, **kwargs: None, tap_percent=lambda *args, **kwargs: None, back=lambda *args, **kwargs: backs.append(1),
                               find=lambda template, **kwargs: (200, 670) if template == run.MARCH_BUTTON else None)
         with (mock.patch.object(run, "_Boss", lambda b, s: SimpleNamespace(troops=[1, 2, 3])),
               mock.patch.object(run, "_pick_troop", lambda *args: None),
