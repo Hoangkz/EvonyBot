@@ -1,8 +1,8 @@
-"""Exact Gift Claims flow for Event Center > Great Expedition.
+"""Luồng Gift Claims chính xác cho Event Center > Great Expedition.
 
-Every tap is anchored to a supplied image.  The only colour inspection is the
-red/available state of the dice costs after the ``Roll x5`` button itself has
-been found, so map artwork can never be interpreted as a disabled roll.
+Mỗi lần bấm đều neo theo ảnh tham chiếu người dùng cung cấp. Phần kiểm tra màu
+duy nhất là trạng thái đỏ/còn dùng được của giá xúc xắc sau khi đã tìm thấy nút
+``Roll x5``; vì vậy hình nền bản đồ không thể bị hiểu nhầm là lượt roll bị khóa.
 """
 from __future__ import annotations
 
@@ -19,12 +19,12 @@ KEY = "gift_great_expedition"
 POLICY = EventPolicy("Great Expedition", key=KEY,
                      screen=GiftScreen.GREAT_EXPEDITION)
 
-# The green frames supplied by the user.  Swipes never leave these interiors.
+# Các khung xanh do người dùng cung cấp. Thao tác vuốt không vượt khỏi phần bên trong.
 QUEST_CONTENT_REGION = (5, 34, 96, 85)
 QUEST_CLAIM_REGION = (65, 34, 96, 85)
 CHEST_QUEST_CONTENT_REGION = (5, 25, 96, 88)
-# The first green map-chest Claim is centred at y=175 on a 704 px frame.
-# Starting at 25% means y=176 and loses that control by one pixel.
+# Claim xanh đầu tiên của rương map có tâm y=175 trên khung cao 704 px.
+# Bắt đầu từ 25% là y=176, khiến nút này bị mất chỉ vì lệch một px.
 CHEST_QUEST_CLAIM_REGION = (65, 22, 96, 88)
 MAP_CHEST_LEFT_REGION = (0, 18, 30, 48)
 ROLL_REGION = (2, 88, 98, 100)
@@ -38,8 +38,8 @@ MAX_PANEL_SWIPES = 15
 MAX_CLAIMS_PER_VIEW = 12
 MAX_TAPS_PER_GREEN_CLAIM = 3
 MAX_ROLLS_PER_WINDOW = 80
-# Median of all 15 supplied Expedition Trial frames.  It scores 0.803..0.973
-# on the real chest and at most 0.221 against every reward-grid false match.
+# Ảnh trung vị của cả 15 khung Expedition Trial được cung cấp. Điểm khớp là
+# 0.803..0.973 với rương thật, và cao nhất chỉ 0.221 với mọi kết quả nhầm trong lưới quà.
 TRIAL_CHEST_THRESHOLD = 0.75
 
 MAIN_TITLE = "EventCenter/GreatExpedition/title"
@@ -90,14 +90,14 @@ def _main_open(bot, screen=None) -> bool:
 
 
 def _map_open(bot, screen=None) -> bool:
-    """The Roll x5 control distinguishes the map from Expedition Trial."""
+    """Nút Roll x5 dùng để phân biệt trang map với Expedition Trial."""
     screen = bot.screenshot() if screen is None else screen
     return find(bot, ROLL_X5, screen, threshold=0.72,
                 region=ROLL_REGION) is not None
 
 
 def _open_main_board(bot) -> bool:
-    """Open the supplied Great Expedition tab before using the Free roll."""
+    """Mở tab Great Expedition đã cung cấp trước khi dùng lượt Free."""
     if _map_open(bot):
         return True
     tab = _wait_for(bot, MAIN_TAB, attempts=4, threshold=0.90,
@@ -123,7 +123,7 @@ def _trial_open(bot, screen=None) -> bool:
 
 
 def _open_trial(bot) -> bool:
-    """Open Expedition Trial from its stable text-only tab template."""
+    """Mở Expedition Trial từ mẫu tab chỉ chứa chữ, ổn định."""
     if _trial_open(bot):
         return True
     tab = _wait_for(bot, TRIAL_TAB, attempts=4, threshold=0.88,
@@ -149,7 +149,7 @@ def _quest_panel_open(bot, screen=None) -> bool:
 
 
 def _close_challenge_quest(bot) -> bool:
-    """Tap the modal's red X; Android Back exits the event completely."""
+    """Bấm X đỏ của modal; Android Back sẽ thoát hẳn khỏi sự kiện."""
     close = _wait_for(bot, CHALLENGE_QUEST_CLOSE, attempts=4, threshold=0.82,
                       region=(85, 10, 100, 25))
     if close is None:
@@ -168,9 +168,9 @@ def _close_challenge_quest(bot) -> bool:
 
 def _chest_quest_panel_open(bot, screen=None) -> bool:
     screen = bot.screenshot() if screen is None else screen
-    # The selected gold Quests tab can score 0.53 against the supplied dark
-    # crop while still being the same control; this probe is only used after
-    # the exact map chest was tapped, within the small modal header region.
+    # Tab Quests vàng được chọn có thể chỉ đạt 0.53 với ảnh cắt tối được cung
+    # cấp dù vẫn là cùng một nút; phép dò này chỉ dùng sau khi đã bấm đúng rương
+    # map, trong vùng tiêu đề modal nhỏ.
     return find(bot, CHEST_QUEST_TAB, screen, threshold=0.50,
                 region=(0, 5, 100, 60)) is not None
 
@@ -197,7 +197,7 @@ def _content_moved(before, after, region) -> tuple[bool, int]:
 
 
 def _button_colour_ratios(screen, center) -> tuple[float, float]:
-    """Return saturated-green and low-saturation ratios around one control."""
+    """Trả về tỷ lệ xanh bão hòa và tỷ lệ bão hòa thấp quanh một nút."""
     scale = screen.shape[1] / REFERENCE_WIDTH
     width, height = max(1, round(78 * scale)), max(1, round(30 * scale))
     left = max(0, center[0] - width // 2)
@@ -214,7 +214,7 @@ def _button_colour_ratios(screen, center) -> tuple[float, float]:
 
 
 def _active_claims(bot, screen, template: str, region):
-    """Find only green Claim controls; the Claim prefix in Claimed is unsafe."""
+    """Chỉ tìm nút Claim xanh; tiền tố Claim trong Claimed không an toàn."""
     candidates = find_all(bot, template, screen, threshold=0.72, region=region)
     return [point for point in candidates
             if ((ratios := _button_colour_ratios(screen, point))[0] >= 0.20
@@ -228,7 +228,7 @@ def _claimed_near(bot, screen, claim, template: str, region) -> bool:
 
 
 def _green_claim_near(bot, screen, claim, template: str, region):
-    """Re-find the same green Claim row after a tap, if it is still active."""
+    """Tìm lại cùng hàng Claim xanh sau khi bấm, nếu nó vẫn còn hoạt động."""
     nearby = [point for point in _active_claims(bot, screen, template, region)
               if abs(point[0] - claim[0]) <= 50
               and abs(point[1] - claim[1]) <= 30]
@@ -237,7 +237,7 @@ def _green_claim_near(bot, screen, claim, template: str, region):
 
 
 def _close_trial_upgrade_congratulations(bot, screen) -> bool:
-    """Verify and close Trial's level-up popup caused by a real Claim tap."""
+    """Xác minh và đóng popup tăng cấp Trial do một lần bấm Claim thật tạo ra."""
     if find(bot, TRIAL_UPGRADE_CONGRATULATIONS, screen, threshold=0.72,
             region=(0, 20, 100, 50)) is None:
         return False
@@ -247,7 +247,7 @@ def _close_trial_upgrade_congratulations(bot, screen) -> bool:
 
 
 def _wait_claimed_near(bot, claim, template: str, region) -> bool:
-    """Require the tapped row itself to turn gray before counting a Claim."""
+    """Yêu cầu chính hàng vừa bấm chuyển xám trước khi tính là đã Claim."""
     for attempt in range(5):
         screen = bot.screenshot()
         if _claimed_near(bot, screen, claim, template, region):
@@ -259,15 +259,15 @@ def _wait_claimed_near(bot, claim, template: str, region) -> bool:
 
 def _claim_green_until_resolved(bot, *, label: str, claim, claim_template: str,
                                 claimed_template: str, claim_region) -> tuple[int, bool]:
-    """Tap one green Claim up to three times, requiring gray/popup proof."""
+    """Bấm một Claim xanh tối đa ba lần, cần xác minh bằng màu xám/popup."""
     target = claim
     for tap_number in range(1, MAX_TAPS_PER_GREEN_CLAIM + 1):
         screen = bot.screenshot()
         current = _green_claim_near(bot, screen, target, claim_template,
                                     claim_region)
         if current is None:
-            # Do not count a vanished control without a recognised Claimed
-            # state or reward popup: a rerender may otherwise hide a failed tap.
+            # Không tính một nút biến mất nếu chưa nhận ra trạng thái Claimed
+            # hoặc popup quà: việc vẽ lại giao diện có thể che một lần bấm lỗi.
             if _claimed_near(bot, screen, target, claimed_template, claim_region):
                 return tap_number - 1, True
             return tap_number - 1, False
@@ -291,7 +291,7 @@ def _claim_green_until_resolved(bot, *, label: str, claim, claim_template: str,
 
 
 def _panel_to_top(bot, *, label: str, content_region) -> bool:
-    """Prove the panel's top edge before the Claim-free sweep begins."""
+    """Xác minh đã ở đầu panel trước khi bắt đầu quét hết Claim."""
     unchanged = 0
     for swipe in range(1, MAX_PANEL_SWIPES + 1):
         bot.check()
@@ -311,7 +311,7 @@ def _panel_to_top(bot, *, label: str, content_region) -> bool:
 
 def _scan_panel(bot, *, label: str, title_open, content_region, claim_region,
                 claim_template: str, claimed_template: str) -> tuple[ClaimReport, bool]:
-    """Claim a whole green panel and prove a clean, stationary bottom edge."""
+    """Nhận toàn bộ Claim trong panel xanh và xác minh đáy sạch, đứng yên."""
     if not title_open(bot):
         bot.record(f"Gift Claims: Great Expedition chưa vào đúng {label}; giữ PENDING")
         return ClaimReport(), False
@@ -379,16 +379,16 @@ def _find_map_chest(bot, screen=None, *, left_only=False):
 
 
 def _find_actionable_map_chest(bot, screen=None):
-    """Return the left map chest only while its user-supplied red badge shows."""
+    """Chỉ trả về rương map bên trái khi chấm đỏ do người dùng cung cấp xuất hiện."""
     screen = bot.screenshot() if screen is None else screen
     chest = _find_map_chest(bot, screen, left_only=True)
     if chest is None:
         return None
     height, width = screen.shape[:2]
     scale = width / REFERENCE_WIDTH
-    # Screenshot_20261028-215612: chest centre (56, 225), badge centre
-    # (72, 211).  Search a compact region relative to the verified chest, so
-    # unrelated top-tab notification dots cannot launch its Quests panel.
+    # Screenshot_20261028-215612: tâm rương (56, 225), tâm chấm đỏ (72, 211).
+    # Tìm trong vùng hẹp tương đối với rương đã xác minh, để chấm thông báo ở
+    # tab trên không liên quan không thể mở panel Quests của rương này.
     left = chest[0] + round(3 * scale)
     top = chest[1] - round(37 * scale)
     right = chest[0] + round(40 * scale)
@@ -407,7 +407,7 @@ def _find_actionable_map_chest(bot, screen=None):
 
 
 def _claim_map_chest(bot, *, label: str) -> tuple[ClaimReport, bool]:
-    """Tap the supplied map chest until it disappears from the same region."""
+    """Bấm rương map đã cung cấp đến khi nó biến mất khỏi cùng vùng."""
     chest = _find_map_chest(bot, left_only=True)
     if chest is None:
         bot.record(f"Gift Claims: Great Expedition {label} không còn rương "
@@ -426,7 +426,7 @@ def _claim_map_chest(bot, *, label: str) -> tuple[ClaimReport, bool]:
 
 
 def _claim_trial_chest(bot) -> tuple[ClaimReport, bool]:
-    """Finish when the calibrated upper-left Expedition Trial chest is absent."""
+    """Hoàn tất khi rương Expedition Trial góc trên trái đã hiệu chuẩn không còn."""
     if not _open_trial(bot):
         return ClaimReport(), False
     chest = _wait_for(bot, TRIAL_CHEST, attempts=4,
@@ -444,8 +444,8 @@ def _claim_trial_chest(bot) -> tuple[ClaimReport, bool]:
         bot.record(f"Gift Claims: Great Expedition thấy rương Trial tại {chest}; "
                    f"tap lần {attempted}")
         bot.tap(*chest, delay=SETTLE_SECONDS)
-        # A received chest must disappear, or produce the standard
-        # Congratulations state; keep retrying this exact chest until it does.
+        # Rương đã nhận phải biến mất hoặc hiện trạng thái Congratulations
+        # chuẩn; tiếp tục bấm lại đúng rương này đến khi điều đó xảy ra.
         if close_congratulations(bot, attempts=3):
             bot.record("Gift Claims: Great Expedition rương Trial -> Congratulations")
         chest = _wait_for(bot, TRIAL_CHEST, attempts=4,
@@ -459,7 +459,7 @@ def _claim_trial_chest(bot) -> tuple[ClaimReport, bool]:
 
 
 def _run_case_one(bot, *, force_trial: bool = False) -> tuple[ClaimReport, bool] | None:
-    """Claim Challenge Quest, then finish only from the Trial chest state."""
+    """Nhận Challenge Quest, sau đó chỉ hoàn tất theo trạng thái rương Trial."""
     if force_trial and not _open_trial(bot):
         return ClaimReport(), False
     screen = bot.screenshot()
@@ -491,20 +491,19 @@ def _run_case_one(bot, *, force_trial: bool = False) -> tuple[ClaimReport, bool]
         return report, False
     if not _close_challenge_quest(bot):
         return report, False
-    # The map chest only launches its own Quests panel.  The terminal chest
-    # belongs to Expedition Trial and is checked after Challenge Quest clears.
+    # Rương map chỉ mở panel Quests của nó. Rương quyết định kết thúc thuộc về
+    # Expedition Trial và được kiểm tra sau khi Challenge Quest đã sạch.
     chest, chest_done = _claim_trial_chest(bot)
     return ClaimReport(report.attempted + chest.attempted,
                        report.verified + chest.verified), chest_done
 
 
 def _roll_cost_red(screen, center: tuple[int, int], *, offset_x: int) -> bool:
-    """Read red state of one anchored 1/5 die price, never map artwork."""
+    """Đọc trạng thái đỏ của giá xúc xắc 1/5 đã neo, không đọc hình nền map."""
     scale = screen.shape[1] / REFERENCE_WIDTH
-    # Screenshot_20261028-214134 places the x5 price 18 px right of its text
-    # anchor.  The x1 price is centred under its different caption, so its
-    # separately measured offset is 2 px.  Both remain derived from the
-    # detected x5 template rather than an absolute screen coordinate.
+    # Screenshot_20261028-214134 đặt giá x5 lệch phải 18 px so với neo chữ.
+    # Giá x1 nằm giữa dưới nhãn khác, nên độ lệch đo riêng là 2 px. Cả hai vẫn
+    # được suy ra từ mẫu x5 đã nhận diện thay vì một tọa độ màn hình tuyệt đối.
     x = round(center[0] + offset_x * scale)
     y = round(center[1] + 28 * scale)
     half_w, half_h = max(5, round(14 * scale)), max(5, round(11 * scale))
@@ -515,13 +514,13 @@ def _roll_cost_red(screen, center: tuple[int, int], *, offset_x: int) -> bool:
     hsv = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
     red = (((hsv[..., 0] <= 12) | (hsv[..., 0] >= 170)) &
            (hsv[..., 1] >= 110) & (hsv[..., 2] >= 70))
-    # The narrow red ``1`` uses as few as eight saturated pixels on the
-    # supplied 393 px live frame; a 3% area threshold would miss it.
+    # Số ``1`` đỏ mảnh chỉ dùng ít nhất tám px bão hòa trên khung thực 393 px
+    # được cung cấp; ngưỡng 3% diện tích sẽ bỏ sót nó.
     return int(red.sum()) >= max(5, round(crop.shape[0] * crop.shape[1] * .012))
 
 
 def _roll_controls(bot, screen):
-    """Find x5 and derive the adjacent x1 target from that verified control."""
+    """Tìm x5 và suy ra mục tiêu x1 liền kề từ nút đã xác minh đó."""
     x5 = find(bot, ROLL_X5, screen, threshold=0.72, region=ROLL_REGION)
     if x5 is None:
         return None
@@ -532,7 +531,7 @@ def _roll_controls(bot, screen):
 
 
 def _x5_auto_rolling(bot, screen, x5=None) -> bool:
-    """Read the supplied Auto-Rolling label only in the left dice control."""
+    """Chỉ đọc nhãn Auto-Rolling được cung cấp trong nút xúc xắc bên trái."""
     height, width = screen.shape[:2]
     if x5 is None:
         region = (0, 88, 54, 100)
@@ -549,7 +548,7 @@ def _x5_auto_rolling(bot, screen, x5=None) -> bool:
 
 
 def _skip_animation_enabled(screen, label: tuple[int, int]) -> bool:
-    """Read the green tick immediately right of the detected Skip label."""
+    """Đọc dấu tick xanh ngay bên phải nhãn Skip đã nhận diện."""
     scale = screen.shape[1] / REFERENCE_WIDTH
     left = round(label[0] + 37 * scale)
     right = round(label[0] + 62 * scale)
@@ -566,11 +565,11 @@ def _skip_animation_enabled(screen, label: tuple[int, int]) -> bool:
 
 
 def _claim_chest_quests(bot) -> tuple[ClaimReport, bool]:
-    """Open the map chest's Quests tab and exhaust only green Claims."""
+    """Mở tab Quests của rương map và chỉ nhận hết Claim xanh."""
     tab = None
-    # A roll-result overlay can swallow the initial chest tap.  Re-find the
-    # same supplied chest after the animation instead of interpreting that
-    # transient frame as a missing Quests tab or tapping a stale coordinate.
+    # Lớp phủ kết quả roll có thể nuốt lần bấm rương đầu tiên. Tìm lại đúng
+    # rương đã cung cấp sau animation, thay vì hiểu khung tạm thời này là thiếu
+    # tab Quests hoặc bấm vào tọa độ cũ.
     for attempt in range(4):
         tab = _wait_for(bot, CHEST_QUEST_TAB, attempts=3, threshold=0.50,
                         region=(0, 5, 100, 60))
@@ -607,7 +606,7 @@ def _claim_chest_quests(bot) -> tuple[ClaimReport, bool]:
 
 
 def _run_case_two(bot) -> tuple[ClaimReport, str]:
-    """Spend x5 then x1; a persistent map chest is only one Quests launcher."""
+    """Dùng x5 rồi x1; rương map còn hiện chỉ là một launcher Quests."""
     attempted = verified = 0
     map_chest_handled = False
     roll = 0
@@ -657,8 +656,8 @@ def _run_case_two(bot) -> tuple[ClaimReport, str]:
                    f"chờ {delay:g}s")
         bot.tap(*target, delay=delay)
         attempted += 1
-        # A new roll may reveal a fresh map chest; permit its Quests panel once
-        # more even if the old permanent launcher is still visible.
+        # Một lượt roll mới có thể hiện rương map mới; cho phép mở panel Quests
+        # thêm một lần kể cả khi launcher cũ cố định vẫn còn hiển thị.
         map_chest_handled = False
         after = bot.screenshot()
         if (_quest_panel_open(bot, after) or find(
@@ -681,7 +680,7 @@ def _run_case_two(bot) -> tuple[ClaimReport, str]:
 
 
 def _enable_skip_and_roll_free(bot) -> ClaimReport:
-    """Use the supplied Skip animation and Roll Once Free controls once."""
+    """Dùng một lần các nút Skip animation và Roll Once Free đã cung cấp."""
     attempted = 0
     skip_screen = bot.screenshot()
     skip = find(bot, SKIP_ANIMATION, skip_screen, threshold=0.72,
@@ -696,9 +695,9 @@ def _enable_skip_and_roll_free(bot) -> ClaimReport:
     else:
         bot.record("Gift Claims: Great Expedition không thấy Skip animation; "
                    "tiếp tục kiểm tra Roll Once")
-    # ``Roll Once`` without Free still scores ~0.75 because both captions
-    # share their first line.  Only the supplied two-line Free state is safe
-    # to consume before reading the x5/x1 priority branch.
+    # ``Roll Once`` không có Free vẫn đạt ~0.75 vì cả hai nhãn chung dòng đầu.
+    # Chỉ trạng thái Free hai dòng được cung cấp mới an toàn để dùng trước khi
+    # đọc nhánh ưu tiên x5/x1.
     free = _wait_for(bot, ROLL_ONCE, attempts=3, threshold=0.85,
                      region=ROLL_REGION)
     if free is None:
@@ -710,23 +709,22 @@ def _enable_skip_and_roll_free(bot) -> ClaimReport:
 
 
 def claim_opened(bot) -> tuple[ClaimReport, bool]:
-    """Run the specified Quest/x5/x1 loop until its final Quest pass is clean."""
+    """Chạy vòng Quest/x5/x1 đã chỉ định đến khi lượt Quest cuối sạch."""
     if not _main_open(bot):
         bot.record("Gift Claims: Great Expedition chưa xác nhận title; giữ PENDING")
         return ClaimReport(), False
 
-    # Screenshot_20261028-215142: enter the main Great Expedition board before
-    # Screenshot_20261028-213612 (the one free roll).  The Trial chest is not
-    # a terminal gate for the Quest/x5/x1 flow below.
+    # Screenshot_20261028-215142: vào bàn Great Expedition chính trước
+    # Screenshot_20261028-213612 (lượt roll miễn phí duy nhất). Rương Trial
+    # không phải cổng kết thúc cho luồng Quest/x5/x1 bên dưới.
     if not _open_main_board(bot):
         return ClaimReport(), False
     free = _enable_skip_and_roll_free(bot)
     total = ClaimReport(free.attempted, free.verified)
-    # A chest can create dice/quests.  Completion therefore needs a final
-    # Challenge Quest pass after x5 and x1 are both red and no chest remains.
-    # Only attempt the first branch once per state transition: its launcher
-    # remains visible after a clean pass, so reopening it immediately would
-    # starve the x5/x1 branch forever.
+    # Một rương có thể tạo xúc xắc/quest. Vì vậy, hoàn tất cần một lượt
+    # Challenge Quest cuối sau khi x5 và x1 đều đỏ, không còn rương. Chỉ thử
+    # nhánh đầu một lần theo mỗi lần đổi trạng thái: launcher vẫn hiện sau lượt
+    # sạch, nên mở lại ngay sẽ làm nhánh x5/x1 bị bỏ đói mãi.
     initial_case_one = True
     for _cycle in range(1, MAX_ROLLS_PER_WINDOW + 1):
         bot.check()
@@ -737,9 +735,9 @@ def claim_opened(bot) -> tuple[ClaimReport, bool]:
                 total = ClaimReport(total.attempted + report.attempted,
                                     total.verified + report.verified)
                 if done:
-                    # Case 1 has exhausted its Claim panel and its left-side
-                    # chest is absent (or disappeared after a verified tap).
-                    # That is an explicit terminal state in the supplied flow.
+                    # Trường hợp 1 đã quét hết panel Claim và rương bên trái
+                    # không còn (hoặc đã biến mất sau lần bấm xác minh). Đây là
+                    # trạng thái kết thúc được chỉ định rõ trong flow cung cấp.
                     return ClaimReport(total.attempted,
                                        max(total.verified, 1)), True
                 return total, False
@@ -755,8 +753,8 @@ def claim_opened(bot) -> tuple[ClaimReport, bool]:
                             total.verified + report.verified)
         if state == "pending":
             return total, False
-        # Case 2 is complete: map-chest Quests are clear and x5/x1 are red.
-        # Complete Challenge Quest in Expedition Trial, then inspect its chest.
+        # Trường hợp 2 đã xong: Quests rương map sạch và x5/x1 đều đỏ. Hoàn tất
+        # Challenge Quest trong Expedition Trial, sau đó kiểm tra rương của nó.
         final = _run_case_one(bot, force_trial=True)
         if final is None:
             bot.record("Gift Claims: Great Expedition đã hết Roll nhưng chưa "
@@ -780,7 +778,7 @@ def run(bot):
 
 
 def run_standalone(bot):
-    """Compatibility entry point for a direct Great Expedition test run."""
+    """Điểm vào tương thích cho một lượt kiểm thử Great Expedition trực tiếp."""
     if not open_event_center_event(bot, "EventCenter/GreatExpedition/list_row",
                                    MAIN_TITLE):
         return False
