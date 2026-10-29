@@ -34,6 +34,8 @@ DAILY_DONE: set[str] = set()
 
 def target(bot):
     """Hàm cần test — sửa ở đây."""
+    if os.environ.get("EVONY_TEST") == "iscout":
+        return test_iscout(bot)
     # EVONY_TEST=redeem: chỉ đổi quà event 3 ngày (đang ở sẵn màn event); three_day: cả event 3 ngày;
     # mặc định chạy nhiệm vụ Daily Trade Carriage.
     # if os.environ.get("EVONY_TEST") == "redeem":
@@ -232,6 +234,19 @@ def main():
         log("dừng")
     log(f"daily_done: {done}")
 
+
+
+def test_iscout(bot):
+    """Attack Boss nguồn IsCout, chạy tới khi Ctrl+C. Bot tự mở trình duyệt Chromium và đăng nhập iScout.
+    EVONY_SERVER = server của tài khoản trên thiết bị (bỏ trống thì nhận tab iScout bất kỳ); EVONY_EMAIL / EVONY_PASSWORD = tài khoản iScout
+    để bot tự đăng nhập; EVONY_TROOP = số đội (mặc định 1)."""
+    from bot.activities.attack_boss import run
+    bot.server = os.environ.get("EVONY_SERVER", "")
+    bot.alert = lambda message: print(f"[POPUP] {message}", flush=True)       # app thật hiện hộp thoại; ở đây in ra
+    settings = {"source": "api", "attack_type": "attack", "troop": [f"Troop {os.environ.get('EVONY_TROOP', '1')}"],
+                "email": os.environ.get("EVONY_EMAIL", ""), "password": os.environ.get("EVONY_PASSWORD", "")}
+    bot.settings = {"Attack Boss": settings}
+    return run(bot, settings)
 
 
 def test_crazy_eggs(bot):

@@ -40,6 +40,8 @@ class BotContext(FlowMixin, InputMixin, ScreenMixin):
         self.forget_daily = lambda task: None
         # Craft: một trang bị vừa chế tạo xong (id "ring/05_Tên"); worker báo UI trừ 1 ở tab Craft và lưu DB.
         self.craft_done = lambda item_id: None
+        # Bot cần người dùng biết ngay (VD chưa mở iScout): worker báo UI hiện popup.
+        self.alert = lambda message: None
         # Mọi key đang có trong daily_done (kể cả ngày cũ), VD tìm "<key>_reached_<mục tiêu>".
         self.daily_keys = lambda: []
         # Giờ reset server "HH:MM" (màn Home); worker gán BotWorker.server_time.

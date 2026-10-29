@@ -211,6 +211,7 @@ class MainWindow(QMainWindow):
         self.bots.city_map_found.connect(self.db.set_city_map)
         self.bots.bubble_disabled.connect(self._on_bubble_disabled)
         self.bots.craft_done.connect(self._on_craft_done)
+        self.bots.alert.connect(self._on_alert)
         self.bots.log_message.connect(self._on_log_message)
         self.bots.history.connect(self._on_history)
         # Sub-tab index kept across devices, so switching device stays on
@@ -739,6 +740,13 @@ class MainWindow(QMainWindow):
         else:   # bot start từ DB, chưa dựng giao diện: sửa thẳng DB
             init = self.db.load_settings(device_id).get("Initialization", {})
             self.db.save_settings(device_id, {"Initialization": {**init, "bubble": False}})
+
+    def _on_alert(self, device_id: str, message: str):
+        """Bot cần người dùng biết (VD chưa bật iScout): hiện popup, không chặn các bot khác."""
+        box = QMessageBox(QMessageBox.Warning, f"Bot {device_id}", message, QMessageBox.Ok, self)
+        box.setModal(False)
+        box.setAttribute(Qt.WA_DeleteOnClose)
+        box.show()
 
     def _on_craft_done(self, device_id: str, item_id: str):
         """Bot vừa chế tạo xong một trang bị: tab Craft trừ 1 số lượng (về 0 thì bỏ tích) rồi lưu cấu hình mới vào DB, lần Start sau không làm lại."""

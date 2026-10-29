@@ -6,6 +6,7 @@ numpy
 Pillow
 certifi
 cryptography
+websocket-client
 # Build only (installer/build.ps1 compiles with them, does not ship them)
 nuitka
 poethepoet

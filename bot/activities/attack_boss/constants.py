@@ -7,9 +7,9 @@ TAB = "Attack Boss"   # = tên activity = tên tab = khoá settings (database.TA
 # selected_bosses) còn có:
 SOURCE_KEY = "source"            # nguồn nhận boss: một trong SOURCES
 PLAYER_KEY = "player_name"       # tên người chơi gửi boss (nguồn player_chat)
+EMAIL_KEY = "email"              # tài khoản đăng nhập iScout (nguồn api): bot tự đăng nhập trong trình duyệt nó mở
+PASSWORD_KEY = "password"        # mật khẩu iScout (lưu nguyên văn trong DB, ô nhập hiện dấu chấm)
 TYPE_KEY = "attack_type"         # cách đánh: một trong ATTACK_TYPES
-EMAIL_KEY = "email"              # tài khoản đăng nhập IsCout (nguồn api)
-PASSWORD_KEY = "password"        # mật khẩu IsCout (lưu nguyên văn trong DB, ô nhập hiện dấu chấm)
 VIKING = "Viking"                # boss Viking được gửi đi theo luồng chung (nguồn Alliance / Whisper); chỉ Viking tự gọi (Summon) là riêng
 VIKING_SUMMON_KEY = "viking_summon"   # tích Summon: bot tự gọi Viking theo cơ chế Viking Summon (cùng key với tab Join Monster War); độ khó ở "viking_level"
 MARCH_SPEED_KEY = "march_speedup"    # tăng tốc lúc hành quân tới boss: một trong SPEEDUP_CHOICES
@@ -21,6 +21,8 @@ EGGS_KEY = "crazy_eggs_hours"    # Crazy Eggs: 0 (không làm) / 1..4 giờ, cù
 SOURCE_ALLIANCE = "alliance_chat"
 SOURCE_PLAYER = "player_chat"
 SOURCE_API = "api"
+ISCOUT_DONE_MINUTES = 10          # nguồn IsCout: boss đã đánh chỉ nhớ tối đa chừng này phút (theo id và theo toạ độ), sau đó còn sống thì đánh lại được
+ISCOUT_BATCH = 6                 # nguồn IsCout: mỗi lượt lấy bấy nhiêu boss gần thành nhất, đánh hết rồi mới kiểm tra trình duyệt lại
 SOURCES = (
     (SOURCE_ALLIANCE, "Alliance chat"),
     (SOURCE_PLAYER, "Whisper"),
@@ -39,6 +41,14 @@ TYPE_DEFAULT = TYPE_ATTACK
 IDLE_WAIT = 5            # giây nghỉ khi nguồn chưa có boss mới
 
 # Bước đánh (đo trên giả lập 396 x 704)
+RING_BELOW = 10                # px: điểm bấm = đáy vòng sáng + chừng này (kỵ sĩ Bayard đứng DƯỚI vòng sáng: bấm đúng đáy / giữa vòng thì trượt, đo trên 21913)
+TAP_MAX_Y = 352               # px: điểm bấm không thấp hơn y này = giữa màn hình (boss đứng yên trúng ở y này cho cả 7 loại đã đo trên 21913; Quỷ Vương và Kamaitachi trượt ở y 378-380)
+RING_MAX_DIST = 100            # px: IsCout chỉ nhận vòng màu cách tâm màn hình không quá chừng này; xa hơn là boss khác (đo trên 21913: boss đích lệch < 50 px, boss khác 160-190 px)
+RETAP_AFTER = 2               # IsCout: bấm vào boss mà sau chừng này lần tìm nút Attack (mỗi ATTACK_MENU_POLL giây) vẫn chưa thấy thì tìm lại vòng màu (boss có thể đang di chuyển)
+RETAP_MOVE = 20               # px: vòng màu tìm lại cách chỗ đã bấm hơn chừng này thì bấm lại (đáy vòng nhấp nháy ~10 px theo hoạt ảnh lửa); không thì chỉ chờ tiếp (menu hiện chậm do lag)
+ATTACK_MENU_POLL = 1          # IsCout: giây giữa hai lần tìm nút Attack của menu nhanh sau khi bấm vào boss
+ATTACK_MENU_WAIT = 8          # IsCout: chờ tối đa chừng này giây; không thấy nút Attack thì tính boss là đã đánh ngay
+BOSS_POLL = 1                # giây giữa hai lần tìm vòng màu boss trong BOSS_WAIT
 BOSS_WAIT = 8                # giây chờ boss hiện ra giữa màn hình sau khi nhảy tới toạ độ
 BOSS_NEAR = 90               # px: boss nằm trong khoảng này quanh giữa màn hình (boss_scan.CAMERA_PX) mới là boss cần đánh
 POPUP_WAIT = 5               # giây chờ cửa sổ thông tin boss sau khi bấm Attack ở menu nhanh
@@ -48,7 +58,10 @@ POLL = 0.5                   # giây giữa hai lần kiểm tra
 ATTACK_FROM_WAR = (-166, 0)  # px: nút Attack so với nút Alliance War (bossPopup.png) trong cửa sổ thông tin boss (283,531) -> (117,531)
 MARCH_BUTTON = "AttackBoss/march.png"   # chữ "March" của nút March ở màn đánh boss (bên dưới có đồng hồ nên ảnh hanhquan.png của Join Boss chỉ khớp ~0,69)
 MARCH_THRESHOLD = 0.8
-TROOP_TRIES = 10               # số lần thử chọn đội có tướng (xoay vòng qua các đội đã tích rồi các đội còn lại)
+LOW_ODDS = "AttackBoss/lowOdds.png"   # hai dòng chữ đầu của hộp "winning odds are extremely low. Are you sure you still want to send the troops?" (Cancel / Confirm) hiện sau khi bấm March
+LOW_ODDS_THRESHOLD = 0.7              # đo trên 24 ảnh thật: có hộp 1,0; không có hộp tối đa 0,23
+LOW_ODDS_CANCEL = (-65, 77)           # nút Cancel so với tâm ảnh mẫu (hộp nằm cố định giữa màn hình)
+TROOP_TRIES = 10               # số lần thử chọn đội có tướng (xoay vòng qua các đội đã tích)
 # Alliance War (rally): bấm nút Alliance War ở cửa sổ boss -> hộp "Alliance War Rally!" chọn thời gian chờ -> màn March (bố cục như màn March của Join Monster War)
 RALLY_TITLE = "AttackBoss/rallyTitle.png"
 RALLY_MINUTES = 5                                   # thời gian chờ rally chọn mặc định

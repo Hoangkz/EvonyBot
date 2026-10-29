@@ -14,9 +14,7 @@ class SourceTests(unittest.TestCase):
     def test_make_source(self):
         self.assertIsInstance(make_source({}), AllianceChatSource)
         self.assertIsInstance(make_source({SOURCE_KEY: "lạ"}), AllianceChatSource)
-        api = make_source({SOURCE_KEY: SOURCE_API, "email": " a@b.c ", "password": "pw"})
-        self.assertIsInstance(api, ApiSource)
-        self.assertEqual((api.email, api.password), ("a@b.c", "pw"))
+        self.assertIsInstance(make_source({SOURCE_KEY: SOURCE_API}), ApiSource)
         source = make_source({SOURCE_KEY: SOURCE_PLAYER, PLAYER_KEY: " Bob "})
         self.assertIsInstance(source, PlayerChatSource)
         self.assertEqual(source.player_name, "Bob")
