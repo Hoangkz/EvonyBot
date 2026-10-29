@@ -18,7 +18,7 @@ from ..join_monster_war.boss_memory import JOINED, BossMemory
 from ..join_monster_war.constants import (GENERAL_SEARCH, MARCH, NOT_ENOUGH_STAMINA, PRESET_ACTIVE_WAIT, PRESET_COUNT, PRESET_DX,
                                           PRESET_LOCKED, PRESET_LOCKED_THRESHOLD, PRESET_X0, PRESET_Y, REGIONS)
 from ..join_monster_war.run import _Boss, _preset_active, _troops
-from .constants import (AGE_LIMIT_MIN, ATTACK_FROM_WAR, ISCOUT_DONE_MINUTES, ATTACK_MENU_POLL, ATTACK_MENU_WAIT, BOSS_NEAR, BOSS_POLL, BOSS_WAIT, DROP, EGGS_KEY, FULL, FULL_RETRY_WAIT, FULL_TRIES, GLOW_TAP_DX, GLOW_TAP_DY, IDLE_WAIT, LOW_ODDS, LOW_ODDS_CANCEL, LOW_ODDS_THRESHOLD, MAIN_GENERAL_REGION, MARCH_BUTTON,
+from .constants import (AGE_LIMIT_MIN, ATTACK_FROM_WAR, ISCOUT_DONE_MINUTES, ATTACK_MENU_POLL, ATTACK_MENU_WAIT, BOSS_NEAR, BOSS_POLL, BOSS_WAIT, DROP, EGGS_KEY, FULL, FULL_RETRY_WAIT, FULL_TRIES, IDLE_WAIT, RETAP_AFTER, RETAP_MOVE, RING_BELOW, RING_MAX_DIST, TAP_MAX_Y, LOW_ODDS, LOW_ODDS_CANCEL, LOW_ODDS_THRESHOLD, MAIN_GENERAL_REGION, MARCH_BUTTON,
                         MARCH_OPEN_WAIT, MARCH_SPEED_KEY, MARCH_THRESHOLD, MARCH_WAIT, MARCHED, NO_LANES_WAIT, ON_SPOT_KM, POLL, POPUP_WAIT,
                         RALLY_BUTTONS, RALLY_MINUTES, RALLY_TITLE, RALLY_WAIT, RETRY, RETURN_SPEED_KEY, SOURCE_ALLIANCE,
                         SOURCE_API, SOURCE_DEFAULT, SOURCE_KEY, SOURCE_PLAYER, TROOP_TRIES, TYPE_ATTACK, TYPE_DEFAULT, TYPE_KEY, TYPE_WAR,
@@ -71,7 +71,7 @@ def run(bot, settings: dict):
                 del pending[offer.coords]
                 continue
             # Đánh luôn, không chờ đường: hết đường thì _war / _march tự bấm lại 5 phút / March cho tới khi vào được màn March.
-            result = attack(bot, settings, offer, getattr(source, "goto", None))
+            result = attack(bot, settings, offer, getattr(source, "goto", None), latest=getattr(source, "latest", None))
             if result == FULL:        # thấy "không đủ đội quân": có dùng tăng tốc thì tăng tốc ngay rồi đánh lại boss này luôn; (không dùng thì đã bấm lại hết số lần)
                 pending[offer.coords] = offer
                 speed_up_if_full(bot, settings, troops, force=True)
@@ -164,7 +164,7 @@ def attack_type(settings: dict) -> str:
     return kind if kind in (TYPE_ATTACK, TYPE_WAR) else TYPE_DEFAULT
 
 
-def attack(bot, settings: dict, offer: BossOffer, go=None, own=None) -> str:
+def attack(bot, settings: dict, offer: BossOffer, go=None, own=None, latest=None) -> str:
     """Tới boss, chờ boss hiện ra, bấm giữa màn hình mở menu -> Attack -> cửa sổ thông tin boss -> Attack / Alliance War (theo
     attack_type) -> màn March: chọn đội rồi March. Trả:
     - MARCHED: đã hành quân;
@@ -179,10 +179,18 @@ def attack(bot, settings: dict, offer: BossOffer, go=None, own=None) -> str:
     `own`: vị trí nhãn của boss Viking TỰ GỌI (đang ở giữa màn hình): bấm vào đó thay cho giữa màn hình, không tìm boss, không lọc theo ô đã tích, và luôn đánh
     bằng Alliance War vì cửa sổ boss tự gọi chỉ có nút Alliance War.
 
+    `latest(bot, offer)` (IsCout): toạ độ mới nhất của boss theo id ngay trước khi tới; None = boss đã chết, bỏ luôn không đi tới.
+
     Nguồn IsCout (boss thật có thể lệch khỏi toạ độ): sau khi tới toạ độ, bấm vào vòng boss gần giữa màn hình nhất (không cần đúng giữa); không thấy vòng
     boss nào, hoặc bấm vào mà không ra Attack, thì DROP (tính là đã đánh). Từ cửa sổ thông tin trở đi giống mọi nguồn khác."""
     iscout = settings.get(SOURCE_KEY) == SOURCE_API
     tap_at = boss_scan.CAMERA_PX
+    if own is None and latest is not None:       # IsCout: lấy toạ độ mới nhất của boss này ngay trước khi tới (boss lang thang đã rời toạ độ lúc nhận)
+        current = latest(bot, offer)
+        if current is None:
+            bot.log(f"Attack Boss: boss {offer.uid} không còn trên iScout (đã chết), bỏ")
+            return DROP
+        offer = current
     if own is None:
         if go is not None and go(bot, offer):
             pass
@@ -199,7 +207,7 @@ def attack(bot, settings: dict, offer: BossOffer, go=None, own=None) -> str:
             bot.log(f"Attack Boss: không thấy boss ở giữa màn hình ({offer}), boss đã chết hoặc đã đi, bỏ")
             boss_scan.ensure_map(bot)
             return DROP
-    opened = _tap_attack(bot, own or tap_at) if iscout else boss_scan.tap_menu_item(bot, own or tap_at, boss_scan.ATTACK_ICON)
+    opened = _tap_attack(bot, own or tap_at, relocate=_ring_point) if iscout else boss_scan.tap_menu_item(bot, own or tap_at, boss_scan.ATTACK_ICON)
     if not opened:
         return DROP if iscout else RETRY       # IsCout: bấm vào boss mà không ra Attack = coi như đã đánh
     screen, war = _wait_popup(bot)
@@ -286,18 +294,27 @@ def _on_spot(bot, offer: BossOffer) -> bool:
     return camera is not None and abs(camera[0] - offer.x) <= ON_SPOT_KM and abs(camera[1] - offer.y) <= ON_SPOT_KM
 
 
+def _ring_point(screen):
+    """IsCout: điểm bấm của vòng màu boss gần tâm màn hình nhất, chỉ xét vòng cách tâm không quá RING_MAX_DIST px (xa hơn là boss khác, không phải boss
+    đích). Điểm bấm = (trung bình x, đáy vòng sáng + RING_BELOW), không thấp hơn TAP_MAX_Y; None nếu không có vòng nào."""
+    points = [point for point in glow_points(screen) if math.dist(point, boss_scan.CAMERA_PX) <= RING_MAX_DIST]
+    if not points:
+        return None
+    x, bottom = min(points, key=lambda point: math.dist(point, boss_scan.CAMERA_PX))
+    return x, min(bottom + RING_BELOW, TAP_MAX_Y)
+
+
 def _wait_boss(bot, nearest: bool = False):
     """Chờ tới BOSS_WAIT giây cho boss hiện ra (bản đồ vừa nhảy tới, boss tải chậm hơn nền đất). Tìm mỗi BOSS_POLL (1) giây. Trả vị trí để bấm vào boss, None nếu không thấy.
     Mặc định boss phải nằm trong BOSS_NEAR quanh giữa màn hình và bấm giữa màn hình. `nearest` (IsCout: boss thật có thể lệch khỏi toạ độ nhận được):
-    lấy vòng màu boss gần giữa màn hình nhất, ở đâu cũng được, và bấm vào điểm của vòng đó (x = trung bình x, y = y lớn nhất của các điểm cam sáng: `glow_points`), dời GLOW_TAP_DX / GLOW_TAP_DY px."""
+    lấy vòng màu boss gần giữa màn hình nhất trong RING_MAX_DIST px (`_ring_point`) và bấm vào điểm của vòng đó (x = trung bình x, y = đáy vòng sáng + RING_BELOW, tối đa TAP_MAX_Y: `_ring_point`)."""
     for _ in range(round(BOSS_WAIT / BOSS_POLL)):
         bot.sleep(BOSS_POLL)
         screen = bot.screenshot()
         if nearest:
-            points = glow_points(screen)
-            if points:
-                x, y = min(points, key=lambda point: math.dist(point, boss_scan.CAMERA_PX))
-                return x + GLOW_TAP_DX, y + GLOW_TAP_DY
+            point = _ring_point(screen)
+            if point is not None:
+                return point
             continue
         found = find_bosses(screen)
         if not found:
@@ -308,16 +325,27 @@ def _wait_boss(bot, nearest: bool = False):
     return None
 
 
-def _tap_attack(bot, pos: tuple[int, int]) -> bool:
+def _tap_attack(bot, pos: tuple[int, int], relocate=None) -> bool:
     """IsCout: bấm vào boss rồi tìm nút Attack của menu nhanh mỗi ATTACK_MENU_POLL (1) giây, tối đa ATTACK_MENU_WAIT (8) giây; thấy thì bấm. False nếu
-    không thấy (về bản đồ sạch): boss tính là đã đánh. Không dùng boss_scan.tap_menu_item (dùng chung, nhịp 0,3 giây / 5 giây) để không đổi các hoạt động khác."""
+    không thấy (về bản đồ sạch): boss tính là đã đánh. Boss có thể đang di chuyển (Bayard, Kamaitachi): có `relocate(screen)` thì sau RETAP_AFTER lần chưa
+    thấy menu, tìm lại vòng màu và bấm vào chỗ mới nếu nó cách chỗ đã bấm hơn RETAP_MOVE px (cùng chỗ thì chỉ chờ tiếp, menu có thể hiện chậm do lag).
+    Không dùng boss_scan.tap_menu_item (dùng chung, nhịp 0,3 giây / 5 giây) để không đổi các hoạt động khác."""
     bot.tap(*pos, delay=0)
+    tapped, waited = pos, 0
     for _ in range(round(ATTACK_MENU_WAIT / ATTACK_MENU_POLL)):
         bot.sleep(ATTACK_MENU_POLL)
-        found = boss_scan.find_menu_item(bot, bot.screenshot(), boss_scan.ATTACK_ICON)
+        screen = bot.screenshot()
+        found = boss_scan.find_menu_item(bot, screen, boss_scan.ATTACK_ICON)
         if found is not None:
             bot.tap(*found, delay=0)
             return True
+        waited += 1
+        if relocate is not None and waited >= RETAP_AFTER:
+            moved = relocate(screen)
+            if moved is not None and math.dist(moved, tapped) > RETAP_MOVE:
+                bot.log(f"Attack Boss: boss dời chỗ, bấm lại {moved}")
+                bot.tap(*moved, delay=0)
+                tapped, waited = moved, 0
     bot.log(f"Attack Boss: không thấy nút Attack sau khi bấm {pos}")
     boss_scan.ensure_map(bot)
     return False

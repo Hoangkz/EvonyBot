@@ -228,6 +228,20 @@ class ApiSource:
             return bosses
         return sorted(bosses, key=lambda boss: math.dist((boss["x"], boss["y"]), home))
 
+    def latest(self, bot, offer: BossOffer):
+        """Toạ độ MỚI NHẤT của boss `offer` (theo id) trước khi tới đánh: boss lang thang (Bayard, Kamaitachi) đã rời toạ độ lúc nhận, nhất là boss thứ 5-6 của
+        lượt. None nếu boss đã bị xoá khỏi iScout (đã chết): khỏi đi tới. Không biết (chưa có dữ liệu / lỗi iScout) thì giữ toạ độ cũ."""
+        try:
+            bosses = iscout.get_hub().bosses(bot.server, self.email, self.password)
+        except iscout.IScoutError:
+            return offer
+        if not bosses:
+            return offer
+        for boss in bosses:
+            if boss["id"] == offer.uid:
+                return BossOffer(boss["x"], boss["y"], boss["name"], boss["level"], uid=offer.uid)
+        return None
+
     def finished(self, offer: BossOffer) -> None:
         """`run` gọi khi xong một boss của lượt: đã hành quân, hoặc bỏ vì không tìm thấy boss. Cả hai đều tính là đã đánh (không đánh lại)."""
         self.batch.pop(offer.uid, None)

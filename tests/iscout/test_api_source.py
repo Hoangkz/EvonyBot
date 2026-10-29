@@ -91,6 +91,24 @@ class ApiSourceTests(unittest.TestCase):
         now[0] += 2 * 60
         self.assertEqual([o.uid for o in source.poll(bot)], ["a"])   # 11 phút: quá hạn, boss còn sống thì đánh lại
 
+    def test_latest_gives_the_current_coords_of_the_same_boss(self):
+        self.feed([boss("a", 560, 70), boss("b", 1, 2)])
+        offer = BossOffer(556, 66, "Rùa Nham thạch", 1, uid="a")
+        current = ApiSource("a@b.c", "pw").latest(make_bot(), offer)
+        self.assertEqual((current.uid, current.coords), ("a", (560, 70)))
+
+    def test_latest_is_none_when_the_boss_is_gone_but_unknown_when_there_is_no_data(self):
+        offer = BossOffer(556, 66, "Rùa Nham thạch", 1, uid="a")
+        self.feed([boss("b", 1, 2)], [])
+        source, bot = ApiSource("a@b.c", "pw"), make_bot()
+        self.assertIsNone(source.latest(bot, offer))              # có dữ liệu mà không còn boss này: đã chết
+        self.assertIs(source.latest(bot, offer), offer)           # chưa có dữ liệu: giữ toạ độ cũ, không kết luận
+
+    def test_latest_keeps_the_old_coords_when_iscout_has_a_problem(self):
+        self.feed(IScoutNotOpen())
+        offer = BossOffer(556, 66, "Rùa Nham thạch", 1, uid="a")
+        self.assertIs(ApiSource("a@b.c", "pw").latest(make_bot(), offer), offer)
+
     def test_problem_alerts_and_stops(self):
         self.feed(IScoutNotOpen())
         bot = make_bot()

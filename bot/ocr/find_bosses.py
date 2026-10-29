@@ -135,8 +135,8 @@ def glow_regions(screen: np.ndarray, masked: np.ndarray | None = None) -> list[t
 
 
 def glow_points(screen: np.ndarray, masked: np.ndarray | None = None) -> list[tuple[int, int]]:
-    """Điểm bấm của từng vòng sáng boss: x = trung bình x của các điểm cam sáng thuộc vòng đó, y = y lớn nhất của các điểm đó (điểm thấp nhất trên màn
-    hình, dưới chân boss, khác `pos` của vùng nhãn). Cùng bộ lọc với glow_regions; [] nếu ít điểm cam hơn GATE_MIN."""
+    """Điểm của từng vòng sáng boss: (trung bình x, y lớn nhất) của các điểm cam sáng thuộc vòng đó, tức giữa đáy vòng sáng (khác `pos` của vùng nhãn nằm
+    dưới thân boss). Cùng bộ lọc với glow_regions; [] nếu ít điểm cam hơn GATE_MIN."""
     masked = world_mask.mask_ui(screen) if masked is None else masked
     mask = cv2.inRange(cv2.cvtColor(masked, cv2.COLOR_BGR2HSV), GLOW_LOW, GLOW_HIGH)
     if cv2.countNonZero(mask) < GATE_MIN:
