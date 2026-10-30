@@ -24,7 +24,7 @@ from ..join_monster_war.boss_memory import JOINED, SKIPPED, BossMemory
 from ..join_monster_war.constants import (GENERAL_SEARCH, MARCH, NOT_ENOUGH_STAMINA, PRESET_ACTIVE_WAIT, PRESET_COUNT, PRESET_DX,
                                           PRESET_LOCKED, PRESET_LOCKED_THRESHOLD, PRESET_X0, PRESET_Y, REGIONS)
 from ..join_monster_war.run import _Boss, _preset_active, _troops
-from .constants import (NAME_GAP, NAME_MAX_H, NAME_MAX_RB, NAME_MIN_H, NAME_MIN_W, NAME_TAP_ABOVE, AGE_LIMIT_MIN, ATTACK_FROM_WAR, ISCOUT_DONE_MINUTES, ATTACK_MENU_POLL, ATTACK_MENU_WAIT, BOSS_NEAR, BOSS_POLL, BOSS_WAIT, DROP, EGGS_KEY, FULL, FULL_RETRY_WAIT, FULL_TRIES, IDLE_WAIT, RETAP_AFTER, RETAP_MOVE, RING_MAX_DIST, LOW_ODDS, LOW_ODDS_CANCEL, LOW_ODDS_THRESHOLD, MAIN_GENERAL_REGION, MARCH_BUTTON, NAME_AREA, NAME_MAX_GLOW_DIST, NAME_READ_GAP, SEARCH_BOX, MARCH_BOX_SIZE, MARCH_GRAY_MAX_SATURATION, RESET_BUTTON, RESET_WAIT,
+from .constants import (NAME_GAP, NAME_MAX_H, NAME_MAX_RB, NAME_MIN_H, NAME_MIN_W, NAME_TAP_ABOVE, AGE_LIMIT_MIN, ATTACK_FROM_WAR, ISCOUT_DONE_MINUTES, ATTACK_MENU_POLL, ATTACK_MENU_WAIT, BOSS_NEAR, BOSS_POLL, BOSS_WAIT, DROP, EGGS_KEY, FULL, FULL_RETRY_WAIT, FULL_TRIES, IDLE_WAIT, RETAP_AFTER, RETAP_MOVE, RING_MAX_DIST, LOW_ODDS, LOW_ODDS_CANCEL, LOW_ODDS_THRESHOLD, MAIN_GENERAL_REGION, MARCH_BUTTON, NAME_READ_GAP, NAME_REGION_EXTRA, SEARCH_BOX, MARCH_BOX_SIZE, MARCH_GRAY_MAX_SATURATION, RESET_BUTTON, RESET_WAIT,
                         MARCH_OPEN_WAIT, MARCH_SPEED_KEY, MARCH_THRESHOLD, MARCH_WAIT, MARCHED, NO_LANES_WAIT, ON_SPOT_KM, POLL, POPUP_WAIT,
                         RALLY_BUTTONS, RALLY_MINUTES, RALLY_TITLE, RALLY_WAIT, RETRY, RETURN_SPEED_KEY, SOURCE_ALLIANCE,
                         SOURCE_API, SOURCE_DEFAULT, SOURCE_KEY, SOURCE_PLAYER, STAMINA, STAMINA_WAIT_MINUTES, TYPE_ATTACK, TYPE_DEFAULT, TYPE_KEY, TYPE_WAR,
@@ -388,35 +388,27 @@ def _text_boxes(masked, x1: int, y1: int, x2: int, y2: int, gap: int) -> list[tu
 
 
 def _name_point(screen):
-    """IsCout: tìm MỌI vùng cam (vòng sáng) trong SEARCH_BOX, xét vùng gần giữa màn hình nhất trước rồi tới các vùng khác. Mỗi vùng: tìm dòng tên boss sát vòng sáng (NAME_AREA, NAME_MAX_GLOW_DIST;
-    chữ be kem, nối huy hiệu cấp và các từ của tên bằng NAME_GAP) và OCR tên (như Find Boss: danh mục boss + `read_map_label`). Tên thuộc danh mục boss thì dừng ngay, các vùng còn lại không xét;
-    không thì qua vùng kế (quái thường, chữ số huy hiệu / nút giao diện màu cam, tên không đọc được). Điểm bấm = (giữa dòng tên theo x, mép trên dòng tên - NAME_TAP_ABOVE).
-    None nếu không vùng nào có boss trong danh mục (boss đã chết / đã đi)."""
+    """IsCout: tìm vùng cam như Find Boss (`glow_regions`, cùng bộ lọc màu và ngưỡng) nhưng chỉ lấy dòng chữ nằm trong SEARCH_BOX (Find Boss quét cả màn hình). Mỗi vùng mở rộng xuống NAME_REGION_EXTRA px
+    vì vòng sáng vỡ mảnh làm vùng dừng cao hơn dòng tên. Các dòng tên (chữ be kem, nối huy hiệu cấp và các từ của tên bằng NAME_GAP) của mọi vùng xếp theo khoảng cách tới giữa màn hình, gần nhất trước,
+    rồi OCR từng dòng (danh mục boss của Find Boss, `_read_boss`): thuộc danh mục thì dừng ngay, các dòng còn lại không xét; không thì xét dòng kế (quái thường, tên thành, chữ số huy hiệu...).
+    Điểm bấm = (giữa dòng tên theo x, mép trên dòng tên - NAME_TAP_ABOVE). None nếu không có boss trong danh mục (boss đã chết / đã đi)."""
     masked = world_mask.mask_ui(screen)
     height, width = screen.shape[:2]
     left, top, right, bottom = (SEARCH_BOX[0] * width / 100, SEARCH_BOX[1] * height / 100, SEARCH_BOX[2] * width / 100, SEARCH_BOX[3] * height / 100)
-    points = [point for point in glow_points(screen, masked)
-              if left <= point[0] <= right and top <= point[1] <= bottom]      # chỉ vùng giữa màn hình
-    regions = glow_regions(screen, masked)
-    half, up, down = NAME_AREA
-    for glow in sorted(points, key=lambda point: math.dist(point, boss_scan.CAMERA_PX)):      # vòng sáng gần tâm nhất trước
-        region = next((box for box in regions if box[0] <= glow[0] <= box[2] and box[1] <= glow[1] <= box[3]), None)
-        if region is None:
-            continue
-        x1, y1, x2, y2 = max(region[0], glow[0] - half), max(region[1], glow[1] - up), min(region[2], glow[0] + half), min(region[3], glow[1] + down)      # chỉ phần sát vòng sáng của vùng cam
-        if x2 <= x1 or y2 <= y1:
-            continue
-        lines = [box for box in _text_boxes(masked, x1, y1, x2, y2, NAME_GAP) if left <= box[0] + box[2] // 2 <= right and top <= box[1] <= bottom
-                 and math.dist((box[0] + box[2] // 2, box[1]), glow) <= NAME_MAX_GLOW_DIST]      # tên phải sát vòng sáng, không lấy tên ở xa
-        narrow = _text_boxes(masked, x1, y1, x2, y2, NAME_READ_GAP)      # dòng không dính huy hiệu cấp: dễ đọc hơn
-        for box in sorted(lines, key=lambda box: math.dist((box[0] + box[2] // 2, box[1]), glow)):
-            inside = [part for part in narrow if box[0] <= part[0] + part[2] // 2 <= box[0] + box[2] and box[1] - 2 <= part[1] <= box[1] + box[3]]
-            if _read_boss(screen, [box] + inside):
-                return box[0] + box[2] // 2, box[1] - NAME_TAP_ABOVE
+    lines, narrow = [], []
+    for x1, y1, x2, y2 in glow_regions(screen, masked):
+        y2 = min(height, y2 + NAME_REGION_EXTRA)
+        lines += [box for box in _text_boxes(masked, x1, y1, x2, y2, NAME_GAP) if box not in lines and left <= box[0] + box[2] // 2 <= right and top <= box[1] <= bottom]
+        narrow += _text_boxes(masked, x1, y1, x2, y2, NAME_READ_GAP)      # dòng không dính huy hiệu cấp: dễ đọc hơn
+    for box in sorted(lines, key=lambda box: math.dist((box[0] + box[2] // 2, box[1]), boss_scan.CAMERA_PX)):      # dòng tên gần giữa màn hình nhất trước
+        inside = [part for part in narrow if box[0] <= part[0] + part[2] // 2 <= box[0] + box[2] and box[1] - 2 <= part[1] <= box[1] + box[3]]
+        if _read_boss(screen, [box] + inside):
+            return box[0] + box[2] // 2, box[1] - NAME_TAP_ABOVE
     return None
 
 
 BOSS_ISCOUT_LOGS = Path(os.environ.get("LOCALAPPDATA", Path.home())) / "EvonyBot" / "logs" / "bossIsCout"
+NOT_BOSS_LOGS = Path(os.environ.get("LOCALAPPDATA", Path.home())) / "EvonyBot" / "logs" / "notBossIsCout"      # ảnh màn hình khi IsCout không tìm thấy boss (không có vùng cam / không có tên boss)
 
 
 def _save_tap_debug(screen, point: tuple[int, int]):
@@ -431,11 +423,21 @@ def _save_tap_debug(screen, point: tuple[int, int]):
         pass
 
 
+def _save_not_boss(screen):
+    """IsCout không tìm thấy boss (không có vùng cam trong vùng tìm, hoặc có mà không đọc ra tên boss trong danh mục): lưu ảnh màn hình cuối vào logs/notBossIsCout/<giờ>_<lý do>.png để xem lại (no_glow / no_name)."""
+    try:
+        reason = "no_name" if glow_regions(screen) else "no_glow"
+        NOT_BOSS_LOGS.mkdir(parents=True, exist_ok=True)
+        cv2.imwrite(str(NOT_BOSS_LOGS / f"{datetime.now():%Y%m%d_%H%M%S_%f}_{reason}.png"), screen)
+    except Exception:
+        pass
+
 def _wait_boss(bot, nearest: bool = False):
     """Chờ tới BOSS_WAIT giây cho boss hiện ra (bản đồ vừa nhảy tới, boss tải chậm hơn nền đất). Tìm mỗi BOSS_POLL (1) giây. Trả vị trí để bấm vào boss, None nếu không thấy.
     Mặc định boss phải nằm trong BOSS_NEAR quanh giữa màn hình và bấm giữa màn hình. `nearest` (IsCout: boss thật có thể lệch khỏi toạ độ nhận được):
     lấy vùng cam (vòng sáng) gần giữa màn hình nhất trong RING_MAX_DIST px, tìm dòng tên boss trong vùng đó và bấm cao hơn tên một chút (`_name_point`). Không thấy tên trong vùng cam thì coi như
     boss đã đánh: hết BOSS_WAIT giây trả None (attack trả DROP)."""
+    screen = None
     for _ in range(round(BOSS_WAIT / BOSS_POLL)):
         bot.sleep(BOSS_POLL)
         screen = bot.screenshot()
@@ -451,8 +453,9 @@ def _wait_boss(bot, nearest: bool = False):
         best = min(found, key=lambda boss: math.dist(boss["pos"], boss_scan.CAMERA_PX))
         if math.dist(best["pos"], boss_scan.CAMERA_PX) <= BOSS_NEAR:
             return boss_scan.CAMERA_PX
+    if nearest:
+        _save_not_boss(screen)      # hết giờ mà không thấy boss: lưu ảnh để xem lại
     return None
-
 
 def _tap_attack(bot, pos: tuple[int, int], relocate=None) -> bool:
     """IsCout: bấm vào boss rồi tìm nút Attack của menu nhanh mỗi ATTACK_MENU_POLL (1) giây, tối đa ATTACK_MENU_WAIT (8) giây; thấy thì bấm. False nếu

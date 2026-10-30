@@ -44,8 +44,7 @@ IDLE_WAIT = 5            # giây nghỉ khi nguồn chưa có boss mới
 # Bước đánh (đo trên giả lập 396 x 704)
 RING_MAX_DIST = 75             # px: IsCout chỉ nhận vòng màu cách tâm màn hình không quá chừng này; xa hơn là boss khác (đo trên 21913: boss đích lệch < 50 px, boss khác 160-190 px)
 SEARCH_BOX = (15, 9, 84, 80)    # % màn hình (x1, y1, x2, y2): IsCout chỉ tìm boss trong vùng giữa này: x từ mép phải cấp VIP / cột Bookmarks tới nút về thành, y từ thanh VIP xuống 80 % chiều cao (ngoài vùng là giao diện hoặc boss khác)
-NAME_AREA = (60, 45, 15)       # px (nửa rộng, lên, xuống) quanh điểm vòng sáng: vùng tìm tên chỉ lấy phần này của vùng cam (glow_regions rộng hơn, lẫn tên thành / quái bên cạnh); tên boss cách vòng sáng cao hơn 7-29 px, thấp hơn tới 6 px
-NAME_MAX_GLOW_DIST = 35        # px: dòng tên phải nằm gần điểm vòng sáng đã chọn (đo trên ảnh thật: tên cách vòng sáng 2-29 px); xa hơn là tên của boss khác / huy hiệu cấp nhận nhầm là vòng sáng -> không bấm
+NAME_REGION_EXTRA = 20          # px: vùng cam (glow_regions) mở rộng xuống chừng này khi tìm dòng tên (vòng sáng vỡ mảnh làm vùng dừng cao hơn dòng tên vài px)
 NAME_READ_GAP = 7              # px: khi OCR tên, thử thêm dòng chữ gộp theo khoảng này (không dính huy hiệu cấp, như read_map_label.lines)
 NAME_GAP = 15                  # px: IsCout tìm dòng tên boss trong vùng cam: chữ cách nhau dưới chừng này cột gộp thành một dòng (huy hiệu cấp + từng từ của tên)
 NAME_MIN_W = 40                # px: dòng tên rộng ít nhất chừng này (tia lửa và mảnh viền vòng sáng hẹp hơn hoặc thấp hơn)

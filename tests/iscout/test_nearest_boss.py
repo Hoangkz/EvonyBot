@@ -1,5 +1,7 @@
 """Attack Boss nguồn IsCout: bấm vòng boss gần giữa nhất; không thấy / không ra Attack thì tính là đã đánh (không cần giả lập)."""
 import importlib
+import tempfile
+from pathlib import Path
 import unittest
 from types import SimpleNamespace
 from unittest import mock
@@ -16,10 +18,16 @@ def setUpModule():
     global _gray_patch
     _gray_patch = mock.patch.object(run, "_march_gray", lambda screen, pos: False)      # ảnh giả của các test này là chuỗi, không đo màu nút March
     _gray_patch.start()
+    global _logs_patch, _logs_dir
+    _logs_dir = tempfile.TemporaryDirectory()
+    _logs_patch = mock.patch.object(run, "NOT_BOSS_LOGS", Path(_logs_dir.name))      # ảnh "không thấy boss" ghi vào thư mục tạm, không vào logs thật
+    _logs_patch.start()
 
 
 def tearDownModule():
     _gray_patch.stop()
+    _logs_patch.stop()
+    _logs_dir.cleanup()
 CENTER = boss_scan.CAMERA_PX
 
 
@@ -315,13 +323,14 @@ class NameLineTests(unittest.TestCase):
         _, y = run._name_point(shot)
         self.assertLess(y, 372)                                     # không bấm xuống vùng vòng sáng / dưới tên
 
-    def test_far_glow_is_ignored(self):
+    def test_glow_region_outside_the_search_box_is_ignored(self):
+        """Vùng cam nằm ngoài SEARCH_BOX (VD sát cột nút bên phải) không có dòng tên nào được xét, dù ở đó có chữ."""
         import os
 
         import cv2
         shot = cv2.imread(os.path.join(os.path.dirname(__file__), "screens", "lava_turtle_world.png"))
-        far = (CENTER[0] + RING_MAX_DIST + 60, CENTER[1])         # boss khác ở xa (đo thật 160-190 px)
-        with mock.patch.object(run, "glow_points", lambda screen, masked=None: [far]):
+        outside = (340, 300, 396, 400)
+        with mock.patch.object(run, "glow_regions", lambda screen, masked=None: [outside]):
             self.assertIsNone(run._name_point(shot))
 
     def test_no_name_when_there_is_no_glow(self):
