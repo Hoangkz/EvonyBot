@@ -20,7 +20,7 @@ from ..event_center.crazy_eggs import constants as eggs
 from ..event_center.crazy_eggs.run import _run_crazy_eggs
 from ..find_boss.constants import TO_WORLD_TAP, TO_WORLD_TRIES, TO_WORLD_WAIT
 from ..join_monster_war import boss_names
-from ..join_monster_war.boss_memory import JOINED, BossMemory
+from ..join_monster_war.boss_memory import JOINED, SKIPPED, BossMemory
 from ..join_monster_war.constants import (GENERAL_SEARCH, MARCH, NOT_ENOUGH_STAMINA, PRESET_ACTIVE_WAIT, PRESET_COUNT, PRESET_DX,
                                           PRESET_LOCKED, PRESET_LOCKED_THRESHOLD, PRESET_X0, PRESET_Y, REGIONS)
 from ..join_monster_war.run import _Boss, _preset_active, _troops
@@ -93,6 +93,8 @@ def run(bot, settings: dict):
             else:
                 del pending[offer.coords]
                 getattr(source, "finished", lambda _offer: None)(offer)
+                if result == DROP:      # boss đã chết / đã đi / không đánh: nhớ toạ độ như đã đánh, nguồn có nhận lại cũng không tìm lại
+                    bot.attack_memory.mark(offer.coords, SKIPPED)
                 if result == MARCHED:
                     bot.attack_memory.mark(offer.coords, JOINED)
                     speed_up_if_full(bot, settings, troops)      # đánh xong mà số đường đã đủ tối đa thì tăng tốc, xong đánh boss mới luôn
