@@ -24,9 +24,9 @@ from ..join_monster_war.run import _Boss, _preset_active, _troops
 from .constants import (NAME_GAP, NAME_MAX_H, NAME_MIN_H, NAME_MIN_W, NAME_TAP_ABOVE, AGE_LIMIT_MIN, ATTACK_FROM_WAR, ISCOUT_DONE_MINUTES, ATTACK_MENU_POLL, ATTACK_MENU_WAIT, BOSS_NEAR, BOSS_POLL, BOSS_WAIT, DROP, EGGS_KEY, FULL, FULL_RETRY_WAIT, FULL_TRIES, IDLE_WAIT, RETAP_AFTER, RETAP_MOVE, RING_MAX_DIST, LOW_ODDS, LOW_ODDS_CANCEL, LOW_ODDS_THRESHOLD, MAIN_GENERAL_REGION, MARCH_BUTTON,
                         MARCH_OPEN_WAIT, MARCH_SPEED_KEY, MARCH_THRESHOLD, MARCH_WAIT, MARCHED, NO_LANES_WAIT, ON_SPOT_KM, POLL, POPUP_WAIT,
                         RALLY_BUTTONS, RALLY_MINUTES, RALLY_TITLE, RALLY_WAIT, RETRY, RETURN_SPEED_KEY, SOURCE_ALLIANCE,
-                        SOURCE_API, SOURCE_DEFAULT, SOURCE_KEY, SOURCE_PLAYER, TROOP_TRIES, TYPE_ATTACK, TYPE_DEFAULT, TYPE_KEY, TYPE_WAR,
+                        SOURCE_API, SOURCE_DEFAULT, SOURCE_KEY, SOURCE_PLAYER, STAMINA, STAMINA_WAIT_MINUTES, TROOP_TRIES, TYPE_ATTACK, TYPE_DEFAULT, TYPE_KEY, TYPE_WAR,
                         VIKING_LABEL)
-from . import lanes, speedup, viking
+from . import lanes, speedup, stamina, viking
 from .goto import goto_coords
 from .sources import BossOffer, make_source
 from .world import ensure_world
@@ -76,6 +76,10 @@ def run(bot, settings: dict):
                 continue
             # Đánh luôn, không chờ đường: hết đường thì _war / _march tự bấm lại 5 phút / March cho tới khi vào được màn March.
             result = attack(bot, settings, offer, getattr(source, "goto", None), latest=getattr(source, "latest", None))
+            if result == STAMINA:     # hết thể lực mà không dùng được: bỏ các boss còn lại, tăng tốc, nghỉ
+                out_of_stamina(bot, settings, source, pending, troops)
+                retry = False
+                break
             if result == FULL:        # thấy "không đủ đội quân": có dùng tăng tốc thì tăng tốc ngay rồi đánh lại boss này luôn; (không dùng thì đã bấm lại hết số lần)
                 pending[offer.coords] = offer
                 speed_up_if_full(bot, settings, troops, force=True)
@@ -93,6 +97,16 @@ def run(bot, settings: dict):
                 break    # tới giờ đập trứng: các boss còn lại làm sau
         if retry:
             delay(bot, IDLE_WAIT)
+
+
+def out_of_stamina(bot, settings: dict, source, pending: dict, troops: int) -> None:
+    """Hết thể lực mà không dùng được vật phẩm (ô Use Stamina là No, hết vật phẩm, hoặc dùng rồi vẫn thiếu): bỏ mọi boss còn chưa đánh khỏi danh sách (`pending` và, với
+    IsCout, lượt đang giữ), tăng tốc đội đang hành quân rồi đội đang trở về (chỉ khi có tích tăng tốc), rồi nghỉ STAMINA_WAIT_MINUTES phút. Boss còn sống sẽ được nhận lại ở lần poll sau khi nghỉ."""
+    getattr(source, "drop_all", lambda offers: None)(list(pending.values()))      # nguồn quên các boss này (không tính là đã đánh) để sau khi nghỉ tìm lại theo cách của nó
+    pending.clear()
+    bot.record(f"Attack Boss: hết thể lực, bỏ các boss còn lại, tăng tốc (nếu có chọn) rồi nghỉ {STAMINA_WAIT_MINUTES} phút")
+    speed_up_if_full(bot, settings, troops, force=True)
+    delay(bot, STAMINA_WAIT_MINUTES * 60)
 
 
 def speed_up_if_full(bot, settings: dict, troops: int, force: bool = False) -> None:
@@ -173,6 +187,7 @@ def attack(bot, settings: dict, offer: BossOffer, go=None, own=None, latest=None
     attack_type) -> màn March: chọn đội rồi March. Trả:
     - MARCHED: đã hành quân;
     - DROP: boss không còn đó (đã chết), không thuộc loại được tích, hoặc game báo tỷ lệ thắng cực thấp (đã Cancel): bỏ hẳn;
+    - STAMINA: hết thể lực mà không dùng được vật phẩm (không tích, hết vật phẩm, hoặc dùng rồi vẫn thiếu): `run` bỏ các boss còn lại, tăng tốc rồi nghỉ 20 phút;
     - FULL: game báo hết đường hành quân ("You cannot send more troops."): giữ boss lại, `run` chuyển sang tăng tốc rồi chờ có đường trống;
     - RETRY: chưa đánh được (không đội nào có tướng, hết thể lực, màn không mở...): giữ boss lại đánh sau, KHÔNG bỏ qua.
     Mọi nhánh thất bại đều về bản đồ sạch.
@@ -230,6 +245,8 @@ def attack(bot, settings: dict, offer: BossOffer, go=None, own=None, latest=None
             return FULL
         if _consume_low_odds(bot):
             return DROP
+        if _consume_no_stamina(bot):
+            return STAMINA
         return MARCHED if marched else RETRY
     bot.tap(war[0] + ATTACK_FROM_WAR[0], war[1] + ATTACK_FROM_WAR[1])
     marched = _march(bot, settings, MAIN_GENERAL_REGION)
@@ -237,7 +254,16 @@ def attack(bot, settings: dict, offer: BossOffer, go=None, own=None, latest=None
         return FULL
     if _consume_low_odds(bot):
         return DROP
+    if _consume_no_stamina(bot):
+        return STAMINA
     return MARCHED if marched else RETRY
+
+
+def _consume_no_stamina(bot) -> bool:
+    """`_march` vừa hết thể lực mà không dùng được vật phẩm: True một lần, rồi xoá cờ."""
+    flagged = getattr(bot, "attack_no_stamina", False)
+    bot.attack_no_stamina = False
+    return flagged
 
 
 def _consume_low_odds(bot) -> bool:
@@ -405,9 +431,12 @@ def _pick_troop(bot, helper, screen, region) -> int | None:
     return None
 
 
-def _march(bot, settings: dict, region) -> bool:
+def _march(bot, settings: dict, region, refilled: bool = False) -> bool:
     """Màn March: BẮT BUỘC chọn được đội quân có tướng chính (đội không có tướng thì thử đội khác; tích Select General thì chọn tướng cho đội;
-    vẫn không có thì Back, không hành quân). Tướng phụ không bắt buộc (không chọn). Xong bấm March; thành công khi về bản đồ sạch."""
+    vẫn không có thì Back, không hành quân). Tướng phụ không bắt buộc (không chọn). Xong bấm March; thành công khi về bản đồ sạch.
+    Hết thể lực (popup "Get more now?"): ô Use Stamina của tab được chọn thì dùng vật phẩm thể lực y như Join Monster War (stamina.refill) rồi làm lại màn March
+    một lần (`refilled`: không dùng thể lực lần nữa). Không chọn, hết vật phẩm hoặc đã dùng rồi mà vẫn thiếu thì đặt cờ `bot.attack_no_stamina` (attack trả STAMINA);
+    lỗi khác (màn dùng thể lực không mở / không đóng) chỉ bỏ qua boss này (RETRY)."""
     if getattr(bot, "boss_memory", None) is None:
         bot.boss_memory = BossMemory()     # _Boss cần, Attack Boss không dùng
     helper = _Boss(bot, settings)      # dùng lại phần chọn đội / tướng của Join Monster War
@@ -447,11 +476,19 @@ def _march(bot, settings: dict, region) -> bool:
                 bot.attack_low_odds = True
                 boss_scan.ensure_map(bot)
                 return False
-            if bot.find(NOT_ENOUGH_STAMINA, screen=shot) is not None:
-                # TODO: dùng vật phẩm thể lực (helper._use_stamina gắn với vòng lặp Join Boss), tạm bỏ qua boss này.
-                bot.record("Attack Boss: hết thể lực, chưa xử lý")
-                boss_scan.ensure_map(bot)
-                return False
+            confirm = bot.find(NOT_ENOUGH_STAMINA, screen=shot)
+            if confirm is not None:
+                if refilled or not stamina.enabled(helper):
+                    bot.record("Attack Boss: hết thể lực" + (" (đã dùng vật phẩm mà vẫn thiếu)" if refilled else ", không dùng vật phẩm thể lực"))
+                    bot.attack_no_stamina = True
+                    boss_scan.ensure_map(bot)
+                    return False
+                refilled_state = stamina.refill(bot, helper, confirm)
+                if refilled_state != stamina.OK:
+                    bot.attack_no_stamina = refilled_state == stamina.EMPTY      # hết vật phẩm: như không dùng thể lực; lỗi khác: chỉ bỏ qua boss này
+                    boss_scan.ensure_map(bot)
+                    return False
+                return _march(bot, settings, region, refilled=True)      # thể lực đã đầy lại: làm lại màn March (chọn đội, bấm March)
             if boss_scan.on_map(bot, shot):
                 return True
         if not full or bot.find(MARCH_BUTTON, region=REGIONS[MARCH], threshold=MARCH_THRESHOLD) is None:

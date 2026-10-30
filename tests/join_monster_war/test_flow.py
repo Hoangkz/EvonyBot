@@ -18,7 +18,7 @@ import numpy as np
 from bot.activities import join_monster_war
 from bot.activities.join_monster_war.boss_memory import JOINED, SKIPPED, BossMemory
 from bot.activities.join_monster_war.constants import (CHOOSE_DEVELOPMENT, FAVORITE_OFF, GENERAL_DETAIL_CLOSE, IDLE, JOIN, JOINED_BUTTON, LISTBOSS, MARCH,
-                                                     NOT_ENOUGH_STAMINA, PRESET_DX, PRESET_X0, PRESET_Y,
+                                                     NOT_ENOUGH_STAMINA, PRESET_DX, PRESET_RING_R, PRESET_X0, PRESET_Y,
                                                      REGIONS, SELECT_GENERAL, STAMINA_PLUS, STAMINA_SLIDER_END,
                                                      STAMINA_USE, WAR_TICKED)
 from bot.activities.join_monster_war.run import (POLL_INTERVAL, STEP_TIMEOUT, _Boss,
@@ -69,6 +69,31 @@ def unknown(screen):
     return screen
 
 
+def lit_preset(troop):
+    """ẢNH TỔNG HỢP: màn March mà đúng ô preset `troop` đang sáng (vòng cam). Bot chỉ xét tướng sau khi ô vừa bấm sáng lên (PRESET_ACTIVE_WAIT), nhưng ảnh
+    tĩnh của kịch bản không đổi sau cú bấm; ảnh chụp thật chỉ có một vài ô sáng (march_preset_2_unlocked: không ô nào, march_main_general_chosen: ô 1, march_ready: ô 2).
+    Xoá vòng sáng ở cả 8 ô (lấy ô tương ứng của march_preset_2_unlocked) rồi dán vòng sáng của ô 1 (march_main_general_chosen) vào ô `troop`."""
+    def apply(screen):
+        plain = cv2.imread(str(SCREENS / "march_preset_2_unlocked.png"))
+        ring = cv2.imread(str(SCREENS / "march_main_general_chosen.png"))
+        h, w = screen.shape[:2]
+        half = int(w * PRESET_RING_R[1] / 100) + 2
+
+        def cell(t):
+            cx, cy = int(w * (PRESET_X0 + (t - 1) * PRESET_DX) / 100), int(h * PRESET_Y / 100)
+            return slice(cy - half, cy + half + 1), slice(max(cx - half, 0), cx + half + 1)
+        for t in range(1, 9):
+            screen[cell(t)] = plain[cell(t)]
+        screen[cell(troop)] = ring[cell(1)]
+        return screen
+    return apply
+
+
+def lit(screen, troop=1):
+    """Tên ảnh `screen` với ô preset `troop` sáng (xem lit_preset)."""
+    return f"{screen}?lit{troop}"
+
+
 def run_join(testcase, flow, settings, **kwargs):
     # Bộ ảnh legacy ghép màn danh sách và March từ các lượt chơi khác nhau nên tọa độ
     # không trùng. Cho March dùng tọa độ vừa báo; kiểm tra OCR thật nằm trong
@@ -79,7 +104,7 @@ def run_join(testcase, flow, settings, **kwargs):
 
     with mock.patch.object(_Boss, "_read_march_target_coords", reported_target):
         return run_flow(testcase, join_monster_war.run, SCREENS, flow, settings,
-                        variants={"war_off": war_off, "unknown": unknown}, **kwargs)
+                        variants={"war_off": war_off, "unknown": unknown, "lit1": lit_preset(1), "lit2": lit_preset(2)}, **kwargs)
 
 
 def remember(coords, status):
@@ -274,7 +299,7 @@ ALL_TROOPS = {**IDLE_SETTINGS, "troop": [f"Troop {i}" for i in range(1, 9)]}
 JOIN_AND_MARCH = [
     Step(W("02_war_list_join.png"), tap(JOIN)),
     Step(MARCH_SCREEN, preset(1)),
-    Step(MARCH_SCREEN, tap(MARCH)),
+    Step(lit(MARCH_SCREEN), tap(MARCH)),
     Step(W("war_after_march_joined.png"), end(IDLE)),
 ]
 # Người dùng chỉ chọn đội 3, 4 nhưng các ô đó đang khoá -> không đội nào dùng được -> Back.
@@ -291,7 +316,7 @@ CHOOSE_ASSISTANT = [
     Step("march_main_general_chosen.png", preset(1)),
     Step("march_main_general_chosen.png", tap(SELECT_GENERAL)),
     Step("select_general_fav_off.png", tap(FAVORITE_OFF)),
-    Step("select_general_fav_on.png", tap_at(329, 373, tol=8)),
+    Step("select_general_fav_on.png", tap_at(329, 627, tol=8)),
     Step("march_preset_2_unlocked.png", tap(MARCH)),
     Step("war_epic_cerberus_skeleton.png", end(IDLE)),
 ]
@@ -299,7 +324,7 @@ CHOOSE_ASSISTANT = [
 CHOOSE_ASSISTANT_FAV_ALREADY_ON = [
     Step("march_main_general_chosen.png", preset(1)),
     Step("march_main_general_chosen.png", tap(SELECT_GENERAL)),
-    Step("select_general_fav_on.png", tap_at(329, 373, tol=8)),
+    Step("select_general_fav_on.png", tap_at(329, 627, tol=8)),
     Step("march_preset_2_unlocked.png", tap(MARCH)),
 ]
 # Tích "Development General": màn Select a General -> bấm tab Development (cái búa) trước
@@ -309,7 +334,7 @@ CHOOSE_ASSISTANT_DEVELOPMENT = [
     Step("march_main_general_chosen.png", tap(SELECT_GENERAL)),
     Step("select_general_fav_off.png", tap(CHOOSE_DEVELOPMENT)),
     Step("select_general_fav_off.png", tap(FAVORITE_OFF)),
-    Step("select_general_fav_on.png", tap_at(329, 373, tol=8)),
+    Step("select_general_fav_on.png", tap_at(329, 627, tol=8)),
     Step("march_preset_2_unlocked.png", tap(MARCH)),
 ]
 # Màn chọn tướng phụ: King Arthur (tướng chính) có nút Select XÁM, không chọn được ->
@@ -335,14 +360,14 @@ NO_MAIN = "march_no_main_general.png"
 SKIP_TROOP_WITHOUT_GENERAL = [
     Step(NO_MAIN, preset(1)),
     Step(NO_MAIN, preset(2)),
-    Step(MARCH_SCREEN, tap(MARCH)),
+    Step(lit(MARCH_SCREEN, 2), tap(MARCH)),
 ]
 # Đội 1, 2 đều không có tướng chính, tích "Select General" -> bấm "+" ô Main General ->
 # Select tướng đầu tiên -> về màn March, ô đã có tướng -> March.
 CHOOSE_MAIN_GENERAL = [
     Step(NO_MAIN, preset(1)),
     Step(NO_MAIN, preset(2)),
-    Step(NO_MAIN, tap(SELECT_GENERAL)),
+    Step(lit(NO_MAIN, 2), tap(SELECT_GENERAL)),
     Step("select_general_fav_on.png", tap_at(329, 373, tol=8)),
     Step("march_main_general_chosen.png", tap(MARCH)),
 ]
@@ -350,7 +375,7 @@ CHOOSE_MAIN_GENERAL = [
 NO_MAIN_GENERAL_STILL_MARCH = [
     Step(NO_MAIN, preset(1)),
     Step(NO_MAIN, preset(2)),
-    Step(NO_MAIN, tap(SELECT_GENERAL)),
+    Step(lit(NO_MAIN, 2), tap(SELECT_GENERAL)),
     Step("select_general_no_favorite.png", back()),
     Step(NO_MAIN, tap(MARCH)),
 ]
@@ -358,14 +383,14 @@ NO_MAIN_GENERAL_STILL_MARCH = [
 NO_MAIN_GENERAL_MARCH = [
     Step(NO_MAIN, preset(1)),
     Step(NO_MAIN, preset(2)),
-    Step(NO_MAIN, tap(MARCH)),
+    Step(lit(NO_MAIN, 2), tap(MARCH)),
 ]
 # Ảnh thật trước / sau khi bấm March (đủ thể lực): màn March (đội có tướng chính và tướng phụ)
 # -> March -> quay về danh sách War, thẻ Manticore đã "Joined", ô War đang tích -> bỏ tích ->
 # chỉ còn thẻ Joined, danh sách đã hiện hết -> rảnh.
 MARCH_THEN_BACK_TO_LIST = [
     Step("march_ready.png", preset(1)),
-    Step("march_ready.png", tap(MARCH)),
+    Step(lit("march_ready.png"), tap(MARCH)),
     Step("war_after_march_joined.png", tap_at(201, 118, tol=8)),
     Step(W("war_after_march_joined.png"), end(IDLE)),
 ]
@@ -375,13 +400,13 @@ STAMINA_POPUP = "march_not_enough_stamina.png"
 NO_STAMINA_STOP = [
     Step(W("02_war_list_join.png"), tap(JOIN)),
     Step(MARCH_SCREEN, preset(1)),
-    Step(MARCH_SCREEN, tap(MARCH)),
+    Step(lit(MARCH_SCREEN), tap(MARCH)),
     Step(STAMINA_POPUP, back(3)),
     Step(W("war_after_march_joined.png"), end(IDLE)),
 ]
 NO_STAMINA_CONFIRM = [
     Step(MARCH_SCREEN, preset(1)),
-    Step(MARCH_SCREEN, tap(MARCH)),
+    Step(lit(MARCH_SCREEN), tap(MARCH)),
     Step(STAMINA_POPUP, tap(NOT_ENOUGH_STAMINA)),
 ]
 # Dùng vật phẩm thể lực: Confirm -> màn Use Item: bấm Use đầu tiên -> popup số lượng
@@ -390,7 +415,7 @@ def refill(slider_step):
     return [
         Step(W("02_war_list_join.png"), tap(JOIN)),
         Step(MARCH_SCREEN, preset(1)),
-        Step(MARCH_SCREEN, tap(MARCH)),
+        Step(lit(MARCH_SCREEN), tap(MARCH)),
         Step(STAMINA_POPUP, tap(NOT_ENOUGH_STAMINA)),
         Step("stamina_use_item_list.png", tap_at(292, 360, tol=8)),   # Use ( 90 ) của vật phẩm đầu
         *slider_step,
@@ -406,12 +431,12 @@ GENERAL_DETAIL_OPENED = [
     # Lỡ bấm vào tướng trên màn March -> popup "Detail" (ảnh chụp thật): bấm X đỏ, về màn March làm tiếp.
     Step("march_general_detail.png", tap(GENERAL_DETAIL_CLOSE)),
     Step(MARCH_SCREEN, preset(1)),
-    Step(MARCH_SCREEN, tap(MARCH)),
+    Step(lit(MARCH_SCREEN), tap(MARCH)),
 ]
 OUT_OF_STAMINA_ITEMS = [
     Step(W("02_war_list_join.png"), tap(JOIN)),
     Step(MARCH_SCREEN, preset(1)),
-    Step(MARCH_SCREEN, tap(MARCH)),
+    Step(lit(MARCH_SCREEN), tap(MARCH)),
     Step(STAMINA_POPUP, tap(NOT_ENOUGH_STAMINA)),
     Step("stamina_no_items.png", back(3)),
     Step(W("war_after_march_joined.png"), end(IDLE)),
@@ -430,7 +455,7 @@ REFILL_ALL = refill([Step("stamina_use_popup.png", tap_pct(*STAMINA_SLIDER_END, 
 # Tướng phụ đã có sẵn -> không chọn gì thêm, March luôn.
 ASSISTANT_ALREADY_THERE = [
     Step(MARCH_SCREEN, preset(1)),
-    Step(MARCH_SCREEN, tap(MARCH)),
+    Step(lit(MARCH_SCREEN), tap(MARCH)),
 ]
 
 
@@ -623,7 +648,7 @@ class JoinMonsterWarFlow(unittest.TestCase):
                 self.assertIn(f"Join Monster War: dùng vật phẩm thể lực ({target})", device.logs)
 
     def test_swipe_opening_troop_detail_backs_once(self):
-        run_join(self, SWIPE_OPENED_TROOP_DETAIL, {**ALL_TROOPS})
+        run_join(self, SWIPE_OPENED_TROOP_DETAIL, {**ALL_TROOPS}, setup=remember(MINOTAUR, JOINED))      # boss trên danh sách đã biết: bot cuộn, không bấm Join
 
     def test_general_detail_popup_closes_with_x_then_marches(self):
         device = run_join(self, GENERAL_DETAIL_OPENED, {**ALL_TROOPS})

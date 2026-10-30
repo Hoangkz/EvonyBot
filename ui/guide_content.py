@@ -52,6 +52,40 @@ GUIDE: list[tuple[str, str]] = [
   <li>Cấp độ Viking khi tự gọi (Summon): Easy / Normal / Hard / Hell.</li>
 </ul>
 """),
+    ("Attack Boss", """
+<h2>Attack Boss</h2>
+<p>Bot tự đi tới từng boss trên bản đồ thế giới rồi đánh (một mình hoặc lập rally). Khác Join Monster War (chỉ vào rally của người khác).
+Chức năng này <b>chạy một mình</b>: không làm các việc khác, trừ <b>Crazy Eggs</b> và <b>Viking Summon</b> nếu bạn bật.</p>
+
+<h3>Boss source (chỉ chọn một)</h3>
+<ul>
+  <li><b>Alliance chat</b>: đọc toạ độ boss liên minh chia sẻ trong 30 phút gần nhất. Boss gần thành đánh trước. Chọn boss / cấp muốn đánh ở danh sách bên dưới.</li>
+  <li><b>Whisper</b>: đọc toạ độ boss một người chơi gửi riêng cho bạn; nhập <b>Player name</b>. Được gửi boss nào đánh boss đó, luôn dùng Attack.</li>
+  <li><b>IsCout</b>: lấy boss từ trang iScout, nhập <b>email</b> và <b>mật khẩu</b> iScout (xem bên dưới).</li>
+</ul>
+
+<h3>Nguồn IsCout</h3>
+<ul>
+  <li>Bấm Start thì bot <b>tự mở một trình duyệt</b> (Chrome, Edge, Brave hoặc Cốc Cốc; không hỗ trợ Firefox) tới trang iScout và tự đăng nhập. Trình duyệt dùng hồ sơ riêng nên lần sau vào thẳng Dashboard. Cứ để cửa sổ đó mở.</li>
+  <li>Tài khoản iScout phải <b>cùng server</b> với giả lập này.</li>
+  <li>Không chọn boss ở tab: <b>bộ lọc boss đặt ngay trên trang iScout</b>, bot đánh các boss có trên bảng (boss thường và boss sự kiện).</li>
+  <li>Mỗi lượt bot lấy 6 boss gần thành nhất, đánh hết rồi mới lấy lượt kế. Boss đã đánh không bị đánh lại trong 10 phút.</li>
+  <li>iScout cho toạ độ của <b>vùng có chứa boss</b>, không phải toạ độ chính xác (mỗi lần tính có thể lệch 1-2 ô). Vì vậy sau khi nhảy tới toạ độ, bot tìm vòng sáng cam gần giữa màn hình nhất, tìm tên boss trong vùng đó rồi bấm lên trên tên một chút. <b>Không thấy tên boss thì bot coi như boss đó đã đánh</b> và qua boss khác.</li>
+  <li>Thiếu email / mật khẩu, không có trình duyệt, đăng nhập không được hoặc sai server: bot hiện popup báo lỗi và <b>dừng máy này</b>; sửa xong bấm Start lại.</li>
+</ul>
+
+<h3>Setting và Troop</h3>
+<ul>
+  <li><b>Use Stamina</b>: khi hết thể lực, dùng vật phẩm thể lực: <i>ALL</i> (dùng hết), <i>100</i> … <i>500</i> (nhận tới mức đó) hoặc <i>No</i> (không dùng).</li>
+  <li><b>Troop</b>: tích các đội dùng để đi đánh. Đội phải có <b>tướng chính</b>; bot chỉ thử các đội đã tích, đội nào không có tướng thì thử đội kế. Số đội đã tích cũng giới hạn số hành quân cùng lúc.</li>
+  <li><b>Type</b>: <i>Attack</i> (đánh một mình) hoặc <i>Alliance War</i> (lập rally 5 phút cho liên minh vào đánh cùng). Nguồn Whisper luôn dùng Attack.</li>
+  <li><b>March speed / Return speed</b>: dùng vật phẩm tăng tốc cho đội đang đi tới boss / đang trở về. <i>No</i> = không dùng; <i>All</i> = tăng tới khi tới nơi / về xong; <i>5s … 30s</i> = tăng tới khi thời gian còn lại không quá chừng đó; <i>1 … 10</i> = dùng đúng chừng đó cái. Bot chỉ tăng tốc khi đã dùng hết số đường hành quân.</li>
+  <li><b>Crazy Eggs</b>: 0 = tắt; 1-4h = đập trứng xen giữa lúc đánh boss, chưa vỡ đủ 4 quả thì làm lại sau chừng đó giờ.</li>
+  <li><b>Viking → Summon</b>: bot tự gọi Viking (Event Center → Viking Challenge), nhờ liên minh giúp rồi tấn công luôn. Chọn độ khó ở <i>Level</i>. Thẻ <b>Viking share</b> ở danh sách boss là Viking người khác gửi.</li>
+</ul>
+
+<p><i>Lưu ý:</i> hết thể lực thì bot dùng vật phẩm thể lực nếu ô <b>Use Stamina</b> được chọn (như Join Monster War); chọn <i>No</i>, hết vật phẩm hoặc dùng rồi vẫn thiếu thì bot bỏ các boss còn chưa đánh khỏi danh sách (không tính là đã đánh), tăng tốc đội hành quân / trở về nếu có chọn rồi <b>nghỉ 20 phút</b>; sau đó bot tìm lại boss theo nguồn đã chọn. Thời gian chờ rally cố định 5 phút. Hết đường hành quân mà không bật tăng tốc thì bot chờ có đường trống rồi đánh tiếp.</p>
+"""),
     ("Daily Activities", """
 <h2>Daily Activities</h2>
 <p>Tích các nhiệm vụ hằng ngày muốn bot làm. Mỗi nhiệm vụ làm <b>một lần mỗi ngày</b>, sang giờ reset server

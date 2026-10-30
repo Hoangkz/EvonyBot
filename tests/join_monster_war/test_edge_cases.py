@@ -26,6 +26,7 @@ from bot.activities.join_monster_war.constants import (
     WAR_TICKED,
     WAR_UNTICK_TRIES,
 )
+from bot.activities.join_monster_war.constants import MARCH_RESULT_WAIT
 from bot.activities.join_monster_war.run import (MAX_MAP_COORD, POLL_INTERVAL, STEP_TIMEOUT,
                                                  _Boss, _near, _troops)
 
@@ -96,7 +97,7 @@ class JoinBossEdgeCaseTests(unittest.TestCase):
 
         bot.tap.assert_called_once()
         bot.back.assert_called_once()
-        self.assertEqual(bot.screenshot.call_count, int(STEP_TIMEOUT / POLL_INTERVAL))
+        self.assertEqual(bot.screenshot.call_count, int(MARCH_RESULT_WAIT / POLL_INTERVAL))      # _press_march chờ MARCH_RESULT_WAIT (5 s) màn sau khi bấm March
         self.assertIsNone(boss.memory.status((500, 600)))
 
     def test_closed_march_without_war_list_is_not_remembered(self):
