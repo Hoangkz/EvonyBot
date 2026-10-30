@@ -102,7 +102,7 @@ class FixedGiftFlowTests(unittest.TestCase):
             {"RevelryCarnival"},
             {path.name for path in (root / "Event").iterdir()
              if path.is_dir()})
-        self.assertEqual(18, len([
+        self.assertEqual(19, len([
             path for path in (root / "EventCenter").iterdir()
             if path.is_dir()]))
         self.assertEqual(18, len([
@@ -3736,6 +3736,7 @@ class FixedGiftFlowTests(unittest.TestCase):
 
     def test_event_row_wait_does_not_treat_loading_frame_as_opened(self):
         bot = mock.Mock()
+        bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
         with mock.patch.object(
                 event_center, "identify",
                 side_effect=(None, None,

@@ -7,6 +7,7 @@ import numpy as np
 from . import (blessing_of_pallas, dragon_battle, dwarfs_lucky_apple,
                dwarfs_treasure,
                eagle_of_freedom,
+               garuda_trial,
                giants_wisdom_temple, grace_of_star_trail, great_expedition,
                hypnos_dream,
                legion_hunting,
@@ -23,6 +24,8 @@ from ..valuable_event.named_flow import region_hamming_distance
 
 KEY = "gift_event_center_limited"
 PAGE = "EventCenter/title"
+ACTIVITIES_SELECTED = "EventCenter/tab_activities_on"
+LIMITED_SELECTED = "EventCenter/tab_limited_on"
 CONGRATULATIONS = "SuperValueReturn/LoginGifts/congratulations"
 # Event Center uses the same edge contract as Valuable Event: an edge is real
 # only after two consecutive settled swipes do not move the list.  There is no
@@ -218,6 +221,7 @@ EVENT_POLICIES = (
     giants_wisdom_temple.POLICY,
     wishful_windmill_festival.POLICY,
     revelation_of_horus.POLICY,
+    garuda_trial.POLICY,
 )
 POLICY_BY_SCREEN = {policy.screen: policy for policy in EVENT_POLICIES
                     if policy.screen is not None}
@@ -269,9 +273,13 @@ FORCED_ACTIVITY_ROWS = (
      FORCED_EVENT_PREFIX + b"dwarfs_lucky_apple",
      GiftScreen.DWARFS_LUCKY_APPLE, "Dwarf's Lucky Apple",
      dwarfs_lucky_apple.POLICY.key),
+    ("EventCenter/GarudaTrial/list_row",
+     FORCED_EVENT_PREFIX + b"garuda_trial",
+     GiftScreen.GARUDA_TRIAL, "Garuda Trial", garuda_trial.POLICY.key),
 )
 POLICY_CATEGORIES = {
     dwarfs_lucky_apple.POLICY.key: "activities",
+    garuda_trial.POLICY.key: "activities",
 }
 
 
@@ -918,7 +926,10 @@ def _wait_event_row_open(bot, expected_screen=None, *, delay=UI_SETTLE_SECONDS):
     """
     actual = None
     for attempt in range(5):
-        actual = identify(bot)
+        screen = bot.screenshot()
+        actual = identify(bot, screen)
+        if actual is None and _event_center_list_open(bot, screen):
+            actual = GiftScreen.EVENT_CENTER
         if expected_screen is not None and actual == expected_screen:
             return actual
         if (expected_screen is None
@@ -1967,6 +1978,7 @@ EXACT_HANDLERS = {
     GiftScreen.LEGION_HUNTING: _handle_legion_hunting,
     GiftScreen.MOMENT_OF_GLORY: _handle_moment_of_glory,
     GiftScreen.GREAT_EXPEDITION: great_expedition.claim_opened,
+    GiftScreen.GARUDA_TRIAL: garuda_trial.claim_opened,
 }
 
 
@@ -2018,8 +2030,7 @@ def _signature_seen(signature: bytes, attempted: set[bytes], max_distance=18) ->
 def _back_to_list(bot):
     for _ in range(4):
         screen = bot.screenshot()
-        if find(bot, PAGE, screen, threshold=0.72,
-                region=(0, 0, 100, 13)) is not None:
+        if _event_center_list_open(bot, screen):
             return True
         bot.back(delay=UI_SETTLE_SECONDS)
     return False
@@ -2364,6 +2375,23 @@ def _category_db_done(bot, category: str) -> bool:
                for key in _category_policy_keys(category))
 
 
+def _event_center_list_open(bot, screen) -> bool:
+    """Recognize both Event Center list headers.
+
+    The Activities list replaces the ordinary ``Event Center`` title with the
+    rotating celebration name (currently ``Delight Celebration``), so the
+    selected tab is its stable page marker.
+    """
+    if find(bot, PAGE, screen, threshold=0.72,
+            region=(0, 0, 100, 13)) is not None:
+        return True
+    return any(
+        find(bot, template, screen, threshold=0.96,
+             region=(0, 5, 80, 18)) is not None
+        for template in (ACTIVITIES_SELECTED, LIMITED_SELECTED)
+    )
+
+
 def _select_category(bot, name: str, x_percent: int) -> bool:
     bot.record(f"Gift Claims: Event Center chọn nhóm {name}")
     screen = bot.screenshot()
@@ -2379,14 +2407,16 @@ def _select_category(bot, name: str, x_percent: int) -> bool:
                         region=(0, 5, 80, 18))
     settle = (APPLE_LIST_SETTLE_SECONDS
               if name == "activities" else UI_SETTLE_SECONDS)
+    selected_template = (ACTIVITIES_SELECTED
+                         if name == "activities" else LIMITED_SELECTED)
     if category_pos is not None:
         bot.tap(*category_pos, delay=settle)
     else:
         bot.tap_percent(x_percent, 11, delay=settle)
     for _ in range(4):
         screen = bot.screenshot()
-        if find(bot, PAGE, screen, threshold=0.72,
-                region=(0, 0, 100, 13)) is not None:
+        if find(bot, selected_template, screen, threshold=0.96,
+                region=(0, 5, 80, 18)) is not None:
             return True
         bot.sleep(settle)
     return False
@@ -2757,8 +2787,7 @@ def _scan_category(bot, category: str, visited: set[bytes]) -> bool:
 def run_opened(bot, handled=None):
     """Finish Limited first, then Activities, resuming after a Boss yield."""
     screen = bot.screenshot()
-    if find(bot, PAGE, screen, threshold=0.72,
-            region=(0, 0, 100, 13)) is None:
+    if not _event_center_list_open(bot, screen):
         return_home(bot)
         return False
 
