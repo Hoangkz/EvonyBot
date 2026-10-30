@@ -27,6 +27,7 @@ NO_DATA_SECONDS = 30       # tab (không phải trang đăng nhập) quá chừn
 LOGIN_SECONDS = 40         # trang đăng nhập quá chừng này giây vẫn chưa vào được = đăng nhập thất bại
 BROWSER_START_SECONDS = 40     # mở trình duyệt xong chờ chừng này giây cho tab iScout hiện ra
 LOGIN_ID = 200
+RELOAD_ID = 300
 START_URL = "https://www.iscout.club/vi/dashboard"
 PROFILE = os.path.join(os.path.expanduser("~"), "iscout_browser")      # hồ sơ riêng (cùng thư mục với open_browser.bat): giữ phiên đăng nhập
 # Điền email / mật khẩu rồi bấm đăng nhập; "wait" khi form chưa hiện. Giá trị gán bằng setter gốc + sự kiện input để React / Vue nhận ra.
@@ -131,14 +132,23 @@ class Tab:
     """Boss của một tab iScout: id -> boss; `server` (từ khung dữ liệu) None tới khi tab nhận khung đầu tiên; `configured` là "ID máy chủ đã
     cấu hình" đọc từ chữ trên trang (server trong hồ sơ iScout, có thể khác server của boss với tài khoản miễn phí)."""
 
-    def __init__(self, url=""):
+    def __init__(self, url="", socket_url=""):
         self.url = url
+        self.socket_url = socket_url      # địa chỉ DevTools của tab (để gửi lệnh tải lại trang)
         self.started = time.monotonic()
         self.server = None
         self.login_sent = False
         self.configured = None
         self.bosses = {}
         self.alive = True
+
+    def reset(self):
+        """Quên dữ liệu đã nhận (trang vừa được tải lại): tab chờ khung đầu tiên như tab mới mở."""
+        self.started = time.monotonic()
+        self.server = None
+        self.login_sent = False
+        self.configured = None
+        self.bosses = {}
 
     @property
     def known_server(self):
@@ -232,6 +242,25 @@ class IScoutHub:
         dữ liệu (gọi lại sau). Chưa có tab thì mở trình duyệt, y như `bosses`. Raises IScoutError."""
         return self._tab(server, email, password) is not None
 
+    def reload(self, server) -> None:
+        """Tải lại trang iScout (tab đã dùng cho `server`, chưa có thì mọi tab): iScout tự ngắt phiên sau tối đa 30 phút nên mỗi lần vào Attack Boss tải lại
+        cho chắc. Dữ liệu cũ của tab bị xoá, `ready` / `bosses` chờ khung mới. Không có tab (trình duyệt chưa mở) thì không làm gì; lỗi gửi lệnh thì bỏ qua."""
+        self._refresh()
+        with self._lock:
+            tab = self._last.get(str(server))
+            tabs = [tab] if tab is not None and tab.alive else [t for t in self._tabs.values() if t.alive]
+        for tab in tabs:
+            try:
+                ws = websocket.create_connection(tab.socket_url, suppress_origin=True, timeout=5)
+                try:
+                    ws.send(json.dumps({"id": RELOAD_ID, "method": "Page.reload", "params": {"ignoreCache": True}}))
+                finally:
+                    ws.close()
+            except (websocket.WebSocketException, OSError):
+                continue
+            with self._lock:
+                tab.reset()
+
     def _tab(self, server, email, password):
         """Tab đã dùng được cho `server`, hoặc None khi còn đang chờ. Raises IScoutError."""
         self._login = (email, password)
@@ -278,7 +307,7 @@ class IScoutHub:
                     else:
                         tab.url = url
                         continue
-                tab = self._tabs[target] = Tab(url)
+                tab = self._tabs[target] = Tab(url, socket_url)
                 threading.Thread(target=self._listen, args=(socket_url, tab), daemon=True).start()
 
     def _listen(self, url, tab):
