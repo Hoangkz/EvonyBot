@@ -132,9 +132,17 @@ class ApiSourceTests(unittest.TestCase):
             if isinstance(state, Exception):
                 raise state
             return state
-        patch = mock.patch.object(sources.iscout, "get_hub", lambda: SimpleNamespace(ready=ready))
+        self.reloads = []
+        hub = SimpleNamespace(ready=ready, reload=self.reloads.append)
+        patch = mock.patch.object(sources.iscout, "get_hub", lambda: hub)
         patch.start()
         self.addCleanup(patch.stop)
+
+    def test_prepare_reloads_the_page_before_waiting_for_data(self):
+        self.feed_ready(True)
+        bot = make_bot()
+        ApiSource("a@b.c", "pw").prepare(bot)
+        self.assertEqual(self.reloads, [bot.server])
 
     def test_prepare_waits_until_the_browser_is_ready(self):
         self.feed_ready(False, False, True)
