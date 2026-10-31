@@ -75,6 +75,15 @@ def ask_retry_offline(parent=None) -> bool:
     return box.clickedButton() is retry
 
 
+def show_clock_wrong(parent=None):
+    """Giờ máy sai làm chứng chỉ HTTPS bị từ chối: nói rõ để người dùng chỉnh lại giờ."""
+    QMessageBox.critical(
+        parent, "Wrong date/time",
+        "Your computer's date or time is incorrect, so the secure connection to the server was rejected.\n\n"
+        "Open Settings > Time & language > Date & time, turn on \"Set time automatically\" "
+        "(and the time zone), click \"Sync now\", then start the app again.")
+
+
 PREBUILD_IDLE_SECONDS = 1.0   # chỉ dựng sẵn giao diện máy khi người dùng đã ngừng thao tác chừng này giây
 
 
@@ -127,6 +136,7 @@ class MainWindow(QMainWindow):
         checking_layout.addWidget(checking_bar)
         self.license_checking.hide()
         self._startup_check = False    # lần kiểm tra đang chạy là lần lúc mở app
+        self._clock_wrong = False      # lần hỏi gần nhất lỗi vì giờ máy sai -> popup nhắc chỉnh giờ
         self._startup_offline = False  # lần đó không tới được server -> hỏi Retry / Quit
         self.content = QWidget()
         outer_layout.addWidget(self.content, 1)
@@ -254,7 +264,9 @@ class MainWindow(QMainWindow):
         self._license_worker.offline.connect(self._on_license_offline)
         self._license_worker.start()
 
-    def _on_license_offline(self, _msg: str):
+    def _on_license_offline(self, msg: str):
+        if msg == licensing.CLOCK_ERROR:
+            self._clock_wrong = True
         if self._startup_check:
             self._startup_offline = True   # popup hiện ở _end_license_check, khi thread đã xong hẳn
         else:
@@ -266,9 +278,13 @@ class MainWindow(QMainWindow):
         Lần lúc mở app mà không tới được server: popup Retry (hỏi lại) / Quit (đóng app); có kết quả rồi thì mới
         kiểm tra bản mới."""
         self.license_checking.hide()
+        clock_wrong, self._clock_wrong = self._clock_wrong, False
         if self._startup_offline:
             self._startup_offline = False
-            if ask_retry_offline(self):
+            if clock_wrong:
+                show_clock_wrong(self)
+                self.close()
+            elif ask_retry_offline(self):
                 self._check_license(startup=True)
             else:
                 self.close()

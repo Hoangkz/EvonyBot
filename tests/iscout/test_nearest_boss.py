@@ -1,7 +1,5 @@
 """Attack Boss nguồn IsCout: bấm vòng boss gần giữa nhất; không thấy / không ra Attack thì tính là đã đánh (không cần giả lập)."""
 import importlib
-import tempfile
-from pathlib import Path
 import unittest
 from types import SimpleNamespace
 from unittest import mock
@@ -18,16 +16,10 @@ def setUpModule():
     global _gray_patch
     _gray_patch = mock.patch.object(run, "_march_gray", lambda screen, pos: False)      # ảnh giả của các test này là chuỗi, không đo màu nút March
     _gray_patch.start()
-    global _logs_patch, _logs_dir
-    _logs_dir = tempfile.TemporaryDirectory()
-    _logs_patch = mock.patch.object(run, "NOT_BOSS_LOGS", Path(_logs_dir.name))      # ảnh "không thấy boss" ghi vào thư mục tạm, không vào logs thật
-    _logs_patch.start()
 
 
 def tearDownModule():
     _gray_patch.stop()
-    _logs_patch.stop()
-    _logs_dir.cleanup()
 CENTER = boss_scan.CAMERA_PX
 
 
@@ -238,8 +230,7 @@ class GlowCenterTests(unittest.TestCase):
         from bot.ocr.find_bosses import glow_points
         shot = cv2.imread(os.path.join(os.path.dirname(__file__), "screens", "lava_turtle_world.png"))
         points = glow_points(shot)
-        self.assertEqual(len(points), 1)
-        x, y = points[0]
+        x, y = min(points, key=lambda point: abs(point[0] - 192) + abs(point[1] - 376))      # vòng sáng của rùa (ngưỡng màu thấp hơn nên có thể thêm mảng cam nhỏ khác trên ảnh)
         self.assertLessEqual(abs(x - 192), 3)       # trung bình x các điểm cam sáng (đo trên ảnh thật 21923)
         self.assertLessEqual(abs(y - 376), 3)       # đáy vòng sáng (y lớn nhất)
 
@@ -336,6 +327,38 @@ class NameLineTests(unittest.TestCase):
     def test_no_name_when_there_is_no_glow(self):
         import numpy as np
         self.assertIsNone(run._name_point(np.zeros((704, 396, 3), np.uint8)))
+
+
+class EnsureWorldTests(unittest.TestCase):
+    """Ở trong thành: bấm nút ra bản đồ rồi chờ mỗi WORLD_POLL (1) giây, tối đa WORLD_WAIT (15) giây cho tới khi thấy bản đồ thế giới."""
+
+    def run_world(self, ready_after):
+        from bot.activities.attack_boss import world
+        from bot.activities.attack_boss.constants import BACK_ARROW
+        naps, taps = [], []
+        bot = SimpleNamespace(sleep=naps.append, screenshot=lambda: "shot", tap_percent=lambda *args, **kwargs: taps.append(args),
+                              find=lambda template, **kwargs: None, back=lambda **kwargs: None)
+        state = {"n": 0}
+
+        def on_world(b, screen):
+            state["n"] += 1
+            return state["n"] > ready_after
+        with mock.patch.object(world.boss_scan, "on_map", lambda b, screen=None: True), mock.patch.object(world, "on_world", on_world):
+            return world.ensure_world(bot), naps, taps
+
+    def test_waits_one_second_at_a_time_until_the_world_map_shows(self):
+        ok, naps, taps = self.run_world(ready_after=4)       # lần kiểm tra đầu ở thành, 3 lần chờ sau khi bấm vẫn chưa thấy, lần chờ thứ 4 thấy bản đồ
+        self.assertTrue(ok)
+        self.assertEqual(len(taps), 1)
+        self.assertEqual(naps, [1, 1, 1, 1])
+
+    def test_gives_up_waiting_after_fifteen_seconds_per_tap(self):
+        ok, naps, taps = self.run_world(ready_after=10 ** 6)
+        self.assertFalse(ok)
+        from bot.activities.attack_boss.constants import WORLD_TRIES
+        self.assertEqual(len(taps), WORLD_TRIES)
+        self.assertEqual(naps, [1] * (15 * WORLD_TRIES))
+
 
 
 class StaminaTests(unittest.TestCase):

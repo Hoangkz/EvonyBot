@@ -22,7 +22,8 @@ Thứ tự ưu tiên: Bubble > Auto Times Out > Join Boss > nhiệm vụ.
   lúc 0h...: YieldToTask, xét mỗi 5 giây), xong việc đó rảnh lại thì quét lại.
 - Không chọn Join Boss: không có giới hạn 120 giây, các nhiệm vụ chạy lần lượt tới khi xong.
 - Activity chạy một mình (activities.EXCLUSIVE_ACTIVITIES, VD Recruit General): chỉ chạy hàm của nó, KHÔNG liên quan Bubble
-  (kể cả đã tích), Auto Times Out, reset server, Join Boss hay nhiệm vụ nào khác (_run_exclusive).
+  (kể cả đã tích), Auto Times Out, reset server, Join Boss hay nhiệm vụ nào khác (_run_exclusive). Riêng Attack Boss
+  (activities.constants.GUARDED_EXCLUSIVE) vẫn ưu tiên Bubble, Auto Times Out và reset server: chạy qua guards.call.
 - Không tích Bubble: không có luật Bubble (không lo bubble, không bị ngắt vì bubble).
 - Một nhiệm vụ chạy hết một lượt mà vẫn chưa xong tối đa MAX_ATTEMPTS (6) lần mỗi ngày; quá thì bỏ qua tới ngày mới
   (bị ngắt giữa chừng không tính là một lần thử).
@@ -43,6 +44,7 @@ from types import SimpleNamespace
 from PyQt5.QtCore import QThread, pyqtSignal
 
 from ..activities import ACTIVITIES, EXCLUSIVE_ACTIVITIES
+from ..activities.constants import GUARDED_EXCLUSIVE
 from ..city.city_map import scan_city
 from ..activities.join_monster_war import IDLE as BOSS_IDLE
 from ..activities.join_monster_war import stamina_wait
@@ -213,7 +215,7 @@ class BotWorker(QThread):
 
     def _run_exclusive(self):
         """Activity chạy một mình: gọi thẳng hàm run, không qua guards (Bubble, Auto Times Out, reset server) và không
-        có Join Boss / nhiệm vụ khác. Chạy một lượt rồi dừng; hàm run tự lặp nếu cần."""
+        có Join Boss / nhiệm vụ khác (riêng GUARDED_EXCLUSIVE, VD Attack Boss: vẫn qua guards.call). Chạy một lượt rồi dừng; hàm run tự lặp nếu cần."""
         for activity in self.activities:
             if self._stop.is_set():
                 break
@@ -225,7 +227,11 @@ class BotWorker(QThread):
                 continue
             self._current = activity
             self.activity_changed.emit(self.serial, activity)
-            run(self.ctx, self.settings.get(activity, {}))
+            if activity in GUARDED_EXCLUSIVE:      # vẫn ưu tiên Bubble / Auto Times Out / reset server (guards.call lo rồi gọi lại run từ đầu nếu bị ngắt)
+                self.guards.reset_handled = last_reset(self.server_time)      # vừa Start thì không đóng game; chỉ đóng khi qua một mốc reset mới
+                self.guards.call(activity, run, self.ctx, self.settings.get(activity, {}))
+            else:
+                run(self.ctx, self.settings.get(activity, {}))
 
     def _run_tasks(self):
         """Vòng lặp chính (xem docstring đầu file) cho tới khi Stop."""

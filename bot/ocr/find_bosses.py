@@ -21,7 +21,7 @@ import numpy as np
 
 from . import read_boss_popup, read_map_label, read_map_level, world_mask
 
-GLOW_LOW, GLOW_HIGH = (8, 170, 210), (20, 255, 255)      # HSV (OpenCV) của cam sáng ở vòng sáng
+GLOW_LOW, GLOW_HIGH = (8, 150, 190), (20, 255, 255)      # HSV (OpenCV) của cam sáng ở vòng sáng
 GATE_MIN = 60                                            # ít hơn chừng này điểm cam sáng (sau khi che giao diện) thì coi là không có boss (boss trùm 250-330 điểm, boss Event vòng yếu 70-100 điểm, khung không boss trung vị 26)
 BLOB_MIN = 20                                            # vùng cam nhỏ hơn chừng này điểm: bỏ
 EDGE_MAX_CANDIDATES = 2                                  # nhãn sát rìa không có vùng sáng: đoạn đọc được khớp quá nhiều tên (VD "Juni" -> mọi "Junior …") thì quá mơ hồ, bỏ

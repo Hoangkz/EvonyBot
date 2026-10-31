@@ -83,7 +83,6 @@ flowchart TD
 Ở bản đồ thế giới bấm dòng toạ độ `X:… Y:…` ở đáy (205, 622) -> hộp "Search" (Server / X / Y / Go): bấm ô X, ô nhập hiện ở đáy màn, xoá số cũ + gõ số (một lệnh adb vì ô tự đóng sau ~10 giây), bấm OK; tương tự ô Y; bấm Go. Kiểm lại bằng toạ độ camera (bộ đọc thanh X:Y đôi khi trả None, VD "0572 0112": coi như đạt). Mỗi lần nhảy mất ~15 giây.
 
 ## Chưa chắc / chưa làm (TODO)
-- **XOÁ sau khi test xong**: IsCout, sau khi `_name_point` tìm được vùng cam + tên, `_wait_boss` gọi `_save_tap_debug` (run.py) chụp màn hình, vẽ dấu thập đỏ tại điểm sắp bấm vào boss, lưu `%LOCALAPPDATA%\EvonyBot\logs\bossIsCout\<giờ>_<x>_<y>.png`. Xoá hàm đó, hằng `BOSS_ISCOUT_LOGS`, các import `os` / `Path` nếu không còn dùng, và dòng gọi trong `_wait_boss`.
 - Mẫu chữ tên (`ChatName`) mới có các chữ của Viking, (Boss), Yasha, Centaur: boss khác sẽ đọc ra nhiều "?" (khớp mờ vẫn thường đúng), cần thêm mẫu khi gặp tên mới (chia sẻ thêm boss rồi cắt mẫu như `read_chat` đã làm).
 - Số của dòng giờ dùng mẫu chữ số xanh (cùng kiểu chữ): đã kiểm 1, 2, 4, 8; các số 0, 3, 5, 6, 7, 9 chưa có ảnh giờ thật để kiểm.
 - Tên dài xuống dòng thứ hai trong bong bóng chưa đọc (chỉ đọc dòng đầu).

@@ -88,6 +88,8 @@ ON_SPOT_KM = 3               # camera lệch toạ độ boss không quá chừn
 BACK_ARROW = "AttackBoss/backArrow.png"   # mũi tên quay lại vàng ở góc trên trái của màn toàn màn hình (chat, cuộc trò chuyện); màn March khớp 0,72
 BACK_ARROW_THRESHOLD = 0.9
 WORLD_TRIES = 6
+WORLD_WAIT = 15                      # giây chờ tối đa sau khi bấm nút ra bản đồ thế giới (ở trong thành)
+WORLD_POLL = 1                       # giây giữa hai lần kiểm tra đã ra bản đồ chưa
 TO_CITY = "CityMap/toCity.png"   # nút góc dưới phải khi ở bản đồ thế giới (= common/go_home.TO_CITY)
 
 # Nhảy tới toạ độ (goto.py): hộp "Search" mở bằng cách bấm dòng toạ độ X:… Y:… ở đáy bản đồ (đo trên 396 x 704)
