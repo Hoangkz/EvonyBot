@@ -32,8 +32,9 @@ from ...event.kings_path.city_tax.constants import (
 )
 from ...event.city_building import MARKET
 from ...event.kings_path.building import open_building
-from ...event.kings_path.city_tax.run import _popup_closed, _row_buttons
+from ...event.kings_path.city_tax.run import _popup_closed, _row_buttons, tax_disabled
 from ...result import done as report_done
+from ....common import no_gems
 from ..common import Task, mark_task_done
 from .constants import (
     BACKS_AFTER_TAX,
@@ -127,8 +128,17 @@ def _tax_row(bot, row: int, count: int, use_free: bool) -> bool:
     elif _set_count(bot, popup, count):
         done = f"x{count}"
     else:
-        bot.record(f"{tag}: cannot set count to {count}, not taxing")
+        # Nút Tax xám (không đủ kim cương) làm ô số đọc không được: ghi đúng lý do.
+        why = "not enough gems (Tax button disabled)" if tax_disabled(bot.screenshot()) else f"cannot set count to {count}"
+        bot.record(f"{tag}: {why}, not taxing")
+        if "gems" in why:
+            no_gems.flag(bot)
         bot.back(delay=1)
+        return False
+    if tax_disabled(bot.screenshot()):
+        bot.record(f"{tag}: not enough gems (Tax button disabled), not taxing")
+        no_gems.flag(bot)
+        bot.back(delay=1)   # đóng popup; tax_all vẫn báo xong hôm nay như mọi lỗi khác (không thu lại, tránh tốn kim cương)
         return False
     button = bot.find(POPUP_TAX)
     if button is None:

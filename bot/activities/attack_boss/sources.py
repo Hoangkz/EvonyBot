@@ -206,6 +206,7 @@ class ApiSource:
         nhập thì đăng nhập, rồi chờ tab cùng server với thiết bị nhận dữ liệu (kiểm tra mỗi ISCOUT_CHECK_POLL giây). Có vấn đề (hub báo lỗi, hết thời gian
         chờ của hub): popup rồi dừng thiết bị (`StopRequested`), không làm gì ở game."""
         bot.log("Attack Boss: kiểm tra trình duyệt iScout")
+        self._guard(bot, lambda: iscout.get_hub().reload(bot.server))      # iScout ngắt phiên sau tối đa 30 phút: mỗi lần vào tải lại trang rồi chờ dữ liệu mới
         while not self._guard(bot, lambda: iscout.get_hub().ready(bot.server, self.email, self.password)):
             bot.sleep(ISCOUT_CHECK_POLL)
         bot.log("Attack Boss: iScout sẵn sàng")

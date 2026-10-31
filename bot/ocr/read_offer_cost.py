@@ -21,6 +21,7 @@ SNAP = 2                     # chữ số dính nhau: dời chỗ cắt tới c�
 HUE = (12, 38)               # vàng
 MIN_SATURATION = 100
 MIN_VALUE = 150
+RED_MIN_PIXELS = 30          # chữ Cost ĐỎ = không đủ kim cương: ảnh thật 167 điểm ảnh đỏ; Cost đủ kim cương (chữ vàng) 0
 
 
 def split(image: np.ndarray) -> list:
@@ -80,6 +81,16 @@ def _digits_of(part: np.ndarray) -> list:
     cuts.append(w)
     pieces = [_trim(part[:, a:b]) for a, b in zip(cuts, cuts[1:])]
     return [p for p in pieces if p.size and p.any()]
+
+
+def unaffordable(image: np.ndarray) -> bool:
+    """Ảnh BGR ô Cost có chữ đỏ: không đủ kim cương cho số lượng đang chọn (chữ vàng khi đủ). Nút Offer vẫn xanh."""
+    if image.size == 0:
+        return False
+    hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+    h, s, v = (hsv[..., i].astype(int) for i in range(3))
+    red = ((h <= 6) | (h >= 170)) & (s >= 150) & (v >= 150)
+    return int(red.sum()) >= RED_MIN_PIXELS
 
 
 def run(image: np.ndarray) -> int | None:

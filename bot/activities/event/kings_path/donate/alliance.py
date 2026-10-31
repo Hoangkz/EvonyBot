@@ -16,7 +16,7 @@ from .constants import (
     OUT_ALLIANCE,
     SCIENCE_TITLE,
 )
-from .donating import donate_times
+from .donating import OutOfGems, donate_times
 
 NAME = "Donate"
 _ON_SCIENCE, _TAP, _BACK, _SCROLL, _OUT, _OPEN = "on_science", "tap", "back", "scroll", "out_alliance", "open_alliance"
@@ -46,8 +46,13 @@ def run(bot, task: dict):
     bot.log(f"{NAME}: Patrol off -> donate via Alliance Science ({done} / {target})")
     if not _open_science(bot):
         return
-    donated = donate_times(bot, NAME, target - done,
-                           on_donate=lambda i: bot.mark_daily_done(alliance_key(done + i)))
+    try:
+        donated = donate_times(bot, NAME, target - done,
+                               on_donate=lambda i: bot.mark_daily_done(alliance_key(done + i)))
+    except OutOfGems as out:
+        bot.record(f"{NAME}: out of gems after {done + out.donated} / {target}, done for today, continue tomorrow")
+        mark_done(bot, KEY)
+        return
     if done + donated >= target:
         bot.record(f"{NAME}: donated {done + donated} / {target}, done")
         bot.back(delay=1)

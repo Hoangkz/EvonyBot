@@ -17,6 +17,7 @@ Bị ngắt giữa chừng: lượt sau đọc lại số đã làm ở dòng Go
 import math
 
 from ...city_building import MARKET
+from .....common import no_gems
 from ...common import EventState, mark_daily_activity, mark_target_reached
 from .. import path_task
 from ..building import open_building
@@ -35,6 +36,8 @@ from .constants import (
     POPUP,
     POPUP_PLUS,
     POPUP_TAX,
+    POPUP_TAX_BOX,
+    POPUP_TAX_DISABLED_MAX,
     ROW_NAMES,
     ROW_TAX,
     ROW_BUTTON_REGION,
@@ -56,6 +59,7 @@ from .constants import (
 )
 
 NAME = "City Tax"
+OUT_OF_GEMS = "out_of_gems"   # _tax_row: nút Tax xám (không đủ kim cương)
 
 
 def split_counts(total: int, parts: int = TAX_ROWS) -> list[int]:
@@ -78,6 +82,10 @@ def _tax(bot, path, done, target):
         result = _tax_row(bot, row, count)
         if result == path_task.AGAIN:
             return path_task.AGAIN
+        if result == OUT_OF_GEMS:
+            # Dừng, KHÔNG lưu gì vào DB: nhiệm vụ chưa xong, worker bỏ qua nó sau MAX_ATTEMPTS lần, lần chạy sau vẫn kiểm tra.
+            bot.record(f"{NAME}: out of gems, stop")
+            return None
         if not result:
             return None
     bot.record(f"{NAME}: all rows taxed, done")
@@ -88,7 +96,8 @@ def _tax(bot, path, done, target):
 
 def _tax_row(bot, row: int, count: int):
     """Dòng thứ `row` (0..3) trên màn Tax: Tax -> popup -> chọn `count` bằng "−" / "+" -> Tax.
-    True: xong dòng; False: lỗi, dừng; path_task.AGAIN: popup không đóng, đã Back -> đi lại từ đầu."""
+    True: xong dòng; False: lỗi, dừng; path_task.AGAIN: popup không đóng, đã Back -> đi lại từ đầu; OUT_OF_GEMS: nút Tax
+    xám (không đủ kim cương), đã Back đóng popup."""
     tag = f"{NAME} [{row + 1}/{TAX_ROWS} {ROW_NAMES[row]}]"   # đang thu loại nào, trong mọi log
     buttons = _row_buttons(bot)
     if len(buttons) < TAX_ROWS:
@@ -106,6 +115,11 @@ def _tax_row(bot, row: int, count: int):
         bot.record(f"{tag}: count still changing after {MINUS_MAX_TAPS} taps on −")
         return False
     bot.sleep(TAX_STEP_WAIT)   # ô số cập nhật xong rồi mới bấm Tax
+    if tax_disabled(bot.screenshot()):
+        bot.record(f"{tag}: not enough gems (Tax button disabled), not taxing")
+        no_gems.flag(bot)
+        bot.back(delay=1)   # đóng popup
+        return OUT_OF_GEMS
     button = bot.find(POPUP_TAX)
     if button is None:
         bot.record(f"{tag}: popup Tax button not found")
@@ -124,6 +138,13 @@ def _tax_row(bot, row: int, count: int):
     bot.sleep(TAX_STEP_WAIT)   # màn Tax ổn định rồi mới tìm nút dòng sau
     bot.record(f"{tag}: taxed x{count}")
     return True
+
+
+def tax_disabled(screen) -> bool:
+    """Nút Tax của popup bị xám (không đủ kim cương cho số lần đã chọn)."""
+    x, y, w, h = POPUP_TAX_BOX
+    box = screen[y:y + h, x:x + w].astype(int)
+    return float((box[..., 1] - box[..., 2]).mean()) < POPUP_TAX_DISABLED_MAX
 
 
 def _row_buttons(bot) -> list:

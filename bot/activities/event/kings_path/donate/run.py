@@ -13,7 +13,7 @@ kim cương). Bị ngắt giữa chừng: lượt sau đọc lại số đã là
 Ô Patrol ở tab Event = 0 (không làm Patrol): không vào King's Path mà donate qua Liên minh ->
 Alliance Science (alliance.py). Vòng donate dùng chung: donating.py.
 """
-from ...common import EventState, mark_target_reached
+from ...common import EventState, mark_done, mark_target_reached
 from .. import path_task
 from . import alliance
 from .constants import (
@@ -28,13 +28,15 @@ from .constants import (
     TAB_INDEX,
     TAB_SELECTED,
 )
-from .donating import donate_times
+from .donating import OutOfGems, donate_times
 
 NAME = "Donate"
+OUT_OF_GEMS = "out_of_gems"   # after_go trả về khi hết kim cương (popup Buy): đã Back đóng popup, KHÔNG lưu gì vào DB
 
 
 def _donate(bot, path, done, target):
-    """Sau Go: donate (mục tiêu - số đã làm) lần ở màn Alliance Science."""
+    """Sau Go: donate (mục tiêu - số đã làm) lần ở màn Alliance Science. Popup không đủ kim cương -> dừng, trả OUT_OF_GEMS
+    mà không lưu gì vào DB (3-Day Event dùng thẳng hàm này; King's Path qua _donate_kings)."""
     if done is None:
         bot.record(f"{NAME}: progress unknown, not donating")
         return
@@ -42,10 +44,22 @@ def _donate(bot, path, done, target):
         bot.record(f"{NAME}: Alliance Science not shown")
         return
     need = target - done
-    donated = donate_times(bot, NAME, need)
+    try:
+        donated = donate_times(bot, NAME, need)
+    except OutOfGems as out:
+        bot.record(f"{NAME}: out of gems after {out.donated}, stop")
+        return OUT_OF_GEMS
     if donated >= need:
         bot.record(f"{NAME}: donated {donated}, done")
         mark_target_reached(bot, path.key)
+
+
+def _donate_kings(bot, path, done, target):
+    """_donate của King's Path: hết kim cương thì xong hôm nay (chưa hoàn thành: mai làm tiếp phần còn thiếu)."""
+    result = _donate(bot, path, done, target)
+    if result == OUT_OF_GEMS:
+        mark_done(bot, path.key)
+    return result
 
 
 def _patrol_enabled(bot) -> bool:
@@ -63,7 +77,7 @@ def _patrol_enabled(bot) -> bool:
 PATH = path_task.PathTask(
     key=KEY, name=NAME, day=DAY, tab_index=TAB_INDEX,
     tab_selected=TAB_SELECTED, tab=TAB,
-    row_title=ROW_TITLE, after_go=_donate,
+    row_title=ROW_TITLE, after_go=_donate_kings,
 )
 
 

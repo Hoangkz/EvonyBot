@@ -26,7 +26,7 @@ Flow:
 """
 import numpy as np
 
-from .....common import delay, find_first, wait_gone
+from .....common import delay, find_first, no_gems, wait_gone
 from .....ocr import read_progress
 from ...common import (HANDLED, STOP, EventState, mark_complete, mark_daily_activity,
                        mark_target_reached, run_task)
@@ -97,7 +97,13 @@ def run(bot, task: dict, state: EventState):
             if done is None:
                 bot.record("Cultivate Generals: progress unknown, not using Cultivate x100")
                 return STOP
-            bot.tap(*x100)
+            bot.tap(*x100, delay=1)
+            if no_gems.shown(bot):
+                # Thiếu gems (x100 = 2000): popup "insufficient Gems ... Buy" thay vì cultivate -> không tính lần nào.
+                no_gems.dismiss(bot, "Cultivate Generals")
+                # Dừng, KHÔNG lưu gì vào DB: nhiệm vụ chưa xong, worker bỏ qua nó sau MAX_ATTEMPTS lần, lần chạy sau vẫn kiểm tra.
+                bot.record(f"Cultivate Generals: out of gems at {done}/{TOTAL}, stop")
+                return STOP
             done += CULTIVATE_X100_TIMES
             bot.record(f"Cultivate Generals: Cultivate x100 -> {done}/{TOTAL}")
             mark_daily_activity(bot, "cultivate")   # đã cultivate thật: việc Daily General Enhancing hôm nay cũng xong

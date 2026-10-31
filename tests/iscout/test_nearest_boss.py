@@ -10,6 +10,16 @@ from bot.activities.attack_boss.sources import BossOffer
 from bot.common import boss_scan
 
 run = importlib.import_module("bot.activities.attack_boss.run")      # `attack_boss.run` là hàm run của package, lấy module qua importlib
+
+
+def setUpModule():
+    global _gray_patch
+    _gray_patch = mock.patch.object(run, "_march_gray", lambda screen, pos: False)      # ảnh giả của các test này là chuỗi, không đo màu nút March
+    _gray_patch.start()
+
+
+def tearDownModule():
+    _gray_patch.stop()
 CENTER = boss_scan.CAMERA_PX
 
 
@@ -143,6 +153,24 @@ class PickTroopTests(unittest.TestCase):
     def test_only_troop_1_chosen_with_general_picks_it(self):
         self.assertEqual(self.pick([1], with_general=(1,)), (1, [1]))
 
+    def test_checks_one_round_only_without_going_back_to_the_first_troop(self):
+        tapped = []
+        bot = SimpleNamespace(find_all=lambda *args, **kwargs: [], log=lambda message: None, find=lambda *args, **kwargs: None)
+        bot.tap_percent = lambda x, y: tapped.append(round((x - run.PRESET_X0) / run.PRESET_DX) + 1)
+        helper = SimpleNamespace(troops=[1, 2, 3], _poll_screen=lambda name, fn, **kwargs: (None, fn(None)))
+        with mock.patch.object(run, "_preset_active", lambda image, troop: True):
+            self.assertIsNone(run._pick_troop(bot, helper, None, None))
+        self.assertEqual(tapped, [1, 2, 3])          # đội 1 -> 2 -> 3 rồi dừng, không xoay vòng lần hai
+
+    def test_troop_whose_preset_never_lights_up_is_skipped_once(self):
+        tapped = []
+        bot = SimpleNamespace(find_all=lambda *args, **kwargs: [], log=lambda message: None, find=lambda *args, **kwargs: (1, 1))
+        bot.tap_percent = lambda x, y: tapped.append(round((x - run.PRESET_X0) / run.PRESET_DX) + 1)
+        helper = SimpleNamespace(troops=[1, 2], _poll_screen=lambda name, fn, **kwargs: (None, fn(None)))
+        with mock.patch.object(run, "_preset_active", lambda image, troop: troop == 2):
+            self.assertEqual(run._pick_troop(bot, helper, None, None), 2)
+        self.assertEqual(tapped, [1, 2])
+
     def test_tries_the_next_chosen_troop_but_not_the_others(self):
         picked, tapped = self.pick([1, 2], with_general=(2,))
         self.assertEqual(picked, 2)
@@ -202,8 +230,7 @@ class GlowCenterTests(unittest.TestCase):
         from bot.ocr.find_bosses import glow_points
         shot = cv2.imread(os.path.join(os.path.dirname(__file__), "screens", "lava_turtle_world.png"))
         points = glow_points(shot)
-        self.assertEqual(len(points), 1)
-        x, y = points[0]
+        x, y = min(points, key=lambda point: abs(point[0] - 192) + abs(point[1] - 376))      # vòng sáng của rùa (ngưỡng màu thấp hơn nên có thể thêm mảng cam nhỏ khác trên ảnh)
         self.assertLessEqual(abs(x - 192), 3)       # trung bình x các điểm cam sáng (đo trên ảnh thật 21923)
         self.assertLessEqual(abs(y - 376), 3)       # đáy vòng sáng (y lớn nhất)
 
@@ -218,21 +245,120 @@ class NameLineTests(unittest.TestCase):
         from bot.activities.attack_boss.constants import NAME_TAP_ABOVE
         shot = cv2.imread(os.path.join(os.path.dirname(__file__), "screens", "lava_turtle_world.png"))
         x, y = run._name_point(shot)
-        self.assertLessEqual(abs(x - 195), 3)                       # giữa dòng tên (đo trên ảnh thật: x 156-234)
+        self.assertLessEqual(abs(x - 201), 3)                       # giữa chữ tên (đo trên ảnh thật: x 168-234; huy hiệu cấp vàng bên trái không tính)
         self.assertEqual(y, 361 - NAME_TAP_ABOVE)                   # mép trên dòng tên y = 361, bấm cao hơn NAME_TAP_ABOVE px
 
-    def test_far_glow_is_ignored(self):
+    def test_name_stuck_to_the_ring_below_it_is_still_found(self):
+        """Ảnh thật (Peryton): chữ "(Boss) Peryton" ở y 361-368 nằm sát vòng sáng cam ngay dưới (y 372-384) và cạnh nhãn quái thường "Murderous Warrior" (y 427-433)."""
+        import os
+
+        import cv2
+        from bot.activities.attack_boss.constants import NAME_TAP_ABOVE
+        shot = cv2.imread(os.path.join(os.path.dirname(__file__), "screens", "peryton_world.png"))
+        x, y = run._name_point(shot)
+        self.assertLessEqual(abs(x - 204), 4)                       # giữa chữ (x 162-246), không phải nhãn "Murderous Warrior" (x 67-129)
+        self.assertEqual(y, 361 - NAME_TAP_ABOVE)                   # cao hơn mép trên tên 4 px
+
+    def test_griffin_with_other_labels_around_it(self):
+        """Ảnh thật (Griffin): quanh có nhãn quái thường "Murderous Warrior", nhãn thành phố, và một boss khác bị cắt ở mép trái (vòng cam ở x 16): chỉ chọn boss gần giữa."""
+        import os
+
+        import cv2
+        from bot.activities.attack_boss.constants import NAME_TAP_ABOVE
+        shot = cv2.imread(os.path.join(os.path.dirname(__file__), "screens", "griffin_world.png"))
+        x, y = run._name_point(shot)
+        self.assertLessEqual(abs(x - 204), 4)                       # giữa chữ "(Boss) Gnffin" (x 167-242)
+        self.assertEqual(y, 361 - NAME_TAP_ABOVE)
+
+    def test_real_screens(self):
+        """Ảnh thật: (tên ảnh, điểm bấm mong đợi). Điểm bấm = giữa chữ tên theo x, mép trên chữ tên - NAME_TAP_ABOVE theo y."""
+        import os
+
+        import cv2
+        here = os.path.join(os.path.dirname(__file__), "screens")
+        cases = [
+            ("centaur_world.png", (204, 357)),                          # (Boss) Centaur ở giữa
+            ("yasha_world.png", (204, 357)),                            # (Boss) Yasha ở giữa; con cá cam ở (262, 317) là vòng cam xa hơn nên bị bỏ qua
+            ("skeleton_dragon_lava_turtle_world.png", (261, 351)),      # hai boss gần nhau, bảng March đang mở: lấy boss có vòng sáng gần tâm nhất (Skeleton Dragon)
+        ]
+        for name, (x, y) in cases:
+            with self.subTest(name):
+                shot = cv2.imread(os.path.join(here, name))
+                self.assertIsNotNone(shot, name)
+                found = run._name_point(shot)
+                self.assertIsNotNone(found)
+                self.assertLessEqual(abs(found[0] - x), 4)
+                self.assertLessEqual(abs(found[1] - y), 2)
+
+    def test_viking_summoned_is_not_an_iscout_boss_so_no_ring_and_no_boss_is_found(self):
+        """Viking tự gọi ("Viking(Asking for help)") không phải boss / boss sự kiện của iScout (hub chỉ nhận boss_monster và event_monster) và có luồng riêng:
+        trên ảnh thật này bước tìm vòng sáng không ra gì, không có vùng cam, không có điểm bấm, và _wait_boss (nearest) chờ hết BOSS_WAIT giây rồi trả None (không thấy boss)."""
+        import os
+
+        import cv2
+        from bot.ocr.find_bosses import glow_points, glow_regions
+        shot = cv2.imread(os.path.join(os.path.dirname(__file__), "screens", "viking_asking_for_help_world.png"))
+        self.assertEqual(glow_points(shot), [])
+        self.assertEqual(glow_regions(shot), [])
+        self.assertIsNone(run._name_point(shot))
+        naps = []
+        bot = SimpleNamespace(sleep=naps.append, screenshot=lambda: shot)
+        self.assertIsNone(run._wait_boss(bot, nearest=True))
+        self.assertEqual(naps, [BOSS_POLL] * round(BOSS_WAIT / BOSS_POLL))
+
+    def test_orange_ring_pixels_are_not_text(self):
+        import os
+
+        import cv2
+        shot = cv2.imread(os.path.join(os.path.dirname(__file__), "screens", "peryton_world.png"))
+        _, y = run._name_point(shot)
+        self.assertLess(y, 372)                                     # không bấm xuống vùng vòng sáng / dưới tên
+
+    def test_glow_region_outside_the_search_box_is_ignored(self):
+        """Vùng cam nằm ngoài SEARCH_BOX (VD sát cột nút bên phải) không có dòng tên nào được xét, dù ở đó có chữ."""
         import os
 
         import cv2
         shot = cv2.imread(os.path.join(os.path.dirname(__file__), "screens", "lava_turtle_world.png"))
-        far = (CENTER[0] + RING_MAX_DIST + 60, CENTER[1])         # boss khác ở xa (đo thật 160-190 px)
-        with mock.patch.object(run, "glow_points", lambda screen, masked=None: [far]):
+        outside = (340, 300, 396, 400)
+        with mock.patch.object(run, "glow_regions", lambda screen, masked=None: [outside]):
             self.assertIsNone(run._name_point(shot))
 
     def test_no_name_when_there_is_no_glow(self):
         import numpy as np
         self.assertIsNone(run._name_point(np.zeros((704, 396, 3), np.uint8)))
+
+
+class EnsureWorldTests(unittest.TestCase):
+    """Ở trong thành: bấm nút ra bản đồ rồi chờ mỗi WORLD_POLL (1) giây, tối đa WORLD_WAIT (15) giây cho tới khi thấy bản đồ thế giới."""
+
+    def run_world(self, ready_after):
+        from bot.activities.attack_boss import world
+        from bot.activities.attack_boss.constants import BACK_ARROW
+        naps, taps = [], []
+        bot = SimpleNamespace(sleep=naps.append, screenshot=lambda: "shot", tap_percent=lambda *args, **kwargs: taps.append(args),
+                              find=lambda template, **kwargs: None, back=lambda **kwargs: None)
+        state = {"n": 0}
+
+        def on_world(b, screen):
+            state["n"] += 1
+            return state["n"] > ready_after
+        with mock.patch.object(world.boss_scan, "on_map", lambda b, screen=None: True), mock.patch.object(world, "on_world", on_world):
+            return world.ensure_world(bot), naps, taps
+
+    def test_waits_one_second_at_a_time_until_the_world_map_shows(self):
+        ok, naps, taps = self.run_world(ready_after=4)       # lần kiểm tra đầu ở thành, 3 lần chờ sau khi bấm vẫn chưa thấy, lần chờ thứ 4 thấy bản đồ
+        self.assertTrue(ok)
+        self.assertEqual(len(taps), 1)
+        self.assertEqual(naps, [1, 1, 1, 1])
+
+    def test_gives_up_waiting_after_fifteen_seconds_per_tap(self):
+        ok, naps, taps = self.run_world(ready_after=10 ** 6)
+        self.assertFalse(ok)
+        from bot.activities.attack_boss.constants import WORLD_TRIES
+        self.assertEqual(len(taps), WORLD_TRIES)
+        self.assertEqual(naps, [1] * (15 * WORLD_TRIES))
+
 
 
 class StaminaTests(unittest.TestCase):
@@ -252,7 +378,7 @@ class StaminaTests(unittest.TestCase):
             return refill_result
         records = []
         bot = SimpleNamespace(sleep=lambda seconds: None, screenshot=lambda: "shot", log=lambda message: None, record=records.append,
-                              tap=lambda *args, **kwargs: None, find=find, back=lambda *args, **kwargs: None)
+                              tap=lambda *args, **kwargs: None, tap_percent=lambda *args, **kwargs: None, find=find, back=lambda *args, **kwargs: None)
         with (mock.patch.object(run, "_Boss", lambda b, s: SimpleNamespace(troops=[1], use_stamina=use_stamina)),
               mock.patch.object(run, "_pick_troop", lambda *args: 1),
               mock.patch.object(run.lanes, "no_lanes", lambda b, s: False),
@@ -402,6 +528,40 @@ class OutOfStaminaTests(unittest.TestCase):
         from bot.activities.attack_boss.sources import AllianceChatSource
         self.assertFalse(hasattr(AllianceChatSource(), "drop_all"))        # đọc lại chat mỗi lần poll, không nhớ boss nào
 
+    def test_retry_keeps_the_boss_unmarked_and_attacks_it_again(self):
+        """Không đội nào có tướng (attack trả RETRY): boss KHÔNG được tính là đã đánh (không finished, không attack_memory), ở lại danh sách chờ và bị đánh lại ở vòng sau."""
+        class Done(Exception):
+            pass
+        boss = BossOffer(1, 1, "a", 1, uid="a")
+        results, finished, polls, marked = iter([run.RETRY, run.MARCHED]), [], [], []
+
+        def poll(b):
+            polls.append(1)
+            if len(polls) >= 3:
+                raise Done()
+            return [boss] if len(polls) == 1 else []
+
+        attacked = []
+
+        def attack(b, settings, offer, go=None, own=None, latest=None):
+            attacked.append(offer.uid)
+            if len(attacked) == 1:
+                self.assertIsNone(b.attack_memory.status((1, 1)))       # sau lần RETRY đầu vẫn chưa tính là đã đánh
+            return next(results)
+        source = SimpleNamespace(poll=poll, drop_all=lambda dropped: None, finished=finished.append)
+        bot = SimpleNamespace(attack_memory=None, screenshot=lambda: None, log=lambda message: None, record=lambda message: None, sleep=lambda seconds: None)
+        with (mock.patch.object(run, "make_source", lambda settings: source),
+              mock.patch.object(run, "eggs_due", lambda b, hours: False),
+              mock.patch.object(run.viking, "summon_due", lambda b, settings, screen: False),
+              mock.patch.object(run, "ensure_world", lambda b: True),
+              mock.patch.object(run, "home_coords", lambda b: None),
+              mock.patch.object(run, "attack", attack),
+              mock.patch.object(run, "speed_up_if_full", lambda *args, **kwargs: None)):
+            with self.assertRaises(Done):
+                run.run(bot, {"source": "api"})
+        self.assertEqual(attacked, ["a", "a"])                          # cùng một boss được đánh lại
+        self.assertEqual([offer.uid for offer in finished], ["a"])      # chỉ xong (finished) sau lần hành quân thành công, không phải sau lần RETRY
+
     def test_run_stops_attacking_the_rest_of_the_list_without_marking_them(self):
         class Rest(Exception):
             pass
@@ -451,7 +611,7 @@ class LowOddsTests(unittest.TestCase):
     def test_march_cancels_the_box_and_flags_the_boss(self):
         taps = []
         bot = SimpleNamespace(sleep=lambda seconds: None, screenshot=lambda: "shot", log=lambda message: None, record=lambda message: None,
-                              tap=lambda *args, **kwargs: taps.append(args))
+                              tap=lambda *args, **kwargs: taps.append(args), tap_percent=lambda *args, **kwargs: None)
 
         def find(template, screen=None, region=None, threshold=0.8, **kwargs):
             if template == run.LOW_ODDS:
@@ -465,6 +625,18 @@ class LowOddsTests(unittest.TestCase):
             self.assertFalse(run._march(bot, {}, None))
         self.assertTrue(bot.attack_low_odds)
         self.assertIn((198 + run.LOW_ODDS_CANCEL[0], 337 + run.LOW_ODDS_CANCEL[1]), taps)
+
+    def test_no_troop_with_general_backs_out_to_a_clean_map(self):
+        backs, cleaned = [], []
+        bot = SimpleNamespace(sleep=lambda seconds: None, screenshot=lambda: "shot", log=lambda message: None, record=lambda message: None,
+                              tap=lambda *args, **kwargs: None, tap_percent=lambda *args, **kwargs: None, back=lambda *args, **kwargs: backs.append(1),
+                              find=lambda template, **kwargs: (200, 670) if template == run.MARCH_BUTTON else None)
+        with (mock.patch.object(run, "_Boss", lambda b, s: SimpleNamespace(troops=[1, 2, 3])),
+              mock.patch.object(run, "_pick_troop", lambda *args: None),
+              mock.patch.object(boss_scan, "ensure_map", cleaned.append)):
+            self.assertFalse(run._march(bot, {}, None))
+        self.assertEqual(len(backs), 1)          # Back một lần
+        self.assertEqual(len(cleaned), 1)        # rồi về bản đồ sạch
 
     def test_attack_drops_the_boss_when_march_hit_the_box(self):
         bot = fake_bot()

@@ -42,10 +42,15 @@ TYPE_DEFAULT = TYPE_ATTACK
 IDLE_WAIT = 5            # giây nghỉ khi nguồn chưa có boss mới
 
 # Bước đánh (đo trên giả lập 396 x 704)
-RING_MAX_DIST = 100            # px: IsCout chỉ nhận vòng màu cách tâm màn hình không quá chừng này; xa hơn là boss khác (đo trên 21913: boss đích lệch < 50 px, boss khác 160-190 px)
+RING_MAX_DIST = 75             # px: IsCout chỉ nhận vòng màu cách tâm màn hình không quá chừng này; xa hơn là boss khác (đo trên 21913: boss đích lệch < 50 px, boss khác 160-190 px)
+SEARCH_BOX = (15, 9, 84, 80)    # % màn hình (x1, y1, x2, y2): IsCout chỉ tìm boss trong vùng giữa này: x từ mép phải cấp VIP / cột Bookmarks tới nút về thành, y từ thanh VIP xuống 80 % chiều cao (ngoài vùng là giao diện hoặc boss khác)
+NAME_REGION_EXTRA = 20          # px: vùng cam (glow_regions) mở rộng xuống chừng này khi tìm dòng tên (vòng sáng vỡ mảnh làm vùng dừng cao hơn dòng tên vài px)
+NAME_READ_GAP = 7              # px: khi OCR tên, thử thêm dòng chữ gộp theo khoảng này (không dính huy hiệu cấp, như read_map_label.lines)
 NAME_GAP = 15                  # px: IsCout tìm dòng tên boss trong vùng cam: chữ cách nhau dưới chừng này cột gộp thành một dòng (huy hiệu cấp + từng từ của tên)
 NAME_MIN_W = 40                # px: dòng tên rộng ít nhất chừng này (tia lửa và mảnh viền vòng sáng hẹp hơn hoặc thấp hơn)
-NAME_MIN_H, NAME_MAX_H = 7, 12   # px: dòng tên cao trong khoảng này
+NAME_MIN_H, NAME_MAX_H = 7, 14   # px: dòng tên cao trong khoảng này
+NAME_MAX_RB = 100              # chữ tên be kem có (đỏ - xanh dương) trung vị ~74 (hầu hết <= 105), điểm cam sáng của vòng sáng có trung vị ~156 (>= 99): chỉ nhận điểm có đỏ - xanh dương <= chừng này,
+                               # không thì chữ dính vào vòng sáng ngay dưới nó thành một hộp cao ~24 px bị loại (đo trên ảnh Peryton và Lava Turtle)
 NAME_TAP_ABOVE = 4             # px: bấm cao hơn mép trên của dòng tên chừng này (y nhỏ hơn y của tên một chút) = vào chân / thân boss
 RETAP_AFTER = 2              # IsCout: bấm vào boss mà sau chừng này lần tìm nút Attack (mỗi ATTACK_MENU_POLL giây) vẫn chưa thấy thì tìm lại vòng màu (boss có thể đang di chuyển)
 RETAP_MOVE = 20               # px: vòng màu tìm lại cách chỗ đã bấm hơn chừng này thì bấm lại (đáy vòng nhấp nháy ~10 px theo hoạt ảnh lửa); không thì chỉ chờ tiếp (menu hiện chậm do lag)
@@ -61,10 +66,13 @@ POLL = 0.5                   # giây giữa hai lần kiểm tra
 ATTACK_FROM_WAR = (-166, 0)  # px: nút Attack so với nút Alliance War (bossPopup.png) trong cửa sổ thông tin boss (283,531) -> (117,531)
 MARCH_BUTTON = "AttackBoss/march.png"   # chữ "March" của nút March ở màn đánh boss (bên dưới có đồng hồ nên ảnh hanhquan.png của Join Boss chỉ khớp ~0,69)
 MARCH_THRESHOLD = 0.8
+RESET_BUTTON = (8.1, 95.9)           # % màn hình: nút Reset (hai kiếm chéo) góc dưới trái màn March (tâm 32, 675 / 396x704): bấm trước khi chọn đội
+RESET_WAIT = 1                       # giây chờ sau khi bấm Reset
+MARCH_GRAY_MAX_SATURATION = 50      # độ bão hoà HSV trung bình của nút March (hộp MARCH_BOX_SIZE quanh chữ March) dưới mức này = nút xám (hết lính). Đo ảnh hết lính: 13,7
+MARCH_BOX_SIZE = (130, 35)           # (rộng, cao) px hộp nút March, tâm là chữ "March" tìm được
 LOW_ODDS = "AttackBoss/lowOdds.png"   # hai dòng chữ đầu của hộp "winning odds are extremely low. Are you sure you still want to send the troops?" (Cancel / Confirm) hiện sau khi bấm March
 LOW_ODDS_THRESHOLD = 0.7              # đo trên 24 ảnh thật: có hộp 1,0; không có hộp tối đa 0,23
 LOW_ODDS_CANCEL = (-65, 77)           # nút Cancel so với tâm ảnh mẫu (hộp nằm cố định giữa màn hình)
-TROOP_TRIES = 10               # số lần thử chọn đội có tướng (xoay vòng qua các đội đã tích)
 # Alliance War (rally): bấm nút Alliance War ở cửa sổ boss -> hộp "Alliance War Rally!" chọn thời gian chờ -> màn March (bố cục như màn March của Join Monster War)
 RALLY_TITLE = "AttackBoss/rallyTitle.png"
 RALLY_MINUTES = 5                                   # thời gian chờ rally chọn mặc định
@@ -80,6 +88,8 @@ ON_SPOT_KM = 3               # camera lệch toạ độ boss không quá chừn
 BACK_ARROW = "AttackBoss/backArrow.png"   # mũi tên quay lại vàng ở góc trên trái của màn toàn màn hình (chat, cuộc trò chuyện); màn March khớp 0,72
 BACK_ARROW_THRESHOLD = 0.9
 WORLD_TRIES = 6
+WORLD_WAIT = 15                      # giây chờ tối đa sau khi bấm nút ra bản đồ thế giới (ở trong thành)
+WORLD_POLL = 1                       # giây giữa hai lần kiểm tra đã ra bản đồ chưa
 TO_CITY = "CityMap/toCity.png"   # nút góc dưới phải khi ở bản đồ thế giới (= common/go_home.TO_CITY)
 
 # Nhảy tới toạ độ (goto.py): hộp "Search" mở bằng cách bấm dòng toạ độ X:… Y:… ở đáy bản đồ (đo trên 396 x 704)

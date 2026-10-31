@@ -17,6 +17,7 @@ lượt sau đọc lại số đã mua ở dòng Go rồi mua tiếp; bị ngắ
 """
 import numpy as np
 
+from .....common import no_gems
 from .....ocr.read_balance import read_gems, read_gold
 from ...city_building import MARKET
 from ...common import EventState, mark_daily_activity, mark_target_reached
@@ -72,6 +73,17 @@ def open_black_market(bot, name: str = NAME) -> bool:
 
 
 def buy_items(bot, progress: int, target: int, finish, name: str = NAME) -> bool:
+    """Như _buy_loop; thấy popup "insufficient Gems" (không đủ kim cương cho Instant Refresh / món mua bằng kim cương)
+    -> đã Back đóng popup, Back thêm lần nữa ra khỏi Black Market, False (không gọi finish, lượt sau thử lại)."""
+    try:
+        return _buy_loop(bot, progress, target, finish, name)
+    except no_gems.OutOfGems:
+        bot.record(f"{name}: not enough gems, stop")
+        bot.back(delay=1)
+        return False
+
+
+def _buy_loop(bot, progress: int, target: int, finish, name: str) -> bool:
     """Đang ở màn Black Market: mua các món không trả bằng kim cương (Instant Refresh khi mua hết) tới khi
     `progress` (+1 mỗi lần mua) >= `target` -> finish(message), True. Dừng giữa chừng (hết hàng / không thấy
     Instant Refresh / kẹt / vàng < GOLD_MIN hoặc kim cương < GEMS_MIN) -> False, không gọi finish. Dùng chung với
@@ -85,6 +97,7 @@ def buy_items(bot, progress: int, target: int, finish, name: str = NAME) -> bool
             finish(f"bought {progress} / {target}, done")
             return True
         screen = bot.screenshot()
+        no_gems.check(bot, screen, name)
         if bot.find(TITLE, screen=screen) is None:
             bot.record(f"{name}: not on Black Market screen, stop")
             return False
@@ -95,10 +108,11 @@ def buy_items(bot, progress: int, target: int, finish, name: str = NAME) -> bool
             return False
         confirm = bot.find(CONFIRM, screen=screen)
         if confirm is not None and last == "buy":
+            bot.tap(*confirm, delay=BUY_WAIT)
+            no_gems.check(bot, bot.screenshot(), name)   # thiếu kim cương: popup hiện thay vì mua
             progress += 1
             idle = 0
             bot.log(f"{name}: buy confirmed ({progress} / {target})")
-            bot.tap(*confirm, delay=BUY_WAIT)
             last = None
             continue
         slot = next((i for i, (x, y) in enumerate(SLOTS)
@@ -146,6 +160,7 @@ def _refresh(bot, screen, name: str = NAME) -> bool:
         bot.tap(*refresh, delay=REFRESH_FIRST_CHECK)
         for _ in range(REFRESH_CHECKS):
             now = bot.screenshot()
+            no_gems.check(bot, now, name)
             confirm = bot.find(CONFIRM, screen=now)
             if confirm is not None:
                 bot.log(f"{name}: confirm paid refresh")

@@ -107,6 +107,19 @@ class PatrolFlow(unittest.TestCase):
         self.assertIn(MORE_KEY, device.daily_done)   # hết Refresh: cả việc nối tiếp cũng xong, hôm nay không vào lại
         self.assertNotIn(round_key(1, KEY), device.daily_done)
 
+    def test_after_go_not_enough_gems(self):
+        """Bấm Patrol thiếu kim cương: popup "insufficient Gems ... Buy" -> Back đóng popup (không Buy), không tính lượt,
+        dừng; KHÔNG lưu gì vào DB (lần chạy sau vẫn kiểm tra lại)."""
+        flow = [
+            *TO_PATROL,
+            Step("patrol_selected.png", tap(PATROL_BUTTON)),
+            Step("patrol_no_gems.png", back(), end(result=False)),
+        ]
+        device = run_flow(self, _after_go, SCREENS, flow, {})
+        self.assertNotIn(round_key(1, KEY), device.daily_done)
+        self.assertNotIn(KEY, device.daily_done)
+        self.assertNotIn(MORE_KEY, device.daily_done)
+
     def test_after_go_not_confirmed(self):
         """Bấm Patrol mà màn không chuyển sang "đã patrol" (thiếu kim cương / game chậm): không tính lượt, dừng,
         không đánh dấu xong."""

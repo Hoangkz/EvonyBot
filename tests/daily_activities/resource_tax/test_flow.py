@@ -55,6 +55,21 @@ class ResourceTaxFlow(unittest.TestCase):
         go = [e for _, e in device.events if e[0] == "tap"][-1]
         self.assertEqual(go[2], TAX_GO_Y)
 
+    def test_after_go_not_enough_gems_stops(self):
+        """Food 3: popup ô số đã 3 nhưng nút Tax XÁM (không đủ kim cương) -> Back đóng popup, không bấm Tax, không thu
+        dòng sau (Wood 5), Back về thành, vẫn báo xong hôm nay (không vào thu lại)."""
+        flow = [
+            *TO_TAX,   # gọi thẳng after_go (bỏ phần mở nhiệm vụ: không liên quan tới nút xám)
+            Step("05_tax_screen.png", tap_at(ROW_X, ROW_Y["Food"])),
+            Step("12_tax_popup_no_gems.png", back()),
+            Step("05_tax_screen.png", back()),
+            Step("01_main.png", end(result=True)),
+        ]
+        device = run_flow(self, lambda bot, _s: after_go(bot), SCREENS, flow, {},
+                          ctx_settings=_tax_settings(Food=3, Wood=5))
+        self.assertTrue(any("not enough gems" in line for line in device.logs))
+        self.assertIn("daily_resource_tax", device.daily_done)
+
     def test_after_go_taxes_free_then_count(self):
         """Stone tích Free (+0): popup giữ số free mặc định (11) -> Tax -> hộp xác nhận kim cương ->
         Okay -> băng Taxing Gift -> bấm cho mất. Food 7: popup ô số đọc 7 = đúng số chọn -> Tax.

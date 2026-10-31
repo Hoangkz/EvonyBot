@@ -11,20 +11,21 @@ import cv2
 import numpy as np
 
 from ...common import arc_sweep, boss_scan, delay
-from ...ocr import read_camera, world_mask
-from ...ocr.find_bosses import find_bosses, glow_points, glow_regions, read_popup
+from ...ocr import read_camera, read_map_label, world_mask
+from ...ocr import find_bosses as find_bosses_module
+from ...ocr.find_bosses import _catalog as find_boss_catalog, find_bosses, glow_points, glow_regions, read_popup
 from ..event_center.crazy_eggs import constants as eggs
 from ..event_center.crazy_eggs.run import _run_crazy_eggs
 from ..find_boss.constants import TO_WORLD_TAP, TO_WORLD_TRIES, TO_WORLD_WAIT
 from ..join_monster_war import boss_names
-from ..join_monster_war.boss_memory import JOINED, BossMemory
+from ..join_monster_war.boss_memory import JOINED, SKIPPED, BossMemory
 from ..join_monster_war.constants import (GENERAL_SEARCH, MARCH, NOT_ENOUGH_STAMINA, PRESET_ACTIVE_WAIT, PRESET_COUNT, PRESET_DX,
                                           PRESET_LOCKED, PRESET_LOCKED_THRESHOLD, PRESET_X0, PRESET_Y, REGIONS)
 from ..join_monster_war.run import _Boss, _preset_active, _troops
-from .constants import (NAME_GAP, NAME_MAX_H, NAME_MIN_H, NAME_MIN_W, NAME_TAP_ABOVE, AGE_LIMIT_MIN, ATTACK_FROM_WAR, ISCOUT_DONE_MINUTES, ATTACK_MENU_POLL, ATTACK_MENU_WAIT, BOSS_NEAR, BOSS_POLL, BOSS_WAIT, DROP, EGGS_KEY, FULL, FULL_RETRY_WAIT, FULL_TRIES, IDLE_WAIT, RETAP_AFTER, RETAP_MOVE, RING_MAX_DIST, LOW_ODDS, LOW_ODDS_CANCEL, LOW_ODDS_THRESHOLD, MAIN_GENERAL_REGION, MARCH_BUTTON,
+from .constants import (NAME_GAP, NAME_MAX_H, NAME_MAX_RB, NAME_MIN_H, NAME_MIN_W, NAME_TAP_ABOVE, AGE_LIMIT_MIN, ATTACK_FROM_WAR, ISCOUT_DONE_MINUTES, ATTACK_MENU_POLL, ATTACK_MENU_WAIT, BOSS_NEAR, BOSS_POLL, BOSS_WAIT, DROP, EGGS_KEY, FULL, FULL_RETRY_WAIT, FULL_TRIES, IDLE_WAIT, RETAP_AFTER, RETAP_MOVE, RING_MAX_DIST, LOW_ODDS, LOW_ODDS_CANCEL, LOW_ODDS_THRESHOLD, MAIN_GENERAL_REGION, MARCH_BUTTON, NAME_READ_GAP, NAME_REGION_EXTRA, SEARCH_BOX, MARCH_BOX_SIZE, MARCH_GRAY_MAX_SATURATION, RESET_BUTTON, RESET_WAIT,
                         MARCH_OPEN_WAIT, MARCH_SPEED_KEY, MARCH_THRESHOLD, MARCH_WAIT, MARCHED, NO_LANES_WAIT, ON_SPOT_KM, POLL, POPUP_WAIT,
                         RALLY_BUTTONS, RALLY_MINUTES, RALLY_TITLE, RALLY_WAIT, RETRY, RETURN_SPEED_KEY, SOURCE_ALLIANCE,
-                        SOURCE_API, SOURCE_DEFAULT, SOURCE_KEY, SOURCE_PLAYER, STAMINA, STAMINA_WAIT_MINUTES, TROOP_TRIES, TYPE_ATTACK, TYPE_DEFAULT, TYPE_KEY, TYPE_WAR,
+                        SOURCE_API, SOURCE_DEFAULT, SOURCE_KEY, SOURCE_PLAYER, STAMINA, STAMINA_WAIT_MINUTES, TYPE_ATTACK, TYPE_DEFAULT, TYPE_KEY, TYPE_WAR,
                         VIKING_LABEL)
 from . import lanes, speedup, stamina, viking
 from .goto import goto_coords
@@ -90,6 +91,8 @@ def run(bot, settings: dict):
             else:
                 del pending[offer.coords]
                 getattr(source, "finished", lambda _offer: None)(offer)
+                if result == DROP:      # boss đã chết / đã đi / không đánh: nhớ toạ độ như đã đánh, nguồn có nhận lại cũng không tìm lại
+                    bot.attack_memory.mark(offer.coords, SKIPPED)
                 if result == MARCHED:
                     bot.attack_memory.mark(offer.coords, JOINED)
                     speed_up_if_full(bot, settings, troops)      # đánh xong mà số đường đã đủ tối đa thì tăng tốc, xong đánh boss mới luôn
@@ -259,6 +262,16 @@ def attack(bot, settings: dict, offer: BossOffer, go=None, own=None, latest=None
     return MARCHED if marched else RETRY
 
 
+def _march_gray(screen, pos: tuple[int, int]) -> bool:
+    """Nút March xám (hết lính): độ bão hoà trung bình của hộp quanh chữ March thấp; nút có lính màu sáng, bão hoà cao."""
+    w, h = MARCH_BOX_SIZE
+    x, y = int(pos[0]), int(pos[1])
+    box = screen[max(0, y - h // 2):y + h // 2, max(0, x - w // 2):x + w // 2]
+    if box.size == 0:
+        return False
+    return float(cv2.cvtColor(box, cv2.COLOR_BGR2HSV)[..., 1].mean()) < MARCH_GRAY_MAX_SATURATION
+
+
 def _consume_no_stamina(bot) -> bool:
     """`_march` vừa hết thể lực mà không dùng được vật phẩm: True một lần, rồi xoá cờ."""
     flagged = getattr(bot, "attack_no_stamina", False)
@@ -324,28 +337,72 @@ def _on_spot(bot, offer: BossOffer) -> bool:
     return camera is not None and abs(camera[0] - offer.x) <= ON_SPOT_KM and abs(camera[1] - offer.y) <= ON_SPOT_KM
 
 
-def _name_point(screen):
-    """IsCout: chọn MỘT vùng cam (vòng sáng) gần giữa màn hình nhất (điểm vòng sáng cách tâm không quá RING_MAX_DIST px, xa hơn là boss khác), rồi chỉ trong vùng đó tìm
-    dòng tên boss (chữ be kem, nối huy hiệu cấp và các từ của tên bằng NAME_GAP; không cần đọc ra tên); nhiều dòng thì lấy dòng gần vòng sáng nhất. Điểm bấm = (giữa dòng tên
-    theo x, mép trên dòng tên - NAME_TAP_ABOVE), tức cao hơn tên một chút. None nếu không có vùng cam gần tâm hoặc không thấy dòng tên."""
-    masked = world_mask.mask_ui(screen)
-    points = [point for point in glow_points(screen, masked) if math.dist(point, boss_scan.CAMERA_PX) <= RING_MAX_DIST]
-    if not points:
-        return None
-    glow = min(points, key=lambda point: math.dist(point, boss_scan.CAMERA_PX))      # vòng sáng gần tâm nhất
-    region = next((box for box in glow_regions(screen, masked) if box[0] <= glow[0] <= box[2] and box[1] <= glow[1] <= box[3]), None)
-    if region is None:
-        return None
-    x1, y1, x2, y2 = region
+_boss_reader_cache: dict = {}
+
+
+def _boss_reader():
+    """(Lexicon, {chữ trên nhãn: tên boss}) cho OCR tên trên bản đồ, dựng từ danh mục boss của Find Boss (`find_bosses._catalog`, ui/tabs/boss.py) cộng tên trơn không "(Boss)"
+    (VD "Lava Turtle": boss sự kiện chỉ hiện huy hiệu cấp + tên). Nhãn quái thường (DECOYS) có trong Lexicon để đọc ra rồi bị loại, không đọc nhầm thành boss."""
+    if not _boss_reader_cache:
+        entries, labels, _ = find_boss_catalog()
+        events = {entry[0] for entry in entries if entry[1] and entry[0] != "Viking"}      # boss sự kiện (có cấp): nhãn "<tầng> <tên>" hoặc chỉ "<tên>", KHÔNG có "(Boss)"
+        monsters = {entry[0] for entry in entries if not entry[1] and entry[0] != "Viking"}      # boss quái vật (không có cấp): nhãn "(Boss) <tên>"
+        known = {text: boss for text, (boss, tier, _tag) in labels.items() if tier or (boss in monsters and text.startswith("(Boss) "))}      # nhãn có tầng của boss sự kiện, "(Boss) <tên>" của boss quái vật
+        known.update({name: name for name in events})
+        known.pop("(Boss) Viking", None)       # Viking có luồng riêng (viking.py), không phải boss của iScout: không đọc ra để bấm
+        names = sorted(events | monsters)
+        lexicon = read_map_label.Lexicon(sorted(known) + find_bosses_module.DECOYS + ["(Boss) Viking"], names + find_bosses_module.DECOYS + ["Viking"])      # Viking vẫn đọc ra (để loại), không bị đọc nhầm sang tên khác
+        _boss_reader_cache.update(lexicon=lexicon, known=known)
+    return _boss_reader_cache["lexicon"], _boss_reader_cache["known"]
+
+
+def _read_boss(screen, boxes) -> str | None:
+    """Tên boss (theo danh mục) đọc được từ một trong các hộp dòng chữ `boxes` (x, y, w, h); thử lệch lên / xuống 1 hàng vì nét chữ đầu dòng có thể lệch. Đọc đủ tên thì lấy luôn; đọc
+    không đủ (chữ bị cắt / mờ) thì chỉ cần gần đúng: đoạn đầu / cuối / giữa tên (như Find Boss: `read_partial`, `read_fragment`, tối thiểu 4 chữ cái) mà mọi tên chứa đoạn đó đều là CÙNG MỘT boss
+    thì lấy boss đó. None nếu không đọc ra boss nào (không có trong danh mục, là quái thường, hoặc đoạn đọc được khớp nhiều boss)."""
+    lexicon, known = _boss_reader()
+    for x, y, w, h in boxes:
+        for dy in (0, -1, 1):
+            strip = read_map_label.ink(screen, (x, y + dy, w, h))
+            read = read_map_label.read(strip, lexicon)
+            if read:
+                return known.get(read["text"])
+            for part in (read_map_label.read_partial(strip, lexicon, "right"), read_map_label.read_partial(strip, lexicon, "left"), read_map_label.read_fragment(strip, lexicon)):
+                if part:
+                    bosses = {known.get(text) for text in read_map_label.candidates(lexicon, part)}      # quái thường / Viking không có trong `known` -> None -> mơ hồ
+                    if len(bosses) == 1 and None not in bosses:
+                        return bosses.pop()
+    return None
+
+
+def _text_boxes(masked, x1: int, y1: int, x2: int, y2: int, gap: int) -> list[tuple[int, int, int, int]]:
+    """Hộp (x, y, w, h) các dòng chữ be kem (không lấy điểm cam sáng của vòng sáng) trong vùng (x1, y1, x2, y2); chữ cách nhau dưới `gap` cột gộp thành một dòng."""
     area = masked[y1:y2, x1:x2].astype(np.int16)
-    text = (((area[..., 2] > 185) & (area[..., 1] > 150) & (area[..., 2] - area[..., 0] > 20)) * 255).astype(np.uint8)
-    merged = cv2.dilate(text, cv2.getStructuringElement(cv2.MORPH_RECT, (NAME_GAP, 1)))
+    red_over_blue = area[..., 2] - area[..., 0]
+    text = (((area[..., 2] > 185) & (area[..., 1] > 150) & (red_over_blue > 20) & (red_over_blue <= NAME_MAX_RB)) * 255).astype(np.uint8)
+    merged = cv2.dilate(text, cv2.getStructuringElement(cv2.MORPH_RECT, (gap, 1)))
     count, _, stats, _ = cv2.connectedComponentsWithStats(merged, 8)
-    names = [(int(x1 + x + w // 2), int(y1 + y)) for x, y, w, h, _ in stats[1:count] if w >= NAME_MIN_W and NAME_MIN_H <= h <= NAME_MAX_H]
-    if not names:
-        return None
-    x, top = min(names, key=lambda name: math.dist(name, glow))
-    return x, top - NAME_TAP_ABOVE
+    return [(int(x1 + x), int(y1 + y), int(w), int(h)) for x, y, w, h, _ in stats[1:count] if w >= NAME_MIN_W and NAME_MIN_H <= h <= NAME_MAX_H]
+
+
+def _name_point(screen):
+    """IsCout: tìm vùng cam như Find Boss (`glow_regions`, cùng bộ lọc màu và ngưỡng) nhưng chỉ lấy dòng chữ nằm trong SEARCH_BOX (Find Boss quét cả màn hình). Mỗi vùng mở rộng xuống NAME_REGION_EXTRA px
+    vì vòng sáng vỡ mảnh làm vùng dừng cao hơn dòng tên. Các dòng tên (chữ be kem, nối huy hiệu cấp và các từ của tên bằng NAME_GAP) của mọi vùng xếp theo khoảng cách tới giữa màn hình, gần nhất trước,
+    rồi OCR từng dòng (danh mục boss của Find Boss, `_read_boss`): thuộc danh mục thì dừng ngay, các dòng còn lại không xét; không thì xét dòng kế (quái thường, tên thành, chữ số huy hiệu...).
+    Điểm bấm = (giữa dòng tên theo x, mép trên dòng tên - NAME_TAP_ABOVE). None nếu không có boss trong danh mục (boss đã chết / đã đi)."""
+    masked = world_mask.mask_ui(screen)
+    height, width = screen.shape[:2]
+    left, top, right, bottom = (SEARCH_BOX[0] * width / 100, SEARCH_BOX[1] * height / 100, SEARCH_BOX[2] * width / 100, SEARCH_BOX[3] * height / 100)
+    lines, narrow = [], []
+    for x1, y1, x2, y2 in glow_regions(screen, masked):
+        y2 = min(height, y2 + NAME_REGION_EXTRA)
+        lines += [box for box in _text_boxes(masked, x1, y1, x2, y2, NAME_GAP) if box not in lines and left <= box[0] + box[2] // 2 <= right and top <= box[1] <= bottom]
+        narrow += _text_boxes(masked, x1, y1, x2, y2, NAME_READ_GAP)      # dòng không dính huy hiệu cấp: dễ đọc hơn
+    for box in sorted(lines, key=lambda box: math.dist((box[0] + box[2] // 2, box[1]), boss_scan.CAMERA_PX)):      # dòng tên gần giữa màn hình nhất trước
+        inside = [part for part in narrow if box[0] <= part[0] + part[2] // 2 <= box[0] + box[2] and box[1] - 2 <= part[1] <= box[1] + box[3]]
+        if _read_boss(screen, [box] + inside):
+            return box[0] + box[2] // 2, box[1] - NAME_TAP_ABOVE
+    return None
 
 
 def _wait_boss(bot, nearest: bool = False):
@@ -368,7 +425,6 @@ def _wait_boss(bot, nearest: bool = False):
         if math.dist(best["pos"], boss_scan.CAMERA_PX) <= BOSS_NEAR:
             return boss_scan.CAMERA_PX
     return None
-
 
 def _tap_attack(bot, pos: tuple[int, int], relocate=None) -> bool:
     """IsCout: bấm vào boss rồi tìm nút Attack của menu nhanh mỗi ATTACK_MENU_POLL (1) giây, tối đa ATTACK_MENU_WAIT (8) giây; thấy thì bấm. False nếu
@@ -409,19 +465,18 @@ def _wait_popup(bot):
 
 
 def _pick_troop(bot, helper, screen, region) -> int | None:
-    """Chọn đội (preset 1-8) CHỈ trong các đội đã tích (từ đội nhỏ nhất, bỏ đội bị khoá), không đụng tới đội khác; xoay vòng qua các đội đã tích tối đa TROOP_TRIES (10) lần thử;
-    đội đạt = ô preset sáng lên và ô Main General có tướng (thấy kính lúp). Trả số đội, None nếu không đội đã tích nào có tướng. Bố cục màn March của Attack khác rally: ô tướng chính nằm cao hơn."""
+    """Chọn đội (preset 1-8) CHỈ trong các đội đã tích (từ đội nhỏ nhất, bỏ đội bị khoá), không đụng tới đội khác; kiểm tra đúng MỘT vòng (VD 1 -> 2 -> 3), mỗi đội một lần,
+    không quay lại đội đầu; đội đạt = ô preset sáng lên và ô Main General có tướng (thấy kính lúp). Trả số đội, None nếu không đội đã tích nào có tướng. Bố cục màn March của Attack
+    khác rally: ô tướng chính nằm cao hơn."""
     locked = len(bot.find_all(PRESET_LOCKED, threshold=PRESET_LOCKED_THRESHOLD, screen=screen, region=REGIONS[PRESET_LOCKED]))
     unlocked = range(1, PRESET_COUNT - locked + 1)
-    chosen = [t for t in helper.troops if t in unlocked]
-    candidates = chosen          # chỉ các đội người dùng đã tích
-    for attempt in range(TROOP_TRIES if candidates else 0):      # xoay vòng qua các đội, tối đa TROOP_TRIES lần thử
-        troop = candidates[attempt % len(candidates)]
+    candidates = [t for t in helper.troops if t in unlocked]          # chỉ các đội người dùng đã tích
+    for troop in candidates:
         bot.tap_percent(PRESET_X0 + (troop - 1) * PRESET_DX, PRESET_Y)
         _, active = helper._poll_screen(f"attack_activate_troop_{troop}", lambda image: _preset_active(image, troop),
                                         timeout=PRESET_ACTIVE_WAIT, interval=1)
         if not active:
-            bot.log(f"Attack Boss: bấm đội {troop} mà ô không sáng, thử lại")
+            bot.log(f"Attack Boss: bấm đội {troop} mà ô không sáng, qua đội kế")
             continue
         _, general = helper._poll_screen(f"attack_troop_{troop}_general", lambda image: bot.find(GENERAL_SEARCH, screen=image, region=region))
         if general is not None:
@@ -432,8 +487,8 @@ def _pick_troop(bot, helper, screen, region) -> int | None:
 
 
 def _march(bot, settings: dict, region, refilled: bool = False) -> bool:
-    """Màn March: BẮT BUỘC chọn được đội quân có tướng chính (đội không có tướng thì thử đội khác; tích Select General thì chọn tướng cho đội;
-    vẫn không có thì Back, không hành quân). Tướng phụ không bắt buộc (không chọn). Xong bấm March; thành công khi về bản đồ sạch.
+    """Màn March: BẮT BUỘC chọn được đội quân có tướng chính (đội không có tướng thì thử đội đã tích kế tiếp, chỉ một vòng 1 -> 2 -> 3 ...;
+    không đội nào có tướng thì Back, không hành quân). Tướng phụ không bắt buộc (không chọn). Xong bấm March; thành công khi về bản đồ sạch.
     Hết thể lực (popup "Get more now?"): ô Use Stamina của tab được chọn thì dùng vật phẩm thể lực y như Join Monster War (stamina.refill) rồi làm lại màn March
     một lần (`refilled`: không dùng thể lực lần nữa). Không chọn, hết vật phẩm hoặc đã dùng rồi mà vẫn thiếu thì đặt cờ `bot.attack_no_stamina` (attack trả STAMINA);
     lỗi khác (màn dùng thể lực không mở / không đóng) chỉ bỏ qua boss này (RETRY)."""
@@ -450,13 +505,22 @@ def _march(bot, settings: dict, region, refilled: bool = False) -> bool:
         bot.log("Attack Boss: không thấy màn March sau khi bấm đánh")
         boss_scan.ensure_map(bot)
         return False
+    bot.tap_percent(*RESET_BUTTON)      # Reset trước, rồi mới chọn đội
+    bot.sleep(RESET_WAIT)
+    screen = bot.screenshot()
     if _pick_troop(bot, helper, screen, region) is None:
         bot.record("Attack Boss: không có đội quân nào có tướng, không hành quân")
         bot.back()
+        boss_scan.ensure_map(bot)       # về bản đồ sạch rồi làm các bước kế tiếp (attack trả RETRY: boss giữ lại, run qua boss kế)
         return False
     pos = bot.find(MARCH_BUTTON, region=REGIONS[MARCH], threshold=MARCH_THRESHOLD)
     if pos is None:
         bot.back()
+        return False
+    if _march_gray(bot.screenshot(), pos):      # hết lính: nút March xám, bấm không gửi được -> Back, qua boss khác, boss này giữ lại (RETRY) đánh sau
+        bot.record("Attack Boss: nút March xám (hết lính), Back, chuyển boss khác, boss này đánh lại sau")
+        bot.back()
+        boss_scan.ensure_map(bot)
         return False
     keep = not speedup.enabled(settings)           # thấy "không đủ đội quân": không dùng tăng tốc thì bấm lại March; có dùng thì bỏ ra (FULL) để tăng tốc
     for _ in range(FULL_TRIES if keep else 1):

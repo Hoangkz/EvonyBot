@@ -133,6 +133,34 @@ class BlackMarketFlow(unittest.TestCase):
         self.assertIn("Black Market: confirm paid refresh", device.logs)
         self.assertIn("Black Market: buy confirmed (1 / 1)", device.logs)
 
+    def test_black_market_not_enough_gems_after_confirm(self):
+        """Confirm mua mà thiếu kim cương -> popup "insufficient Gems ... Buy": Back (không Buy), Back ra khỏi Black Market,
+        không tính đã mua, không lưu xong."""
+        flow = [
+            Step("day5_market_trade.png", tap_at(335, 344)),
+            Step("bm_city.png", tap_pct(50, 50)),
+            Step("bm_menu.png", tap(BM_MENU)),
+            Step("bm_screen.png", tap_at(*BM_SLOTS[0])),
+            Step("bm_confirm.png", tap(BM_CONFIRM)),
+            Step("bm_no_gems.png", back(), back(), end()),
+        ]
+        device = _run(self, flow, {black_market.KEY: {"value": 1, "day": 5}})
+        self.assertIn("Black Market: not enough gems, stop", device.logs)
+        self.assertNotIn(black_market.KEY, device.daily_done)
+
+    def test_black_market_not_enough_gems_after_refresh(self):
+        """Instant Refresh thiếu kim cương -> popup Buy: Back, Back ra khỏi Black Market, không bấm Refresh lại."""
+        flow = [
+            Step("day5_market_trade.png", tap_at(335, 344)),
+            Step("bm_city.png", tap_pct(50, 50)),
+            Step("bm_menu.png", tap(BM_MENU)),
+            Step("bm_refresh_gems.png?sold_out", tap(BM_REFRESH)),
+            Step("bm_no_gems.png", back(), back(), end()),
+        ]
+        device = _run(self, flow, {black_market.KEY: {"value": 1, "day": 5}})
+        self.assertIn("Black Market: not enough gems, stop", device.logs)
+        self.assertNotIn(black_market.KEY, device.daily_done)
+
 
 if __name__ == "__main__":
     unittest.main()

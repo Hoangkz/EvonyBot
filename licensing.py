@@ -75,6 +75,13 @@ class OfflineError(Exception):
     """The server could not be reached; the local license may still be inside its grace period."""
 
 
+CLOCK_ERROR = "Your computer's date/time is incorrect."
+
+
+class ClockError(OfflineError):
+    """The TLS certificate is "not yet valid" / "expired" because this computer's clock is wrong."""
+
+
 def hwid() -> str:
     """Stable id of this machine: SHA-256 of the Windows MachineGuid."""
     guid = ""
@@ -183,6 +190,9 @@ def _call(endpoint: str, code: str, customer: dict | None = None, running: list[
         except Exception:
             raise OfflineError(f"Server error {e.code}") from e
     except (urllib.error.URLError, OSError, ValueError) as e:
+        reason = str(getattr(e, "reason", e))
+        if "certificate is not yet valid" in reason or "certificate has expired" in reason:
+            raise ClockError(CLOCK_ERROR) from e
         raise OfflineError(str(e)) from e
     if not answer.get("ok"):
         error = answer.get("error", "")

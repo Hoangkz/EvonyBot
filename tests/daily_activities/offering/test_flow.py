@@ -16,6 +16,7 @@ from bot.activities.daily_activities.offering.constants import (
     MENU_OFFER,
     OFFER_SCREEN,
     POPUP_OFFER,
+    POPUP_CLOSE,
     POPUP_PLUS,
 )
 from bot.activities.daily_activities.offering.run import after_go
@@ -116,7 +117,7 @@ class OfferPopupTests(unittest.TestCase):
         from bot.activities.daily_activities.offering import run as offer_run
         bot = mock.Mock()
         bot.find.return_value = (1, 1)
-        with mock.patch.object(offer_run, "read_cost", side_effect=costs):
+        with mock.patch.object(offer_run, "read_cost", side_effect=costs),                 mock.patch.object(offer_run, "cost_red", return_value=False):
             result = offer_run._offer_in_popup(bot, times)
         taps = [c.args for c in bot.tap.call_args_list]
         return result, taps, bot
@@ -141,6 +142,39 @@ class OfferPopupTests(unittest.TestCase):
         result, taps, _ = self._run(10, [None])
         self.assertFalse(result)
         self.assertEqual(len(taps), 1)   # đóng popup
+
+    def test_red_cost_logs_not_enough_gems(self):
+        """Cost đọc không được vì chữ đỏ (thiếu kim cương) -> ghi rõ "not enough gems", đóng popup, không bấm Offer."""
+        from unittest import mock
+        from bot.activities.daily_activities.offering import run as offer_run
+        bot = mock.Mock()
+        bot.find.return_value = (1, 1)
+        with mock.patch.object(offer_run, "read_cost", side_effect=[None]),                 mock.patch.object(offer_run, "cost_red", return_value=True):
+            result = offer_run._offer_in_popup(bot, 10)
+        self.assertFalse(result)
+        self.assertEqual(len(bot.tap.call_args_list), 1)   # chỉ bấm X đóng popup
+        self.assertIn("not enough gems", bot.record.call_args.args[0])
+
+
+class OfferNotEnoughGems(unittest.TestCase):
+    def test_popup_with_red_cost_does_not_offer(self):
+        """Ảnh thật: popup Offer Gems, Cost 1.000 chữ ĐỎ (không đủ kim cương; nút Offer vẫn xanh) -> chỉ đóng popup bằng X,
+        không bấm "+" / Offer, chưa xong."""
+        from bot.activities.daily_activities.offering.run import _offer_in_popup
+        flow = [Step("17_offer_gems_red_cost.png", tap(POPUP_CLOSE)), Step("07_offer_screen.png", end(result=False))]
+        device = run_flow(self, lambda bot, _s: _offer_in_popup(bot, 10), SCREENS, flow, {})
+        self.assertTrue(any("not enough gems" in line for line in device.logs))
+
+    def test_red_cost_only_on_unaffordable_popup(self):
+        """Chữ Cost đỏ chỉ có ở popup thiếu kim cương: mọi popup khác (chữ vàng) không bị coi là thiếu."""
+        import cv2
+        from bot.ocr.read_offer_cost import CROP, unaffordable
+        x, y, w, h = CROP
+        for path in sorted(SCREENS.glob("*.png")):
+            screen = cv2.imread(str(path))
+            if screen is None or not ("popup" in path.name or "red_cost" in path.name):
+                continue
+            self.assertEqual(unaffordable(screen[y:y + h, x:x + w]), "red_cost" in path.name, path.name)
 
 
 if __name__ == "__main__":

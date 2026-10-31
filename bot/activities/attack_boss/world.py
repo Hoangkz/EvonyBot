@@ -2,9 +2,9 @@
 world.py — đưa game ra bản đồ thế giới sạch (dùng chung run.py và sources.py).
 """
 from ...common import arc_sweep, boss_scan
-from ..find_boss.constants import TO_WORLD_TAP, TO_WORLD_WAIT
+from ..find_boss.constants import TO_WORLD_TAP
 from ..event_center.viking_summon.constants import DEFEATED_TEXT
-from .constants import DEFEATED_ATTR, BACK_ARROW, BACK_ARROW_THRESHOLD, TO_CITY, WORLD_TRIES
+from .constants import DEFEATED_ATTR, BACK_ARROW, BACK_ARROW_THRESHOLD, TO_CITY, WORLD_POLL, WORLD_TRIES, WORLD_WAIT
 
 
 def on_world(bot, screen) -> bool:
@@ -29,5 +29,10 @@ def ensure_world(bot) -> bool:
             continue
         if on_world(bot, screen):
             return True
-        bot.tap_percent(*TO_WORLD_TAP, delay=TO_WORLD_WAIT)
+        bot.tap_percent(*TO_WORLD_TAP)
+        for _ in range(round(WORLD_WAIT / WORLD_POLL)):      # game chuyển từ thành ra bản đồ mất vài giây: chờ tới WORLD_WAIT giây, thấy bản đồ là đi tiếp
+            bot.sleep(WORLD_POLL)
+            screen = bot.screenshot()
+            if boss_scan.on_map(bot, screen) and on_world(bot, screen):
+                return True
     return False
