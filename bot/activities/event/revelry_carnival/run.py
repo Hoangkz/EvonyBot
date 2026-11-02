@@ -18,7 +18,6 @@ from .constants import (
     CONGRATULATIONS,
     CONTROL_THRESHOLD,
     EDGE_CONFIRMATIONS,
-    EMPTY_VIEWS_BEFORE_MASK_CHECK,
     GREEN_HUE,
     GREEN_MIN_RATIO,
     GREEN_MIN_SATURATION,
@@ -46,6 +45,7 @@ from .constants import (
     RETURN_TOP_SWIPE,
     RETURN_TOP_SWIPE_FALLBACKS,
     REWARD_REGION,
+    REWARD_SCROLL_DELAY,
     REWARD_STATIC_REGION,
     REWARD_STATIC_SAME,
     SCAN_SWIPE,
@@ -360,7 +360,7 @@ def _scroll_reward_frame(bot, direction: str, primary, fallbacks) -> bool:
         bot.check()
         before = bot.screenshot()
         bot.swipe_percent(*gesture, duration=SLOW_SWIPE_DURATION,
-                          delay=STEP_DELAY)
+                          delay=REWARD_SCROLL_DELAY)
         after = bot.screenshot()
         similarity = _reward_static_similarity(before, after)
         moved = similarity < REWARD_STATIC_SAME
@@ -370,21 +370,6 @@ def _scroll_reward_frame(bot, direction: str, primary, fallbacks) -> bool:
         if moved:
             return True
     return False
-
-
-def _swipe_to_top(bot) -> bool:
-    unchanged = 0
-    swipe = 0
-    while unchanged < EDGE_CONFIRMATIONS:
-        bot.check()
-        swipe += 1
-        moved = _scroll_reward_frame(
-            bot, "lên", RETURN_TOP_SWIPE, RETURN_TOP_SWIPE_FALLBACKS)
-        unchanged = 0 if moved else unchanged + 1
-        bot.record(f"{NAME}: kiểm tra đầu danh sách lần {swipe}; không đổi "
-                   f"{unchanged}/{EDGE_CONFIRMATIONS}")
-    bot.record(f"{NAME}: đã xác nhận đầu danh sách quà")
-    return True
 
 
 def _claim_current_view(bot):
@@ -414,35 +399,50 @@ def _claim_current_view(bot):
     return claimed, remains
 
 
-def _scan_full_list(bot):
+def _scan_full_list(bot, direction="xuống"):
+    """Claim every visible reward while travelling to the requested edge.
+
+    Empty reward rows are normal: two empty frames do *not* prove that the
+    list has ended.  Only two measured no-movement swipes at the requested
+    edge authorise the caller to continue.
+    """
+    if direction == "xuống":
+        primary, fallbacks, edge = (SCAN_SWIPE, SCAN_SWIPE_FALLBACKS, "đáy")
+    elif direction == "lên":
+        primary, fallbacks, edge = (
+            RETURN_TOP_SWIPE, RETURN_TOP_SWIPE_FALLBACKS, "đầu")
+    else:
+        raise ValueError(f"unknown Revelry reward direction: {direction}")
     saw_claim = False
-    empty_views = 0
     unchanged = 0
     position = 0
     while True:
         bot.check()
         position += 1
-        bot.record(f"{NAME}: quét vùng quà vị trí {position}")
+        bot.record(f"{NAME}: quét vùng quà lướt {direction} vị trí {position}")
         claimed, stuck = _claim_current_view(bot)
         saw_claim = saw_claim or claimed
         if stuck:
             return saw_claim, True, False
-        empty_views = 0 if claimed else empty_views + 1
-        if empty_views >= EMPTY_VIEWS_BEFORE_MASK_CHECK:
-            bot.record(f"{NAME}: {empty_views} khung liên tiếp không có Claim xanh "
-                       "(khung mở và một lần lướt); dừng quét để kiểm tra Parade Mask")
-            return saw_claim, False, True
-        moved = _scroll_reward_frame(
-            bot, "xuống", SCAN_SWIPE, SCAN_SWIPE_FALLBACKS)
-        unchanged = 0 if moved else unchanged + 1
-        bot.record(f"{NAME}: kiểm tra cuối danh sách; không đổi "
-                   f"{unchanged}/{EDGE_CONFIRMATIONS}")
-        if unchanged >= EDGE_CONFIRMATIONS:
-            return saw_claim, False, True
+
+        # A view may contain no Claim and still be in the middle of the list.
+        # After every scanned viewport keep moving until an actual movement is
+        # observed, or the relevant edge is confirmed twice.  Do not re-scan
+        # the same stationary endpoint frame between confirmations.
+        while True:
+            moved = _scroll_reward_frame(bot, direction, primary, fallbacks)
+            unchanged = 0 if moved else unchanged + 1
+            bot.record(f"{NAME}: kiểm tra {edge} danh sách; không đổi "
+                       f"{unchanged}/{EDGE_CONFIRMATIONS}")
+            if unchanged >= EDGE_CONFIRMATIONS:
+                bot.record(f"{NAME}: đã xác nhận {edge} danh sách quà")
+                return saw_claim, False, True
+            if moved:
+                break
 
 
 def _claim_rewards(bot) -> bool:
-    """Return only after two clean up/down Claim audits; not task DONE."""
+    """Return after a clean complete down/up Claim audit; not task DONE."""
     clean_audits = 0
     for pass_number in range(1, MAX_FULL_PASSES + 1):
         if pass_number == 1:
@@ -453,31 +453,38 @@ def _claim_rewards(bot) -> bool:
             bot.record(f"{NAME}: vừa vào màn; quét Claim ngay ở khung hiện tại "
                        "trước khi lướt")
         else:
+            # The prior upward scan already left the list at the confirmed
+            # top, so begin the next verification directly without an extra
+            # return-to-top traversal.
             bot.record(f"{NAME}: bắt đầu lượt quét lại {pass_number}/{MAX_FULL_PASSES}; "
-                       "trở về đầu danh sách")
-            if not _swipe_to_top(bot):
-                return False
-        saw_claim, stuck, bottom = _scan_full_list(bot)
+                       "đang ở đầu danh sách")
+        saw_down, stuck, bottom = _scan_full_list(bot, "xuống")
         if stuck:
             bot.record(f"{NAME}: Claim xanh vẫn còn sau giới hạn bấm; giữ PENDING")
             return False
         if not bottom:
             bot.record(f"{NAME}: chưa hoàn tất lượt quét quà; giữ PENDING")
             return False
-        if saw_claim:
+        bot.record(f"{NAME}: đã tới đáy; lướt ngược lên và tiếp tục quét Claim")
+        saw_up, stuck, top = _scan_full_list(bot, "lên")
+        if stuck:
+            bot.record(f"{NAME}: Claim xanh vẫn còn sau giới hạn bấm; giữ PENDING")
+            return False
+        if not top:
+            bot.record(f"{NAME}: chưa hoàn tất lượt quét ngược; giữ PENDING")
+            return False
+        if saw_down or saw_up:
             clean_audits = 0
-            bot.record(f"{NAME}: vừa nhận quà; quét lại toàn bộ trước khi DONE")
+            bot.record(f"{NAME}: vừa nhận quà; quét lại hai chiều trước khi DONE")
             continue
         clean_audits += 1
         if clean_audits >= CLEAN_CLAIM_AUDIT_PASSES:
-            bot.record(f"{NAME}: đã soát Claim xanh lên/xuống "
+            bot.record(f"{NAME}: đã soát Claim xanh xuống/lên "
                        f"{clean_audits}/{CLEAN_CLAIM_AUDIT_PASSES} lần không thấy; "
-                       "lướt lên lần cuối rồi kiểm tra Parade Mask")
-            if not _swipe_to_top(bot):
-                return False
+                       "đang ở đầu danh sách, kiểm tra Parade Mask")
             return True
         bot.record(f"{NAME}: lượt soát Claim sạch {clean_audits}/"
-                   f"{CLEAN_CLAIM_AUDIT_PASSES}; lướt lên rồi quét xuống lần nữa")
+                   f"{CLEAN_CLAIM_AUDIT_PASSES}; quét lại hai chiều")
     bot.record(f"{NAME}: chưa có lượt quét sạch Claim xanh; giữ PENDING")
     return False
 

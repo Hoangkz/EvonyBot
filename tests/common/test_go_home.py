@@ -6,7 +6,20 @@ from unittest import mock
 import cv2
 
 from bot.common import go_home
-from bot.common.go_home import RADIAL_CLOSE_TAPS, TO_CITY, TO_CITY_REGION, TO_CITY_WAIT
+from bot.common.go_home import (
+    GAME_PACKAGE,
+    RADIAL_CLOSE_TAPS,
+    RESTART_GAME,
+    RESTART_GAME_REGION,
+    RESTART_GAME_THRESHOLD,
+    TO_CITY,
+    TO_CITY_REGION,
+    TO_CITY_WAIT,
+    UPDATE_LATER,
+    UPDATE_LATER_REGION,
+    UPDATE_LATER_THRESHOLD,
+    UPDATE_LATER_WAIT,
+)
 from bot.context.templates import TEMPLATE_DIR
 
 SCREENS = Path(__file__).parent / "screens"
@@ -73,6 +86,34 @@ class GoHomeTests(unittest.TestCase):
         self.assertEqual(len(bot.taps), 1)
         x, y = bot.taps[0]
         self.assertTrue(80 <= x <= 190 and 395 <= y <= 435)   # nút Cancel
+
+    @mock.patch("bot.common.go_home.current_focus", return_value="com.topgamesinc.evony")
+    def test_update_later_is_dismissed_before_other_home_recovery(self, _focus):
+        bot = mock.Mock()
+        bot.find.side_effect = lambda path, **_kw: (
+            (139, 417) if path == UPDATE_LATER else None)
+
+        go_home(bot, "screen")
+
+        bot.tap.assert_called_once_with(139, 417, delay=UPDATE_LATER_WAIT)
+        self.assertIn(mock.call(UPDATE_LATER, threshold=UPDATE_LATER_THRESHOLD,
+                                screen="screen", region=UPDATE_LATER_REGION),
+                      bot.find.call_args_list)
+        bot.back.assert_not_called()
+
+    @mock.patch("bot.common.go_home.current_focus", return_value="com.topgamesinc.evony")
+    def test_restart_uses_the_expanded_central_popup_region(self, _focus):
+        bot = mock.Mock()
+        bot.find.side_effect = lambda path, **_kw: (
+            (198, 415) if path == RESTART_GAME else None)
+
+        go_home(bot, "screen")
+
+        bot.shell.assert_called_once_with(f"am force-stop {GAME_PACKAGE}")
+        self.assertIn(mock.call(RESTART_GAME, threshold=RESTART_GAME_THRESHOLD,
+                                screen="screen", region=RESTART_GAME_REGION),
+                      bot.find.call_args_list)
+        bot.back.assert_not_called()
 
 
 if __name__ == "__main__":

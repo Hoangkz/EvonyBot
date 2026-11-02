@@ -13,6 +13,19 @@ TO_CITY_WAIT = 4             # giây chờ game chuyển về màn thành sau kh
 EXIT_DIALOG = "en/exitGame.png"
 EXIT_CANCEL = "en/exitCancel.png"
 EXIT_THRESHOLD = 0.85
+# Forced-update dialog: dismiss the optional download prompt so the activity
+# can resume.  The button is deliberately searched only inside the popup's
+# lower half, avoiding similarly coloured city controls.
+UPDATE_LATER = "en/updateLater.png"
+UPDATE_LATER_REGION = (10, 50, 55, 68)
+UPDATE_LATER_THRESHOLD = 0.85
+UPDATE_LATER_WAIT = 1.0
+# A downloaded update changes this dialog from "Update Later" to "Restart".
+# Keep the full central popup band: device UI scale and the text wrapping both
+# move the green Restart button vertically, as seen on 21503.
+RESTART_GAME = "en/restartgame.png"
+RESTART_GAME_REGION = (0, 35, 100, 80)
+RESTART_GAME_THRESHOLD = 0.85
 # Menu tròn của công trình (Train / Detail / Upgrade...): Back KHÔNG đóng được mà mở hộp thoát game. Nhận ra bằng icon "Detail"
 # (có ở mọi công trình, vị trí cung tròn đổi theo công trình), đóng bằng cách bấm đất trống (lần lượt từng điểm, % màn hình).
 RADIAL_MENU = "CityMap/radialDetail.png"
@@ -23,8 +36,8 @@ def go_home(bot, screen):
     """Utils.Home(auto, screen) — called when nothing known is on screen:
     - on the Android launcher (game not open): launch the game, wait up to
       15 s for "Try again" and tap through the loading screen;
-    - game shows a load error, or the "new game updates, Restart" popup:
-      force-stop it (next Home call relaunches);
+    - game shows an optional update prompt: tap Update Later; if the following
+      update prompt says Restart, force-stop it (next Home call relaunches);
     - exit-game dialog: tap Cancel;
     - a building's round menu is open (Back cannot close it): tap empty ground;
     - on the world map (city button at the bottom right): tap it to return to
@@ -46,7 +59,12 @@ def go_home(bot, screen):
         bot.record("Home: load error, force-stopping game")
         bot.shell(f"am force-stop {GAME_PACKAGE}")
         delay(bot, 10)
-    elif bot.find("en/restartgame.png", threshold=0.85, screen=screen) is not None:
+    elif (update_later := bot.find(UPDATE_LATER, threshold=UPDATE_LATER_THRESHOLD,
+                                   screen=screen, region=UPDATE_LATER_REGION)) is not None:
+        bot.record("Home: game báo có bản cập nhật, bấm Update Later")
+        bot.tap(*update_later, delay=UPDATE_LATER_WAIT)
+    elif bot.find(RESTART_GAME, threshold=RESTART_GAME_THRESHOLD, screen=screen,
+                  region=RESTART_GAME_REGION) is not None:
         bot.record("Home: game báo có bản cập nhật cần Restart, tắt game mở lại")
         bot.shell(f"am force-stop {GAME_PACKAGE}")
         delay(bot, 10)

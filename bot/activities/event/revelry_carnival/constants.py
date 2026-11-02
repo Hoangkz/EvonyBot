@@ -44,37 +44,37 @@ REWARD_STATIC_SAME = 0.85
 # Parade Mask controls or finish on the level/progress strip or green border.
 #
 # On 21513 at LV7/8, the centre path could be swallowed by a reward row and
-# produce two identical frames even though levels remained below.  The user
+# produce an identical frame even though levels remained below.  The user
 # selected x=45 px (11.36%) for the left fallback: y=665 -> 496 px remains
-# exactly inside the green frame.  The right and slightly-raised centre paths
-# are retained as later probes.  They are fallback probes, not extra broad
-# gestures: every endpoint remains within this green frame.
+# exactly inside the green frame.  Do not try additional right/raised paths:
+# each edge needs only the centre path and this one measured fallback, then
+# the normal two consecutive unchanged checks decide the edge.  This keeps a
+# full Revelry audit well below the worker's 120-second window.
 SCAN_SWIPE = (50, 94.5, 50, 70.5)
 RETURN_TOP_SWIPE = (50, 70.5, 50, 94.5)
 SCAN_SWIPE_FALLBACKS = (
     (11.36, 94.5, 11.36, 70.5),  # (45, 665) -> (45, 496) at 396x704
-    (80, 94.5, 80, 70.5),
-    (50, 93.5, 50, 70.5),
 )
 RETURN_TOP_SWIPE_FALLBACKS = (
     (11.36, 70.5, 11.36, 94.5),  # (45, 496) -> (45, 665) at 396x704
-    (80, 70.5, 80, 94.5),
-    (50, 70.5, 50, 93.5),
 )
-SLOW_SWIPE_DURATION = 1.2
+# The reward list needs a short settle after an ADB swipe before its static LV
+# strip is compared.  A live 21503 scan has 19 positions; the old 1.2s swipe
+# plus 0.4s wait consumed almost the entire 100s window before the upward
+# verification began.  0.3s + 0.2s is reserved for this static-list gesture;
+# Claim/pop-up timing keeps the normal, safer STEP_DELAY below.
+SLOW_SWIPE_DURATION = 0.3
+REWARD_SCROLL_DELAY = 0.2
 STEP_DELAY = 1.0
 # The game may take a moment to open the Mask quantity panel.  Do not decide
 # that there is no Use/DONE result from the first immediately-following frame.
 PARADE_MASK_OPEN_DELAY = 2.0
 EDGE_CONFIRMATIONS = 2
-# Check the viewport shown on entry and exactly one viewport after a scroll.
-# When both contain no green Claim, inspect Parade Mask instead of dragging
-# through an empty reward list.
-EMPTY_VIEWS_BEFORE_MASK_CHECK = 2
-# Before Parade Mask is inspected, repeat the entire Claim scan in both
-# vertical directions.  This catches a delayed green Claim without treating a
-# single apparently empty viewport as clean.
-CLEAN_CLAIM_AUDIT_PASSES = 2
+# One clean audit means two complete directional scans: down to the confirmed
+# bottom, then immediately up to the confirmed top while still detecting and
+# claiming.  Empty rows do not end either scan; the edge detector must observe
+# two unchanged swipes at that endpoint.
+CLEAN_CLAIM_AUDIT_PASSES = 1
 MAX_FULL_PASSES = 3
 MAX_CLAIMS_PER_VIEW = 6
 

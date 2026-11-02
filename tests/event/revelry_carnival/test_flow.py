@@ -134,49 +134,62 @@ class ClaimColourTests(unittest.TestCase):
         self.assertTrue(moved)
         self.assertEqual(
             [mock.call(*run.SCAN_SWIPE,
-                       duration=run.SLOW_SWIPE_DURATION, delay=run.STEP_DELAY),
+                       duration=run.SLOW_SWIPE_DURATION,
+                       delay=run.REWARD_SCROLL_DELAY),
              mock.call(*run.SCAN_SWIPE_FALLBACKS[0],
-                       duration=run.SLOW_SWIPE_DURATION, delay=run.STEP_DELAY)],
+                       duration=run.SLOW_SWIPE_DURATION,
+                       delay=run.REWARD_SCROLL_DELAY)],
             bot.swipe_percent.call_args_list)
+
+    def test_each_edge_check_uses_only_the_measured_left_fallback(self):
+        """Do not turn two unchanged edge confirmations into eight swipes."""
+        self.assertEqual(1, len(run.SCAN_SWIPE_FALLBACKS))
+        self.assertEqual(1, len(run.RETURN_TOP_SWIPE_FALLBACKS))
 
     @mock.patch.object(run, "_scan_full_list",
                        side_effect=((False, False, True), (False, False, True)))
-    @mock.patch.object(run, "_swipe_to_top", return_value=True)
-    def test_clean_claim_audit_checks_opened_view_then_returns_up_for_second_pass(
-            self, swipe_to_top, scan_full_list):
+    def test_clean_claim_audit_scans_to_both_edges_before_mask(
+            self, scan_full_list):
         bot = mock.Mock()
 
         self.assertTrue(run._claim_rewards(bot))
 
         self.assertEqual(2, scan_full_list.call_count)
-        self.assertEqual(2, swipe_to_top.call_count)
+        self.assertEqual([mock.call(bot, "xuống"), mock.call(bot, "lên")],
+                         scan_full_list.call_args_list)
 
     @mock.patch.object(run, "_scan_full_list",
                        side_effect=((True, False, True), (False, False, True),
-                                    (False, False, True)))
-    @mock.patch.object(run, "_swipe_to_top", return_value=True)
-    def test_claim_resets_the_two_clean_up_down_audits(
-            self, swipe_to_top, scan_full_list):
+                                    (False, False, True), (False, False, True)))
+    def test_claim_restarts_the_complete_two_direction_audit(
+            self, scan_full_list):
         bot = mock.Mock()
 
         self.assertTrue(run._claim_rewards(bot))
 
-        self.assertEqual(3, scan_full_list.call_count)
-        self.assertEqual(3, swipe_to_top.call_count)
+        self.assertEqual(4, scan_full_list.call_count)
+        self.assertEqual([mock.call(bot, "xuống"), mock.call(bot, "lên"),
+                          mock.call(bot, "xuống"), mock.call(bot, "lên")],
+                         scan_full_list.call_args_list)
 
-    @mock.patch.object(run, "_scroll_reward_frame", return_value=True)
+    @mock.patch.object(run, "_scroll_reward_frame",
+                       side_effect=(True, True, False, False))
     @mock.patch.object(run, "_claim_current_view",
-                       side_effect=((False, False), (False, False)))
-    def test_two_empty_views_go_to_parade_mask_check_without_extra_scrolls(
+                       side_effect=((False, False), (False, False),
+                                    (False, False)))
+    def test_empty_views_keep_scrolling_until_the_bottom_is_confirmed(
             self, claim_current_view, scroll_reward_frame):
         bot = mock.Mock()
 
-        saw_claim, stuck, ready_for_mask = run._scan_full_list(bot)
+        saw_claim, stuck, ready_for_mask = run._scan_full_list(bot, "xuống")
 
         self.assertEqual((False, False, True),
                          (saw_claim, stuck, ready_for_mask))
-        self.assertEqual(2, claim_current_view.call_count)
-        scroll_reward_frame.assert_called_once_with(
+        # Two empty views in the middle are not terminal.  The third is the
+        # bottom view, then two static swipes confirm that exact edge.
+        self.assertEqual(3, claim_current_view.call_count)
+        self.assertEqual(4, scroll_reward_frame.call_count)
+        scroll_reward_frame.assert_called_with(
             bot, "xuống", run.SCAN_SWIPE, run.SCAN_SWIPE_FALLBACKS)
 
 
