@@ -407,7 +407,8 @@ def _scan_full_list(bot, direction="xuống"):
     edge authorise the caller to continue.
     """
     if direction == "xuống":
-        primary, fallbacks, edge = (SCAN_SWIPE, SCAN_SWIPE_FALLBACKS, "đáy")
+        primary, fallbacks, edge = (
+            SCAN_SWIPE, SCAN_SWIPE_FALLBACKS, "đáy")
     elif direction == "lên":
         primary, fallbacks, edge = (
             RETURN_TOP_SWIPE, RETURN_TOP_SWIPE_FALLBACKS, "đầu")

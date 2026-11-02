@@ -43,28 +43,24 @@ REWARD_STATIC_SAME = 0.85
 # the measured 170 px gesture from y=94.5 -> 70.5% does.  Do not start over
 # Parade Mask controls or finish on the level/progress strip or green border.
 #
-# On 21513 at LV7/8, the centre path could be swallowed by a reward row and
-# produce an identical frame even though levels remained below.  The user
-# selected x=45 px (11.36%) for the left fallback: y=665 -> 496 px remains
-# exactly inside the green frame.  Do not try additional right/raised paths:
-# each edge needs only the centre path and this one measured fallback, then
-# the normal two consecutive unchanged checks decide the edge.  This keeps a
-# full Revelry audit well below the worker's 120-second window.
-SCAN_SWIPE = (50, 94.5, 50, 70.5)
-RETURN_TOP_SWIPE = (50, 70.5, 50, 94.5)
-SCAN_SWIPE_FALLBACKS = (
-    (11.36, 94.5, 11.36, 70.5),  # (45, 665) -> (45, 496) at 396x704
-)
-RETURN_TOP_SWIPE_FALLBACKS = (
-    (11.36, 70.5, 11.36, 94.5),  # (45, 496) -> (45, 665) at 396x704
-)
+# Reward icons swallow vertical gestures.  Drag only on the fixed LV-label
+# column, at x=63 on the 396px reference screen (15.9%), which stays inside
+# the static level strip and not on an icon or Claim control.  Both endpoint
+# confirmations deliberately repeat this same reliable column.
+# 15.91% is truncated by InputMixin to exactly x=63 at 396px wide.
+LV_COLUMN_SWIPE_X = 15.91
+SCAN_SWIPE = (LV_COLUMN_SWIPE_X, 94.5, LV_COLUMN_SWIPE_X, 70.5)
+RETURN_TOP_SWIPE = (LV_COLUMN_SWIPE_X, 70.5, LV_COLUMN_SWIPE_X, 94.5)
+SCAN_SWIPE_FALLBACKS = ()
+RETURN_TOP_SWIPE_FALLBACKS = ()
 # The reward list needs a short settle after an ADB swipe before its static LV
 # strip is compared.  A live 21503 scan has 19 positions; the old 1.2s swipe
 # plus 0.4s wait consumed almost the entire 100s window before the upward
-# verification began.  0.3s + 0.2s is reserved for this static-list gesture;
-# Claim/pop-up timing keeps the normal, safer STEP_DELAY below.
+# verification began.  The fast 0.3s gesture needs 0.4s to settle: live 21503
+# scores were 0.493 at 0.2s (false movement at the real edge) and 0.9995 at
+# 0.4s.  Claim/pop-up timing keeps the normal, safer STEP_DELAY below.
 SLOW_SWIPE_DURATION = 0.3
-REWARD_SCROLL_DELAY = 0.2
+REWARD_SCROLL_DELAY = 0.4
 STEP_DELAY = 1.0
 # The game may take a moment to open the Mask quantity panel.  Do not decide
 # that there is no Use/DONE result from the first immediately-following frame.

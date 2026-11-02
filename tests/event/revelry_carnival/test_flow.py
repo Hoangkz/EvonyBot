@@ -123,11 +123,11 @@ class ClaimColourTests(unittest.TestCase):
                          bot.tap.call_args_list)
         bot.swipe_percent.assert_not_called()
 
-    def test_stationary_centre_swipe_tries_green_frame_fallback_before_edge(self):
+    def test_reward_scroll_uses_the_lv_label_column_only(self):
         bot = mock.Mock()
         bot.screenshot.return_value = np.zeros((704, 396, 3), dtype=np.uint8)
         with mock.patch.object(run, "_reward_static_similarity",
-                               side_effect=(0.95, 0.42)):
+                               return_value=0.42):
             moved = run._scroll_reward_frame(
                 bot, "xuống", run.SCAN_SWIPE, run.SCAN_SWIPE_FALLBACKS)
 
@@ -135,16 +135,19 @@ class ClaimColourTests(unittest.TestCase):
         self.assertEqual(
             [mock.call(*run.SCAN_SWIPE,
                        duration=run.SLOW_SWIPE_DURATION,
-                       delay=run.REWARD_SCROLL_DELAY),
-             mock.call(*run.SCAN_SWIPE_FALLBACKS[0],
-                       duration=run.SLOW_SWIPE_DURATION,
                        delay=run.REWARD_SCROLL_DELAY)],
             bot.swipe_percent.call_args_list)
 
-    def test_each_edge_check_uses_only_the_measured_left_fallback(self):
-        """Do not turn two unchanged edge confirmations into eight swipes."""
-        self.assertEqual(1, len(run.SCAN_SWIPE_FALLBACKS))
-        self.assertEqual(1, len(run.RETURN_TOP_SWIPE_FALLBACKS))
+    def test_every_reward_swipe_stays_on_x_63_lv_column(self):
+        from bot.activities.event.revelry_carnival.constants import LV_COLUMN_SWIPE_X
+        self.assertAlmostEqual(15.91, LV_COLUMN_SWIPE_X)
+        self.assertEqual(63, int(396 * LV_COLUMN_SWIPE_X / 100))
+        for gesture in (run.SCAN_SWIPE, run.RETURN_TOP_SWIPE):
+            with self.subTest(gesture=gesture):
+                self.assertEqual(LV_COLUMN_SWIPE_X, gesture[0])
+                self.assertEqual(LV_COLUMN_SWIPE_X, gesture[2])
+        self.assertEqual((), run.SCAN_SWIPE_FALLBACKS)
+        self.assertEqual((), run.RETURN_TOP_SWIPE_FALLBACKS)
 
     @mock.patch.object(run, "_scan_full_list",
                        side_effect=((False, False, True), (False, False, True)))
@@ -190,7 +193,7 @@ class ClaimColourTests(unittest.TestCase):
         self.assertEqual(3, claim_current_view.call_count)
         self.assertEqual(4, scroll_reward_frame.call_count)
         scroll_reward_frame.assert_called_with(
-            bot, "xuống", run.SCAN_SWIPE, run.SCAN_SWIPE_FALLBACKS)
+            bot, "xuống", run.SCAN_SWIPE, ())
 
 
 class ResumeBot:
