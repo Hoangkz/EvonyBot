@@ -3768,22 +3768,26 @@ class FixedGiftFlowTests(unittest.TestCase):
     def test_giant_requires_no_items_after_exact_tile(self):
         bot = mock.Mock()
         with (mock.patch.object(event_center, "_ensure_skip_animation",
-                                return_value=True),
+                                return_value=True) as skip,
+              mock.patch.object(event_center, "_giant_terminal_state",
+                                side_effect=(None, "not_enough_items")),
               mock.patch.object(event_center, "_wait_for",
-                                side_effect=(None, (150, 419), None, (70, 174))),
+                                return_value=(150, 419)),
               mock.patch.object(event_center, "_close_exact_congratulations",
                                 return_value=False)):
             report, done = event_center._handle_giant(bot)
 
         self.assertTrue(done)
         self.assertEqual(common.ClaimReport(1, 1), report)
+        skip.assert_called_once_with(
+            bot, "EventCenter/GiantsWisdomTemple")
         bot.tap.assert_called_once_with(
             150, 419, delay=event_center.LIST_SCROLL_SETTLE_SECONDS)
 
     def test_giant_event_ended_is_done_without_tapping(self):
         bot = mock.Mock()
-        with (mock.patch.object(event_center, "_wait_for",
-                                return_value=(196, 240)),
+        with (mock.patch.object(event_center, "_giant_terminal_state",
+                                return_value="event_ended"),
               mock.patch.object(event_center, "_ensure_skip_animation") as skip):
             report, done = event_center._handle_giant(bot)
 
@@ -3792,10 +3796,26 @@ class FixedGiftFlowTests(unittest.TestCase):
         skip.assert_not_called()
         bot.tap.assert_not_called()
 
-    def test_dwarf_daily_free_congratulations_is_done(self):
+    def test_giant_congratulations_is_closed_but_is_not_done(self):
         bot = mock.Mock()
         with (mock.patch.object(event_center, "_ensure_skip_animation",
                                 return_value=True),
+              mock.patch.object(event_center, "_giant_terminal_state",
+                                side_effect=(None, None, None)),
+              mock.patch.object(event_center, "_wait_for",
+                                side_effect=((150, 419), None)),
+              mock.patch.object(event_center, "_close_exact_congratulations",
+                                return_value=True) as close):
+            report, done = event_center._handle_giant(bot)
+
+        self.assertFalse(done)
+        self.assertEqual(common.ClaimReport(1, 0), report)
+        close.assert_called_once_with(bot)
+
+    def test_dwarf_daily_free_congratulations_is_done(self):
+        bot = mock.Mock()
+        with (mock.patch.object(event_center, "_ensure_skip_animation",
+                                return_value=True) as skip,
               mock.patch.object(event_center, "_wait_for",
                                 return_value=(355, 180)),
               mock.patch.object(event_center, "_close_exact_congratulations",
@@ -3804,6 +3824,7 @@ class FixedGiftFlowTests(unittest.TestCase):
 
         self.assertTrue(done)
         self.assertEqual(common.ClaimReport(1, 1), report)
+        skip.assert_called_once_with(bot, "EventCenter/DwarfsTreasure")
 
     def test_dwarf_missing_daily_free_after_loaded_page_is_done(self):
         bot = mock.Mock()

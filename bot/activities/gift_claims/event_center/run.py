@@ -454,37 +454,57 @@ def _handle_grace(bot):
     return report, report.verified > 0
 
 
+def _giant_terminal_state(bot, *, attempts: int):
+    """Return Giant's only two valid terminal states, if either is visible."""
+    for attempt in range(attempts):
+        screen = bot.screenshot()
+        if find(bot, "EventCenter/GiantsWisdomTemple/status_event_ended", screen,
+                threshold=0.70, region=(0, 8, 100, 75)) is not None:
+            return "event_ended"
+        if find(bot, "EventCenter/GiantsWisdomTemple/message_not_enough_items", screen,
+                threshold=0.70, region=(0, 15, 100, 45)) is not None:
+            return "not_enough_items"
+        if attempt + 1 < attempts:
+            bot.sleep(UI_SETTLE_SECONDS)
+    return None
+
+
 def _handle_giant(bot):
-    ended = _wait_for(bot, "EventCenter/GiantsWisdomTemple/status_event_ended",
-                      attempts=2, threshold=0.70,
-                      region=(0, 8, 100, 75))
-    if ended is not None:
-        bot.record("Gift Claims: Giant's Wisdom Temple hiện Event has ended; DONE")
+    terminal = _giant_terminal_state(bot, attempts=2)
+    if terminal is not None:
+        bot.record(f"Gift Claims: Giant's Wisdom Temple hiện {terminal}; DONE")
         return ClaimReport(0, 1), True
-    if not _ensure_skip_animation(bot, "GiantsWisdomTemple"):
+    if not _ensure_skip_animation(bot, "EventCenter/GiantsWisdomTemple"):
         return ClaimReport(), False
-    target = _wait_for(bot, "EventCenter/GiantsWisdomTemple/button_free_wisdom_tile", attempts=4,
-                       threshold=0.70, region=(0, 30, 100, 92))
-    if target is None:
-        return ClaimReport(), False
-    bot.record("Gift Claims: Giant's Wisdom Temple tap exact free tile")
-    # The result animation is noticeably slower on a multi-emulator host.
-    bot.tap(*target, delay=LIST_SCROLL_SETTLE_SECONDS)
-    if _close_exact_congratulations(bot):
-        return ClaimReport(1, 1), True
-    ended = _wait_for(bot, "EventCenter/GiantsWisdomTemple/status_event_ended",
-                      attempts=4, threshold=0.70,
-                      region=(0, 8, 100, 75))
-    if ended is not None:
-        bot.record("Gift Claims: Giant's Wisdom Temple nhận Event has ended; DONE")
-        return ClaimReport(1, 1), True
-    done = _wait_for(bot, "EventCenter/GiantsWisdomTemple/message_not_enough_items", attempts=4,
-                     threshold=0.70, region=(0, 15, 100, 45)) is not None
-    return ClaimReport(1, int(done)), done
+    attempted = 0
+    while True:
+        bot.check()
+        target = _wait_for(
+            bot, "EventCenter/GiantsWisdomTemple/button_free_wisdom_tile",
+            attempts=4, threshold=0.70, region=(0, 30, 100, 92))
+        if target is None:
+            return ClaimReport(attempted, 0), False
+        attempted += 1
+        bot.record("Gift Claims: Giant's Wisdom Temple tap exact free tile")
+        # The result animation is noticeably slower on a multi-emulator host.
+        bot.tap(*target, delay=LIST_SCROLL_SETTLE_SECONDS)
+        congratulated = _close_exact_congratulations(bot)
+        if congratulated:
+            bot.record("Gift Claims: Giant's Wisdom Temple đã đóng Congratulations; "
+                       "tiếp tục tới trạng thái kết thúc thật")
+        terminal = _giant_terminal_state(bot, attempts=4)
+        if terminal is not None:
+            bot.record(f"Gift Claims: Giant's Wisdom Temple nhận {terminal}; DONE")
+            return ClaimReport(attempted, 1), True
+        # A verified Congratulations permits another exact free-tile probe.
+        # Without it or a terminal message, do not repeat a possibly swallowed
+        # tap blindly; keep the event pending for the next run instead.
+        if not congratulated:
+            return ClaimReport(attempted, 0), False
 
 
 def _handle_dwarf(bot):
-    if not _ensure_skip_animation(bot, "DwarfsTreasure"):
+    if not _ensure_skip_animation(bot, "EventCenter/DwarfsTreasure"):
         return ClaimReport(), False
     daily = _wait_for(bot, "EventCenter/DwarfsTreasure/button_daily_free_chest", attempts=4,
                       threshold=0.66, region=(65, 12, 100, 38))
