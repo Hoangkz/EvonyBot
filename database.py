@@ -229,6 +229,9 @@ class Database:
         self._known = {row["serial"] for row in self.conn.execute("SELECT serial FROM devices")}
 
         self._queue: queue.Queue = queue.Queue()
+        # Số việc ghi (không tính log) còn chờ: _flush chỉ đợi các việc này, không đợi hàng đợi log của bot đang chạy.
+        self._pending = 0
+        self._pending_cv = threading.Condition()
         self._writer = threading.Thread(
             target=self._write_loop, args=(path,), name="db-writer", daemon=True
         )
@@ -241,28 +244,39 @@ class Database:
         self.conn.close()
 
     # ---- background writer -------------------------------------------
-    def _write(self, job):
-        """Queue `job(conn)`; it runs in its own transaction on the writer thread."""
-        self._queue.put(job)
+    def _write(self, job, track: bool = True):
+        """Queue `job(conn)`; it runs in its own transaction on the writer thread.
+        track=False (ghi log): _flush không đợi việc này, để đọc cấu hình không bị kẹt sau hàng đợi log của nhiều bot."""
+        if track:
+            with self._pending_cv:
+                self._pending += 1
+        self._queue.put((job, track))
 
     def _write_loop(self, path: Path):
         conn = _connect(path)
         while True:
-            job = self._queue.get()
+            item = self._queue.get()
+            if item is None:
+                self._queue.task_done()
+                break
+            job, track = item
             try:
-                if job is None:
-                    break
                 with conn:
                     job(conn)
             except Exception as e:
                 print(f"[Database] write failed: {e}")
             finally:
+                if track:
+                    with self._pending_cv:
+                        self._pending -= 1
+                        self._pending_cv.notify_all()
                 self._queue.task_done()
         conn.close()
 
     def _flush(self):
-        """Wait for queued writes (usually none) so a read sees them."""
-        self._queue.join()
+        """Wait for queued writes (usually none) so a read sees them. Không đợi việc ghi log."""
+        with self._pending_cv:
+            self._pending_cv.wait_for(lambda: self._pending == 0)
 
     def _row(self, serial: str):
         self._flush()
@@ -510,7 +524,7 @@ class Database:
         self._write(lambda conn: conn.execute(
             "INSERT INTO logs (serial, created_at, message) VALUES (?, ?, ?)",
             (serial, created_at, message),
-        ))
+        ), track=False)
 
     def purge_logs(self, days: int = 3):
         """Xoá lịch sử cũ hơn `days` ngày (chạy ở thread ghi) rồi VACUUM để file DB nhỏ lại."""
@@ -525,7 +539,7 @@ class Database:
     def load_logs(self, serial: str, since: str = "", limit: int = 500) -> list[tuple[str, str]]:
         """Tối đa `limit` dòng lịch sử gần nhất của thiết bị có created_at >= `since` (ISO; rỗng = mọi
         lúc) [(created_at, message)], cũ trước mới sau."""
-        self._flush()
+        self._queue.join()      # đọc log: đợi cả việc ghi log (khác _flush)
         rows = self.conn.execute(
             "SELECT created_at, message FROM logs WHERE serial = ? AND created_at >= ? ORDER BY id DESC LIMIT ?",
             (serial, since, limit),
