@@ -27,7 +27,12 @@ HEART = f"{FOLDER_PATH}/Heart.png"
 MENU_CHAMPION = f"{FOLDER_PATH}/Champion.png"
 CHAMPION_TITLE = f"{FOLDER_PATH}/ChampionTitle.png"
 GREET_BUTTON = f"{FOLDER_PATH}/Greet.png"   # icon nút Greet sáng (chưa khoá); khoá (ổ khoá + đếm ngược) thì không khớp
-GREET_THRESHOLD = 0.8
+GREET_THRESHOLD = 0.9   # điểm khớp vòng tròn nút Greet (khớp có MẶT NẠ TRÒN: nền mỹ nữ khác nhau không làm tụt điểm; sáng 0,97-1,00)
+# Nút Greet đang khoá (chờ hồi) có thêm ổ khoá nhỏ ở góc trên phải nút (GreetLocked.png) + đếm ngược. Chỉ so vòng tròn thì nút khoá
+# vẫn ~0,95 -> phải loại bằng ổ khoá: khoá khớp 1,00, màn không khoá <= 0,39.
+GREET_LOCKED = f"{FOLDER_PATH}/GreetLocked.png"
+GREET_LOCKED_THRESHOLD = 0.8
+GREET_REGION = (0, 380, 140, 620)   # px (x0, y0, x1, y1): chỗ nút Greet (+ ổ khoá) nằm góc dưới trái, tuỳ mỹ nữ
 # Bấm Greet -> popup "Are you sure you want to interact with <tên>?": ô "Don't show this again for today" (chưa tích
 # khớp 1,00, màn thường 0,4) -> tích -> Confirm (xanh). Đã tích hôm nay thì popup không hiện nữa.
 DONT_SHOW = f"{FOLDER_PATH}/DontShow.png"
@@ -38,7 +43,7 @@ UNLOCK_THRESHOLD = 0.85
 # 10/10 chỉ 0,70 -> không nhận ra, chờ tới hết 600 s, không lưu xong). So HÌNH chữ: chỉ lấy điểm vàng (HSV GREET_FULL_HSV) của mẫu
 # và của vùng GREET_FULL_REGION rồi so hai mặt nạ. Đo: Esmeralda 10/10 1,00 (có toast 0,96), Helen 10/10 0,875; Helen 2/10 0,60.
 GREET_FULL = f"{FOLDER_PATH}/GreetFull.png"
-GREET_FULL_REGION = (30, 500, 100, 535)   # px (x0, y0, x1, y1): dòng chữ "Greet n/10" dưới nút Greet
+GREET_FULL_REGION = (30, 500, 100, 620)   # px (x0, y0, x1, y1): dòng chữ "Greet n/10" dưới nút Greet; nút Greet đổi chỗ theo màn (y 466 hoặc 543 khi có Champion Skill) nên vùng cao hơn
 GREET_FULL_HSV = ((18, 120, 150), (35, 255, 255))   # khoảng HSV của chữ vàng
 GREET_FULL_THRESHOLD = 0.78
 # Thông báo giữa màn "You cannot Empower anymore for today!" (bấm giữa = vào mỹ nữ, hết lượt Empower hôm nay). KHÔNG có nghĩa

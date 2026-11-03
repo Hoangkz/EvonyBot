@@ -14,13 +14,15 @@ import cv2
 
 from bot.activities.daily_activities.greet_champion import run as greet_run
 from bot.activities.daily_activities.greet_champion.constants import KEY, MORE_KEY
-from bot.activities.daily_activities.greet_champion.run import FULL, TIMEOUT, _greet_loop, after_go, greet_full
-from tests.flow import Step, end, run_flow
+from bot.activities.daily_activities.greet_champion.constants import GREET_MIDDLE
+from bot.activities.daily_activities.greet_champion.run import FULL, TIMEOUT, _greet_loop, after_go, greet_button, greet_full
+from tests.flow import Step, end, run_flow, tap_at, tap_pct
 
 SCREENS = Path(__file__).parent / "screens"
 FULL_SCREEN = "champion_greet_full.png"
 TOAST_SCREEN = "champion_greet_full_toast.png"
 HELEN_FULL = "champion_helen_greet_full.png"          # 21913: Helen, Greet 10/10
+ESMERALDA_READY = "champion_esmeralda_greet_0_ready.png"   # 23:05 03/11: Esmeralda nền tối, Greet 0/10 sáng (Greet.png vuông chỉ 0,66)
 HELEN_2_LOCKED = "champion_helen_greet_2_locked.png"  # 21913: Helen, Greet 2/10 đang chờ hồi (ổ khoá + đếm ngược)
 
 
@@ -41,9 +43,24 @@ def _after_go(bot, _settings):
 class GreetChampionFlow(unittest.TestCase):
     def test_greet_full_by_text_shape_on_any_background(self):
         # Chữ 10/10 đè trong suốt lên nền: so hình chữ vàng nên nhận ra trên cả Esmeralda lẫn Helen (21913); 2/10 thì không.
-        for screen, full in ((FULL_SCREEN, True), (TOAST_SCREEN, True), (HELEN_FULL, True), (HELEN_2_LOCKED, False)):
+        for screen, full in ((FULL_SCREEN, True), (TOAST_SCREEN, True), (HELEN_FULL, True), (HELEN_2_LOCKED, False),
+                             (ESMERALDA_READY, False)):
             with self.subTest(screen=screen):
                 self.assertEqual(greet_full(cv2.imread(str(SCREENS / screen))), full)
+
+    def test_greet_button_found_on_any_background_but_not_when_locked(self):
+        # Nút Greet sáng nhận ra trên mọi nền mỹ nữ (mặt nạ tròn); nút khoá (ổ khoá + đếm ngược) thì không.
+        for screen, found in ((ESMERALDA_READY, True), (FULL_SCREEN, True), (HELEN_FULL, True), (HELEN_2_LOCKED, False)):
+            with self.subTest(screen=screen):
+                self.assertEqual(greet_button(cv2.imread(str(SCREENS / screen))) is not None, found)
+
+    def test_dark_background_greet_0_of_10_taps_greet_not_middle(self):
+        # Lỗi 03/11: Greet.png vuông chỉ khớp 0,66 trên Esmeralda nền tối -> bot tưởng nút khoá, chỉ bấm giữa, không bao giờ Greet.
+        device = run_flow(self, _loop, SCREENS, [
+            Step(ESMERALDA_READY, tap_at(42, 563), tap_pct(*GREET_MIDDLE, count=10)),
+            Step(FULL_SCREEN, end(result=FULL)),
+        ], {})
+        self.assertIn("Greet Champion: Greet 10/10", device.logs)
 
     def test_greet_10_of_10_is_recognised(self):
         for screen in (FULL_SCREEN, TOAST_SCREEN, HELEN_FULL):

@@ -11,6 +11,7 @@ hôm nay -> Back về thành.
 import time
 
 import cv2
+import numpy as np
 
 from ...event.city_building import KEEP
 from ...event.kings_path.building import open_menu
@@ -44,6 +45,9 @@ from .constants import (
     GREET_FULL_THRESHOLD,
     GREET_MIDDLE,
     GREET_BUTTON,
+    GREET_LOCKED,
+    GREET_LOCKED_THRESHOLD,
+    GREET_REGION,
     GREET_THRESHOLD,
     HEART,
     LOCKED_WAIT,
@@ -147,7 +151,7 @@ def _greet_loop(bot, on_greet=None) -> str:
                 bot.record(f"{LABEL}: both arrows greyed out, no champion left to greet")
                 return NONE_LEFT
             continue
-        button = bot.find(GREET_BUTTON, screen=screen, threshold=GREET_THRESHOLD)
+        button = greet_button(screen)
         if button is None:   # Greet đang khoá (chờ hồi): bấm giữa; hết Empower thì chỉ chờ
             if empower_limit:
                 bot.sleep(LOCKED_WAIT)
@@ -187,6 +191,25 @@ def _open_champion(bot) -> bool:
         return False
     bot.tap(*pos, delay=0)
     return True
+
+
+def greet_button(screen):
+    """Tâm nút Greet SÁNG (chưa khoá) hoặc None. Khớp icon bằng mặt nạ tròn (nền mỹ nữ khác nhau không làm tụt điểm); nút khoá
+    (có ổ khoá nhỏ trên góc phải) thì None."""
+    x0, y0, x1, y1 = GREET_REGION
+    area = screen[y0:y1, x0:x1]
+    locked = read_image(TEMPLATE_DIR / GREET_LOCKED)
+    if cv2.minMaxLoc(cv2.matchTemplate(area, locked, cv2.TM_CCOEFF_NORMED))[1] >= GREET_LOCKED_THRESHOLD:
+        return None
+    template = read_image(TEMPLATE_DIR / GREET_BUTTON)
+    h, w = template.shape[:2]
+    mask = np.zeros((h, w), np.uint8)
+    cv2.circle(mask, (w // 2, h // 2), min(h, w) // 2 - 3, 255, -1)
+    result = cv2.matchTemplate(area, template, cv2.TM_CCORR_NORMED, mask=cv2.merge([mask] * 3))
+    _, score, _, loc = cv2.minMaxLoc(result)
+    if score < GREET_THRESHOLD:
+        return None
+    return x0 + loc[0] + w // 2, y0 + loc[1] + h // 2
 
 
 def greet_full(screen) -> bool:
