@@ -244,6 +244,7 @@ class MainWindow(QMainWindow):
         self.home_view.stop_all_requested.connect(self._on_stop_all_requested)
         self.home_view.exit_all_requested.connect(self._on_exit_all_requested)
         self.home_view.active_all_requested.connect(self._on_active_all_requested)
+        self.home_view.reset_progress_all_requested.connect(self._on_reset_progress_all)
 
     def _check_license(self, startup: bool = False):
         """Hỏi server giấy phép trên thread nền. `startup`: lần lúc mở app (app đã mở sẵn, không chờ) — không tới
@@ -741,6 +742,12 @@ class MainWindow(QMainWindow):
         """Nút Reset progress: xoá dấu "đã làm" (DB và worker đang chạy) để bot làm lại các nhiệm vụ của tab."""
         self.db.clear_daily_done(device_id, event)
         self.bots.clear_daily_done(device_id, lambda key: "_cycle_reset_" not in key and is_event_key(key) == event)
+
+    def _on_reset_progress_all(self):
+        """Nút Reset progress ở Home: xoá dấu "đã làm" (cả Daily và Event) của mọi thiết bị."""
+        for device_id in list(self._device_ids):
+            for event in (False, True):
+                self._on_reset_progress(device_id, event)
 
     def _on_civilization_changed(self, device_id: str, civilization: int):
         """Người dùng đổi nền văn minh -> lưu DB và xoá route (bản đồ thành) cũ về null để bot quét lại."""

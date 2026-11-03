@@ -36,6 +36,7 @@ class HomeView(QWidget):
     stop_all_requested = pyqtSignal()      # dừng mọi bot đang chạy
     exit_all_requested = pyqtSignal()       # đóng game trên mọi thiết bị
     active_all_requested = pyqtSignal()     # kích hoạt mọi thiết bị đang Inactive
+    reset_progress_all_requested = pyqtSignal()   # xoá dấu "đã làm" (Daily + Event) của mọi thiết bị
     reset_time_changed = pyqtSignal(str)   # giờ reset server "HH:MM" người dùng vừa chọn
     auto_timeout_changed = pyqtSignal(str)  # số phút "Auto Times Out" người dùng vừa chọn
     scan_ports_changed = pyqtSignal(int, int)   # (start, end) port Load Devices quét, người dùng vừa sửa
@@ -117,6 +118,11 @@ class HomeView(QWidget):
         active_all.clicked.connect(self.active_all_requested.emit)
         toolbar.addWidget(active_all)
 
+        reset_all = QPushButton("Reset progress")
+        reset_all.setMinimumSize(100, 36)
+        reset_all.clicked.connect(self._confirm_reset_all)
+        toolbar.addWidget(reset_all)
+
         toolbar.addStretch(1)
 
         self.start_all_button = QPushButton("Start All(0)")
@@ -162,6 +168,13 @@ class HomeView(QWidget):
             """
         )
         layout.addWidget(self.table, 1)
+
+    def _confirm_reset_all(self):
+        if QMessageBox.question(self, "Reset progress",
+                                "Đặt mọi nhiệm vụ (Daily Activities và Event) của TẤT CẢ các máy về chưa làm?\n"
+                                "Lần chạy sau bot sẽ làm lại từ đầu.",
+                                QMessageBox.Yes | QMessageBox.No, QMessageBox.No) == QMessageBox.Yes:
+            self.reset_progress_all_requested.emit()
 
     # ---- khoảng port quét ---------------------------------------------
     @staticmethod
