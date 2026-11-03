@@ -6,6 +6,7 @@ listing connected devices (was `panelistbutton`) next to a content
 area (was `panelData`) that shows either the home/welcome screen or
 the selected device's tabbed control panel.
 """
+import copy
 import ctypes
 import os
 import platform
@@ -172,8 +173,11 @@ class MainWindow(QMainWindow):
         # Start All: mỗi máy chưa dựng phải dựng DeviceView + đủ tab (~3 s) mới lấy được cấu hình; dựng liền 30 máy
         # trong một lần bấm làm app "Not Responding". Nên xếp hàng, mỗi lượt event loop chỉ start một máy.
         self._start_queue: list[str] = []
+        self._defaults: dict | None = None     # cấu hình mặc định các tab, dựng lười (xem _default_settings)
         self._start_timer = QTimer(self)
-        self._start_timer.setInterval(0)
+        # Giãn từng lượt start: mỗi lượt có thể dựng DeviceView (~3 s) hoặc chờ DB ghi xong; interval 0 làm các lượt
+        # nối liền nhau, vòng lặp sự kiện không kịp vẽ lại -> Windows báo Not responding.
+        self._start_timer.setInterval(300)
         self._start_timer.timeout.connect(self._start_next_queued)
 
         # Tab Event hiện thời gian còn lại của event ở tiêu đề group: đọc mốc reset bot đã lưu trong DB (daily_done) mỗi phút.
@@ -647,6 +651,7 @@ class MainWindow(QMainWindow):
                 self._start_queue.clear()
                 break
             self._start_bot(device_id)
+            QApplication.processEvents()   # vẽ lại / nhận thao tác ngay sau lượt nặng
             break
         if not self._start_queue:
             self._start_timer.stop()
@@ -679,9 +684,38 @@ class MainWindow(QMainWindow):
         for view in self.device_views.values():
             view.set_run_counts(*counts)
 
+    def _default_settings(self) -> dict:
+        """Cấu hình mặc định của mọi tab (không gồm phần riêng từng máy). Mặc định giống nhau cho mọi máy nên dựng
+        một DeviceView mẫu đúng một lần mỗi lần chạy app (~vài giây) thay vì dựng cho từng máy."""
+        if self._defaults is None:
+            view = DeviceView("")     # không nối tín hiệu nào: không ghi DB, không hiện lên giao diện
+            try:
+                self._defaults = view.shareable_settings()
+            finally:
+                view.deleteLater()
+        return self._defaults
+
+    def _fill_missing_settings(self, device_id: str, saved: dict):
+        """Máy chưa dựng giao diện mà DB thiếu cấu hình tab: ghi cấu hình mặc định vào DB và `saved` để Start All đọc
+        thẳng từ DB, không phải dựng DeviceView cho từng máy."""
+        missing = [t for t in TAB_COLUMNS if t not in saved or (t == "Initialization" and "activities" not in saved[t])]
+        if not missing:
+            return
+        defaults = copy.deepcopy(self._default_settings())
+        fill = {t: defaults[t] for t in missing if t in defaults}
+        if not fill:
+            return
+        self.db.save_settings(device_id, fill)
+        # DB đã có cấu hình: lúc dựng view sau này phải nạp lại từ DB, không ghi đè Initialization (mất server bot đã đọc).
+        self._new_devices.discard(device_id)
+        for tab, data in fill.items():
+            saved[tab] = {**data, **saved.get(tab, {})}    # giữ server / bubble / civilization / city_map đã có
+
     def _start_bot(self, device_id: str):
         # Đây là dữ liệu riêng của thiết bị trong DB, không phải cấu hình Apply ALL.
         saved = self.db.load_settings(device_id)
+        if device_id not in self.device_views:
+            self._fill_missing_settings(device_id, saved)
         if device_id not in self.device_views and all(tab in saved for tab in TAB_COLUMNS):
             # Chưa dựng giao diện nhưng DB đã đủ cấu hình mọi tab (tab nào dựng xong cũng tự lưu): start thẳng từ DB,
             # khỏi dựng DeviceView + 10 tab (~3 s chặn giao diện mỗi máy, Start All lần đầu 30 máy mất ~2 phút).
