@@ -175,9 +175,9 @@ class MainWindow(QMainWindow):
         self._start_queue: list[str] = []
         self._defaults: dict | None = None     # cấu hình mặc định các tab, dựng lười (xem _default_settings)
         self._start_timer = QTimer(self)
-        # Giãn từng lượt start: mỗi lượt có thể dựng DeviceView (~3 s) hoặc chờ DB ghi xong; interval 0 làm các lượt
-        # nối liền nhau, vòng lặp sự kiện không kịp vẽ lại -> Windows báo Not responding.
-        self._start_timer.setInterval(300)
+        # Mỗi lượt start đọc thẳng DB nên rất nhanh; vòng lặp sự kiện được chạy sau mỗi lượt (processEvents trong
+        # _start_next_queued) để giao diện không đơ. Không đặt interval lớn: N máy sẽ mất N x interval mới start xong.
+        self._start_timer.setInterval(0)
         self._start_timer.timeout.connect(self._start_next_queued)
 
         # Tab Event hiện thời gian còn lại của event ở tiêu đề group: đọc mốc reset bot đã lưu trong DB (daily_done) mỗi phút.
@@ -466,6 +466,11 @@ class MainWindow(QMainWindow):
             QTimer.singleShot(100, self._prebuild_next_view)
             return
         todo = [d for d in self._device_ids if d not in self.device_views]
+        if self._defaults is None:
+            if _idle_seconds() < PREBUILD_IDLE_SECONDS:
+                QTimer.singleShot(300, self._prebuild_next_view)
+                return
+            self._default_settings()     # dựng sẵn mặc định lúc rảnh để lần Start All đầu không phải chờ
         if not todo:
             return
         if _idle_seconds() < PREBUILD_IDLE_SECONDS:   # người dùng đang thao tác: đợi, đừng chặn giao diện
