@@ -547,15 +547,16 @@ class MainWindow(QMainWindow):
 
     def _on_apply_all_requested(self, source_id: str, settings: dict):
         """Copy the active device's config onto every other device."""
-        self._ensure_all_views()
+        # Không dựng view cho máy chưa mở (~3 s/máy chặn giao diện): máy đã có view thì cập nhật cho khớp, còn lại chỉ
+        # cần ghi DB; lúc view dựng sau này sẽ nạp từ DB.
         for device_id, view in self.device_views.items():
             if device_id != source_id:
                 view.set_settings(settings)
         # One transaction for every device: a commit per device (30+
-        # fsyncs) froze the UI for seconds.
-        self.db.save_many_settings(
-            {device_id: view.get_settings() for device_id, view in self.device_views.items()}
-        )
+        # fsyncs) froze the UI for seconds. `settings` đã bỏ device_id / server nên không ghi đè phần riêng từng máy.
+        self.db.save_many_settings({device_id: settings for device_id in self._device_ids})
+        for device_id in self._device_ids:
+            self._new_devices.discard(device_id)   # DB đã có cấu hình: view dựng sau này nạp từ DB, không ghi đè
 
     def _on_auto_angles(self, device_id: str):
         """Nút Auto của tab Find Boss: chia đều 0..360° cho mọi thiết bị cùng server với `device_id` (xếp theo device id), mỗi máy một cung liền nhau,
