@@ -13,7 +13,6 @@ import platform
 import random
 import sys
 import threading
-import time
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -657,13 +656,8 @@ class MainWindow(QMainWindow):
                 self.bots.start(device_id, [], {})   # chỉ để ghi log báo đã đạt giới hạn
                 self._start_queue.clear()
                 break
-            t0 = time.perf_counter()
             self._start_bot(device_id)
-            t1 = time.perf_counter()
             QApplication.processEvents()   # vẽ lại / nhận thao tác ngay sau lượt nặng
-            t2 = time.perf_counter()
-            if t2 - t0 > 0.15:             # đo chỗ đứng của Start All: start máy (DB, tạo worker) hay xử lý sự kiện
-                print(f"[StartAll] {device_id}: _start_bot {t1 - t0:.2f}s, processEvents {t2 - t1:.2f}s")
             break
         if not self._start_queue:
             self._start_timer.stop()
