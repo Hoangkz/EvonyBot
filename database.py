@@ -27,7 +27,7 @@ import os
 import queue
 import sqlite3
 import threading
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from bot.daily_reset import done_today, reset_clock
@@ -511,6 +511,16 @@ class Database:
             "INSERT INTO logs (serial, created_at, message) VALUES (?, ?, ?)",
             (serial, created_at, message),
         ))
+
+    def purge_logs(self, days: int = 3):
+        """Xoá lịch sử cũ hơn `days` ngày (chạy ở thread ghi) rồi VACUUM để file DB nhỏ lại."""
+        cutoff = (datetime.now() - timedelta(days=days)).isoformat(timespec="seconds")
+
+        def job(conn):
+            conn.execute("DELETE FROM logs WHERE created_at < ?", (cutoff,))
+            conn.commit()          # VACUUM không chạy được trong transaction
+            conn.execute("VACUUM")
+        self._write(job)
 
     def load_logs(self, serial: str, since: str = "", limit: int = 500) -> list[tuple[str, str]]:
         """Tối đa `limit` dòng lịch sử gần nhất của thiết bị có created_at >= `since` (ISO; rỗng = mọi

@@ -182,6 +182,12 @@ class MainWindow(QMainWindow):
         self._event_timer.timeout.connect(self._refresh_event_times)
         self._event_timer.start()
 
+        # Dọn lịch sử (bảng logs) cũ hơn LOG_KEEP_DAYS ngày: một lần lúc mở app, rồi mỗi 0h giờ máy.
+        self._log_purge_timer = QTimer(self)
+        self._log_purge_timer.setSingleShot(True)
+        self._log_purge_timer.timeout.connect(self._purge_old_logs)
+        self._purge_old_logs()
+
         # Activation code: re-checked with the server hourly; revoked / expired -> stop the bots and quit.
         self._license_worker: LicenseWorker | None = None
         self._license_notice: str | None = None
@@ -508,6 +514,14 @@ class MainWindow(QMainWindow):
         view.set_run_counts(*self._run_counts())
         self.stack.addWidget(view)
         return view
+
+    LOG_KEEP_DAYS = 3
+
+    def _purge_old_logs(self):
+        self.db.purge_logs(self.LOG_KEEP_DAYS)
+        now = datetime.now()
+        midnight = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+        self._log_purge_timer.start(int((midnight - now).total_seconds() * 1000) + 1000)
 
     def _refresh_event_times(self, serial: str | None = None):
         """Cập nhật tiêu đề group của tab Event (thời gian còn lại của event) cho một thiết bị / mọi thiết bị."""
