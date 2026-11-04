@@ -53,6 +53,7 @@ class Sidebar(QWidget):
         self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Expanding)
 
         self._buttons: dict[str, QPushButton] = {}
+        self._labels: dict[str, str] = {}
         self._group = QButtonGroup(self)
         self._group.setExclusive(True)
 
@@ -122,14 +123,21 @@ class Sidebar(QWidget):
         if device_id in self._buttons:
             return self._buttons[device_id]
 
-        btn = QPushButton(label or device_id)
+        btn = QPushButton()
         btn.setCheckable(True)
         btn.clicked.connect(lambda: self.device_selected.emit(device_id))
         self._group.addButton(btn)
         self._list_layout.addWidget(btn)
         self._buttons[device_id] = btn
+        self._labels[device_id] = label or device_id
+        self._renumber()
         self._list_changed()
         return btn
+
+    def _renumber(self):
+        """Đánh số thứ tự 1..N trước tên mỗi máy (theo thứ tự hiện trong sidebar)."""
+        for index, (device_id, btn) in enumerate(self._buttons.items(), 1):
+            btn.setText(f"#{index}  {self._labels[device_id]}")
 
     def remove_device(self, device_id: str):
         btn = self._buttons.pop(device_id, None)
@@ -138,6 +146,8 @@ class Sidebar(QWidget):
             self._list_layout.removeWidget(btn)
             btn.hide()
             btn.deleteLater()
+            self._labels.pop(device_id, None)
+            self._renumber()
             self._list_changed()
 
     def select_device(self, device_id: str):
