@@ -175,6 +175,7 @@ class MainWindow(QMainWindow):
         # trong một lần bấm làm app "Not Responding". Nên xếp hàng, mỗi lượt event loop chỉ start một máy.
         self._start_queue: list[str] = []
         self._defaults: dict | None = None     # cấu hình mặc định các tab, dựng lười (xem _default_settings)
+        self._defaults_view: DeviceView | None = None   # view mẫu sinh ra _defaults, phải giữ sống
         self._start_timer = QTimer(self)
         # Mỗi lượt start đọc thẳng DB nên rất nhanh, nhưng mỗi bot vừa chạy là một thread xử lý ảnh / OCR: start cả
         # chục máy cùng lúc làm CPU vọt lên ~100% và giao diện đơ. Giãn cách START_ALL_INTERVAL_MS giữa hai máy;
@@ -696,11 +697,11 @@ class MainWindow(QMainWindow):
         """Cấu hình mặc định của mọi tab (không gồm phần riêng từng máy). Mặc định giống nhau cho mọi máy nên dựng
         một DeviceView mẫu đúng một lần mỗi lần chạy app (~vài giây) thay vì dựng cho từng máy."""
         if self._defaults is None:
-            view = DeviceView("")     # không nối tín hiệu nào: không ghi DB, không hiện lên giao diện
-            try:
-                self._defaults = view.shareable_settings()
-            finally:
-                view.deleteLater()
+            # Không nối tín hiệu nào: không ghi DB, không hiện lên giao diện. KHÔNG deleteLater(): tab Recruit General
+            # còn dựng ngầm bằng QTimer.singleShot; xoá view giữa chừng làm timer đụng widget đã xoá -> RuntimeError
+            # trong slot Qt -> PyQt5 thoát cả app. Giữ tham chiếu để view sống đến hết phiên.
+            self._defaults_view = DeviceView("")
+            self._defaults = self._defaults_view.shareable_settings()
         return self._defaults
 
     def _fill_missing_settings(self, device_id: str, saved: dict):
