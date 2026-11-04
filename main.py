@@ -23,8 +23,8 @@ os.environ.setdefault("ADB_MDNS", "0")
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import (
-    QApplication, QDialog, QFrame, QHBoxLayout, QLabel, QMainWindow, QMessageBox, QProgressBar, QStackedWidget,
-    QVBoxLayout, QWidget,
+    QApplication, QDialog, QFileDialog, QFrame, QHBoxLayout, QLabel, QMainWindow, QMessageBox, QProgressBar,
+    QStackedWidget, QVBoxLayout, QWidget,
 )
 
 from bot.activities.find_boss.angles import split_angles
@@ -499,6 +499,7 @@ class MainWindow(QMainWindow):
         view.civilization_changed.connect(self._on_civilization_changed)
         view.reset_progress_requested.connect(self._on_reset_progress)
         view.reset_info_requested.connect(self._on_reset_info)
+        view.export_logs_requested.connect(self._on_export_logs)
         view.tab_settings_changed.connect(self.db.save_settings)
         view.profile_selected.connect(self._on_profile_selected)
         view.profile_added.connect(self._on_profile_added)
@@ -770,6 +771,24 @@ class MainWindow(QMainWindow):
         view = self.device_views.get(device_id)
         if view is not None:
             view.initialization_tab.set_settings({"server": server})
+
+    def _on_export_logs(self, device_id: str):
+        """Nút Export của tab Logs: ghi log LOG_KEEP_DAYS ngày gần nhất của thiết bị ra file .txt."""
+        since = (datetime.now() - timedelta(days=self.LOG_KEEP_DAYS)).isoformat(timespec="seconds")
+        rows = self.db.load_logs(device_id, since, limit=-1)
+        safe = "".join(c if c.isalnum() or c in "-_" else "_" for c in device_id)
+        default = str(Path.home() / "Documents" / f"evonybot_{safe}_{datetime.now():%Y%m%d_%H%M%S}.txt")
+        path, _ = QFileDialog.getSaveFileName(self, "Export logs", default, "Text (*.txt)")
+        if not path:
+            return
+        try:
+            with open(path, "w", encoding="utf-8") as f:
+                for created_at, message in rows:
+                    f.write(f"{created_at.replace('T', ' ')}  {message}\n")
+        except OSError as e:
+            QMessageBox.warning(self, "Export logs", f"Không ghi được file:\n{e}")
+            return
+        QMessageBox.information(self, "Export logs", f"Đã xuất {len(rows)} dòng log.\n{path}")
 
     def _on_reset_info(self, device_id: str):
         """Nút Reset info: đưa bubble, server, nền văn minh, route của máy về trống (DB và giao diện)."""

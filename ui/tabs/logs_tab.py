@@ -9,9 +9,9 @@ Không có cấu hình nên không lưu vào settings.
 from collections import deque
 from datetime import datetime, timedelta
 
-from PyQt5.QtCore import QTimer
+from PyQt5.QtCore import Qt, QTimer, pyqtSignal
 from PyQt5.QtGui import QFont, QTextCursor
-from PyQt5.QtWidgets import QPlainTextEdit, QTabWidget, QVBoxLayout, QWidget
+from PyQt5.QtWidgets import QPlainTextEdit, QPushButton, QTabWidget, QVBoxLayout, QWidget
 
 SHOW_SECONDS = 3600          # chỉ hiện log trong 1 giờ gần nhất
 PRUNE_INTERVAL_MS = 60_000   # mỗi phút ẩn các dòng đã quá SHOW_SECONDS
@@ -60,6 +60,8 @@ class _LogView(QPlainTextEdit):
 
 
 class LogsTab(QWidget):
+    export_requested = pyqtSignal()   # nút Export: xuất log 3 ngày của thiết bị ra file .txt
+
     def __init__(self, parent=None):
         super().__init__(parent)
         layout = QVBoxLayout(self)
@@ -70,6 +72,11 @@ class LogsTab(QWidget):
         tabs = QTabWidget()
         tabs.addTab(self.info_view, "Info")
         tabs.addTab(self.history_view, "History")
+        export_button = QPushButton("Export")
+        export_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        export_button.setToolTip("Xuất log 3 ngày gần nhất của thiết bị này ra file .txt")
+        export_button.clicked.connect(self.export_requested)
+        tabs.setCornerWidget(export_button, Qt.Corner.TopRightCorner)
         layout.addWidget(tabs)
 
         self._prune_timer = QTimer(self)

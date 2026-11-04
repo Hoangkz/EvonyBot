@@ -61,6 +61,7 @@ class DeviceView(QWidget):
     profile_selected = pyqtSignal(str, str)  # (device_id, tên hồ sơ) bấm nút hồ sơ
     profile_added = pyqtSignal(str, str)      # (device_id, tên hồ sơ mới) nút "+"
     profile_deleted = pyqtSignal(str, str)    # (device_id, tên hồ sơ)
+    export_logs_requested = pyqtSignal(str)   # device_id: nút Export của tab Logs
 
     def __init__(self, device_id: str, parent=None):
         super().__init__(parent)
@@ -109,6 +110,7 @@ class DeviceView(QWidget):
             self._add_tab_button(title, self.tabs.addTab(QWidget(), title))
         # Logs không có cấu hình: thêm thẳng, không nối Apply ALL / settings.
         self.logs_tab = LogsTab()
+        self.logs_tab.export_requested.connect(lambda: self.export_logs_requested.emit(self.device_id))
         self._add_tab_button("Logs", self.tabs.addTab(self.logs_tab, "Logs"))
         self.tabs.currentChanged.connect(self._build_tab_at)
         self._background_timer = QTimer(self)
