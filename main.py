@@ -724,11 +724,13 @@ class MainWindow(QMainWindow):
     def _start_bot(self, device_id: str):
         # Đây là dữ liệu riêng của thiết bị trong DB, không phải cấu hình Apply ALL.
         saved = self.db.load_settings(device_id)
-        if device_id not in self.device_views:
-            self._fill_missing_settings(device_id, saved)
-        if device_id not in self.device_views and all(tab in saved for tab in TAB_COLUMNS):
-            # Chưa dựng giao diện nhưng DB đã đủ cấu hình mọi tab (tab nào dựng xong cũng tự lưu): start thẳng từ DB,
-            # khỏi dựng DeviceView + 10 tab (~3 s chặn giao diện mỗi máy, Start All lần đầu 30 máy mất ~2 phút).
+        # Tab thiếu trong DB = tab chưa từng được dựng (tab dựng xong tự lưu), nên dựng lên cũng chỉ ra mặc định:
+        # điền mặc định vào DB cả khi máy đã có view (view dựng ngầm lúc rảnh có các tab lazy chưa dựng).
+        self._fill_missing_settings(device_id, saved)
+        if all(tab in saved for tab in TAB_COLUMNS):
+            # DB đã đủ cấu hình mọi tab (mọi chỉnh sửa trên giao diện đều tự lưu vào DB): start thẳng từ DB, kể cả khi
+            # máy ĐÃ có view. Không gọi view.get_settings(): nó ép dựng nốt mọi tab đang lazy của view (~0,5 s và hàng
+            # chục MB mỗi máy trên thread giao diện -> Start All lần sau Stop All đơ từng máy, RAM phình hàng GB).
             self.bots.start(
                 device_id,
                 saved["Initialization"].get("activities", []),
@@ -885,7 +887,36 @@ class MainWindow(QMainWindow):
                          name="exit-all", daemon=True).start()
 
 
+def _install_crash_log():
+    """App chạy bằng pythonw (không console): lỗi Python không bắt (kể cả trong slot Qt, PyQt5 sẽ abort app) và crash
+    native đều mất dấu. Ghi ra %LOCALAPPDATA%\\EvonyBot\\logs\\crash.log để biết vì sao app tắt."""
+    import faulthandler
+    import traceback
+    try:
+        path = Path(os.environ.get("LOCALAPPDATA", Path.home())) / "EvonyBot" / "logs" / "crash.log"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if path.exists() and path.stat().st_size > 1_000_000:
+            path.unlink()
+        stream = open(path, "a", buffering=1, encoding="utf-8")
+    except OSError:
+        return
+    stream.write(f"\n=== {datetime.now():%Y-%m-%d %H:%M:%S} app start ===\n")
+    faulthandler.enable(stream, all_threads=True)      # crash native (segfault...): dump stack mọi thread
+
+    def log_exception(kind, exc_type, exc, tb):
+        stream.write(f"\n[{datetime.now():%H:%M:%S}] {kind}\n{''.join(traceback.format_exception(exc_type, exc, tb))}")
+
+    def excepthook(exc_type, exc, tb):
+        log_exception("Uncaught exception", exc_type, exc, tb)
+        sys.__excepthook__(exc_type, exc, tb)
+
+    sys.excepthook = excepthook
+    threading.excepthook = lambda args: log_exception(f"Thread {args.thread.name if args.thread else '?'}",
+                                                      args.exc_type, args.exc_value, args.exc_traceback)
+
+
 def main():
+    _install_crash_log()
     # adbutils calls platform.system() on every socket. On Windows the
     # first call runs a WMI query that crashes (0x800703e5) when many ADB
     # connect threads hit it at once; call it here so the result is cached.
