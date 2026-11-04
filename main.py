@@ -863,37 +863,7 @@ class MainWindow(QMainWindow):
                          name="exit-all", daemon=True).start()
 
 
-def _install_crash_log():
-    """App chạy bằng pythonw (không console): lỗi Python không bắt (kể cả trong slot Qt, PyQt5 sẽ abort app) và crash
-    native đều mất dấu. Ghi ra %LOCALAPPDATA%\\EvonyBot\\logs\\crash.log để lần sau biết vì sao app tắt."""
-    import faulthandler
-    import traceback
-    log_dir = Path(os.environ.get("LOCALAPPDATA", Path.home())) / "EvonyBot" / "logs"
-    try:
-        log_dir.mkdir(parents=True, exist_ok=True)
-        path = log_dir / "crash.log"
-        if path.exists() and path.stat().st_size > 1_000_000:
-            path.unlink()
-        stream = open(path, "a", buffering=1, encoding="utf-8")
-    except OSError:
-        return
-    stream.write(f"\n=== {datetime.now():%Y-%m-%d %H:%M:%S} app start ===\n")
-    faulthandler.enable(stream, all_threads=True)      # crash native (segfault...): dump stack mọi thread
-
-    def log_exception(kind, exc_type, exc, tb):
-        stream.write(f"\n[{datetime.now():%H:%M:%S}] {kind}\n{''.join(traceback.format_exception(exc_type, exc, tb))}")
-
-    def excepthook(exc_type, exc, tb):
-        log_exception("Uncaught exception", exc_type, exc, tb)
-        sys.__excepthook__(exc_type, exc, tb)
-
-    sys.excepthook = excepthook
-    threading.excepthook = lambda args: log_exception(f"Thread {args.thread.name if args.thread else '?'}",
-                                                      args.exc_type, args.exc_value, args.exc_traceback)
-
-
 def main():
-    _install_crash_log()
     # adbutils calls platform.system() on every socket. On Windows the
     # first call runs a WMI query that crashes (0x800703e5) when many ADB
     # connect threads hit it at once; call it here so the result is cached.
