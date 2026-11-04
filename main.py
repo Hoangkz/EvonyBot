@@ -85,7 +85,8 @@ def show_clock_wrong(parent=None):
         "(and the time zone), click \"Sync now\", then start the app again.")
 
 
-PREBUILD_IDLE_SECONDS = 1.0   # chỉ dựng sẵn giao diện máy khi người dùng đã ngừng thao tác chừng này giây
+START_ALL_INTERVAL_MS = 100   # khoảng cách giữa hai máy khi Start All (ms): tăng nếu CPU còn vọt, giảm nếu muốn start nhanh hơn
+PREBUILD_IDLE_SECONDS = 1.0  # chỉ dựng sẵn giao diện máy khi người dùng đã ngừng thao tác chừng này giây
 
 
 def _idle_seconds() -> float:
@@ -175,9 +176,10 @@ class MainWindow(QMainWindow):
         self._start_queue: list[str] = []
         self._defaults: dict | None = None     # cấu hình mặc định các tab, dựng lười (xem _default_settings)
         self._start_timer = QTimer(self)
-        # Mỗi lượt start đọc thẳng DB nên rất nhanh; vòng lặp sự kiện được chạy sau mỗi lượt (processEvents trong
-        # _start_next_queued) để giao diện không đơ. Không đặt interval lớn: N máy sẽ mất N x interval mới start xong.
-        self._start_timer.setInterval(0)
+        # Mỗi lượt start đọc thẳng DB nên rất nhanh, nhưng mỗi bot vừa chạy là một thread xử lý ảnh / OCR: start cả
+        # chục máy cùng lúc làm CPU vọt lên ~100% và giao diện đơ. Giãn cách START_ALL_INTERVAL_MS giữa hai máy;
+        # N máy mất khoảng N x interval mới start xong.
+        self._start_timer.setInterval(START_ALL_INTERVAL_MS)
         self._start_timer.timeout.connect(self._start_next_queued)
 
         # Tab Event hiện thời gian còn lại của event ở tiêu đề group: đọc mốc reset bot đã lưu trong DB (daily_done) mỗi phút.
